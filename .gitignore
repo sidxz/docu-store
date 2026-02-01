@@ -8,3 +8,35 @@ wheels/
 
 # Virtual environments
 .venv
+.env
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS files
+Thumbs.db
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.ruff_cache/
+
+# Package managers
+node_modules/
+package-lock.json
+yarn.lock
+
+# Logs
+*.log
+logs/
+
+# Local development
+.env.local
+.env.*.local

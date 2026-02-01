@@ -1,9 +1,122 @@
 version: "3.9"
 
 services:
-  app:
-    build: .
+  # MongoDB - Read Models (Replica Set for Transactions)
+  mongo:
+    image: mongo:7.0
+    container_name: docu-store-mongo
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
     volumes:
-      - .:/app
-    working_dir: /app
-    command: python main.py
+      - docu-store-mongo-data:/data/db
+      - ./scripts:/scripts
+    networks:
+      - docu-store-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 })"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB Init - Initialize replica set
+  mongo-init:
+    image: mongo:7.0
+    container_name: docu-store-mongo-init
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - docu-store-network
+    entrypoint: >
+      sh -c "
+      until mongosh --host mongo:27017 --eval 'rs.initiate({_id: \"rs0\", members: [{_id: 0, host: \"mongo:27017\"}]})' | grep -q 'ok'; do
+        echo 'Waiting for replica set initialization...'
+        sleep 2
+      done
+      echo 'Replica set initialized successfully'
+      "
+    restart: "no"
+  # EventStoreDB - Primary event log
+  eventstoredb:
+    image: eventstore/eventstore:24.10.0-jammy
+    container_name: docu-store-eventstoredb
+    environment:
+      - EVENTSTORE_CLUSTER_SIZE=1
+      - EVENTSTORE_RUN_PROJECTIONS=All
+      - EVENTSTORE_START_STANDARD_PROJECTIONS=true
+      - EVENTSTORE_HTTP_PORT=2113
+      - EVENTSTORE_INSECURE=true
+      - EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP=true
+    ports:
+      - "2113:2113"  # HTTP API
+      - "1113:1113"  # TCP
+    volumes:
+      - docu-store-eventstoredb-data:/var/lib/eventstore
+      - docu-store-eventstoredb-logs:/var/log/eventstore
+    networks:
+      - docu-store-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:2113/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Kafka (KRaft) - Message broker for integration events
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: docu-store-kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+      - "19092:19092"
+    environment:
+      CLUSTER_ID: "OVWC3qSNRGCEH7iVaUz6XQ"
+      KAFKA_BROKER_ID: 1
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:19092"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:19092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    networks:
+      - docu-store-network
+    volumes:
+      - docu-store-kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+  
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - 5051:8080
+    environment:
+      DYNAMIC_CONFIG_ENABLED: "true"
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - docu-store-network
+
+volumes:
+  docu-store-eventstoredb-data:
+    driver: local
+  docu-store-eventstoredb-logs:
+    driver: local
+  docu-store-kafka-data:
+    driver: local
+  docu-store-mongo-data:
+    driver: local
+
+networks:
+  docu-store-network:
+    driver: bridge
