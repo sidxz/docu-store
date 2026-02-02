@@ -5,8 +5,21 @@
     "editor.codeActionsOnSave": {
       "source.fixAll.ruff": "explicit",
       "source.organizeImports.ruff": "explicit"
-    }
+    },
+    "editor.insertSpaces": true,
+    "editor.tabSize": 4
   },
-  "ruff.lint.args": ["--select=ALL"],
-  "ruff.format.args": []
+  "python.linting.enabled": true,
+  "python.linting.ruffEnabled": true,
+  "python.linting.pylintEnabled": false,
+  "python.analysis.autoImportCompletions": true,
+  "[pylint]": {
+    "severity": "off"
+  },
+  "cSpell.words": [
+    "chembl",
+    "eventsourcing",
+    "Materializer"
+  ]
 }
+

@@ -1,0 +1,121 @@
+version: "3.9"
+
+services:
+  # MongoDB: Dev mode with no auth, but transactions enabled via replica set
+  mongo:
+    image: mongo:7.0
+    container_name: docu_store-mongo
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - docu_store-network
+    healthcheck:
+      # Simple ping check - no auth required
+      test:
+        ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 })"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Automated Replica Set Initialization
+  mongo-init:
+    image: mongo:7.0
+    container_name: docu_store-mongo-init
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - docu_store-network
+    entrypoint: >
+      mongosh --host mongo:27017 --eval '
+        try {
+          if (rs.status().ok) {
+            console.log("Replica set already up.");
+          }
+        } catch (e) {
+          console.log("Configuring rs0...");
+          rs.initiate({
+            _id: "rs0",
+            members: [{ _id: 0, host: "mongo:27017" }]
+          });
+        }
+      '
+
+  # EventStoreDB: Insecure mode for easy local development
+  eventstoredb:
+    image: eventstore/eventstore:24.10.0-jammy
+    container_name: docu_store-eventstoredb
+    environment:
+      - EVENTSTORE_CLUSTER_SIZE=1
+      - EVENTSTORE_RUN_PROJECTIONS=All
+      - EVENTSTORE_START_STANDARD_PROJECTIONS=true
+      - EVENTSTORE_INSECURE=true
+      - EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP=true
+    ports:
+      - "2113:2113"
+    volumes:
+      - eventstoredb-data:/var/lib/eventstore
+    networks:
+      - docu_store-network
+
+  # Kafka (KRaft): Single node, no Zookeeper needed
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: docu_store-kafka
+    ports:
+      - "9092:9092"
+      - "19092:19092"
+    environment:
+      CLUSTER_ID: "OVWC3qSNRGCEH7iVaUz6XQ"
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:19092"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:19092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - docu_store-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "kafka-broker-api-versions",
+          "--bootstrap-server",
+          "localhost:9092",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Kafka UI: Great for debugging messages
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: docu_store-kafka-ui
+    ports:
+      - "5051:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: dev-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - docu_store-network
+
+volumes:
+  mongo-data:
+  eventstoredb-data:
+  kafka-data:
+
+networks:
+  docu_store-network:
+    driver: bridge
