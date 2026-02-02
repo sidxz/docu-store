@@ -24,7 +24,7 @@ class EventProjector:
             Page.CompoundsAdded: page_projector.compounds_added,
         }
 
-    def process_event(self, event: object, _tracking: object) -> None:
+    def process_event(self, event: object, tracking: object) -> None:
         """Route event to appropriate handler."""
         handler = self._handlers.get(type(event))
         if handler is None:
@@ -33,7 +33,7 @@ class EventProjector:
                 event_type=type(event).__name__,
             )
             return
-        handler(event)
+        handler(event, tracking)
 
     @property
     def materializer(self) -> ReadModelMaterializer:

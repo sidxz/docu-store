@@ -14,7 +14,7 @@ class PageProjector:
     def __init__(self, materializer: ReadModelMaterializer) -> None:  # type: ignore[name-defined]
         self._materializer = materializer
 
-    def page_created(self, event: object) -> None:
+    def page_created(self, event: object, tracking: object) -> None:
         """Project Page Created event to read model."""
         self._materializer.upsert_page(
             page_id=str(event.originator_id),  # type: ignore[attr-defined]
@@ -22,10 +22,10 @@ class PageProjector:
                 "name": event.name,  # type: ignore[attr-defined]
                 "compounds": [],  # Initialize empty compounds list
             },
-            tracking=event.tracking,  # type: ignore[attr-defined]
+            tracking=tracking,  # type: ignore[arg-type]
         )
 
-    def compounds_added(self, event: object) -> None:
+    def compounds_added(self, event: object, tracking: object) -> None:
         """Project Compounds Added event to read model."""
         # Convert Pydantic models to dicts for storage
         compounds_data = [
@@ -37,5 +37,5 @@ class PageProjector:
             fields={
                 "compounds": compounds_data,
             },
-            tracking=event.tracking,  # type: ignore[attr-defined]
+            tracking=tracking,  # type: ignore[arg-type]
         )

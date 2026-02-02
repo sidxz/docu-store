@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     api_port: int = 8000
 
     # MongoDB Read Models
-    mongo_uri: str = "mongodb://localhost:27017"
+    mongo_uri: str = "mongodb://localhost:27017/?replicaSet=rs0&directConnection=true"
     mongo_db: str = "docu_store"
     mongo_pages_collection: str = "page_read_models"
     mongo_articles_collection: str = "article_read_models"

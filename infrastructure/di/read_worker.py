@@ -52,7 +52,9 @@ def run() -> None:
         # Subscribe and process events using standard pattern
         logger.info("read_model_creating_subscription", topics=len(event_projector.topics))
         # Convert event types to their fully qualified names for ApplicationSubscription
-        topic_names = [f"{evt.__module__}:{evt.__name__}" for evt in event_projector.topics]
+        # For nested event classes, we need to use __qualname__ which includes the parent class
+        topic_names = [f"{evt.__module__}:{evt.__qualname__}" for evt in event_projector.topics]
+        logger.info("read_model_subscription_topics", topics=topic_names)
         subscription = ApplicationSubscription(
             app,
             gt=max_tracking_id,
