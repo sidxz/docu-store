@@ -30,12 +30,9 @@ def run() -> None:
     app = container[Application]
     event_projector = container[EventProjector]
 
-    stop_requested = False
-
     def handle_signal(signum: int, _frame: object) -> None:
-        nonlocal stop_requested
         logger.info("read_model_signal_received", signum=signum)
-        stop_requested = True
+        raise KeyboardInterrupt
 
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
@@ -66,10 +63,6 @@ def run() -> None:
         with subscription:
             try:
                 for domain_event, tracking in subscription:  # This is where events are received
-                    if stop_requested:
-                        logger.info("read_model_stop_requested")
-                        break
-
                     try:
                         event_count += 1
                         event_type = type(domain_event).__name__
