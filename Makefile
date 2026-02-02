@@ -51,3 +51,6 @@ docker-clean: ## Stop services and remove volumes
 dev: docker-up dev-install ## Set up development environment
 	@echo "Development environment ready!"
 	@echo "Run 'make run' to start the API server"
+
+test:
+	uv run pytest

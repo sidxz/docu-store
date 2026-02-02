@@ -3,29 +3,39 @@ from lagom import Container
 
 from application.ports.repositories.page_repository import PageRepository
 from application.use_cases.page_use_cases import AddCompoundsUseCase, CreatePageUseCase
+from domain.value_objects.compound import Compound
 from infrastructure.config import settings
 from infrastructure.EventSourcedRepositories.page_repository import EventSourcedPageRepository
+from infrastructure.serialization.pydantic_transcoder import PydanticTranscoding
+
+
+class DocuStoreApplication(Application):
+    """Subclassing Application is the recommended way to register custom transcodings
+    in the latest versions of the eventsourcing library.
+    """
+
+    def register_transcodings(self, transcoder):
+        super().register_transcodings(transcoder)
+        transcoder.register(PydanticTranscoding(Compound))
 
 
 def create_container() -> Container:
     container = Container()
 
-    # Create Application ONCE
-    docu_store_application = Application(
+    # Initialize our custom Application subclass
+    docu_store_application = DocuStoreApplication(
         env={
             "PERSISTENCE_MODULE": "eventsourcing_kurrentdb",
             "KURRENTDB_URI": settings.eventstoredb_uri,
         },
     )
 
-    # Register as singleton instance
     container[Application] = docu_store_application
 
     container[PageRepository] = lambda c: EventSourcedPageRepository(
         application=c[Application],
     )
 
-    # Application Use Cases and other dependencies can be registered here
     container[CreatePageUseCase] = lambda c: CreatePageUseCase(
         page_repository=c[PageRepository],
     )

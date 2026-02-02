@@ -10,7 +10,7 @@ class TestPage:
         assert page.name == "Home"
         assert page.compounds == []
         assert page.id is not None
-        assert page.version == 1
+        assert page.version == 0
 
     def test_add_compounds(self):
         """Test adding compounds to a page."""

@@ -23,5 +23,9 @@ class EventSourcedPageRepository(PageRepository):
             if isinstance(page, Page):
                 return page
             return None
-        except Exception:
+        except Exception as e:
+            print(f"Error retrieving page {page_id}: {e}")
+            import traceback
+
+            traceback.print_exc()
             return None

@@ -13,7 +13,7 @@ class CreatePageUseCase:
     def execute(self, request: CreatePageRequest) -> Result[PageResponse, str]:
         try:
             # Create a new Page aggregate
-            page = Page(name=request.name)
+            page = Page.create(name=request.name)
 
             # Save the Page using the repository
             self.page_repository.save(page)
