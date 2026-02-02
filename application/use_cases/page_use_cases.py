@@ -19,7 +19,7 @@ class CreatePageUseCase:
             self.page_repository.save(page)
 
             # Return a successful result with the PageResponse
-            return Success(PageResponse(id=page.id, name=page.name, compounds=page.compounds))
+            return Success(PageResponse(page_id=page.id, name=page.name, compounds=page.compounds))
         except ValidationError as e:
             return Failure(f"Validation error: {e!s}")
         except Exception as e:
@@ -44,7 +44,7 @@ class AddCompoundsUseCase:
             self.page_repository.save(page)
 
             # Return a successful result with the updated PageResponse
-            return Success(PageResponse(id=page.id, name=page.name, compounds=page.compounds))
+            return Success(PageResponse(page_id=page.id, name=page.name, compounds=page.compounds))
         except ValidationError as e:
             return Failure(f"Validation error: {e!s}")
         except Exception as e:

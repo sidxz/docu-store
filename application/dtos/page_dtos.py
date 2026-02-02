@@ -15,6 +15,6 @@ class AddCompoundsRequest(BaseModel):
 
 
 class PageResponse(BaseModel):
-    id: UUID
+    page_id: UUID
     name: str
     compounds: list[Compound]

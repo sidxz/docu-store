@@ -17,6 +17,6 @@ class MongoReadRepository(PageReadModel):
         doc = await self.pages.find_one({"page_id": str(page_id)})
         if not doc:
             return None
-        # Map MongoDB _id (ObjectId) to id field (UUID string)
-        doc["id"] = str(doc.pop("_id"))
+        # Map MongoDB _id (ObjectId) to page_id field
+        doc["page_id"] = doc.get("page_id") or str(doc.pop("_id"))
         return PageResponse(**doc)
