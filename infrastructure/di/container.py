@@ -2,7 +2,7 @@ from eventsourcing.application import Application
 from lagom import Container
 
 from application.ports.repositories.page_repository import PageRepository
-from application.use_cases.page_use_cases import CreatePageUseCase
+from application.use_cases.page_use_cases import AddCompoundsUseCase, CreatePageUseCase
 from infrastructure.config import settings
 from infrastructure.EventSourcedRepositories.page_repository import EventSourcedPageRepository
 
@@ -27,6 +27,10 @@ def create_container() -> Container:
 
     # Application Use Cases and other dependencies can be registered here
     container[CreatePageUseCase] = lambda c: CreatePageUseCase(
+        page_repository=c[PageRepository],
+    )
+
+    container[AddCompoundsUseCase] = lambda c: AddCompoundsUseCase(
         page_repository=c[PageRepository],
     )
 

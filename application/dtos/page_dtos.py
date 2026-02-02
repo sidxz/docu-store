@@ -9,6 +9,11 @@ class CreatePageRequest(BaseModel):
     name: str
 
 
+class AddCompoundsRequest(BaseModel):
+    page_id: UUID
+    compounds: list[Compound]
+
+
 class PageResponse(BaseModel):
     id: UUID
     name: str

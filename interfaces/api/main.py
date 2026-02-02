@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Cleanup
     logger.info("app_shutting_down")
-    app.state.mongo_client.close()
+    # app.state.mongo_client.close()
     logger.info("app_stopped")
 
 
