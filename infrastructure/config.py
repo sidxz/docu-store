@@ -32,11 +32,11 @@ class Settings(BaseSettings):
     api_port: int = 8000
 
     # MongoDB Read Models
-    # mongo_uri: str = "mongodb://localhost:27017"
-    # mongo_db: str = "todoapp2"
-    # mongo_tasks_collection: str = "task_read_models"
-    # mongo_projects_collection: str = "project_read_models"
-    # mongo_tracking_collection: str = "read_model_tracking"
+    mongo_uri: str = "mongodb://localhost:27017"
+    mongo_db: str = "docu_store"
+    mongo_pages_collection: str = "page_read_models"
+    mongo_articles_collection: str = "article_read_models"
+    mongo_tracking_collection: str = "read_model_tracking"
 
 
 # Global settings instance

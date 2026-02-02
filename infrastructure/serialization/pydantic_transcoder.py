@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 class PydanticTranscoding(Transcoding):
     """Adapter that allows the Event Sourcing library to speak 'Pydantic'.
-    This lives in Infrastructure because it's a serialization concern.
+    Used for serializing and deserializing Pydantic models in event sourcing, both while writing and rehydrating
     """
 
     def __init__(self, type: type[BaseModel]):
