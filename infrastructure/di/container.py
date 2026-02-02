@@ -5,7 +5,7 @@ from application.ports.repositories.page_repository import PageRepository
 from application.use_cases.page_use_cases import AddCompoundsUseCase, CreatePageUseCase
 from domain.value_objects.compound import Compound
 from infrastructure.config import settings
-from infrastructure.EventSourcedRepositories.page_repository import EventSourcedPageRepository
+from infrastructure.event_sourced_repositories.page_repository import EventSourcedPageRepository
 from infrastructure.serialization.pydantic_transcoder import PydanticTranscoding
 
 
