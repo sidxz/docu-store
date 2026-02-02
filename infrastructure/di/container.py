@@ -4,7 +4,9 @@ from typing import TYPE_CHECKING
 
 from eventsourcing.application import Application
 from lagom import Container
+from motor.motor_asyncio import AsyncIOMotorClient
 
+from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
 from application.use_cases.page_use_cases import AddCompoundsUseCase, CreatePageUseCase
 from domain.value_objects.compound import Compound
@@ -14,6 +16,7 @@ from infrastructure.event_sourced_repositories.page_repository import EventSourc
 from infrastructure.read_repositories.mongo_read_model_materializer import (
     MongoReadModelMaterializer,
 )
+from infrastructure.read_repositories.mongo_read_repository import MongoReadRepository
 from infrastructure.serialization.pydantic_transcoder import PydanticTranscoding
 
 if TYPE_CHECKING:
@@ -64,6 +67,13 @@ def create_container() -> Container:
     container[MongoReadModelMaterializer] = lambda _: MongoReadModelMaterializer()
     container[EventProjector] = lambda c: EventProjector(
         materializer=c[MongoReadModelMaterializer],
+    )
+
+    # Register MongoDB Client and Read Repository
+    container[AsyncIOMotorClient] = lambda _: AsyncIOMotorClient(settings.mongo_uri)
+    container[PageReadModel] = lambda c: MongoReadRepository(
+        client=c[AsyncIOMotorClient],
+        settings=settings,
     )
 
     return container

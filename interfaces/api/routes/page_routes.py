@@ -5,10 +5,29 @@ from lagom import Container
 from returns.result import Failure, Success
 
 from application.dtos.page_dtos import AddCompoundsRequest, CreatePageRequest, PageResponse
+from application.ports.repositories.page_read_models import PageReadModel
 from application.use_cases.page_use_cases import AddCompoundsUseCase, CreatePageUseCase
 from interfaces.dependencies import get_container
 
 router = APIRouter(prefix="/pages", tags=["pages"])
+
+
+@router.get("/{page_id}", response_model=PageResponse, status_code=status.HTTP_200_OK)
+async def get_page(
+    page_id: UUID,
+    container: Container = Depends(get_container),
+) -> PageResponse:
+    """Retrieve a page by ID from the read model."""
+    read_repository = container[PageReadModel]
+    page = await read_repository.get_page_by_id(page_id)
+
+    if page is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Page not found",
+        )
+
+    return page
 
 
 @router.post("/", response_model=PageResponse, status_code=status.HTTP_201_CREATED)
