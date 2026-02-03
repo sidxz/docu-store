@@ -16,7 +16,9 @@ logger = structlog.get_logger()
 
 
 class KafkaPublisher:
-    """Publisher for integration events using Kafka."""
+    """Publisher for integration events using Kafka.
+    Caution: This implementation is fire and forget with no outbox pattern or dead letter queue.
+    """
 
     def __init__(self) -> None:
         self._producer = Producer({"bootstrap.servers": settings.kafka_bootstrap_servers})
