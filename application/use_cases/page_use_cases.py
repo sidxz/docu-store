@@ -1,6 +1,7 @@
 from returns.result import Failure, Result, Success
 
 from application.dtos.page_dtos import AddCompoundsRequest, CreatePageRequest, PageResponse
+from application.ports.external_event_publisher import ExternalEventPublisher
 from application.ports.repositories.page_repository import PageRepository
 from domain.aggregates.page import Page
 from domain.exceptions import (
@@ -22,10 +23,15 @@ class AppError:
 
 
 class CreatePageUseCase:
-    def __init__(self, page_repository: PageRepository) -> None:
+    def __init__(
+        self,
+        page_repository: PageRepository,
+        external_event_publisher: ExternalEventPublisher | None = None,
+    ) -> None:
         self.page_repository = page_repository
+        self.external_event_publisher = external_event_publisher
 
-    def execute(self, request: CreatePageRequest) -> Result[PageResponse, AppError]:
+    async def execute(self, request: CreatePageRequest) -> Result[PageResponse, AppError]:
         try:
             # Create a new Page aggregate
             page = Page.create(name=request.name)
@@ -33,15 +39,20 @@ class CreatePageUseCase:
             # Save the Page using the repository
             self.page_repository.save(page)
 
+            result = PageResponse(page_id=page.id, name=page.name, compounds=page.compounds)
+
+            if self.external_event_publisher:
+                await self.external_event_publisher.notify_page_created(result)
+
             # Return a successful result with the PageResponse
-            return Success(PageResponse(page_id=page.id, name=page.name, compounds=page.compounds))
+            return Success(result)
         except ValidationError as e:
             # Domain validation errors - client's fault (400 Bad Request)
             return Failure(AppError("validation", f"Validation error: {e!s}"))
         except ConcurrencyError as e:
             # Concurrency conflicts (409 Conflict)
             return Failure(
-                AppError("concurrency", f"Resource was modified by another request: {e!s}")
+                AppError("concurrency", f"Resource was modified by another request: {e!s}"),
             )
 
 
@@ -71,5 +82,5 @@ class AddCompoundsUseCase:
         except ConcurrencyError as e:
             # Concurrency conflicts (409 Conflict) - retry-able error
             return Failure(
-                AppError("concurrency", f"Resource was modified by another request: {e!s}")
+                AppError("concurrency", f"Resource was modified by another request: {e!s}"),
             )

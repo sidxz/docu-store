@@ -6,6 +6,7 @@ from eventsourcing.application import Application
 from lagom import Container
 from motor.motor_asyncio import AsyncIOMotorClient
 
+from application.ports.external_event_publisher import ExternalEventPublisher
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
 from application.use_cases.page_use_cases import AddCompoundsUseCase, CreatePageUseCase
@@ -13,6 +14,8 @@ from domain.value_objects.compound import Compound
 from infrastructure.config import settings
 from infrastructure.event_projectors.event_projector import EventProjector
 from infrastructure.event_sourced_repositories.page_repository import EventSourcedPageRepository
+from infrastructure.kafka.kafka_external_event_streamer import KafkaExternalEventPublisher
+from infrastructure.kafka.kafka_publisher import KafkaPublisher
 from infrastructure.read_repositories.mongo_read_model_materializer import (
     MongoReadModelMaterializer,
 )
@@ -54,10 +57,29 @@ def create_container() -> Container:
         application=c[Application],
     )
 
+    # Register Kafka Publisher
+    kafka_publisher_instance = (
+        KafkaPublisher() if settings.enable_external_event_streaming else None
+    )
+    if kafka_publisher_instance:
+        # Initialize the Kafka publisher connection in a sync context
+        # The connect() method will be called asynchronously when first used
+        container[KafkaPublisher] = kafka_publisher_instance
+
+    # Register Kafka External Event Publisher
+    # Infrastructure - Notifications
+    if settings.enable_external_event_streaming:
+        container[ExternalEventPublisher] = lambda c: KafkaExternalEventPublisher(
+            publisher=c[KafkaPublisher],
+        )
+    else:
+        container[ExternalEventPublisher] = lambda _: None  # type: ignore[return-value]
+
     # Register Use Cases
     # Page Use Cases
     container[CreatePageUseCase] = lambda c: CreatePageUseCase(
         page_repository=c[PageRepository],
+        external_event_publisher=c[ExternalEventPublisher],
     )
     container[AddCompoundsUseCase] = lambda c: AddCompoundsUseCase(
         page_repository=c[PageRepository],

@@ -24,8 +24,9 @@ class Settings(BaseSettings):
     eventstoredb_uri: str = "esdb://localhost:2113?tls=false"
 
     # Kafka
-    # kafka_bootstrap_servers: str = "localhost:9092"
-    # kafka_topic: str = "docu_store_events"
+    enable_external_event_streaming: bool = True
+    kafka_bootstrap_servers: str = "localhost:19092"
+    kafka_topic: str = "docu_store_events"
 
     # API
     api_host: str = "0.0.0.0"
