@@ -1,7 +1,8 @@
 from uuid import UUID
 
-from domain.value_objects.compound_mention import CompoundMention
 from pydantic import BaseModel
+
+from domain.value_objects.compound_mention import CompoundMention
 
 
 class CreatePageRequest(BaseModel):

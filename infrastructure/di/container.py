@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from domain.value_objects.compound_mention import CompoundMention
 from eventsourcing.application import Application
 from lagom import Container
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -11,6 +10,7 @@ from application.ports.external_event_publisher import ExternalEventPublisher
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
 from application.use_cases.page_use_cases import AddCompoundMentionsUseCase, CreatePageUseCase
+from domain.value_objects.compound_mention import CompoundMention
 from infrastructure.config import settings
 from infrastructure.event_projectors.event_projector import EventProjector
 from infrastructure.event_sourced_repositories.page_repository import EventSourcedPageRepository

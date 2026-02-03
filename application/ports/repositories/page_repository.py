@@ -17,7 +17,7 @@ class PageRepository(ABC):
 
     @abstractmethod
     def save(self, page: Page) -> None:
-        """Saves a page entity to the repository.
+        """Save page entity to the repository.
 
         Raises:
             InfrastructureError: If the save operation fails.
@@ -26,7 +26,7 @@ class PageRepository(ABC):
 
     @abstractmethod
     def get_by_id(self, page_id: UUID) -> Page:
-        """Retrieves a page entity by its ID.
+        """Retrieve page entity by its ID.
 
         Raises:
             AggregateNotFoundError: If the page does not exist.
