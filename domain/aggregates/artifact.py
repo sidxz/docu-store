@@ -23,26 +23,6 @@ class Artifact(Aggregate):
         storage_location: str,
     ) -> "Artifact":
         """Create a new Artifact aggregate (Factory Method)."""
-        if not source_uri:
-            msg = "source_uri must be provided"
-            raise ValueError(msg)
-        if not source_filename:
-            msg = "source_filename must be provided"
-            raise ValueError(msg)
-        if not artifact_type:
-            msg = "artifact_type must be provided"
-            raise ValueError(msg)
-        if not mime_type:
-            msg = "mime_type must be provided"
-            raise ValueError(msg)
-        if not storage_location:
-            msg = "storage_location must be provided"
-            raise ValueError(msg)
-
-        source_uri = source_uri.strip()
-        source_filename = source_filename.strip()
-        storage_location = storage_location.strip()
-
         return cls(
             source_uri=source_uri,
             source_filename=source_filename,
@@ -69,6 +49,26 @@ class Artifact(Aggregate):
         mime_type: MimeType,
         storage_location: str,
     ) -> None:
+        if not source_uri:
+            msg = "source_uri must be provided"
+            raise ValueError(msg)
+        if not source_filename:
+            msg = "source_filename must be provided"
+            raise ValueError(msg)
+        if not artifact_type:
+            msg = "artifact_type must be provided"
+            raise ValueError(msg)
+        if not mime_type:
+            msg = "mime_type must be provided"
+            raise ValueError(msg)
+        if not storage_location:
+            msg = "storage_location must be provided"
+            raise ValueError(msg)
+
+        source_uri = source_uri.strip()
+        source_filename = source_filename.strip()
+        storage_location = storage_location.strip()
+
         self.source_uri = source_uri
         self.source_filename = source_filename
         self.artifact_type = artifact_type
@@ -77,7 +77,7 @@ class Artifact(Aggregate):
         self._pages: list[UUID] = []
         self.title_mention: TitleMention | None = None
         self.summary_candidate: SummaryCandidate | None = None
-        self.tags: set[str] = set()
+        self.tags: list[str] = []
 
     def __hash__(self) -> int:
         """Return hash of the aggregate based on its ID."""
@@ -87,67 +87,107 @@ class Artifact(Aggregate):
     # COMMAND METHOD - Page Management
     # ============================================================================
     @property
-    def pages(self) -> list[UUID]:
-        """Returns the list of associated Page IDs."""
-        return self._pages
+    def pages(self) -> tuple[UUID, ...]:
+        return tuple(self._pages)
 
     class PagesAdded(Aggregate.Event):
         page_ids: list[UUID]
 
     def add_pages(self, page_ids: list[UUID]) -> None:
-        """Add associated Page IDs to the Artifact."""
-        self.trigger_event(self.PagesAdded, page_ids=page_ids)
+        """Add associated Page IDs to the Artifact (idempotent, no duplicates)."""
+        if not page_ids:
+            return  # no-op on empty input
+
+        # Deduplicate while preserving order
+        unique_in_order = list(dict.fromkeys(page_ids))
+
+        # Keep only pages not already present
+        to_add = [pid for pid in unique_in_order if pid not in self._pages]
+
+        if not to_add:
+            return  # no-op if nothing changes
+
+        self.trigger_event(self.PagesAdded, page_ids=to_add)
 
     @event(PagesAdded)
     def _apply_pages_added(self, page_ids: list[UUID]) -> None:
-        self._pages.extend(page_ids)
+        # Defensive: still avoid duplicates even if events repeat
+        existing = set(self._pages)
+        for pid in page_ids:
+            if pid not in existing:
+                self._pages.append(pid)
+                existing.add(pid)
 
     class PagesRemoved(Aggregate.Event):
         page_ids: list[UUID]
 
     def remove_pages(self, page_ids: list[UUID]) -> None:
-        """Remove associated Page IDs from the Artifact."""
-        self.trigger_event(self.PagesRemoved, page_ids=page_ids)
+        """Remove associated Page IDs from the Artifact (idempotent)."""
+        if not page_ids:
+            return  # no-op on empty input
+
+        # Deduplicate while preserving order
+        unique_in_order = list(dict.fromkeys(page_ids))
+
+        # Only attempt to remove those that exist
+        existing = set(self._pages)
+        to_remove = [pid for pid in unique_in_order if pid in existing]
+
+        if not to_remove:
+            return  # no-op if nothing changes
+
+        self.trigger_event(self.PagesRemoved, page_ids=to_remove)
 
     @event(PagesRemoved)
     def _apply_pages_removed(self, page_ids: list[UUID]) -> None:
-        self._pages = [pid for pid in self._pages if pid not in page_ids]
+        remove_set = set(page_ids)
+        if not remove_set:
+            return
+        self._pages = [pid for pid in self._pages if pid not in remove_set]
 
     # ============================================================================
     # COMMAND METHOD - Update TitleMention
     # ============================================================================
     class TitleMentionUpdated(Aggregate.Event):
-        title_mention: TitleMention
+        title_mention: TitleMention | None
 
-    def update_title_mention(self, title_mention: TitleMention) -> None:
+    def update_title_mention(self, title_mention: TitleMention | None) -> None:
         self.trigger_event(self.TitleMentionUpdated, title_mention=title_mention)
 
     @event(TitleMentionUpdated)
-    def _apply_title_mention_updated(self, title_mention: TitleMention) -> None:
+    def _apply_title_mention_updated(self, title_mention: TitleMention | None) -> None:
         self.title_mention = title_mention
 
     # ============================================================================
     # COMMAND METHOD - update SummaryCandidate
     # ============================================================================
     class SummaryCandidateUpdated(Aggregate.Event):
-        summary_candidate: SummaryCandidate
+        summary_candidate: SummaryCandidate | None
 
-    def update_summary_candidate(self, summary_candidate: SummaryCandidate) -> None:
+    def update_summary_candidate(self, summary_candidate: SummaryCandidate | None) -> None:
         self.trigger_event(self.SummaryCandidateUpdated, summary_candidate=summary_candidate)
 
     @event(SummaryCandidateUpdated)
-    def _apply_summary_candidate_updated(self, summary_candidate: SummaryCandidate) -> None:
+    def _apply_summary_candidate_updated(self, summary_candidate: SummaryCandidate | None) -> None:
         self.summary_candidate = summary_candidate
 
     # ============================================================================
     # COMMAND METHOD - Tag Updated
     # ============================================================================
     class TagsUpdated(Aggregate.Event):
-        tags: set[str]
+        tags: list[str]
 
-    def update_tags(self, tags: set[str]) -> None:
-        self.trigger_event(self.TagsUpdated, tags=tags)
+    def update_tags(self, tags: list[str]) -> None:
+        # Normalize: strip and drop blanks
+        normalized = [t.strip() for t in tags if t and t.strip()]
+        # Deduplicate while preserving order
+        cleaned_tags = list(dict.fromkeys(normalized))
+
+        if cleaned_tags == self.tags:
+            return
+
+        self.trigger_event(self.TagsUpdated, tags=cleaned_tags)
 
     @event(TagsUpdated)
-    def _apply_tags_updated(self, tags: set[str]) -> None:
+    def _apply_tags_updated(self, tags: list[str]) -> None:
         self.tags = tags

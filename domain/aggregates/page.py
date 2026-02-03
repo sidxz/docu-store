@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from eventsourcing.domain import Aggregate, event
 
 from domain.value_objects.compound_mention import CompoundMention
@@ -17,18 +19,22 @@ class Page(Aggregate):
     INITIAL_VERSION = 0
 
     @classmethod
-    def create(cls, name: str) -> Page:
-        """Factory method that creates a new Page aggregate."""
-        return cls(name=name)
+    def create(cls, name: str, artifact_id: UUID, index: int = 0) -> Page:
+        """Create a new Page aggregate (Factory Method)."""
+        return cls(name=name, artifact_id=artifact_id, index=index)
 
     class Created(Aggregate.Created):
         """Defines the structure of the Page Created event."""
 
         name: str
+        artifact_id: UUID
+        index: int
 
     @event(Created)  # Links this handler to the Created event class above
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, artifact_id: UUID, index: int) -> None:
         self.name = name
+        self.artifact_id = artifact_id
+        self.index = index
         self.compound_mentions: list[CompoundMention] = []
         self.tag_mentions: list[TagMention] = []
         self.text_mention: TextMention | None = None
