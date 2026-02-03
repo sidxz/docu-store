@@ -51,13 +51,11 @@ class KafkaPublisher:
             await self.connect()
 
             payload = json.dumps(event).encode()
-            loop = asyncio.get_running_loop()
-            future: asyncio.Future[None] = loop.create_future()
 
+            # Callback handles logging only, no future/await interaction
             def delivery(err: Exception | None, msg: Any) -> None:
                 if err:
                     logger.error("kafka_publish_failed", subject=subject, error=str(err))
-                    loop.call_soon_threadsafe(future.set_exception, err)
                     return
                 logger.info(
                     "kafka_event_published",
@@ -66,15 +64,15 @@ class KafkaPublisher:
                     partition=msg.partition(),
                     offset=msg.offset(),
                 )
-                loop.call_soon_threadsafe(future.set_result, None)
 
+            # Enqueue the message and return immediately (Fire-and-Forget)
             self._producer.produce(
                 self._topic,
                 key=subject,
                 value=payload,
                 on_delivery=delivery,
             )
-            await future
+
         except Exception as exc:
             logger.error("kafka_publish_exception", subject=subject, error=str(exc))
             raise
