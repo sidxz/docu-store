@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from eventsourcing.domain import Aggregate, event
 
-from domain.exceptions import ValidationError
-from domain.value_objects.compound import Compound
+from domain.value_objects.compound_mention import CompoundMention
+from domain.value_objects.summary_candidate import SummaryCandidate
+from domain.value_objects.tag_mention import TagMention
+from domain.value_objects.text_mention import TextMention
 
 
 class Page(Aggregate):
@@ -27,24 +29,67 @@ class Page(Aggregate):
     @event(Created)  # Links this handler to the Created event class above
     def __init__(self, name: str) -> None:
         self.name = name
-        self.compounds: list[Compound] = []
+        self.compound_mentions: list[CompoundMention] = []
+        self.tag_mentions: list[TagMention] = []
+        self.text_mention: TextMention | None = None
+        self.summary_candidate: SummaryCandidate | None = None
 
-    class CompoundsAdded(Aggregate.Event):
+    def __hash__(self) -> int:
+        """Return hash of the aggregate based on its ID."""
+        return hash(self.id)
+
+    # ============================================================================
+    # COMMAND METHOD - Update CompoundMentions
+    # ============================================================================
+    class CompoundMentionsUpdated(Aggregate.Event):
         # We use the rich type here. The infrastructure layer
         # (transcoder) will handle the JSON serialization.
-        compounds: list[Compound]
+        compound_mentions: list[CompoundMention]
+
+    def update_compound_mentions(self, compound_mentions: list[CompoundMention]) -> None:
+        # Trigger event
+        self.trigger_event(self.CompoundMentionsUpdated, compound_mentions=compound_mentions)
+
+    @event(CompoundMentionsUpdated)
+    def _apply_compound_mentions_updated(self, compound_mentions: list[CompoundMention]) -> None:
+        # Update internal state, replace existing compound_mentions
+        self.compound_mentions = compound_mentions
 
     # ============================================================================
-    # COMMAND METHOD - Add Compounds
+    # COMMAND METHOD - Update TagMentions
     # ============================================================================
+    class TagMentionsUpdated(Aggregate.Event):
+        tag_mentions: list[TagMention]
 
-    def add_compounds(self, compounds: list[Compound]) -> None:
-        if not compounds:
-            raise ValidationError("Compounds cannot be empty")
+    def update_tag_mentions(self, tag_mentions: list[TagMention]) -> None:
+        self.trigger_event(self.TagMentionsUpdated, tag_mentions=tag_mentions)
 
-        # Trigger event with rich Value Objects
-        self.trigger_event(self.CompoundsAdded, compounds=compounds)
+    @event(TagMentionsUpdated)
+    def _apply_tag_mentions_updated(self, tag_mentions: list[TagMention]) -> None:
+        self.tag_mentions = tag_mentions
 
-    @event(CompoundsAdded)
-    def _apply_compounds_added(self, compounds: list[Compound]) -> None:
-        self.compounds.extend(compounds)
+    # ============================================================================
+    # COMMAND METHOD - Update TextMention
+    # ============================================================================
+    class TextMentionUpdated(Aggregate.Event):
+        text_mention: TextMention
+
+    def update_text_mention(self, text_mention: TextMention) -> None:
+        self.trigger_event(self.TextMentionUpdated, text_mention=text_mention)
+
+    @event(TextMentionUpdated)
+    def _apply_text_mention_updated(self, text_mention: TextMention) -> None:
+        self.text_mention = text_mention
+
+    # ============================================================================
+    # COMMAND METHOD - update SummaryCandidate
+    # ============================================================================
+    class SummaryCandidateUpdated(Aggregate.Event):
+        summary_candidate: SummaryCandidate
+
+    def update_summary_candidate(self, summary_candidate: SummaryCandidate) -> None:
+        self.trigger_event(self.SummaryCandidateUpdated, summary_candidate=summary_candidate)
+
+    @event(SummaryCandidateUpdated)
+    def _apply_summary_candidate_updated(self, summary_candidate: SummaryCandidate) -> None:
+        self.summary_candidate = summary_candidate

@@ -1,20 +1,19 @@
 from uuid import UUID
 
+from domain.value_objects.compound_mention import CompoundMention
 from pydantic import BaseModel
-
-from domain.value_objects.compound import Compound
 
 
 class CreatePageRequest(BaseModel):
     name: str
 
 
-class AddCompoundsRequest(BaseModel):
+class AddCompoundMentionsRequest(BaseModel):
     page_id: UUID
-    compounds: list[Compound]
+    compound_mentions: list[CompoundMention]
 
 
 class PageResponse(BaseModel):
     page_id: UUID
     name: str
-    compounds: list[Compound]
+    compound_mentions: list[CompoundMention]

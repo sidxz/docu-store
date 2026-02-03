@@ -20,22 +20,22 @@ class PageProjector:
             page_id=str(event.originator_id),  # type: ignore[attr-defined]
             fields={
                 "name": event.name,  # type: ignore[attr-defined]
-                "compounds": [],  # Initialize empty compounds list
+                "compound_mentions": [],  # Initialize empty compound_mentions list
             },
             tracking=tracking,  # type: ignore[arg-type]
         )
 
-    def compounds_added(self, event: object, tracking: object) -> None:
-        """Project Compounds Added event to read model."""
+    def compound_mentions_updated(self, event: object, tracking: object) -> None:
+        """Project CompoundMentions Added event to read model."""
         # Convert Pydantic models to dicts for storage
-        compounds_data = [
-            compound.model_dump(mode="json")
-            for compound in event.compounds  # type: ignore[attr-defined]
+        compound_mentions_data = [
+            compound_mention.model_dump(mode="json")
+            for compound_mention in event.compound_mentions  # type: ignore[attr-defined]
         ]
         self._materializer.upsert_page(
             page_id=str(event.originator_id),  # type: ignore[attr-defined]
             fields={
-                "compounds": compounds_data,
+                "compound_mentions": compound_mentions_data,
             },
             tracking=tracking,  # type: ignore[arg-type]
         )

@@ -21,7 +21,7 @@ class EventProjector:
         # Map event types directly to handler methods
         self._handlers = {
             Page.Created: page_projector.page_created,
-            Page.CompoundsAdded: page_projector.compounds_added,
+            Page.CompoundMentionsUpdated: page_projector.compound_mentions_updated,
         }
 
     def process_event(self, event: object, tracking: object) -> None:

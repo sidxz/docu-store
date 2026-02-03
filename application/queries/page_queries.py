@@ -19,7 +19,7 @@ class GetPageByIdQuery:
             page_response = PageResponse(
                 page_id=UUID(page_data["page_id"]),
                 name=page_data["name"],
-                compounds=page_data["compounds"],
+                compound_mentions=page_data["compound_mentions"],
             )
             return Success(page_response)
         except ValueError as e:

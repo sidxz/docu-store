@@ -1,13 +1,13 @@
+from domain.value_objects.compound_mention import CompoundMention
 from eventsourcing.application import Application
 from returns.result import Success
 
-from application.dtos.page_dtos import AddCompoundsRequest, CreatePageRequest
-from application.use_cases.page_use_cases import AddCompoundsUseCase
-from domain.value_objects.compound import Compound
+from application.dtos.page_dtos import AddCompoundMentionsRequest, CreatePageRequest
+from application.use_cases.page_use_cases import AddCompoundMentionsUseCase
 from infrastructure.di.container import create_container
 
 
-def test_page_compounds_roundtrip():
+def test_page_compound_mentions_roundtrip():
     # 1. Setup Container and App
     container = create_container()
     app = container[Application]
@@ -31,28 +31,30 @@ def test_page_compounds_roundtrip():
     page_id = page_response.id
     print(f"Created Page with ID: {page_id}")
 
-    sample_compounds = [
-        Compound(smiles="CCO", extracted_name="Ethanol"),
-        Compound(smiles="C1=CC=CC=C1", extracted_name="Benzene"),
+    sample_compound_mentions = [
+        CompoundMention(smiles="CCO", extracted_name="Ethanol"),
+        CompoundMention(smiles="C1=CC=CC=C1", extracted_name="Benzene"),
     ]
 
-    add_compounds_uc = container[AddCompoundsUseCase]
-    add_compounds_request = AddCompoundsRequest(page_id=page_id, compounds=sample_compounds)
-    add_compounds_uc.execute(request=add_compounds_request)
+    add_compound_mentions_uc = container[AddCompoundMentionsUseCase]
+    add_compound_mentions_request = AddCompoundMentionsRequest(
+        page_id=page_id, compound_mentions=sample_compound_mentions
+    )
+    add_compound_mentions_uc.execute(request=add_compound_mentions_request)
 
     # Check if added correctly
     rehydrated_page = repo.get_by_id(page_id)
     print(f"Rehydrated Page: {rehydrated_page}")
     assert rehydrated_page.name == "Test Discovery Page"
 
-    assert len(rehydrated_page.compounds) == 2
-    assert rehydrated_page.compounds[0].smiles == "CCO"
-    assert isinstance(rehydrated_page.compounds[0], Compound)
-    assert isinstance(rehydrated_page.compounds[0], Compound)
+    assert len(rehydrated_page.compound_mentions) == 2
+    assert rehydrated_page.compound_mentions[0].smiles == "CCO"
+    assert isinstance(rehydrated_page.compound_mentions[0], CompoundMention)
+    assert isinstance(rehydrated_page.compound_mentions[0], CompoundMention)
 
-    print(f"Successfully rehydrated {len(rehydrated_page.compounds)} compounds!")
+    print(f"Successfully rehydrated {len(rehydrated_page.compound_mentions)} compound_mentions!")
 
 
 if __name__ == "__main__":
     # Quick manual run
-    test_page_compounds_roundtrip()
+    test_page_compound_mentions_roundtrip()

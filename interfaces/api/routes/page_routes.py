@@ -5,9 +5,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from lagom import Container
 from returns.result import Failure, Success
 
-from application.dtos.page_dtos import AddCompoundsRequest, CreatePageRequest, PageResponse
+from application.dtos.page_dtos import AddCompoundMentionsRequest, CreatePageRequest, PageResponse
 from application.ports.repositories.page_read_models import PageReadModel
-from application.use_cases.page_use_cases import AddCompoundsUseCase, AppError, CreatePageUseCase
+from application.use_cases.page_use_cases import (
+    AddCompoundMentionsUseCase,
+    AppError,
+    CreatePageUseCase,
+)
 from domain.exceptions import InfrastructureError
 from interfaces.dependencies import get_container
 
@@ -101,16 +105,16 @@ async def create_page(
         ) from exc
 
 
-@router.post("/{page_id}/compounds", status_code=status.HTTP_200_OK)
-async def add_compounds(
+@router.post("/{page_id}/compound_mentions", status_code=status.HTTP_200_OK)
+async def update_compound_mentions(
     page_id: UUID,
-    request: AddCompoundsRequest,
+    request: AddCompoundMentionsRequest,
     container: Annotated[Container, Depends(get_container)],
 ) -> PageResponse:
-    """Add compounds to an existing page.
+    """Add compound_mentions to an existing page.
 
     Returns:
-        200 OK: Compounds successfully added
+        200 OK: CompoundMentions successfully added
         400 Bad Request: Validation error
         404 Not Found: Page not found
         409 Conflict: Page was modified by another request (retry-able)
@@ -124,7 +128,7 @@ async def add_compounds(
             detail="Page ID in path does not match page ID in request body",
         )
 
-    use_case = container[AddCompoundsUseCase]
+    use_case = container[AddCompoundMentionsUseCase]
 
     try:
         result = use_case.execute(request=request)

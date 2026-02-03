@@ -1,6 +1,6 @@
 from returns.result import Failure, Result, Success
 
-from application.dtos.page_dtos import AddCompoundsRequest, CreatePageRequest, PageResponse
+from application.dtos.page_dtos import AddCompoundMentionsRequest, CreatePageRequest, PageResponse
 from application.ports.external_event_publisher import ExternalEventPublisher
 from application.ports.repositories.page_repository import PageRepository
 from domain.aggregates.page import Page
@@ -39,7 +39,11 @@ class CreatePageUseCase:
             # Save the Page using the repository
             self.page_repository.save(page)
 
-            result = PageResponse(page_id=page.id, name=page.name, compounds=page.compounds)
+            result = PageResponse(
+                page_id=page.id,
+                name=page.name,
+                compound_mentions=page.compound_mentions,
+            )
 
             if self.external_event_publisher:
                 await self.external_event_publisher.notify_page_created(result)
@@ -56,23 +60,29 @@ class CreatePageUseCase:
             )
 
 
-class AddCompoundsUseCase:
+class AddCompoundMentionsUseCase:
     def __init__(self, page_repository: PageRepository) -> None:
         self.page_repository = page_repository
 
-    def execute(self, request: AddCompoundsRequest) -> Result[PageResponse, AppError]:
+    def execute(self, request: AddCompoundMentionsRequest) -> Result[PageResponse, AppError]:
         try:
             # Retrieve the page by ID
             page = self.page_repository.get_by_id(request.page_id)
 
-            # Add compounds to the page
-            page.add_compounds(request.compounds)
+            # Add compound_mentions to the page
+            page.update_compound_mentions(request.compound_mentions)
 
             # Save the updated page
             self.page_repository.save(page)
 
             # Return a successful result with the updated PageResponse
-            return Success(PageResponse(page_id=page.id, name=page.name, compounds=page.compounds))
+            return Success(
+                PageResponse(
+                    page_id=page.id,
+                    name=page.name,
+                    compound_mentions=page.compound_mentions,
+                ),
+            )
         except AggregateNotFoundError as e:
             # Page not found - client's fault (404 Not Found)
             return Failure(AppError("not_found", f"Page not found: {e!s}"))
