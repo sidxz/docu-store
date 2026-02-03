@@ -8,7 +8,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from infrastructure.config import settings
-from interfaces.api import routes
+from interfaces.api.routes.artifact_routes import router as artifact_router
+from interfaces.api.routes.page_routes import router as page_router
 from interfaces.dependencies import get_container
 
 # Configure structured logging
@@ -64,7 +65,8 @@ def create_app() -> FastAPI:
     )
 
     # Include routers
-    app.include_router(routes.router)
+    app.include_router(artifact_router)
+    app.include_router(page_router)
 
     @app.get("/health")
     async def health_check() -> dict[str, str]:

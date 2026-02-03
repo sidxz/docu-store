@@ -1,5 +1,6 @@
 import structlog
 
+from application.dtos.artifact_dtos import ArtifactResponse
 from application.dtos.page_dtos import PageResponse
 from application.ports.external_event_publisher import ExternalEventPublisher
 from infrastructure.kafka.kafka_publisher import KafkaPublisher
@@ -20,3 +21,11 @@ class KafkaExternalEventPublisher(ExternalEventPublisher):
         }
         await self.publisher.publish(subject="PageCreated", event=event)
         logger.info("kafka notified_page_created", page_id=str(page.page_id))
+
+    async def notify_artifact_created(self, artifact: ArtifactResponse) -> None:
+        event = {
+            "event_type": "ArtifactCreated",
+            "data": artifact.model_dump(mode="json"),
+        }
+        await self.publisher.publish(subject="ArtifactCreated", event=event)
+        logger.info("kafka notified_artifact_created", artifact_id=str(artifact.artifact_id))

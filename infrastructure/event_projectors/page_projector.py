@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from domain.aggregates.page import Page
+
 if TYPE_CHECKING:
     from infrastructure.read_repositories.read_model_materializer import ReadModelMaterializer
 
@@ -14,13 +16,18 @@ class PageProjector:
     def __init__(self, materializer: ReadModelMaterializer) -> None:  # type: ignore[name-defined]
         self._materializer = materializer
 
-    def page_created(self, event: object, tracking: object) -> None:
+    def page_created(self, event: Page.Created, tracking: object) -> None:
         """Project Page Created event to read model."""
         self._materializer.upsert_page(
-            page_id=str(event.originator_id),  # type: ignore[attr-defined]
+            page_id=str(event.originator_id),
             fields={
-                "name": event.name,  # type: ignore[attr-defined]
-                "compound_mentions": [],  # Initialize empty compound_mentions list
+                "name": event.name,
+                "artifact_id": event.artifact_id,
+                "index": event.index,
+                "compound_mentions": [],
+                "tag_mentions": [],
+                "text_mention": None,
+                "summary_candidate": None,
             },
             tracking=tracking,  # type: ignore[arg-type]
         )

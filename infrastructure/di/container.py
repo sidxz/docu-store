@@ -7,12 +7,17 @@ from lagom import Container
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from application.ports.external_event_publisher import ExternalEventPublisher
+from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
+from application.use_cases.artifact_use_cases import CreateArtifactUseCase
 from application.use_cases.page_use_cases import AddCompoundMentionsUseCase, CreatePageUseCase
 from domain.value_objects.compound_mention import CompoundMention
 from infrastructure.config import settings
 from infrastructure.event_projectors.event_projector import EventProjector
+from infrastructure.event_sourced_repositories.artifact_repository import (
+    EventSourcedArtifactRepository,
+)
 from infrastructure.event_sourced_repositories.page_repository import EventSourcedPageRepository
 from infrastructure.kafka.kafka_external_event_streamer import KafkaExternalEventPublisher
 from infrastructure.kafka.kafka_publisher import KafkaPublisher
@@ -56,6 +61,9 @@ def create_container() -> Container:
     container[PageRepository] = lambda c: EventSourcedPageRepository(
         application=c[Application],
     )
+    container[ArtifactRepository] = lambda c: EventSourcedArtifactRepository(
+        application=c[Application],
+    )
 
     # Register Kafka Publisher
     kafka_publisher_instance = (
@@ -83,6 +91,12 @@ def create_container() -> Container:
     )
     container[AddCompoundMentionsUseCase] = lambda c: AddCompoundMentionsUseCase(
         page_repository=c[PageRepository],
+    )
+
+    # Artifact Use Cases
+    container[CreateArtifactUseCase] = lambda c: CreateArtifactUseCase(
+        artifact_repository=c[ArtifactRepository],
+        external_event_publisher=c[ExternalEventPublisher],
     )
 
     # Register Read Model Infrastructure

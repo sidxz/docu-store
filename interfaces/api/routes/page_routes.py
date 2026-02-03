@@ -9,37 +9,13 @@ from application.dtos.page_dtos import AddCompoundMentionsRequest, CreatePageReq
 from application.ports.repositories.page_read_models import PageReadModel
 from application.use_cases.page_use_cases import (
     AddCompoundMentionsUseCase,
-    AppError,
     CreatePageUseCase,
 )
 from domain.exceptions import InfrastructureError
+from interfaces.api.routes.helpers import _map_app_error_to_http_exception
 from interfaces.dependencies import get_container
 
 router = APIRouter(prefix="/pages", tags=["pages"])
-
-
-def _map_app_error_to_http_exception(error: AppError) -> HTTPException:
-    """Map application layer errors to appropriate HTTP exceptions."""
-    if error.category == "validation":
-        return HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error.message,
-        )
-    if error.category == "not_found":
-        return HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=error.message,
-        )
-    if error.category == "concurrency":
-        return HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=error.message,
-        )
-    # Unknown error category
-    return HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail="Internal server error",
-    )
 
 
 @router.get("/{page_id}", status_code=status.HTTP_200_OK)

@@ -1,6 +1,8 @@
 from returns.result import Failure, Result, Success
 
+from application.dtos.errors import AppError
 from application.dtos.page_dtos import AddCompoundMentionsRequest, CreatePageRequest, PageResponse
+from application.mappers.page_mappers import PageMapper
 from application.ports.external_event_publisher import ExternalEventPublisher
 from application.ports.repositories.page_repository import PageRepository
 from domain.aggregates.page import Page
@@ -9,17 +11,6 @@ from domain.exceptions import (
     ConcurrencyError,
     ValidationError,
 )
-
-
-class AppError:
-    """Represents different categories of application errors."""
-
-    def __init__(self, category: str, message: str) -> None:
-        self.category = category  # 'validation', 'not_found', 'concurrency', 'infrastructure'
-        self.message = message
-
-    def __str__(self) -> str:
-        return self.message
 
 
 class CreatePageUseCase:
@@ -34,16 +25,16 @@ class CreatePageUseCase:
     async def execute(self, request: CreatePageRequest) -> Result[PageResponse, AppError]:
         try:
             # Create a new Page aggregate
-            page = Page.create(name=request.name)
+            page = Page.create(
+                name=request.name,
+                artifact_id=request.artifact_id,
+                index=request.index,
+            )
 
             # Save the Page using the repository
             self.page_repository.save(page)
 
-            result = PageResponse(
-                page_id=page.id,
-                name=page.name,
-                compound_mentions=page.compound_mentions,
-            )
+            result = PageMapper.to_page_response(page)
 
             if self.external_event_publisher:
                 await self.external_event_publisher.notify_page_created(result)
@@ -76,13 +67,8 @@ class AddCompoundMentionsUseCase:
             self.page_repository.save(page)
 
             # Return a successful result with the updated PageResponse
-            return Success(
-                PageResponse(
-                    page_id=page.id,
-                    name=page.name,
-                    compound_mentions=page.compound_mentions,
-                ),
-            )
+            result = PageMapper.to_page_response(page)
+            return Success(result)
         except AggregateNotFoundError as e:
             # Page not found - client's fault (404 Not Found)
             return Failure(AppError("not_found", f"Page not found: {e!s}"))

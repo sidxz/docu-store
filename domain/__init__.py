@@ -1,6 +1,5 @@
 """Domain layer exports."""
 
-from domain.aggregates import Artifact, Page
 from domain.exceptions import DomainError, ValidationError
 from domain.value_objects import (
     ArtifactType,
@@ -14,13 +13,11 @@ from domain.value_objects import (
 )
 
 __all__ = [
-    "Artifact",
     "ArtifactType",
     "CompoundMention",
     "DomainError",
     "ExtractionMetadata",
     "MimeType",
-    "Page",
     "SummaryCandidate",
     "TagMention",
     "TextMention",

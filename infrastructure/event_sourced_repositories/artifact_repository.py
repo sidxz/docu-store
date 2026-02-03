@@ -2,45 +2,45 @@ from uuid import UUID
 
 from eventsourcing.application import Application
 
-from application.ports.repositories.page_repository import PageRepository
-from domain.aggregates.page import Page
+from application.ports.repositories.artifact_repository import ArtifactRepository
+from domain.aggregates.artifact import Artifact
 from domain.exceptions import AggregateNotFoundError, InfrastructureError
 
 
-class EventSourcedPageRepository(PageRepository):
-    """Event-sourced implementation of the PageRepository."""
+class EventSourcedArtifactRepository(ArtifactRepository):
+    """Event-sourced implementation of the ArtifactRepository."""
 
     def __init__(self, application: Application) -> None:
         self.application = application
 
-    def save(self, page: Page) -> None:
-        """Save a page entity to the event-sourced repository.
+    def save(self, artifact: Artifact) -> None:
+        """Save an artifact entity to the event-sourced repository.
 
         Raises:
             InfrastructureError: If the event store operation fails.
 
         """
         try:
-            self.application.save(page)
+            self.application.save(artifact)
         except Exception as e:
             # Let infrastructure errors bubble up for proper error handling at API layer
-            msg = f"Failed to save page: {e!s}"
+            msg = f"Failed to save artifact: {e!s}"
             raise InfrastructureError(msg) from e
 
-    def get_by_id(self, page_id: UUID) -> Page:
-        """Retrieve Page by rebuilding from event history.
+    def get_by_id(self, artifact_id: UUID) -> Artifact:
+        """Retrieve Artifact by rebuilding from event history.
 
         Raises:
-            AggregateNotFoundError: If the page does not exist.
+            AggregateNotFoundError: If the artifact does not exist.
             InfrastructureError: If the event store operation fails.
 
         """
         try:
-            page = self.application.repository.get(page_id)
-            if isinstance(page, Page):
-                return page
+            artifact = self.application.repository.get(artifact_id)
+            if isinstance(artifact, Artifact):
+                return artifact
             # This shouldn't happen in normal circumstances
-            msg = f"Page {page_id} not found"
+            msg = f"Artifact {artifact_id} not found"
             raise AggregateNotFoundError(msg)
         except AggregateNotFoundError:
             # Re-raise our domain exception
@@ -49,6 +49,6 @@ class EventSourcedPageRepository(PageRepository):
             # Check if it's a 'not found' error from eventsourcing
             error_msg = str(e).lower()
             if "not found" in error_msg or "does not exist" in error_msg:
-                raise AggregateNotFoundError(f"Page {page_id} not found") from e
+                raise AggregateNotFoundError(f"Artifact {artifact_id} not found") from e
             # Any other exception (network error, DB error, etc.) is an infrastructure error
-            raise InfrastructureError(f"Failed to retrieve page {page_id}: {e!s}") from e
+            raise InfrastructureError(f"Failed to retrieve artifact {artifact_id}: {e!s}") from e

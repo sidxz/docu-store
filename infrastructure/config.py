@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     mongo_uri: str = "mongodb://localhost:27017/?replicaSet=rs0&directConnection=true"
     mongo_db: str = "docu_store"
     mongo_pages_collection: str = "page_read_models"
-    mongo_articles_collection: str = "article_read_models"
+    mongo_artifacts_collection: str = "artifact_read_models"
     mongo_tracking_collection: str = "read_model_tracking"
 
 
