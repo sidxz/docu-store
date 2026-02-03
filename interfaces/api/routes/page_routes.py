@@ -72,7 +72,7 @@ async def create_page(
     use_case = container[CreatePageUseCase]
 
     try:
-        result = use_case.execute(request=request)
+        result = await use_case.execute(request=request)
 
         if isinstance(result, Success):
             return result.unwrap()
