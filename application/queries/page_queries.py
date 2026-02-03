@@ -17,7 +17,7 @@ class GetPageByIdQuery:
                 return Failure(f"Page with ID {page_id} not found")
 
             page_response = PageResponse(
-                id=UUID(page_data["id"]),
+                page_id=UUID(page_data["page_id"]),
                 name=page_data["name"],
                 compounds=page_data["compounds"],
             )
