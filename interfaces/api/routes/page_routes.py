@@ -10,8 +10,15 @@ from application.ports.repositories.page_read_models import PageReadModel
 from application.use_cases.page_use_cases import (
     AddCompoundMentionsUseCase,
     CreatePageUseCase,
+    DeletePageUseCase,
+    UpdateSummaryCandidateUseCase,
+    UpdateTagMentionsUseCase,
+    UpdateTextMentionUseCase,
 )
 from domain.exceptions import InfrastructureError
+from domain.value_objects.summary_candidate import SummaryCandidate
+from domain.value_objects.tag_mention import TagMention
+from domain.value_objects.text_mention import TextMention
 from interfaces.api.routes.helpers import _map_app_error_to_http_exception
 from interfaces.dependencies import get_container
 
@@ -81,6 +88,149 @@ async def create_page(
         ) from exc
 
 
+@router.patch("/{page_id}/tag_mentions", status_code=status.HTTP_200_OK)
+async def update_tag_mentions(
+    page_id: UUID,
+    tag_mentions: list[TagMention],
+    container: Annotated[Container, Depends(get_container)],
+) -> PageResponse:
+    """Update tag mentions for a page."""
+    use_case = container[UpdateTagMentionsUseCase]
+
+    try:
+        result = await use_case.execute(page_id=page_id, tag_mentions=tag_mentions)
+
+        if isinstance(result, Success):
+            return result.unwrap()
+
+        if isinstance(result, Failure):
+            raise _map_app_error_to_http_exception(result.failure()) from None
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected result type",
+        ) from None
+    except HTTPException:
+        raise
+    except InfrastructureError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Service temporarily unavailable",
+        ) from exc
+    except BaseException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        ) from exc
+
+
+@router.patch("/{page_id}/text_mention", status_code=status.HTTP_200_OK)
+async def update_text_mention(
+    page_id: UUID,
+    text_mention: TextMention,
+    container: Annotated[Container, Depends(get_container)],
+) -> PageResponse:
+    """Update text mention for a page."""
+    use_case = container[UpdateTextMentionUseCase]
+
+    try:
+        result = await use_case.execute(page_id=page_id, text_mention=text_mention)
+
+        if isinstance(result, Success):
+            return result.unwrap()
+
+        if isinstance(result, Failure):
+            raise _map_app_error_to_http_exception(result.failure()) from None
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected result type",
+        ) from None
+    except HTTPException:
+        raise
+    except InfrastructureError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Service temporarily unavailable",
+        ) from exc
+    except BaseException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        ) from exc
+
+
+@router.patch("/{page_id}/summary_candidate", status_code=status.HTTP_200_OK)
+async def update_summary_candidate(
+    page_id: UUID,
+    summary_candidate: SummaryCandidate,
+    container: Annotated[Container, Depends(get_container)],
+) -> PageResponse:
+    """Update summary candidate for a page."""
+    use_case = container[UpdateSummaryCandidateUseCase]
+
+    try:
+        result = await use_case.execute(page_id=page_id, summary_candidate=summary_candidate)
+
+        if isinstance(result, Success):
+            return result.unwrap()
+
+        if isinstance(result, Failure):
+            raise _map_app_error_to_http_exception(result.failure()) from None
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected result type",
+        ) from None
+    except HTTPException:
+        raise
+    except InfrastructureError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Service temporarily unavailable",
+        ) from exc
+    except BaseException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        ) from exc
+
+
+@router.delete("/{page_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_page(
+    page_id: UUID,
+    container: Annotated[Container, Depends(get_container)],
+) -> None:
+    """Delete a page."""
+    use_case = container[DeletePageUseCase]
+
+    try:
+        result = await use_case.execute(page_id=page_id)
+
+        if isinstance(result, Success):
+            return
+
+        if isinstance(result, Failure):
+            raise _map_app_error_to_http_exception(result.failure()) from None
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected result type",
+        ) from None
+    except HTTPException:
+        raise
+    except InfrastructureError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Service temporarily unavailable",
+        ) from exc
+    except BaseException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        ) from exc
+
+
 @router.post("/{page_id}/compound_mentions", status_code=status.HTTP_200_OK)
 async def update_compound_mentions(
     page_id: UUID,
@@ -107,7 +257,7 @@ async def update_compound_mentions(
     use_case = container[AddCompoundMentionsUseCase]
 
     try:
-        result = use_case.execute(request=request)
+        result = await use_case.execute(request=request)
 
         if isinstance(result, Success):
             return result.unwrap()

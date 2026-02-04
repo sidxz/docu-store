@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from eventsourcing.domain import Aggregate, event
@@ -39,6 +40,7 @@ class Page(Aggregate):
         self.tag_mentions: list[TagMention] = []
         self.text_mention: TextMention | None = None
         self.summary_candidate: SummaryCandidate | None = None
+        self.is_deleted: bool = False
 
     def __hash__(self) -> int:
         """Return hash of the aggregate based on its ID."""
@@ -53,6 +55,8 @@ class Page(Aggregate):
         compound_mentions: list[CompoundMention]
 
     def update_compound_mentions(self, compound_mentions: list[CompoundMention]) -> None:
+        if self.is_deleted:
+            raise ValueError("Cannot update compound mentions on a deleted page")
         # Trigger event
         self.trigger_event(self.CompoundMentionsUpdated, compound_mentions=compound_mentions)
 
@@ -68,6 +72,8 @@ class Page(Aggregate):
         tag_mentions: list[TagMention]
 
     def update_tag_mentions(self, tag_mentions: list[TagMention]) -> None:
+        if self.is_deleted:
+            raise ValueError("Cannot update tag mentions on a deleted page")
         self.trigger_event(self.TagMentionsUpdated, tag_mentions=tag_mentions)
 
     @event(TagMentionsUpdated)
@@ -81,6 +87,8 @@ class Page(Aggregate):
         text_mention: TextMention
 
     def update_text_mention(self, text_mention: TextMention) -> None:
+        if self.is_deleted:
+            raise ValueError("Cannot update text mention on a deleted page")
         self.trigger_event(self.TextMentionUpdated, text_mention=text_mention)
 
     @event(TextMentionUpdated)
@@ -94,8 +102,25 @@ class Page(Aggregate):
         summary_candidate: SummaryCandidate
 
     def update_summary_candidate(self, summary_candidate: SummaryCandidate) -> None:
+        if self.is_deleted:
+            raise ValueError("Cannot update summary candidate on a deleted page")
         self.trigger_event(self.SummaryCandidateUpdated, summary_candidate=summary_candidate)
 
     @event(SummaryCandidateUpdated)
     def _apply_summary_candidate_updated(self, summary_candidate: SummaryCandidate) -> None:
         self.summary_candidate = summary_candidate
+
+    # ============================================================================
+    # COMMAND METHOD - Delete Page
+    # ============================================================================
+    class Deleted(Aggregate.Event):
+        deleted_at: datetime
+
+    def delete(self) -> None:
+        """Delete this page aggregate."""
+        self.trigger_event(self.Deleted, deleted_at=datetime.now(UTC))
+
+    @event(Deleted)
+    def _apply_deleted(self, deleted_at: datetime) -> None:
+        self.deleted_at = deleted_at
+        self.is_deleted = True

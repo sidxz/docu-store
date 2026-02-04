@@ -26,6 +26,10 @@ class EventProjector:
             # Page events
             Page.Created: page_projector.page_created,
             Page.CompoundMentionsUpdated: page_projector.compound_mentions_updated,
+            Page.TagMentionsUpdated: page_projector.tag_mentions_updated,
+            Page.TextMentionUpdated: page_projector.text_mention_updated,
+            Page.SummaryCandidateUpdated: page_projector.summary_candidate_updated,
+            Page.Deleted: page_projector.page_deleted,
             # Artifact events
             Artifact.Created: artifact_projector.artifact_created,
             Artifact.PagesAdded: artifact_projector.pages_added,
@@ -33,6 +37,7 @@ class EventProjector:
             Artifact.TitleMentionUpdated: artifact_projector.title_mention_updated,
             Artifact.TagsUpdated: artifact_projector.tags_updated,
             Artifact.SummaryCandidateUpdated: artifact_projector.summary_candidate_updated,
+            Artifact.Deleted: artifact_projector.artifact_deleted,
         }
 
     def process_event(self, event: object, tracking: object) -> None:

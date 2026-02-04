@@ -51,6 +51,34 @@ class ReadModelMaterializer(Protocol):
         """
         ...
 
+    def delete_page(
+        self,
+        page_id: str,
+        tracking: Tracking,
+    ) -> None:
+        """Delete a page read model atomically with tracking.
+
+        Args:
+            page_id: Unique identifier for the page
+            tracking: Event tracking information for idempotency
+
+        """
+        ...
+
+    def delete_artifact(
+        self,
+        artifact_id: str,
+        tracking: Tracking,
+    ) -> None:
+        """Delete an artifact read model atomically with tracking.
+
+        Args:
+            artifact_id: Unique identifier for the artifact
+            tracking: Event tracking information for idempotency
+
+        """
+        ...
+
     def max_tracking_id(self, application_name: str) -> int | None:
         """Get the highest notification ID processed for an application.
 

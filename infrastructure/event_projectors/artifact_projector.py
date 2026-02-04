@@ -95,3 +95,10 @@ class ArtifactProjector:
             },
             tracking=tracking,  # type: ignore[arg-type]
         )
+
+    def artifact_deleted(self, event: object, tracking: object) -> None:
+        """Project ArtifactDeleted event to read model."""
+        self._materializer.delete_artifact(
+            artifact_id=str(event.originator_id),  # type: ignore[attr-defined]
+            tracking=tracking,  # type: ignore[arg-type]
+        )

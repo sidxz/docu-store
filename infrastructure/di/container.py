@@ -11,9 +11,33 @@ from application.ports.repositories.artifact_read_models import ArtifactReadMode
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
-from application.use_cases.artifact_use_cases import CreateArtifactUseCase
-from application.use_cases.page_use_cases import AddCompoundMentionsUseCase, CreatePageUseCase
+from application.use_cases.artifact_use_cases import (
+    AddPagesUseCase,
+    CreateArtifactUseCase,
+    DeleteArtifactUseCase,
+    RemovePagesUseCase,
+    UpdateTagsUseCase,
+    UpdateTitleMentionUseCase,
+)
+from application.use_cases.artifact_use_cases import (
+    UpdateSummaryCandidateUseCase as UpdateArtifactSummaryCandidateUseCase,
+)
+from application.use_cases.page_use_cases import (
+    AddCompoundMentionsUseCase,
+    CreatePageUseCase,
+    DeletePageUseCase,
+    UpdateTagMentionsUseCase,
+    UpdateTextMentionUseCase,
+)
+from application.use_cases.page_use_cases import (
+    UpdateSummaryCandidateUseCase as UpdatePageSummaryCandidateUseCase,
+)
 from domain.value_objects.compound_mention import CompoundMention
+from domain.value_objects.extraction_metadata import ExtractionMetadata
+from domain.value_objects.summary_candidate import SummaryCandidate
+from domain.value_objects.tag_mention import TagMention
+from domain.value_objects.text_mention import TextMention
+from domain.value_objects.title_mention import TitleMention
 from infrastructure.config import settings
 from infrastructure.event_projectors.event_projector import EventProjector
 from infrastructure.event_sourced_repositories.artifact_repository import (
@@ -42,6 +66,11 @@ class DocuStoreApplication(Application):
     def register_transcodings(self, transcoder: JSONTranscoder) -> None:  # type: ignore[name-defined]
         super().register_transcodings(transcoder)
         transcoder.register(PydanticTranscoding(CompoundMention))
+        transcoder.register(PydanticTranscoding(TitleMention))
+        transcoder.register(PydanticTranscoding(SummaryCandidate))
+        transcoder.register(PydanticTranscoding(TagMention))
+        transcoder.register(PydanticTranscoding(TextMention))
+        transcoder.register(PydanticTranscoding(ExtractionMetadata))
 
 
 def create_container() -> Container:
@@ -92,11 +121,55 @@ def create_container() -> Container:
     )
     container[AddCompoundMentionsUseCase] = lambda c: AddCompoundMentionsUseCase(
         page_repository=c[PageRepository],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[UpdateTagMentionsUseCase] = lambda c: UpdateTagMentionsUseCase(
+        page_repository=c[PageRepository],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[UpdateTextMentionUseCase] = lambda c: UpdateTextMentionUseCase(
+        page_repository=c[PageRepository],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[UpdatePageSummaryCandidateUseCase] = lambda c: UpdatePageSummaryCandidateUseCase(
+        page_repository=c[PageRepository],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[DeletePageUseCase] = lambda c: DeletePageUseCase(
+        page_repository=c[PageRepository],
+        external_event_publisher=c[ExternalEventPublisher],
     )
 
     # Artifact Use Cases
     container[CreateArtifactUseCase] = lambda c: CreateArtifactUseCase(
         artifact_repository=c[ArtifactRepository],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[AddPagesUseCase] = lambda c: AddPagesUseCase(
+        artifact_repository=c[ArtifactRepository],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[RemovePagesUseCase] = lambda c: RemovePagesUseCase(
+        artifact_repository=c[ArtifactRepository],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[UpdateTitleMentionUseCase] = lambda c: UpdateTitleMentionUseCase(
+        artifact_repository=c[ArtifactRepository],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[UpdateArtifactSummaryCandidateUseCase] = (
+        lambda c: UpdateArtifactSummaryCandidateUseCase(
+            artifact_repository=c[ArtifactRepository],
+            external_event_publisher=c[ExternalEventPublisher],
+        )
+    )
+    container[UpdateTagsUseCase] = lambda c: UpdateTagsUseCase(
+        artifact_repository=c[ArtifactRepository],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[DeleteArtifactUseCase] = lambda c: DeleteArtifactUseCase(
+        artifact_repository=c[ArtifactRepository],
+        page_repository=c[PageRepository],
         external_event_publisher=c[ExternalEventPublisher],
     )
 

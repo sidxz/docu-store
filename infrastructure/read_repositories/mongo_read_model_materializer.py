@@ -59,7 +59,7 @@ class MongoReadModelMaterializer(MongoReadModelTracking):
         """Create page/article indexes for performance and data integrity."""
         # Page collection indexes
         self.pages.create_index("page_id", unique=True)  # Primary key
-        # self.pages.create_index("article_id")  # For filtering tasks by article
+        self.pages.create_index("article_id")  # For filtering tasks by article
         # self.pages.create_index("status")  # For filtering by task status
 
         # Artifact collection indexes
@@ -106,6 +106,40 @@ class MongoReadModelMaterializer(MongoReadModelTracking):
         )
         logger.info(
             "read_model_artifact_upserted",
+            artifact_id=artifact_id,
+            tracking_id=tracking.notification_id,
+        )
+
+    def delete_page(
+        self,
+        page_id: str,
+        tracking: Tracking,
+    ) -> None:
+        """Delete a page read model atomically with tracking."""
+
+        def _delete(session):
+            self.pages.delete_one({"page_id": page_id}, session=session)
+
+        self._run_in_transaction(tracking, _delete)
+        logger.info(
+            "read_model_page_deleted",
+            page_id=page_id,
+            tracking_id=tracking.notification_id,
+        )
+
+    def delete_artifact(
+        self,
+        artifact_id: str,
+        tracking: Tracking,
+    ) -> None:
+        """Delete an artifact read model atomically with tracking."""
+
+        def _delete(session):
+            self.artifacts.delete_one({"artifact_id": artifact_id}, session=session)
+
+        self._run_in_transaction(tracking, _delete)
+        logger.info(
+            "read_model_artifact_deleted",
             artifact_id=artifact_id,
             tracking_id=tracking.notification_id,
         )

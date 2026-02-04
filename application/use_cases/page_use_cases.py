@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from returns.result import Failure, Result, Success
 
 from application.dtos.errors import AppError
@@ -11,6 +13,9 @@ from domain.exceptions import (
     ConcurrencyError,
     ValidationError,
 )
+from domain.value_objects.summary_candidate import SummaryCandidate
+from domain.value_objects.tag_mention import TagMention
+from domain.value_objects.text_mention import TextMention
 
 
 class CreatePageUseCase:
@@ -52,10 +57,15 @@ class CreatePageUseCase:
 
 
 class AddCompoundMentionsUseCase:
-    def __init__(self, page_repository: PageRepository) -> None:
+    def __init__(
+        self,
+        page_repository: PageRepository,
+        external_event_publisher: ExternalEventPublisher | None = None,
+    ) -> None:
         self.page_repository = page_repository
+        self.external_event_publisher = external_event_publisher
 
-    def execute(self, request: AddCompoundMentionsRequest) -> Result[PageResponse, AppError]:
+    async def execute(self, request: AddCompoundMentionsRequest) -> Result[PageResponse, AppError]:
         try:
             # Retrieve the page by ID
             page = self.page_repository.get_by_id(request.page_id)
@@ -68,6 +78,10 @@ class AddCompoundMentionsUseCase:
 
             # Return a successful result with the updated PageResponse
             result = PageMapper.to_page_response(page)
+
+            if self.external_event_publisher:
+                await self.external_event_publisher.notify_page_updated(result)
+
             return Success(result)
         except AggregateNotFoundError as e:
             # Page not found - client's fault (404 Not Found)
@@ -80,3 +94,175 @@ class AddCompoundMentionsUseCase:
             return Failure(
                 AppError("concurrency", f"Resource was modified by another request: {e!s}"),
             )
+
+
+class UpdateTagMentionsUseCase:
+    """Update tag mentions for a page."""
+
+    def __init__(
+        self,
+        page_repository: PageRepository,
+        external_event_publisher: ExternalEventPublisher | None = None,
+    ) -> None:
+        self.page_repository = page_repository
+        self.external_event_publisher = external_event_publisher
+
+    async def execute(
+        self,
+        page_id: UUID,
+        tag_mentions: list[TagMention],
+    ) -> Result[PageResponse, AppError]:
+        try:
+            # Retrieve the page by ID
+            page = self.page_repository.get_by_id(page_id)
+
+            # Update tag mentions
+            page.update_tag_mentions(tag_mentions)
+
+            # Save the updated page
+            self.page_repository.save(page)
+
+            # Return a successful result with the updated PageResponse
+            result = PageMapper.to_page_response(page)
+
+            if self.external_event_publisher:
+                await self.external_event_publisher.notify_page_updated(result)
+
+            return Success(result)
+        except AggregateNotFoundError as e:
+            return Failure(AppError("not_found", f"Page not found: {e!s}"))
+        except ValidationError as e:
+            return Failure(AppError("validation", f"Validation error: {e!s}"))
+        except ConcurrencyError as e:
+            return Failure(
+                AppError("concurrency", f"Resource was modified by another request: {e!s}"),
+            )
+        except ValueError as e:
+            return Failure(AppError("invalid_operation", str(e)))
+
+
+class UpdateTextMentionUseCase:
+    """Update text mention for a page."""
+
+    def __init__(
+        self,
+        page_repository: PageRepository,
+        external_event_publisher: ExternalEventPublisher | None = None,
+    ) -> None:
+        self.page_repository = page_repository
+        self.external_event_publisher = external_event_publisher
+
+    async def execute(
+        self, page_id: UUID, text_mention: TextMention
+    ) -> Result[PageResponse, AppError]:
+        try:
+            # Retrieve the page by ID
+            page = self.page_repository.get_by_id(page_id)
+
+            # Update text mention
+            page.update_text_mention(text_mention)
+
+            # Save the updated page
+            self.page_repository.save(page)
+
+            # Return a successful result with the updated PageResponse
+            result = PageMapper.to_page_response(page)
+
+            if self.external_event_publisher:
+                await self.external_event_publisher.notify_page_updated(result)
+
+            return Success(result)
+        except AggregateNotFoundError as e:
+            return Failure(AppError("not_found", f"Page not found: {e!s}"))
+        except ValidationError as e:
+            return Failure(AppError("validation", f"Validation error: {e!s}"))
+        except ConcurrencyError as e:
+            return Failure(
+                AppError("concurrency", f"Resource was modified by another request: {e!s}"),
+            )
+        except ValueError as e:
+            return Failure(AppError("invalid_operation", str(e)))
+
+
+class UpdateSummaryCandidateUseCase:
+    """Update summary candidate for a page."""
+
+    def __init__(
+        self,
+        page_repository: PageRepository,
+        external_event_publisher: ExternalEventPublisher | None = None,
+    ) -> None:
+        self.page_repository = page_repository
+        self.external_event_publisher = external_event_publisher
+
+    async def execute(
+        self,
+        page_id: UUID,
+        summary_candidate: SummaryCandidate,
+    ) -> Result[PageResponse, AppError]:
+        try:
+            # Retrieve the page by ID
+            page = self.page_repository.get_by_id(page_id)
+
+            # Update summary candidate
+            page.update_summary_candidate(summary_candidate)
+
+            # Save the updated page
+            self.page_repository.save(page)
+
+            # Return a successful result with the updated PageResponse
+            result = PageMapper.to_page_response(page)
+
+            if self.external_event_publisher:
+                await self.external_event_publisher.notify_page_updated(result)
+
+            return Success(result)
+        except AggregateNotFoundError as e:
+            return Failure(AppError("not_found", f"Page not found: {e!s}"))
+        except ValidationError as e:
+            return Failure(AppError("validation", f"Validation error: {e!s}"))
+        except ConcurrencyError as e:
+            return Failure(
+                AppError("concurrency", f"Resource was modified by another request: {e!s}"),
+            )
+        except ValueError as e:
+            return Failure(AppError("invalid_operation", str(e)))
+
+
+class DeletePageUseCase:
+    """Delete a page."""
+
+    def __init__(
+        self,
+        page_repository: PageRepository,
+        external_event_publisher: ExternalEventPublisher | None = None,
+    ) -> None:
+        self.page_repository = page_repository
+        self.external_event_publisher = external_event_publisher
+
+    async def execute(self, page_id: UUID) -> Result[None, AppError]:
+        try:
+            # Retrieve the page by ID
+            page = self.page_repository.get_by_id(page_id)
+
+            # Delete the page
+            page.delete()
+
+            # Save the updated page
+            self.page_repository.save(page)
+
+            if self.external_event_publisher:
+                await self.external_event_publisher.notify_page_deleted(page_id)
+
+            # Return a successful result
+            return Success(None)
+        except AggregateNotFoundError as e:
+            return Failure(AppError("not_found", f"Page not found: {e!s}"))
+        except ValidationError as e:
+            return Failure(AppError("validation", f"Validation error: {e!s}"))
+        except ConcurrencyError as e:
+            return Failure(
+                AppError("concurrency", f"Resource was modified by another request: {e!s}"),
+            )
+        except ValueError as e:
+            return Failure(AppError("invalid_operation", str(e)))

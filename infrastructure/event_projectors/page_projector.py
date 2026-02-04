@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from domain.aggregates.page import Page
-
 if TYPE_CHECKING:
+    from domain.aggregates.page import Page
     from infrastructure.read_repositories.read_model_materializer import ReadModelMaterializer
 
 
@@ -87,5 +86,12 @@ class PageProjector:
             fields={
                 "summary_candidate": summary_candidate_data,
             },
+            tracking=tracking,  # type: ignore[arg-type]
+        )
+
+    def page_deleted(self, event: object, tracking: object) -> None:
+        """Project PageDeleted event to read model."""
+        self._materializer.delete_page(
+            page_id=str(event.originator_id),  # type: ignore[attr-defined]
             tracking=tracking,  # type: ignore[arg-type]
         )
