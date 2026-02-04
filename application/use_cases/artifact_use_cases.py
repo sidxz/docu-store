@@ -69,9 +69,11 @@ class AddPagesUseCase:
     def __init__(
         self,
         artifact_repository: ArtifactRepository,
+        page_repository: PageRepository,
         external_event_publisher: ExternalEventPublisher | None = None,
     ) -> None:
         self.artifact_repository = artifact_repository
+        self.page_repository = page_repository
         self.external_event_publisher = external_event_publisher
 
     async def execute(
@@ -82,6 +84,17 @@ class AddPagesUseCase:
         try:
             # Retrieve the artifact by ID
             artifact = self.artifact_repository.get_by_id(artifact_id)
+
+            # Validate that all page IDs exist and their artifact_id matches
+            for page_id in page_ids:
+                page = self.page_repository.get_by_id(page_id)
+                if page.artifact_id != artifact_id:
+                    return Failure(
+                        AppError(
+                            "validation",
+                            f"Page {page_id} does not belong to Artifact {artifact_id}",
+                        ),
+                    )
 
             # Add pages to the artifact
             artifact.add_pages(page_ids)

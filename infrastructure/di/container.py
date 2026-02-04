@@ -117,6 +117,7 @@ def create_container() -> Container:
     # Page Use Cases
     container[CreatePageUseCase] = lambda c: CreatePageUseCase(
         page_repository=c[PageRepository],
+        artifact_repository=c[ArtifactRepository],
         external_event_publisher=c[ExternalEventPublisher],
     )
     container[AddCompoundMentionsUseCase] = lambda c: AddCompoundMentionsUseCase(
@@ -137,6 +138,7 @@ def create_container() -> Container:
     )
     container[DeletePageUseCase] = lambda c: DeletePageUseCase(
         page_repository=c[PageRepository],
+        artifact_repository=c[ArtifactRepository],
         external_event_publisher=c[ExternalEventPublisher],
     )
 
@@ -147,6 +149,7 @@ def create_container() -> Container:
     )
     container[AddPagesUseCase] = lambda c: AddPagesUseCase(
         artifact_repository=c[ArtifactRepository],
+        page_repository=c[PageRepository],
         external_event_publisher=c[ExternalEventPublisher],
     )
     container[RemovePagesUseCase] = lambda c: RemovePagesUseCase(
