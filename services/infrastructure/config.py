@@ -73,6 +73,20 @@ class Settings(BaseSettings):
     )
     blob_storage_options: dict = {}
 
+    # Temporal
+    temporal_host: str = Field(
+        default="localhost:7233",
+        validation_alias="TEMPORAL_HOST",
+    )
+    temporal_task_queue: str = Field(
+        default="docu-store-task-queue",
+        validation_alias="TEMPORAL_TASK_QUEUE",
+    )
+    enable_temporal_workflows: bool = Field(
+        default=False,
+        validation_alias="ENABLE_TEMPORAL_WORKFLOWS",
+    )
+
 
 # Global settings instance
 settings = Settings()

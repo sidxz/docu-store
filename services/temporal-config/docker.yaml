@@ -1,0 +1,22 @@
+# Temporal Dynamic Configuration for Docker environment
+# This file configures Temporal server behavior
+
+# Enable search attributes for better workflow filtering
+system.enableNamespaceNotActiveAutoForwarding:
+  - value: true
+    constraints: {}
+
+# Set default workflow execution timeout
+system.defaultWorkflowExecutionTimeout:
+  - value: "72h"
+    constraints: {}
+
+# Set default activity schedule-to-start timeout
+system.defaultActivityScheduleToStartTimeout:
+  - value: "10s"
+    constraints: {}
+
+# Enable verbose logging for development
+system.enableDebugMode:
+  - value: true
+    constraints: {}

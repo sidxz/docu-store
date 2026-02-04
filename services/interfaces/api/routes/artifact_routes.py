@@ -80,11 +80,11 @@ async def create_artifact(
 @handle_use_case_errors
 async def upload_blob(
     container: Annotated[Container, Depends(get_container)],
-    file: UploadFile = File(...),
+    file: Annotated[UploadFile, File()],
 ) -> UploadBlobResponse:
     """Upload a blob to the blob store."""
     use_case = container[UploadBlobUseCase]
-    return use_case.execute(
+    return await use_case.execute(
         stream=file.file,
         cmd=UploadBlobRequest(filename=file.filename, mime_type=file.content_type),
     )

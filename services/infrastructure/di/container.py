@@ -12,9 +12,11 @@ from application.ports.repositories.artifact_read_models import ArtifactReadMode
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
+from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.use_cases.artifact_use_cases import (
     AddPagesUseCase,
     CreateArtifactUseCase,
+    CreateArtifactWithTitleUseCase,
     DeleteArtifactUseCase,
     RemovePagesUseCase,
     UpdateTagsUseCase,
@@ -23,7 +25,7 @@ from application.use_cases.artifact_use_cases import (
 from application.use_cases.artifact_use_cases import (
     UpdateSummaryCandidateUseCase as UpdateArtifactSummaryCandidateUseCase,
 )
-from application.use_cases.blob_use_cases import UploadBlobUseCase
+from application.use_cases.blob_use_cases import ExtractPdfContentUseCase, UploadBlobUseCase
 from application.use_cases.page_use_cases import (
     AddCompoundMentionsUseCase,
     CreatePageUseCase,
@@ -55,6 +57,7 @@ from infrastructure.read_repositories.mongo_read_model_materializer import (
 )
 from infrastructure.read_repositories.mongo_read_repository import MongoReadRepository
 from infrastructure.serialization.pydantic_transcoder import PydanticTranscoding
+from infrastructure.temporal.workflow_trigger import TemporalWorkflowOrchestrator
 
 if TYPE_CHECKING:
     from eventsourcing.persistence import JSONTranscoder
@@ -193,6 +196,16 @@ def create_container() -> Container:
         page_repository=c[PageRepository],
         external_event_publisher=c[ExternalEventPublisher],
         blob_store=c[BlobStore],
+        workflow_orchestrator=c[WorkflowOrchestrator],
+    )
+
+    # Blob/PDF processing use cases (for Temporal workflows)
+    container[ExtractPdfContentUseCase] = lambda c: ExtractPdfContentUseCase(
+        blob_store=c[BlobStore],
+    )
+    container[CreateArtifactWithTitleUseCase] = lambda c: CreateArtifactWithTitleUseCase(
+        artifact_repository=c[ArtifactRepository],
+        external_event_publisher=c[ExternalEventPublisher],
     )
 
     # Register Read Model Infrastructure
@@ -215,5 +228,16 @@ def create_container() -> Container:
 
     container[PageReadModel] = mongo_repository_factory
     container[ArtifactReadModel] = mongo_repository_factory
+
+    # Register Workflow Orchestrator (Port -> Adapter pattern)
+    def workflow_orchestrator_factory(_: object) -> WorkflowOrchestrator | None:
+        if settings.enable_temporal_workflows:
+            return TemporalWorkflowOrchestrator(
+                temporal_host=settings.temporal_host,
+                task_queue=settings.temporal_task_queue,
+            )
+        return None
+
+    container[WorkflowOrchestrator] = workflow_orchestrator_factory  # type: ignore[assignment]
 
     return container

@@ -16,6 +16,12 @@ run: ## Run the FastAPI application
 run-read-models: ## Run the MongoDB read model projector
 	uv run python -m infrastructure.read_worker
 
+run-temporal-worker: ## Run the Temporal worker for workflow execution
+	uv run python -m infrastructure.temporal.temporal_worker
+
+demo-temporal: ## Run the Temporal PDF workflow demo
+	uv run python scripts/demo_temporal_pdf_workflow.py
+
 lint: ## Run linting checks
 	uv run ruff check application/ domain/ infrastructure/ interfaces/ 
 
@@ -29,14 +35,17 @@ clean: ## Clean up generated files
 	rm -rf .pytest_cache .coverage htmlcov .mypy_cache .ruff_cache
 	rm -rf dist build *.egg-info
 
-docker-up: ## Start infrastructure services (EventStoreDB, NATS)
+docker-up: ## Start infrastructure services (EventStoreDB, Kafka, MongoDB, Temporal)
 	docker-compose up -d
 	@echo "Waiting for services to be healthy..."
-	@sleep 5
+	@sleep 10
 	@echo "Services ready!"
 	@echo "  - EventStoreDB UI: http://localhost:2113"
 	@echo "  - Kafka: PLAINTEXT://localhost:9092"
+	@echo "  - Kafka UI: http://localhost:5051"
 	@echo "  - MongoDB: mongodb://localhost:27017"
+	@echo "  - Temporal Server: localhost:7233"
+	@echo "  - Temporal UI: http://localhost:8233"
 
 docker-down: ## Stop infrastructure services
 	docker-compose down

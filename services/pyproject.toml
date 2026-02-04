@@ -15,10 +15,12 @@ dependencies = [
     "pydantic>=2.12.5",
     "pydantic-settings>=2.12.0",
     "pymongo>=4.7.0",
+    "pypdf>=6.6.2",
     "python-dotenv>=1.2.1",
     "python-multipart>=0.0.22",
     "returns>=0.26.0",
     "structlog>=25.5.0",
+    "temporalio>=1.22.0",
     "uvicorn>=0.40.0",
 ]
 
