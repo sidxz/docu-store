@@ -3,10 +3,11 @@ from typing import Annotated
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from returns.result import Failure, Success
 
 from application.dtos.artifact_dtos import ArtifactResponse, CreateArtifactRequest
+from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.use_cases.artifact_use_cases import (
     AddPagesUseCase,
     CreateArtifactUseCase,
@@ -25,6 +26,36 @@ from interfaces.dependencies import get_container
 logger = structlog.get_logger()
 
 router = APIRouter(prefix="/artifacts", tags=["artifacts"])
+
+
+@router.get("", status_code=status.HTTP_200_OK)
+async def list_artifacts(
+    container: Annotated[Container, Depends(get_container)],
+    skip: Annotated[int, Query(...)] = 0,
+    limit: Annotated[int, Query(...)] = 100,
+) -> list[ArtifactResponse]:
+    """List all artifacts with pagination."""
+    read_repository = container[ArtifactReadModel]
+    artifacts = await read_repository.list_artifacts(skip=skip, limit=limit)
+    return artifacts
+
+
+@router.get("/{artifact_id}", status_code=status.HTTP_200_OK)
+async def get_artifact(
+    artifact_id: UUID,
+    container: Annotated[Container, Depends(get_container)],
+) -> ArtifactResponse:
+    """Retrieve an artifact by ID from the read model."""
+    read_repository = container[ArtifactReadModel]
+    artifact = await read_repository.get_artifact_by_id(artifact_id)
+
+    if artifact is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Artifact not found",
+        )
+
+    return artifact
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)

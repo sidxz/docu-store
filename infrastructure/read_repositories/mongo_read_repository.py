@@ -36,3 +36,18 @@ class MongoReadRepository(PageReadModel, ArtifactReadModel):
         else:
             doc["pages"] = ()
         return ArtifactResponse(**doc)
+
+    async def list_artifacts(self, skip: int = 0, limit: int = 100) -> list[ArtifactResponse]:
+        """List all artifacts with pagination."""
+        cursor = self.artifacts.find().skip(skip).limit(limit)
+        artifacts = []
+        async for doc in cursor:
+            # Map MongoDB _id (ObjectId) to artifact_id field
+            doc["artifact_id"] = doc.get("artifact_id") or str(doc.pop("_id"))
+            # Convert page IDs from strings to UUIDs
+            if doc.get("pages"):
+                doc["pages"] = tuple(UUID(page_id) for page_id in doc["pages"])
+            else:
+                doc["pages"] = ()
+            artifacts.append(ArtifactResponse(**doc))
+        return artifacts
