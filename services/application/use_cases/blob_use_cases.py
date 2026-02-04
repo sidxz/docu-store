@@ -12,10 +12,12 @@ from application.dtos.blob_dtos import (
 from application.dtos.errors import AppError
 from application.ports.blob_store import BlobStore, StoredBlob
 from application.ports.external_event_publisher import ExternalEventPublisher
+from application.ports.repositories.blob_repository import BlobRepository
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_repository import PageRepository
-from application.ports.workflow_orchestrator import WorkflowOrchestrator
+from domain.aggregates.blob import Blob
 from domain.exceptions import ValidationError
+from domain.value_objects.blob_ref import BlobRef
 
 logger = structlog.get_logger()
 
@@ -23,23 +25,23 @@ logger = structlog.get_logger()
 class UploadBlobUseCase:
     """Upload a blob and store it.
 
-    This use case handles blob uploads and, for PDFs, triggers the PDF ingestion
-    workflow as part of the business process.
+    This use case handles blob uploads and records a BlobUploaded domain event.
+    Workflow orchestration is handled by application policies reacting to events.
     """
 
     def __init__(
         self,
         artifact_repository: ArtifactRepository,
         page_repository: PageRepository,
+        blob_repository: BlobRepository,
         external_event_publisher: ExternalEventPublisher | None = None,
         blob_store: BlobStore | None = None,
-        workflow_orchestrator: WorkflowOrchestrator | None = None,
     ) -> None:
         self.artifact_repository = artifact_repository
         self.page_repository = page_repository
+        self.blob_repository = blob_repository
         self.external_event_publisher = external_event_publisher
         self.blob_store = blob_store
-        self.workflow_orchestrator = workflow_orchestrator
 
     async def execute(
         self,
@@ -80,31 +82,18 @@ class UploadBlobUseCase:
                 filename=cmd.filename,
             )
 
-            # Business logic: Trigger PDF ingestion workflow for PDF files
-            # This is part of the business process, not infrastructure
-            if self.workflow_orchestrator and cmd.mime_type == "application/pdf":
-                try:
-                    workflow_id = await self.workflow_orchestrator.trigger_pdf_ingestion(
-                        storage_key=stored.key,
-                        filename=cmd.filename,
-                        mime_type=stored.mime_type,
-                        source_uri=f"upload://{cmd.filename or 'unknown'}",
-                        artifact_id=str(artifact_id),
-                    )
-                    logger.info(
-                        "pdf_ingestion_workflow_triggered",
-                        workflow_id=workflow_id,
-                        storage_key=stored.key,
-                        artifact_id=str(artifact_id),
-                    )
-                except Exception:
-                    # Log but don't fail the upload if workflow trigger fails
-                    # The blob is stored successfully, workflow can be retried
-                    logger.exception(
-                        "workflow_trigger_failed_upload_succeeded",
-                        storage_key=stored.key,
-                        artifact_id=str(artifact_id),
-                    )
+            blob = Blob.upload(
+                blob_ref=BlobRef(
+                    key=stored.key,
+                    sha256=stored.sha256,
+                    size_bytes=stored.size_bytes,
+                    mime_type=stored.mime_type,
+                    filename=cmd.filename,
+                ),
+                source_uri=f"upload://{cmd.filename or 'unknown'}",
+                artifact_id=artifact_id,
+            )
+            self.blob_repository.save(blob)
 
             return Success(result)
         except ValidationError as e:
