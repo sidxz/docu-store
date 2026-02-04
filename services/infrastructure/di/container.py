@@ -8,6 +8,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from application.ports.blob_store import BlobStore
 from application.ports.external_event_publisher import ExternalEventPublisher
+from application.ports.repositories.blob_repository import BlobRepository
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_read_models import PageReadModel
@@ -46,6 +47,10 @@ from domain.value_objects.title_mention import TitleMention
 from infrastructure.blob_stores.fsspec_blob_store import FsspecBlobStore
 from infrastructure.config import settings
 from infrastructure.event_projectors.event_projector import EventProjector
+from infrastructure.event_projectors.policy_dispatcher import PolicyDispatcher
+from infrastructure.event_sourced_repositories.blob_repository import (
+    EventSourcedBlobRepository,
+)
 from infrastructure.event_sourced_repositories.artifact_repository import (
     EventSourcedArtifactRepository,
 )
@@ -100,6 +105,9 @@ def create_container() -> Container:
         application=c[Application],
     )
     container[ArtifactRepository] = lambda c: EventSourcedArtifactRepository(
+        application=c[Application],
+    )
+    container[BlobRepository] = lambda c: EventSourcedBlobRepository(
         application=c[Application],
     )
 
@@ -194,9 +202,9 @@ def create_container() -> Container:
     container[UploadBlobUseCase] = lambda c: UploadBlobUseCase(
         artifact_repository=c[ArtifactRepository],
         page_repository=c[PageRepository],
+        blob_repository=c[BlobRepository],
         external_event_publisher=c[ExternalEventPublisher],
         blob_store=c[BlobStore],
-        workflow_orchestrator=c[WorkflowOrchestrator],
     )
 
     # Blob/PDF processing use cases (for Temporal workflows)
@@ -212,6 +220,10 @@ def create_container() -> Container:
     container[MongoReadModelMaterializer] = lambda _: MongoReadModelMaterializer()
     container[EventProjector] = lambda c: EventProjector(
         materializer=c[MongoReadModelMaterializer],
+    )
+    container[PolicyDispatcher] = lambda c: PolicyDispatcher(
+        materializer=c[MongoReadModelMaterializer],
+        workflow_orchestrator=c[WorkflowOrchestrator],
     )
 
     # Register MongoDB Client and Read Repository

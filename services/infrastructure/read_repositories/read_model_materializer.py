@@ -80,6 +80,10 @@ class ReadModelMaterializer(Protocol):
         """
         ...
 
+    def insert_tracking(self, tracking: Tracking) -> None:
+        """Insert tracking information without updating a read model."""
+        ...
+
     def max_tracking_id(self, application_name: str) -> int | None:
         """Get the highest notification ID processed for an application.
 
