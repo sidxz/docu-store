@@ -2,470 +2,198 @@
 
 from __future__ import annotations
 
-from uuid import uuid4
+from collections.abc import Callable
+from uuid import UUID, uuid4
 
 import pytest
+from fastapi.testclient import TestClient
+from returns.result import Failure, Success
 
+from application.dtos.artifact_dtos import ArtifactResponse, CreateArtifactRequest
+from application.dtos.errors import AppError
+from application.dtos.page_dtos import AddCompoundMentionsRequest, CreatePageRequest, PageResponse
+from application.ports.repositories.artifact_read_models import ArtifactReadModel
+from application.ports.repositories.page_read_models import PageReadModel
+from application.use_cases.artifact_use_cases import (
+    CreateArtifactUseCase,
+    UpdateTitleMentionUseCase,
+)
+from application.use_cases.page_use_cases import CreatePageUseCase, DeletePageUseCase
 from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.mime_type import MimeType
+from interfaces.api.main import app
+from interfaces.dependencies import get_container
+
+
+class FakeContainer:
+    def __init__(self, mapping: dict[type, object]) -> None:
+        self._mapping = mapping
+
+    def __getitem__(self, key: type) -> object:
+        return self._mapping[key]
+
+
+class FakeArtifactReadModel(ArtifactReadModel):
+    def __init__(self, artifacts: dict[UUID, ArtifactResponse]) -> None:
+        self._artifacts = artifacts
+
+    async def get_artifact_by_id(self, artifact_id: UUID) -> ArtifactResponse | None:
+        return self._artifacts.get(artifact_id)
+
+    async def list_artifacts(self, skip: int = 0, limit: int = 100) -> list[ArtifactResponse]:
+        artifacts = list(self._artifacts.values())
+        return artifacts[skip : skip + limit]
+
+
+class FakePageReadModel(PageReadModel):
+    def __init__(self, pages: dict[UUID, PageResponse]) -> None:
+        self._pages = pages
+
+    async def get_page_by_id(self, page_id: UUID) -> PageResponse | None:
+        return self._pages.get(page_id)
+
+
+class FakeUseCase:
+    def __init__(self, result: object) -> None:
+        self._result = result
+
+    async def execute(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        return self._result
 
 
 @pytest.fixture
-def client():
-    """Create a test client for the API."""
-    try:
-        from fastapi.testclient import TestClient
-
-        from interfaces.api.main import app
-
+def make_client() -> Callable[[dict[type, object]], TestClient]:
+    def _make_client(overrides: dict[type, object]) -> TestClient:
+        container = FakeContainer(overrides)
+        app.dependency_overrides[get_container] = lambda: container
         return TestClient(app)
-    except ImportError:
-        # If FastAPI app not available, return None and skip tests
-        return None
+
+    yield _make_client
+    app.dependency_overrides.clear()
 
 
 class TestArtifactRoutes:
-    """Test artifact API routes."""
+    def test_create_artifact_success(self, make_client) -> None:
+        artifact_id = uuid4()
+        response_dto = ArtifactResponse(
+            artifact_id=artifact_id,
+            source_uri="https://example.com/paper.pdf",
+            source_filename="paper.pdf",
+            artifact_type=ArtifactType.RESEARCH_ARTICLE,
+            mime_type=MimeType.PDF,
+            storage_location="/storage/paper.pdf",
+        )
+        create_use_case = FakeUseCase(Success(response_dto))
 
-    @pytest.mark.skip(reason="API not fully implemented yet")
-    def test_create_artifact_success(self, client) -> None:
-        """Test successfully creating an artifact via API."""
-        if client is None:
-            pytest.skip("API client not available")
+        client = make_client({CreateArtifactUseCase: create_use_case})
 
-        request_data = {
-            "source_uri": "https://example.com/paper.pdf",
-            "source_filename": "paper.pdf",
-            "artifact_type": ArtifactType.RESEARCH_ARTICLE,
-            "mime_type": MimeType.PDF,
-            "storage_location": "/storage/paper.pdf",
-        }
-
-        response = client.post("/artifacts/", json=request_data)
+        request = CreateArtifactRequest(
+            source_uri="https://example.com/paper.pdf",
+            source_filename="paper.pdf",
+            artifact_type=ArtifactType.RESEARCH_ARTICLE,
+            mime_type=MimeType.PDF,
+            storage_location="/storage/paper.pdf",
+        )
+        response = client.post("/artifacts/", json=request.model_dump())
 
         assert response.status_code == 201
         data = response.json()
-        assert data["source_uri"] == "https://example.com/paper.pdf"
+        assert data["artifact_id"] == str(artifact_id)
         assert data["source_filename"] == "paper.pdf"
-        assert "artifact_id" in data
 
-    @pytest.mark.skip(reason="API not fully implemented yet")
-    def test_create_artifact_validation_error(self, client) -> None:
-        """Test creating artifact with invalid data."""
-        if client is None:
-            pytest.skip("API client not available")
+    def test_get_artifact_not_found(self, make_client) -> None:
+        read_model = FakeArtifactReadModel({})
+        client = make_client({ArtifactReadModel: read_model})
 
-        request_data = {
-            "source_uri": "",  # Invalid: empty
-            "source_filename": "paper.pdf",
-            "artifact_type": ArtifactType.RESEARCH_ARTICLE,
-            "mime_type": MimeType.PDF,
-            "storage_location": "/storage/paper.pdf",
-        }
+        response = client.get(f"/artifacts/{uuid4()}")
 
-        response = client.post("/artifacts/", json=request_data)
+        assert response.status_code == 404
+
+    def test_list_artifacts(self, make_client) -> None:
+        artifact_id = uuid4()
+        read_model = FakeArtifactReadModel(
+            {
+                artifact_id: ArtifactResponse(
+                    artifact_id=artifact_id,
+                    source_uri="https://example.com/paper.pdf",
+                    source_filename="paper.pdf",
+                    artifact_type=ArtifactType.RESEARCH_ARTICLE,
+                    mime_type=MimeType.PDF,
+                    storage_location="/storage/paper.pdf",
+                ),
+            },
+        )
+        client = make_client({ArtifactReadModel: read_model})
+
+        response = client.get("/artifacts?skip=0&limit=10")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["artifact_id"] == str(artifact_id)
+
+    def test_update_title_mention_validation_error(self, make_client) -> None:
+        error_result = Failure(AppError("validation", "bad payload"))
+        use_case = FakeUseCase(error_result)
+        client = make_client({UpdateTitleMentionUseCase: use_case})
+
+        response = client.patch(
+            f"/artifacts/{uuid4()}/title_mention",
+            json={"title": "Title", "confidence": 0.9},
+        )
 
         assert response.status_code == 400
 
-    @pytest.mark.skip(reason="API not fully implemented yet")
-    def test_create_artifact_missing_field(self, client) -> None:
-        """Test creating artifact with missing required field."""
-        if client is None:
-            pytest.skip("API client not available")
-
-        request_data = {
-            "source_uri": "https://example.com/paper.pdf",
-            "source_filename": "paper.pdf",
-            # artifact_type is missing
-            "mime_type": MimeType.PDF,
-            "storage_location": "/storage/paper.pdf",
-        }
-
-        response = client.post("/artifacts/", json=request_data)
-
-        assert response.status_code == 422  # Unprocessable Entity
-
-    @pytest.mark.skip(reason="API not fully implemented yet")
-    def test_get_artifact_success(self, client) -> None:
-        """Test retrieving an artifact."""
-        if client is None:
-            pytest.skip("API client not available")
-
-        # First create an artifact
-        create_request = {
-            "source_uri": "https://example.com/paper.pdf",
-            "source_filename": "paper.pdf",
-            "artifact_type": ArtifactType.RESEARCH_ARTICLE,
-            "mime_type": MimeType.PDF,
-            "storage_location": "/storage/paper.pdf",
-        }
-        create_response = client.post("/artifacts/", json=create_request)
-        artifact_id = create_response.json()["artifact_id"]
-
-        # Retrieve the artifact
-        response = client.get(f"/artifacts/{artifact_id}")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["artifact_id"] == artifact_id
-        assert data["source_filename"] == "paper.pdf"
-
-    @pytest.mark.skip(reason="API not fully implemented yet")
-    def test_get_artifact_not_found(self, client) -> None:
-        """Test retrieving a non-existent artifact."""
-        if client is None:
-            pytest.skip("API client not available")
-
-        non_existent_id = str(uuid4())
-        response = client.get(f"/artifacts/{non_existent_id}")
-
-        assert response.status_code == 404
-
-    @pytest.mark.skip(reason="API not fully implemented yet")
-    def test_list_artifacts(self, client) -> None:
-        """Test listing artifacts."""
-        if client is None:
-            pytest.skip("API client not available")
-
-        # Create multiple artifacts
-        for i in range(3):
-            request_data = {
-                "source_uri": f"https://example.com/paper_{i}.pdf",
-                "source_filename": f"paper_{i}.pdf",
-                "artifact_type": ArtifactType.RESEARCH_ARTICLE,
-                "mime_type": MimeType.PDF,
-                "storage_location": f"/storage/paper_{i}.pdf",
-            }
-            client.post("/artifacts/", json=request_data)
-
-        # List artifacts
-        response = client.get("/artifacts/?skip=0&limit=10")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert isinstance(data, list)
-        assert len(data) >= 3
-
-    @pytest.mark.skip(reason="API not fully implemented yet")
-    def test_list_artifacts_pagination(self, client) -> None:
-        """Test pagination when listing artifacts."""
-        if client is None:
-            pytest.skip("API client not available")
-
-        response = client.get("/artifacts/?skip=0&limit=5")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert isinstance(data, list)
-
-    @pytest.mark.skip(reason="API not fully implemented yet")
-    def test_update_artifact_title_mention(self, client) -> None:
-        """Test updating artifact title mention."""
-        if client is None:
-            pytest.skip("API client not available")
-
-        # Create artifact
-        create_request = {
-            "source_uri": "https://example.com/paper.pdf",
-            "source_filename": "paper.pdf",
-            "artifact_type": ArtifactType.RESEARCH_ARTICLE,
-            "mime_type": MimeType.PDF,
-            "storage_location": "/storage/paper.pdf",
-        }
-        create_response = client.post("/artifacts/", json=create_request)
-        artifact_id = create_response.json()["artifact_id"]
-
-        # Update title mention
-        update_request = {
-            "mention": "Important Research Paper",
-            "page_number": 1,
-            "confidence": 0.95,
-        }
-        response = client.put(
-            f"/artifacts/{artifact_id}/title_mention",
-            json=update_request,
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["title_mention"]["mention"] == "Important Research Paper"
-
-    @pytest.mark.skip(reason="API not fully implemented yet")
-    def test_update_artifact_tags(self, client) -> None:
-        """Test updating artifact tags."""
-        if client is None:
-            pytest.skip("API client not available")
-
-        # Create artifact
-        create_request = {
-            "source_uri": "https://example.com/paper.pdf",
-            "source_filename": "paper.pdf",
-            "artifact_type": ArtifactType.RESEARCH_ARTICLE,
-            "mime_type": MimeType.PDF,
-            "storage_location": "/storage/paper.pdf",
-        }
-        create_response = client.post("/artifacts/", json=create_request)
-        artifact_id = create_response.json()["artifact_id"]
-
-        # Update tags
-        update_request = {"tags": ["chemistry", "research"]}
-        response = client.put(f"/artifacts/{artifact_id}/tags", json=update_request)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "chemistry" in data["tags"]
-        assert "research" in data["tags"]
-
-    @pytest.mark.skip(reason="API not fully implemented yet")
-    def test_delete_artifact(self, client) -> None:
-        """Test deleting an artifact."""
-        if client is None:
-            pytest.skip("API client not available")
-
-        # Create artifact
-        create_request = {
-            "source_uri": "https://example.com/paper.pdf",
-            "source_filename": "paper.pdf",
-            "artifact_type": ArtifactType.RESEARCH_ARTICLE,
-            "mime_type": MimeType.PDF,
-            "storage_location": "/storage/paper.pdf",
-        }
-        create_response = client.post("/artifacts/", json=create_request)
-        artifact_id = create_response.json()["artifact_id"]
-
-        # Delete the artifact
-        response = client.delete(f"/artifacts/{artifact_id}")
-
-        assert response.status_code == 204
-
-        # Verify it's deleted
-        response = client.get(f"/artifacts/{artifact_id}")
-        assert response.status_code == 404
-
 
 class TestPageRoutes:
-    """Test page API routes."""
+    def test_create_page_success(self, make_client) -> None:
+        page_id = uuid4()
+        artifact_id = uuid4()
+        response_dto = PageResponse(
+            page_id=page_id,
+            artifact_id=artifact_id,
+            name="Intro",
+            index=0,
+            compound_mentions=[],
+            tag_mentions=[],
+        )
+        create_use_case = FakeUseCase(Success(response_dto))
 
-    @pytest.mark.skip(reason="API not fully implemented yet")
-    def test_create_page_success(self, client) -> None:
-        """Test successfully creating a page."""
-        if client is None:
-            pytest.skip("API client not available")
+        client = make_client({CreatePageUseCase: create_use_case})
 
-        # First create an artifact
-        artifact_request = {
-            "source_uri": "https://example.com/paper.pdf",
-            "source_filename": "paper.pdf",
-            "artifact_type": ArtifactType.RESEARCH_ARTICLE,
-            "mime_type": MimeType.PDF,
-            "storage_location": "/storage/paper.pdf",
-        }
-        artifact_response = client.post("/artifacts/", json=artifact_request)
-        artifact_id = artifact_response.json()["artifact_id"]
-
-        # Create a page
-        page_request = {
-            "artifact_id": artifact_id,
-            "name": "Introduction",
-            "index": 0,
-        }
-        response = client.post("/pages/", json=page_request)
+        request = CreatePageRequest(artifact_id=artifact_id, name="Intro", index=0)
+        response = client.post("/pages/", json=request.model_dump(mode="json"))
 
         assert response.status_code == 201
         data = response.json()
-        assert data["name"] == "Introduction"
-        assert data["index"] == 0
-        assert "page_id" in data
+        assert data["page_id"] == str(page_id)
+        assert data["name"] == "Intro"
 
-    @pytest.mark.skip(reason="API not fully implemented yet")
-    def test_create_page_missing_artifact(self, client) -> None:
-        """Test creating a page for non-existent artifact."""
-        if client is None:
-            pytest.skip("API client not available")
-
-        page_request = {
-            "artifact_id": str(uuid4()),  # Non-existent artifact
-            "name": "Introduction",
-        }
-        response = client.post("/pages/", json=page_request)
-
-        assert response.status_code == 404
-
-    @pytest.mark.skip(reason="API not fully implemented yet")
-    def test_get_page_success(self, client) -> None:
-        """Test retrieving a page."""
-        if client is None:
-            pytest.skip("API client not available")
-
-        # Create artifact and page
-        artifact_request = {
-            "source_uri": "https://example.com/paper.pdf",
-            "source_filename": "paper.pdf",
-            "artifact_type": ArtifactType.RESEARCH_ARTICLE,
-            "mime_type": MimeType.PDF,
-            "storage_location": "/storage/paper.pdf",
-        }
-        artifact_response = client.post("/artifacts/", json=artifact_request)
-        artifact_id = artifact_response.json()["artifact_id"]
-
-        page_request = {
-            "artifact_id": artifact_id,
-            "name": "Introduction",
-        }
-        page_response = client.post("/pages/", json=page_request)
-        page_id = page_response.json()["page_id"]
-
-        # Retrieve the page
-        response = client.get(f"/pages/{page_id}")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["page_id"] == page_id
-        assert data["name"] == "Introduction"
-
-    @pytest.mark.skip(reason="API not fully implemented yet")
-    def test_get_page_not_found(self, client) -> None:
-        """Test retrieving a non-existent page."""
-        if client is None:
-            pytest.skip("API client not available")
-
-        non_existent_id = str(uuid4())
-        response = client.get(f"/pages/{non_existent_id}")
-
-        assert response.status_code == 404
-
-    @pytest.mark.skip(reason="API not fully implemented yet")
-    def test_update_page_compound_mentions(self, client) -> None:
-        """Test updating page compound mentions."""
-        if client is None:
-            pytest.skip("API client not available")
-
-        # Setup: create artifact and page
-        artifact_request = {
-            "source_uri": "https://example.com/paper.pdf",
-            "source_filename": "paper.pdf",
-            "artifact_type": ArtifactType.RESEARCH_ARTICLE,
-            "mime_type": MimeType.PDF,
-            "storage_location": "/storage/paper.pdf",
-        }
-        artifact_response = client.post("/artifacts/", json=artifact_request)
-        artifact_id = artifact_response.json()["artifact_id"]
-
-        page_request = {
-            "artifact_id": artifact_id,
-            "name": "Introduction",
-        }
-        page_response = client.post("/pages/", json=page_request)
-        page_id = page_response.json()["page_id"]
-
-        # Update compound mentions
-        update_request = {
-            "compound_mentions": [
-                {
-                    "smiles": "C1=CC=CC=C1",
-                    "extracted_name": "Benzene",
-                    "extraction_metadata": {"page_number": 1, "confidence": 0.92},
-                },
-            ],
-        }
-        response = client.put(
-            f"/pages/{page_id}/compound_mentions",
-            json=update_request,
+    def test_update_compound_mentions_path_mismatch(self, make_client) -> None:
+        client = make_client({})
+        request = AddCompoundMentionsRequest(
+            page_id=uuid4(),
+            compound_mentions=[],
+        )
+        response = client.post(
+            f"/pages/{uuid4()}/compound_mentions",
+            json=request.model_dump(mode="json"),
         )
 
-        assert response.status_code == 200
-        data = response.json()
-        assert len(data["compound_mentions"]) > 0
+        assert response.status_code == 400
 
-    @pytest.mark.skip(reason="API not fully implemented yet")
-    def test_delete_page(self, client) -> None:
-        """Test deleting a page."""
-        if client is None:
-            pytest.skip("API client not available")
+    def test_get_page_not_found(self, make_client) -> None:
+        read_model = FakePageReadModel({})
+        client = make_client({PageReadModel: read_model})
 
-        # Create artifact and page
-        artifact_request = {
-            "source_uri": "https://example.com/paper.pdf",
-            "source_filename": "paper.pdf",
-            "artifact_type": ArtifactType.RESEARCH_ARTICLE,
-            "mime_type": MimeType.PDF,
-            "storage_location": "/storage/paper.pdf",
-        }
-        artifact_response = client.post("/artifacts/", json=artifact_request)
-        artifact_id = artifact_response.json()["artifact_id"]
+        response = client.get(f"/pages/{uuid4()}")
 
-        page_request = {
-            "artifact_id": artifact_id,
-            "name": "Introduction",
-        }
-        page_response = client.post("/pages/", json=page_request)
-        page_id = page_response.json()["page_id"]
-
-        # Delete the page
-        response = client.delete(f"/pages/{page_id}")
-
-        assert response.status_code == 204
-
-        # Verify it's deleted
-        response = client.get(f"/pages/{page_id}")
         assert response.status_code == 404
 
+    def test_delete_page_success(self, make_client) -> None:
+        use_case = FakeUseCase(Success(None))
+        client = make_client({DeletePageUseCase: use_case})
 
-class TestErrorHandling:
-    """Test API error handling."""
+        response = client.delete(f"/pages/{uuid4()}")
 
-    @pytest.mark.skip(reason="API not fully implemented yet")
-    def test_invalid_artifact_id_format(self, client) -> None:
-        """Test that invalid UUID format returns 422."""
-        if client is None:
-            pytest.skip("API client not available")
-
-        response = client.get("/artifacts/invalid-uuid")
-
-        assert response.status_code == 422
-
-    @pytest.mark.skip(reason="API not fully implemented yet")
-    def test_invalid_page_id_format(self, client) -> None:
-        """Test that invalid UUID format returns 422."""
-        if client is None:
-            pytest.skip("API client not available")
-
-        response = client.get("/pages/invalid-uuid")
-
-        assert response.status_code == 422
-
-    @pytest.mark.skip(reason="API not fully implemented yet")
-    def test_missing_required_field_in_request(self, client) -> None:
-        """Test that missing required field returns 422."""
-        if client is None:
-            pytest.skip("API client not available")
-
-        request_data = {
-            "source_uri": "https://example.com/paper.pdf",
-            # source_filename is missing
-            "artifact_type": ArtifactType.RESEARCH_ARTICLE,
-            "mime_type": MimeType.PDF,
-            "storage_location": "/storage/paper.pdf",
-        }
-
-        response = client.post("/artifacts/", json=request_data)
-
-        assert response.status_code == 422
-
-    @pytest.mark.skip(reason="API not fully implemented yet")
-    def test_invalid_enum_value(self, client) -> None:
-        """Test that invalid enum value returns 422."""
-        if client is None:
-            pytest.skip("API client not available")
-
-        request_data = {
-            "source_uri": "https://example.com/paper.pdf",
-            "source_filename": "paper.pdf",
-            "artifact_type": "INVALID_TYPE",
-            "mime_type": MimeType.PDF,
-            "storage_location": "/storage/paper.pdf",
-        }
-
-        response = client.post("/artifacts/", json=request_data)
-
-        assert response.status_code == 422
+        assert response.status_code == 204

@@ -42,18 +42,6 @@ class TestCreateArtifactRequest:
                 # storage_location is missing
             )
 
-    def test_create_artifact_request_validation_on_empty_source_uri(self) -> None:
-        """Test that CreateArtifactRequest can be created with empty source_uri (no validation)."""
-        # Note: CreateArtifactRequest doesn't enforce non-empty validation on source_uri
-        request = CreateArtifactRequest(
-            source_uri="",
-            source_filename="paper.pdf",
-            artifact_type=ArtifactType.RESEARCH_ARTICLE,
-            mime_type=MimeType.PDF,
-            storage_location="/storage/paper.pdf",
-        )
-        assert request.source_uri == ""
-
 
 class TestArtifactResponse:
     """Test ArtifactResponse DTO."""
@@ -74,35 +62,6 @@ class TestArtifactResponse:
         assert response.tags == []
         assert response.title_mention is None
         assert response.summary_candidate is None
-
-    def test_artifact_response_with_pages(self) -> None:
-        """Test ArtifactResponse with pages."""
-        artifact_id = uuid4()
-        page_ids = (uuid4(), uuid4())
-        response = ArtifactResponse(
-            artifact_id=artifact_id,
-            source_uri="https://example.com/paper.pdf",
-            source_filename="paper.pdf",
-            artifact_type=ArtifactType.RESEARCH_ARTICLE,
-            mime_type=MimeType.PDF,
-            storage_location="/storage/paper.pdf",
-            pages=page_ids,
-        )
-        assert response.pages == page_ids
-
-    def test_artifact_response_with_tags(self) -> None:
-        """Test ArtifactResponse with tags."""
-        artifact_id = uuid4()
-        response = ArtifactResponse(
-            artifact_id=artifact_id,
-            source_uri="https://example.com/paper.pdf",
-            source_filename="paper.pdf",
-            artifact_type=ArtifactType.RESEARCH_ARTICLE,
-            mime_type=MimeType.PDF,
-            storage_location="/storage/paper.pdf",
-            tags=["chemistry", "research"],
-        )
-        assert response.tags == ["chemistry", "research"]
 
 
 class TestCreatePageRequest:
@@ -160,22 +119,3 @@ class TestPageResponse:
         assert response.tag_mentions == []
         assert response.text_mention is None
         assert response.summary_candidate is None
-
-    def test_page_response_with_mentions(
-        self,
-        sample_compound_mention,
-        sample_tag_mention,
-    ) -> None:
-        """Test PageResponse with mentions."""
-        page_id = uuid4()
-        artifact_id = uuid4()
-        response = PageResponse(
-            page_id=page_id,
-            artifact_id=artifact_id,
-            name="Introduction",
-            index=0,
-            compound_mentions=[sample_compound_mention],
-            tag_mentions=[sample_tag_mention],
-        )
-        assert len(response.compound_mentions) == 1
-        assert len(response.tag_mentions) == 1

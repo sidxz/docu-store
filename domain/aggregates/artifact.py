@@ -1,15 +1,12 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-import structlog
 from eventsourcing.domain import Aggregate, event
 
 from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.mime_type import MimeType
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.title_mention import TitleMention
-
-logger = structlog.get_logger()
 
 
 class Artifact(Aggregate):
@@ -162,42 +159,13 @@ class Artifact(Aggregate):
         title_mention: TitleMention | None
 
     def update_title_mention(self, title_mention: TitleMention | None) -> None:
-        logger.info(
-            "artifact_update_title_mention_called",
-            artifact_id=str(self.id),
-            is_deleted=self.is_deleted,
-            title_mention=title_mention,
-        )
         if self.is_deleted:
-            logger.error(
-                "artifact_is_deleted",
-                artifact_id=str(self.id),
-            )
             raise ValueError("Cannot update title mention on a deleted artifact")
-        logger.info(
-            "triggering_title_mention_updated_event",
-            artifact_id=str(self.id),
-            title_mention=title_mention,
-        )
         self.trigger_event(self.TitleMentionUpdated, title_mention=title_mention)
-        logger.info(
-            "title_mention_updated_event_triggered",
-            artifact_id=str(self.id),
-        )
 
     @event(TitleMentionUpdated)
     def _apply_title_mention_updated(self, title_mention: TitleMention | None) -> None:
-        logger.info(
-            "applying_title_mention_updated_event",
-            artifact_id=str(self.id),
-            title_mention=title_mention,
-        )
         self.title_mention = title_mention
-        logger.info(
-            "title_mention_applied",
-            artifact_id=str(self.id),
-            new_title_mention=self.title_mention,
-        )
 
     # ============================================================================
     # COMMAND METHOD - update SummaryCandidate

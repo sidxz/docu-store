@@ -37,6 +37,26 @@ class TestPageCreation:
         page = Page.create(name="Results", artifact_id=sample_artifact_id)
         assert page.index == 0
 
+    def test_page_name_validation_empty_string(self, sample_artifact_id: int) -> None:
+        """Test that empty name raises ValueError."""
+        with pytest.raises(ValueError, match="name must be provided"):
+            Page.create(name="", artifact_id=sample_artifact_id)
+
+    def test_page_name_validation_whitespace_only(self, sample_artifact_id: int) -> None:
+        """Test that whitespace-only name raises ValueError."""
+        with pytest.raises(ValueError, match="name must be provided"):
+            Page.create(name="   ", artifact_id=sample_artifact_id)
+
+    def test_page_name_strips_whitespace(self, sample_artifact_id: int) -> None:
+        """Test that page name strips whitespace."""
+        page = Page.create(name="  Introduction  ", artifact_id=sample_artifact_id)
+        assert page.name == "Introduction"
+
+    def test_page_index_validation_negative(self, sample_artifact_id: int) -> None:
+        """Test that negative index raises ValueError."""
+        with pytest.raises(ValueError, match="index must be non-negative"):
+            Page.create(name="Test", artifact_id=sample_artifact_id, index=-1)
+
     def test_created_event_is_generated(self, sample_page: Page) -> None:
         """Test that a Created event is generated on page creation."""
         events = list(sample_page.collect_events())

@@ -33,7 +33,18 @@ class Page(Aggregate):
 
     @event(Created)  # Links this handler to the Created event class above
     def __init__(self, name: str, artifact_id: UUID, index: int) -> None:
-        self.name = name
+        # Validate required fields (following same pattern as Artifact)
+        if not name or not name.strip():
+            msg = "name must be provided"
+            raise ValueError(msg)
+        if artifact_id is None:
+            msg = "artifact_id must be provided"
+            raise ValueError(msg)
+        if index < 0:
+            msg = "index must be non-negative"
+            raise ValueError(msg)
+
+        self.name = name.strip()
         self.artifact_id = artifact_id
         self.index = index
         self.compound_mentions: list[CompoundMention] = []

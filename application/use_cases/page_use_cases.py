@@ -40,6 +40,8 @@ class CreatePageUseCase:
                 artifact_id=str(request.artifact_id),
                 page_name=request.name,
             )
+            # Ensure artifact exists before creating a page
+            artifact = self.artifact_repository.get_by_id(request.artifact_id)
             # Create a new Page aggregate
             page = Page.create(
                 name=request.name,
@@ -58,7 +60,6 @@ class CreatePageUseCase:
                 artifact_id=str(request.artifact_id),
                 page_id=str(page.id),
             )
-            artifact = self.artifact_repository.get_by_id(request.artifact_id)
             artifact.add_pages([page.id])
             self.artifact_repository.save(artifact)
             logger.info("artifact_updated_with_page", artifact_id=str(request.artifact_id))
