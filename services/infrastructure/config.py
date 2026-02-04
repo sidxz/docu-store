@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         # make it absolute so reload/CWD doesn't break it
-        env_file=Path(__file__).resolve().parents[2] / ".env",  # adjust parents[] if needed
+        env_file=Path(__file__).resolve().parents[1] / ".env",  # adjust parents[] if needed
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     )
     log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
     log_dir: Path = Field(
-        default=Path(__file__).resolve().parents[2] / "logs",
+        default=Path(__file__).resolve().parents[1] / "logs",
         validation_alias="LOG_DIR",
     )
 
