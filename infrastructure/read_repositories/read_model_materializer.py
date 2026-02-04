@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
-from eventsourcing.persistence import Tracking
+if TYPE_CHECKING:
+    from eventsourcing.persistence import Tracking
 
 
 class ReadModelMaterializer(Protocol):

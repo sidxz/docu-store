@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
-from eventsourcing.persistence import Tracking
 from pymongo import MongoClient
-from pymongo.collection import Collection
-from pymongo.database import Database
+
+if TYPE_CHECKING:
+    from eventsourcing.persistence import Tracking
+    from pymongo.collection import Collection
+    from pymongo.database import Database
 
 from infrastructure.config import settings
 from infrastructure.lib.mongo_read_model_tracking import MongoReadModelTracking
@@ -60,12 +62,9 @@ class MongoReadModelMaterializer(MongoReadModelTracking):
         # Page collection indexes
         self.pages.create_index("page_id", unique=True)  # Primary key
         self.pages.create_index("article_id")  # For filtering tasks by article
-        # self.pages.create_index("status")  # For filtering by task status
 
         # Artifact collection indexes
         self.artifacts.create_index("artifact_id", unique=True)  # Primary key
-        # self.artifacts.create_index("artifact_type")  # For filtering by type
-        # self.artifacts.create_index("status")  # For filtering by artifact status
 
     # ============================================================================
     # ATOMIC UPSERT OPERATIONS
@@ -117,7 +116,7 @@ class MongoReadModelMaterializer(MongoReadModelTracking):
     ) -> None:
         """Delete a page read model atomically with tracking."""
 
-        def _delete(session):
+        def _delete(session: object) -> None:
             self.pages.delete_one({"page_id": page_id}, session=session)
 
         self._run_in_transaction(tracking, _delete)
@@ -134,7 +133,7 @@ class MongoReadModelMaterializer(MongoReadModelTracking):
     ) -> None:
         """Delete an artifact read model atomically with tracking."""
 
-        def _delete(session):
+        def _delete(session: object) -> None:
             self.artifacts.delete_one({"artifact_id": artifact_id}, session=session)
 
         self._run_in_transaction(tracking, _delete)

@@ -75,3 +75,9 @@ markers = [
 ]
 addopts = "--verbose --strict-markers --tb=short"
 minversion = "7.0"
+
+[tool.mypy]
+python_version = "3.12"
+explicit_package_bases = true
+mypy_path = ["."]
+

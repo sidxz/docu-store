@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from domain.aggregates.artifact import Artifact
-
 if TYPE_CHECKING:
+    from domain.aggregates.artifact import Artifact
     from infrastructure.read_repositories.read_model_materializer import ReadModelMaterializer
 
 

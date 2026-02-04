@@ -10,7 +10,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from infrastructure.config import settings
 from interfaces.api.routes.artifact_routes import router as artifact_router
 from interfaces.api.routes.page_routes import router as page_router
-from interfaces.dependencies import get_container
 
 # Configure structured logging
 structlog.configure(
@@ -26,15 +25,9 @@ logger = structlog.get_logger()
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
     """Handle application startup and shutdown."""
     logger.info("app_starting", env=settings.app_env)
-
-    # Initialize Kafka publisher
-    container = get_container()
-    # mongo_client = AsyncIOMotorClient(settings.mongo_uri, tz_aware=True)
-    # container[AsyncIOMotorClient] = mongo_client
-    # app.state.mongo_client = mongo_client
 
     logger.info("app_ready")
 
@@ -42,7 +35,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Cleanup
     logger.info("app_shutting_down")
-    # app.state.mongo_client.close()
     logger.info("app_stopped")
 
 

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from domain.aggregates.artifact import Artifact
-from domain.aggregates.page import Page
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from domain.aggregates.artifact import Artifact
+    from domain.aggregates.page import Page
 
 
 class ArtifactDeletionService:

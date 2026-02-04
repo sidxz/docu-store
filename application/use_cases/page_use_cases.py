@@ -86,11 +86,10 @@ class CreatePageUseCase:
                 AppError("concurrency", f"Resource was modified by another request: {e!s}"),
             )
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "unexpected_error_in_create_page_use_case",
                 error=str(e),
                 error_type=type(e).__name__,
-                exc_info=True,
             )
             return Failure(AppError("internal_error", f"Unexpected error: {e!s}"))
 
@@ -330,11 +329,10 @@ class DeletePageUseCase:
             logger.warning("value_error", page_id=str(page_id), error=str(e))
             return Failure(AppError("invalid_operation", str(e)))
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "unexpected_error_in_delete_page_use_case",
                 page_id=str(page_id),
                 error=str(e),
                 error_type=type(e).__name__,
-                exc_info=True,
             )
             return Failure(AppError("internal_error", f"Unexpected error: {e!s}"))

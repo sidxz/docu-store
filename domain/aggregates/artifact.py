@@ -99,7 +99,8 @@ class Artifact(Aggregate):
     def add_pages(self, page_ids: list[UUID]) -> None:
         """Add associated Page IDs to the Artifact (idempotent, no duplicates)."""
         if self.is_deleted:
-            raise ValueError("Cannot add pages to a deleted artifact")
+            msg = "Cannot add pages to a deleted artifact"
+            raise ValueError(msg)
         if not page_ids:
             return  # no-op on empty input
 
@@ -129,7 +130,8 @@ class Artifact(Aggregate):
     def remove_pages(self, page_ids: list[UUID]) -> None:
         """Remove associated Page IDs from the Artifact (idempotent)."""
         if self.is_deleted:
-            raise ValueError("Cannot remove pages from a deleted artifact")
+            msg = "Cannot remove pages from a deleted artifact"
+            raise ValueError(msg)
         if not page_ids:
             return  # no-op on empty input
 
@@ -160,7 +162,8 @@ class Artifact(Aggregate):
 
     def update_title_mention(self, title_mention: TitleMention | None) -> None:
         if self.is_deleted:
-            raise ValueError("Cannot update title mention on a deleted artifact")
+            msg = "Cannot update title mention on a deleted artifact"
+            raise ValueError(msg)
         self.trigger_event(self.TitleMentionUpdated, title_mention=title_mention)
 
     @event(TitleMentionUpdated)
@@ -175,7 +178,8 @@ class Artifact(Aggregate):
 
     def update_summary_candidate(self, summary_candidate: SummaryCandidate | None) -> None:
         if self.is_deleted:
-            raise ValueError("Cannot update summary candidate on a deleted artifact")
+            msg = "Cannot update summary candidate on a deleted artifact"
+            raise ValueError(msg)
         self.trigger_event(self.SummaryCandidateUpdated, summary_candidate=summary_candidate)
 
     @event(SummaryCandidateUpdated)
@@ -190,7 +194,8 @@ class Artifact(Aggregate):
 
     def update_tags(self, tags: list[str]) -> None:
         if self.is_deleted:
-            raise ValueError("Cannot update tags on a deleted artifact")
+            msg = "Cannot update tags on a deleted artifact"
+            raise ValueError(msg)
         # Normalize: strip and drop blanks
         normalized = [t.strip() for t in tags if t and t.strip()]
         # Deduplicate while preserving order

@@ -7,7 +7,7 @@ from application.ports.repositories.artifact_read_models import ArtifactReadMode
 
 
 class GetArtifactByIdQuery:
-    def __init__(self, artifact_read_model: ArtifactReadModel):
+    def __init__(self, artifact_read_model: ArtifactReadModel) -> None:
         self.artifact_read_model = artifact_read_model
 
     async def execute(self, artifact_id: UUID) -> Result[ArtifactResponse, str]:

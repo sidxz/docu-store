@@ -183,16 +183,18 @@ def create_container() -> Container:
     )
 
     # Register MongoDB Client and Read Repository
-    container[AsyncIOMotorClient] = lambda _: AsyncIOMotorClient(settings.mongo_uri)
-    mongo_repository = lambda c: MongoReadRepository(
-        client=c[AsyncIOMotorClient],
-        settings=settings,
-    )
-    container[PageReadModel] = mongo_repository
-    container[ArtifactReadModel] = mongo_repository
+    def mongo_client_factory(_: object) -> AsyncIOMotorClient:
+        return AsyncIOMotorClient(settings.mongo_uri)
 
-    # # Register Queries
-    # container[GetArtifactByIdQuery] = lambda c: GetArtifactByIdQuery(
-    #     artifact_read_model=c[ArtifactReadModel],
-    # )
+    container[AsyncIOMotorClient] = mongo_client_factory
+
+    def mongo_repository_factory(c: object) -> MongoReadRepository:
+        return MongoReadRepository(
+            client=c[AsyncIOMotorClient],
+            settings=settings,
+        )
+
+    container[PageReadModel] = mongo_repository_factory
+    container[ArtifactReadModel] = mongo_repository_factory
+
     return container

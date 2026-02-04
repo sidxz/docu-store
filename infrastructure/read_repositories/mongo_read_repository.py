@@ -10,7 +10,7 @@ from infrastructure.config import Settings
 
 
 class MongoReadRepository(PageReadModel, ArtifactReadModel):
-    def __init__(self, client: AsyncIOMotorClient, settings: Settings):
+    def __init__(self, client: AsyncIOMotorClient, settings: Settings) -> None:
         self.client = client
         self.db = self.client[settings.mongo_db]
         self.pages = self.db[settings.mongo_pages_collection]

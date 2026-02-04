@@ -7,6 +7,16 @@ from domain.aggregates.page import Page
 from domain.exceptions import AggregateNotFoundError, InfrastructureError
 
 
+def _raise_page_not_found(page_id: UUID) -> None:
+    msg = f"Page {page_id} not found"
+    raise AggregateNotFoundError(msg)
+
+
+def _raise_page_retrieval_error(page_id: UUID, exc: Exception) -> None:
+    msg = f"Failed to retrieve page {page_id}: {exc!s}"
+    raise InfrastructureError(msg) from exc
+
+
 class EventSourcedPageRepository(PageRepository):
     """Event-sourced implementation of the PageRepository."""
 
@@ -40,8 +50,7 @@ class EventSourcedPageRepository(PageRepository):
             if isinstance(page, Page):
                 return page
             # This shouldn't happen in normal circumstances
-            msg = f"Page {page_id} not found"
-            raise AggregateNotFoundError(msg)
+            _raise_page_not_found(page_id)
         except AggregateNotFoundError:
             # Re-raise our domain exception
             raise
@@ -49,6 +58,7 @@ class EventSourcedPageRepository(PageRepository):
             # Check if it's a 'not found' error from eventsourcing
             error_msg = str(e).lower()
             if "not found" in error_msg or "does not exist" in error_msg:
-                raise AggregateNotFoundError(f"Page {page_id} not found") from e
+                msg = f"Page {page_id} not found"
+                raise AggregateNotFoundError(msg) from e
             # Any other exception (network error, DB error, etc.) is an infrastructure error
-            raise InfrastructureError(f"Failed to retrieve page {page_id}: {e!s}") from e
+            _raise_page_retrieval_error(page_id, e)

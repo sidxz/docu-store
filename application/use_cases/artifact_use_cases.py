@@ -15,6 +15,7 @@ from domain.exceptions import (
     ConcurrencyError,
     ValidationError,
 )
+from domain.services.artifact_deletion_service import ArtifactDeletionService
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.title_mention import TitleMention
 
@@ -235,12 +236,11 @@ class UpdateTitleMentionUseCase:
             logger.warning("value_error", artifact_id=str(artifact_id), error=str(e))
             return Failure(AppError("invalid_operation", str(e)))
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "unexpected_error_in_update_title_mention_use_case",
                 artifact_id=str(artifact_id),
                 error=str(e),
                 error_type=type(e).__name__,
-                exc_info=True,
             )
             return Failure(AppError("internal_error", f"Unexpected error: {e!s}"))
 
@@ -355,8 +355,6 @@ class DeleteArtifactUseCase:
             pages = [self.page_repository.get_by_id(page_id) for page_id in artifact.pages]
 
             # Use the domain service to delete artifact and all its pages
-            from domain.services.artifact_deletion_service import ArtifactDeletionService
-
             ArtifactDeletionService.delete_artifact_with_pages(artifact, pages)
 
             # Persist all deleted aggregates

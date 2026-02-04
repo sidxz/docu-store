@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import structlog
 
 from domain.aggregates.artifact import Artifact
 from domain.aggregates.page import Page
 from infrastructure.event_projectors.artifact_projector import ArtifactProjector
 from infrastructure.event_projectors.page_projector import PageProjector
-from infrastructure.read_repositories.read_model_materializer import ReadModelMaterializer
+
+if TYPE_CHECKING:
+    from infrastructure.read_repositories.read_model_materializer import ReadModelMaterializer
 
 logger = structlog.get_logger()
 

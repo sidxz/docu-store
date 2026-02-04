@@ -7,6 +7,16 @@ from domain.aggregates.artifact import Artifact
 from domain.exceptions import AggregateNotFoundError, InfrastructureError
 
 
+def _raise_artifact_not_found(artifact_id: UUID) -> None:
+    msg = f"Artifact {artifact_id} not found"
+    raise AggregateNotFoundError(msg)
+
+
+def _raise_artifact_retrieval_error(artifact_id: UUID, exc: Exception) -> None:
+    msg = f"Failed to retrieve artifact {artifact_id}: {exc!s}"
+    raise InfrastructureError(msg) from exc
+
+
 class EventSourcedArtifactRepository(ArtifactRepository):
     """Event-sourced implementation of the ArtifactRepository."""
 
@@ -40,8 +50,7 @@ class EventSourcedArtifactRepository(ArtifactRepository):
             if isinstance(artifact, Artifact):
                 return artifact
             # This shouldn't happen in normal circumstances
-            msg = f"Artifact {artifact_id} not found"
-            raise AggregateNotFoundError(msg)
+            _raise_artifact_not_found(artifact_id)
         except AggregateNotFoundError:
             # Re-raise our domain exception
             raise
@@ -49,6 +58,7 @@ class EventSourcedArtifactRepository(ArtifactRepository):
             # Check if it's a 'not found' error from eventsourcing
             error_msg = str(e).lower()
             if "not found" in error_msg or "does not exist" in error_msg:
-                raise AggregateNotFoundError(f"Artifact {artifact_id} not found") from e
+                msg = f"Artifact {artifact_id} not found"
+                raise AggregateNotFoundError(msg) from e
             # Any other exception (network error, DB error, etc.) is an infrastructure error
-            raise InfrastructureError(f"Failed to retrieve artifact {artifact_id}: {e!s}") from e
+            _raise_artifact_retrieval_error(artifact_id, e)

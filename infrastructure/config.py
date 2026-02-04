@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     kafka_topic: str = Field(default="docu_store_events", validation_alias="KAFKA_TOPIC")
 
     # API
-    api_host: str = Field(default="0.0.0.0", validation_alias="API_HOST")
+    api_host: str = Field(default="127.0.0.1", validation_alias="API_HOST")
     api_port: int = Field(default=8000, validation_alias="API_PORT")
 
     # MongoDB

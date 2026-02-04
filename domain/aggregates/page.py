@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from uuid import UUID
+from typing import TYPE_CHECKING
 
 from eventsourcing.domain import Aggregate, event
 
-from domain.value_objects.compound_mention import CompoundMention
-from domain.value_objects.summary_candidate import SummaryCandidate
-from domain.value_objects.tag_mention import TagMention
-from domain.value_objects.text_mention import TextMention
+if TYPE_CHECKING:
+    from uuid import UUID
+
+    from domain.value_objects.compound_mention import CompoundMention
+    from domain.value_objects.summary_candidate import SummaryCandidate
+    from domain.value_objects.tag_mention import TagMention
+    from domain.value_objects.text_mention import TextMention
 
 
 class Page(Aggregate):
@@ -67,7 +70,8 @@ class Page(Aggregate):
 
     def update_compound_mentions(self, compound_mentions: list[CompoundMention]) -> None:
         if self.is_deleted:
-            raise ValueError("Cannot update compound mentions on a deleted page")
+            msg = "Cannot update compound mentions on a deleted page"
+            raise ValueError(msg)
         # Trigger event
         self.trigger_event(self.CompoundMentionsUpdated, compound_mentions=compound_mentions)
 
@@ -84,7 +88,8 @@ class Page(Aggregate):
 
     def update_tag_mentions(self, tag_mentions: list[TagMention]) -> None:
         if self.is_deleted:
-            raise ValueError("Cannot update tag mentions on a deleted page")
+            msg = "Cannot update tag mentions on a deleted page"
+            raise ValueError(msg)
         self.trigger_event(self.TagMentionsUpdated, tag_mentions=tag_mentions)
 
     @event(TagMentionsUpdated)
@@ -99,7 +104,8 @@ class Page(Aggregate):
 
     def update_text_mention(self, text_mention: TextMention | None) -> None:
         if self.is_deleted:
-            raise ValueError("Cannot update text mention on a deleted page")
+            msg = "Cannot update text mention on a deleted page"
+            raise ValueError(msg)
         self.trigger_event(self.TextMentionUpdated, text_mention=text_mention)
 
     @event(TextMentionUpdated)
@@ -114,7 +120,8 @@ class Page(Aggregate):
 
     def update_summary_candidate(self, summary_candidate: SummaryCandidate | None) -> None:
         if self.is_deleted:
-            raise ValueError("Cannot update summary candidate on a deleted page")
+            msg = "Cannot update summary candidate on a deleted page"
+            raise ValueError(msg)
         self.trigger_event(self.SummaryCandidateUpdated, summary_candidate=summary_candidate)
 
     @event(SummaryCandidateUpdated)
