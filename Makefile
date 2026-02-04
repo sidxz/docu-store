@@ -11,7 +11,7 @@ dev-install: ## Install development dependencies using uv
 	uv sync --dev
 
 run: ## Run the FastAPI application
-	uvicorn interfaces.api.main:app --host $(or $(HOST),0.0.0.0) --port $(or $(PORT),8000) --reload
+	uv run uvicorn interfaces.api.main:app --host $(or $(HOST),0.0.0.0) --port $(or $(PORT),8000) --reload
 
 run-read-models: ## Run the MongoDB read model projector
 	uv run python -m infrastructure.read_worker

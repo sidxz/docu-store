@@ -22,7 +22,7 @@ class PageProjector:
             page_id=str(event.originator_id),
             fields={
                 "name": event.name,
-                "artifact_id": event.artifact_id,
+                "artifact_id": str(event.artifact_id),
                 "index": event.index,
                 "compound_mentions": [],
                 "tag_mentions": [],
@@ -33,7 +33,7 @@ class PageProjector:
         )
 
     def compound_mentions_updated(self, event: object, tracking: object) -> None:
-        """Project CompoundMentions Added event to read model."""
+        """Project CompoundMentionsUpdated event to read model."""
         # Convert Pydantic models to dicts for storage
         compound_mentions_data = [
             compound_mention.model_dump(mode="json")
@@ -43,6 +43,49 @@ class PageProjector:
             page_id=str(event.originator_id),  # type: ignore[attr-defined]
             fields={
                 "compound_mentions": compound_mentions_data,
+            },
+            tracking=tracking,  # type: ignore[arg-type]
+        )
+
+    def tag_mentions_updated(self, event: object, tracking: object) -> None:
+        """Project TagMentionsUpdated event to read model."""
+        # Convert Pydantic models to dicts for storage
+        tag_mentions_data = [
+            tag_mention.model_dump(mode="json")
+            for tag_mention in event.tag_mentions  # type: ignore[attr-defined]
+        ]
+        self._materializer.upsert_page(
+            page_id=str(event.originator_id),  # type: ignore[attr-defined]
+            fields={
+                "tag_mentions": tag_mentions_data,
+            },
+            tracking=tracking,  # type: ignore[arg-type]
+        )
+
+    def text_mention_updated(self, event: object, tracking: object) -> None:
+        """Project TextMentionUpdated event to read model."""
+        # Convert Pydantic model to dict if not None
+        text_mention_data = (
+            event.text_mention.model_dump(mode="json") if event.text_mention else None  # type: ignore[attr-defined]
+        )
+        self._materializer.upsert_page(
+            page_id=str(event.originator_id),  # type: ignore[attr-defined]
+            fields={
+                "text_mention": text_mention_data,
+            },
+            tracking=tracking,  # type: ignore[arg-type]
+        )
+
+    def summary_candidate_updated(self, event: object, tracking: object) -> None:
+        """Project SummaryCandidateUpdated event to read model."""
+        # Convert Pydantic model to dict if not None
+        summary_candidate_data = (
+            event.summary_candidate.model_dump(mode="json") if event.summary_candidate else None  # type: ignore[attr-defined]
+        )
+        self._materializer.upsert_page(
+            page_id=str(event.originator_id),  # type: ignore[attr-defined]
+            fields={
+                "summary_candidate": summary_candidate_data,
             },
             tracking=tracking,  # type: ignore[arg-type]
         )

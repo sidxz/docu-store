@@ -41,7 +41,7 @@ class MongoReadModelMaterializer(MongoReadModelTracking):
 
         # Main read model collections
         self.pages: Collection = self.db[settings.mongo_pages_collection]
-        # TODO: self.articles: Collection = self.db[settings.mongo_articles_collection]
+        self.artifacts: Collection = self.db[settings.mongo_artifacts_collection]
 
         super().__init__(
             mongo_uri=settings.mongo_uri,
@@ -62,10 +62,10 @@ class MongoReadModelMaterializer(MongoReadModelTracking):
         # self.pages.create_index("article_id")  # For filtering tasks by article
         # self.pages.create_index("status")  # For filtering by task status
 
-        # Article collection indexes
-        # self.articles.create_index("article_id", unique=True)  # Primary key
-        # self.articles.create_index("article_type")  # For filtering by type
-        # self.articles.create_index("status")  # For filtering by article status
+        # Artifact collection indexes
+        self.artifacts.create_index("artifact_id", unique=True)  # Primary key
+        # self.artifacts.create_index("artifact_type")  # For filtering by type
+        # self.artifacts.create_index("status")  # For filtering by artifact status
 
     # ============================================================================
     # ATOMIC UPSERT OPERATIONS
@@ -91,17 +91,21 @@ class MongoReadModelMaterializer(MongoReadModelTracking):
             tracking_id=tracking.notification_id,
         )
 
-    # def upsert_article(
-    #     self,
-    #     document_id: str,
-    #     fields: dict[str, Any],
-    #     tracking: Tracking,
-    # ) -> None:
-    #     self.upsert_document(
-    #         collection=self.articles,
-    #         identity_field="document_id",
-    #         identity_value=document_id,
-    #         fields=fields,
-    #         tracking=tracking,
-    #     )
-    #     logger.info("read_model_article_upserted", document_id=document_id)
+    def upsert_artifact(
+        self,
+        artifact_id: str,
+        fields: dict[str, Any],
+        tracking: Tracking,
+    ) -> None:
+        self.upsert_document(
+            collection=self.artifacts,
+            identity_field="artifact_id",
+            identity_value=artifact_id,
+            fields=fields,
+            tracking=tracking,
+        )
+        logger.info(
+            "read_model_artifact_upserted",
+            artifact_id=artifact_id,
+            tracking_id=tracking.notification_id,
+        )

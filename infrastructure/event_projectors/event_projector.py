@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import structlog
 
+from domain.aggregates.artifact import Artifact
 from domain.aggregates.page import Page
+from infrastructure.event_projectors.artifact_projector import ArtifactProjector
 from infrastructure.event_projectors.page_projector import PageProjector
 from infrastructure.read_repositories.read_model_materializer import ReadModelMaterializer
 
@@ -17,11 +19,20 @@ class EventProjector:
     def __init__(self, materializer: ReadModelMaterializer) -> None:
         self._materializer = materializer
         page_projector = PageProjector(materializer)
+        artifact_projector = ArtifactProjector(materializer)
 
         # Map event types directly to handler methods
         self._handlers = {
+            # Page events
             Page.Created: page_projector.page_created,
             Page.CompoundMentionsUpdated: page_projector.compound_mentions_updated,
+            # Artifact events
+            Artifact.Created: artifact_projector.artifact_created,
+            Artifact.PagesAdded: artifact_projector.pages_added,
+            Artifact.PagesRemoved: artifact_projector.pages_removed,
+            Artifact.TitleMentionUpdated: artifact_projector.title_mention_updated,
+            Artifact.TagsUpdated: artifact_projector.tags_updated,
+            Artifact.SummaryCandidateUpdated: artifact_projector.summary_candidate_updated,
         }
 
     def process_event(self, event: object, tracking: object) -> None:

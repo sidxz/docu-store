@@ -7,6 +7,7 @@ from lagom import Container
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from application.ports.external_event_publisher import ExternalEventPublisher
+from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
@@ -107,9 +108,15 @@ def create_container() -> Container:
 
     # Register MongoDB Client and Read Repository
     container[AsyncIOMotorClient] = lambda _: AsyncIOMotorClient(settings.mongo_uri)
-    container[PageReadModel] = lambda c: MongoReadRepository(
+    mongo_repository = lambda c: MongoReadRepository(
         client=c[AsyncIOMotorClient],
         settings=settings,
     )
+    container[PageReadModel] = mongo_repository
+    container[ArtifactReadModel] = mongo_repository
 
+    # # Register Queries
+    # container[GetArtifactByIdQuery] = lambda c: GetArtifactByIdQuery(
+    #     artifact_read_model=c[ArtifactReadModel],
+    # )
     return container

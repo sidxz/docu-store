@@ -35,6 +35,22 @@ class ReadModelMaterializer(Protocol):
         """
         ...
 
+    def upsert_artifact(
+        self,
+        artifact_id: str,
+        fields: dict[str, Any],
+        tracking: Tracking,
+    ) -> None:
+        """Upsert an artifact read model atomically with tracking.
+
+        Args:
+            artifact_id: Unique identifier for the artifact
+            fields: Dictionary of field names to values to update
+            tracking: Event tracking information for idempotency
+
+        """
+        ...
+
     def max_tracking_id(self, application_name: str) -> int | None:
         """Get the highest notification ID processed for an application.
 

@@ -18,6 +18,7 @@ class GetPageByIdQuery:
 
             page_response = PageResponse(
                 page_id=UUID(page_data["page_id"]),
+                artifact_id=UUID(page_data["artifact_id"]),
                 name=page_data["name"],
                 compound_mentions=page_data["compound_mentions"],
             )
