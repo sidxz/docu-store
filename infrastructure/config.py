@@ -1,43 +1,66 @@
-"""Application configuration using Pydantic Settings."""
-
+from pathlib import Path
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
-
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # make it absolute so reload/CWD doesn't break it
+        env_file=Path(__file__).resolve().parents[2] / ".env",  # adjust parents[] if needed
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
     )
 
     # Application
-    app_name: str = "DocuStore"
-    app_env: Literal["development", "staging", "production"] = "development"
-    log_level: str = "INFO"
+    app_name: str = Field(default="DocuStore", validation_alias="APP_NAME")
+    app_env: Literal["development", "staging", "production"] = Field(
+        default="development",
+        validation_alias="APP_ENV",
+    )
+    log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
 
     # EventStoreDB
-    eventstoredb_uri: str = "esdb://localhost:2113?tls=false"
+    eventstoredb_uri: str = Field(
+        default="esdb://localhost:2113?tls=false",
+        validation_alias="EVENTSTOREDB_URI",
+    )
 
     # Kafka
-    enable_external_event_streaming: bool = True
-    kafka_bootstrap_servers: str = "localhost:19092"
-    kafka_topic: str = "docu_store_events"
+    enable_external_event_streaming: bool = Field(
+        default=True,
+        validation_alias="ENABLE_EXTERNAL_EVENT_STREAMING",
+    )
+    kafka_bootstrap_servers: str = Field(
+        default="localhost:19092",
+        validation_alias="KAFKA_BOOTSTRAP_SERVERS",
+    )
+    kafka_topic: str = Field(default="docu_store_events", validation_alias="KAFKA_TOPIC")
 
     # API
-    api_host: str = "0.0.0.0"
-    api_port: int = 8000
+    api_host: str = Field(default="127.0.0.1", validation_alias="API_HOST")
+    api_port: int = Field(default=8000, validation_alias="API_PORT")
 
-    # MongoDB Read Models
-    mongo_uri: str = "mongodb://localhost:27017/?replicaSet=rs0&directConnection=true"
-    mongo_db: str = "docu_store"
-    mongo_pages_collection: str = "page_read_models"
-    mongo_articles_collection: str = "article_read_models"
-    mongo_tracking_collection: str = "read_model_tracking"
+    # MongoDB
+    mongo_uri: str = Field(
+        default="mongodb://localhost:27017/?replicaSet=rs0",
+        validation_alias="MONGO_URI",
+    )
+    mongo_db: str = Field(default="docu_store", validation_alias="MONGO_DB")
+    mongo_pages_collection: str = Field(
+        default="page_read_models",
+        validation_alias="MONGO_PAGES_COLLECTION",
+    )
+    mongo_artifacts_collection: str = Field(
+        default="artifact_read_models",
+        validation_alias="MONGO_ARTIFACTS_COLLECTION",
+    )
+    mongo_tracking_collection: str = Field(
+        default="read_model_tracking",
+        validation_alias="MONGO_TRACKING_COLLECTION",
+    )
 
 
 # Global settings instance

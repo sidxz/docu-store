@@ -3,39 +3,24 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from lagom import Container
-from returns.result import Failure, Success
 
-from application.dtos.page_dtos import AddCompoundsRequest, CreatePageRequest, PageResponse
+from application.dtos.page_dtos import AddCompoundMentionsRequest, CreatePageRequest, PageResponse
 from application.ports.repositories.page_read_models import PageReadModel
-from application.use_cases.page_use_cases import AddCompoundsUseCase, AppError, CreatePageUseCase
-from domain.exceptions import InfrastructureError
+from application.use_cases.page_use_cases import (
+    AddCompoundMentionsUseCase,
+    CreatePageUseCase,
+    DeletePageUseCase,
+    UpdateSummaryCandidateUseCase,
+    UpdateTagMentionsUseCase,
+    UpdateTextMentionUseCase,
+)
+from domain.value_objects.summary_candidate import SummaryCandidate
+from domain.value_objects.tag_mention import TagMention
+from domain.value_objects.text_mention import TextMention
+from interfaces.api.middleware import handle_use_case_errors
 from interfaces.dependencies import get_container
 
 router = APIRouter(prefix="/pages", tags=["pages"])
-
-
-def _map_app_error_to_http_exception(error: AppError) -> HTTPException:
-    """Map application layer errors to appropriate HTTP exceptions."""
-    if error.category == "validation":
-        return HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error.message,
-        )
-    if error.category == "not_found":
-        return HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=error.message,
-        )
-    if error.category == "concurrency":
-        return HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=error.message,
-        )
-    # Unknown error category
-    return HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail="Internal server error",
-    )
 
 
 @router.get("/{page_id}", status_code=status.HTTP_200_OK)
@@ -57,6 +42,7 @@ async def get_page(
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
+@handle_use_case_errors
 async def create_page(
     request: CreatePageRequest,
     container: Annotated[Container, Depends(get_container)],
@@ -70,53 +56,64 @@ async def create_page(
 
     """
     use_case = container[CreatePageUseCase]
-
-    try:
-        result = await use_case.execute(request=request)
-
-        if isinstance(result, Success):
-            return result.unwrap()
-
-        if isinstance(result, Failure):
-            raise _map_app_error_to_http_exception(result.failure()) from None
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected result type",
-        ) from None
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
-    except InfrastructureError as exc:
-        # Infrastructure errors should return 500
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Service temporarily unavailable",
-        ) from exc
-    except BaseException as exc:
-        # Unexpected errors
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error",
-        ) from exc
+    return await use_case.execute(request=request)
 
 
-@router.post("/{page_id}/compounds", status_code=status.HTTP_200_OK)
-async def add_compounds(
+@router.patch("/{page_id}/tag_mentions", status_code=status.HTTP_200_OK)
+@handle_use_case_errors
+async def update_tag_mentions(
     page_id: UUID,
-    request: AddCompoundsRequest,
+    tag_mentions: list[TagMention],
     container: Annotated[Container, Depends(get_container)],
 ) -> PageResponse:
-    """Add compounds to an existing page.
+    """Update tag mentions for a page."""
+    use_case = container[UpdateTagMentionsUseCase]
+    return await use_case.execute(page_id=page_id, tag_mentions=tag_mentions)
 
-    Returns:
-        200 OK: Compounds successfully added
-        400 Bad Request: Validation error
-        404 Not Found: Page not found
-        409 Conflict: Page was modified by another request (retry-able)
-        500 Internal Server Error: Infrastructure failure (DB unavailable, etc.)
 
-    """
+@router.patch("/{page_id}/text_mention", status_code=status.HTTP_200_OK)
+@handle_use_case_errors
+async def update_text_mention(
+    page_id: UUID,
+    text_mention: TextMention,
+    container: Annotated[Container, Depends(get_container)],
+) -> PageResponse:
+    """Update text mention for a page."""
+    use_case = container[UpdateTextMentionUseCase]
+    return await use_case.execute(page_id=page_id, text_mention=text_mention)
+
+
+@router.patch("/{page_id}/summary_candidate", status_code=status.HTTP_200_OK)
+@handle_use_case_errors
+async def update_summary_candidate(
+    page_id: UUID,
+    summary_candidate: SummaryCandidate,
+    container: Annotated[Container, Depends(get_container)],
+) -> PageResponse:
+    """Update summary candidate for a page."""
+    use_case = container[UpdateSummaryCandidateUseCase]
+    return await use_case.execute(page_id=page_id, summary_candidate=summary_candidate)
+
+
+@router.delete("/{page_id}", status_code=status.HTTP_204_NO_CONTENT)
+@handle_use_case_errors
+async def delete_page(
+    page_id: UUID,
+    container: Annotated[Container, Depends(get_container)],
+) -> None:
+    """Delete a page."""
+    use_case = container[DeletePageUseCase]
+    return await use_case.execute(page_id=page_id)
+
+
+@router.post("/{page_id}/compound_mentions", status_code=status.HTTP_200_OK)
+@handle_use_case_errors
+async def update_compound_mentions(
+    page_id: UUID,
+    request: AddCompoundMentionsRequest,
+    container: Annotated[Container, Depends(get_container)],
+) -> PageResponse:
+    """Add compound_mentions to an existing page."""
     # Validate that the page_id in the path matches the request
     if page_id != request.page_id:
         raise HTTPException(
@@ -124,33 +121,5 @@ async def add_compounds(
             detail="Page ID in path does not match page ID in request body",
         )
 
-    use_case = container[AddCompoundsUseCase]
-
-    try:
-        result = use_case.execute(request=request)
-
-        if isinstance(result, Success):
-            return result.unwrap()
-
-        if isinstance(result, Failure):
-            raise _map_app_error_to_http_exception(result.failure()) from None
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected result type",
-        ) from None
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
-    except InfrastructureError as exc:
-        # Infrastructure errors should return 500
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Service temporarily unavailable",
-        ) from exc
-    except BaseException as exc:
-        # Unexpected errors
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error",
-        ) from exc
+    use_case = container[AddCompoundMentionsUseCase]
+    return await use_case.execute(request=request)

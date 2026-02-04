@@ -7,12 +7,42 @@ from lagom import Container
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from application.ports.external_event_publisher import ExternalEventPublisher
+from application.ports.repositories.artifact_read_models import ArtifactReadModel
+from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
-from application.use_cases.page_use_cases import AddCompoundsUseCase, CreatePageUseCase
-from domain.value_objects.compound import Compound
+from application.use_cases.artifact_use_cases import (
+    AddPagesUseCase,
+    CreateArtifactUseCase,
+    DeleteArtifactUseCase,
+    RemovePagesUseCase,
+    UpdateTagsUseCase,
+    UpdateTitleMentionUseCase,
+)
+from application.use_cases.artifact_use_cases import (
+    UpdateSummaryCandidateUseCase as UpdateArtifactSummaryCandidateUseCase,
+)
+from application.use_cases.page_use_cases import (
+    AddCompoundMentionsUseCase,
+    CreatePageUseCase,
+    DeletePageUseCase,
+    UpdateTagMentionsUseCase,
+    UpdateTextMentionUseCase,
+)
+from application.use_cases.page_use_cases import (
+    UpdateSummaryCandidateUseCase as UpdatePageSummaryCandidateUseCase,
+)
+from domain.value_objects.compound_mention import CompoundMention
+from domain.value_objects.extraction_metadata import ExtractionMetadata
+from domain.value_objects.summary_candidate import SummaryCandidate
+from domain.value_objects.tag_mention import TagMention
+from domain.value_objects.text_mention import TextMention
+from domain.value_objects.title_mention import TitleMention
 from infrastructure.config import settings
 from infrastructure.event_projectors.event_projector import EventProjector
+from infrastructure.event_sourced_repositories.artifact_repository import (
+    EventSourcedArtifactRepository,
+)
 from infrastructure.event_sourced_repositories.page_repository import EventSourcedPageRepository
 from infrastructure.kafka.kafka_external_event_streamer import KafkaExternalEventPublisher
 from infrastructure.kafka.kafka_publisher import KafkaPublisher
@@ -35,7 +65,12 @@ class DocuStoreApplication(Application):
 
     def register_transcodings(self, transcoder: JSONTranscoder) -> None:  # type: ignore[name-defined]
         super().register_transcodings(transcoder)
-        transcoder.register(PydanticTranscoding(Compound))
+        transcoder.register(PydanticTranscoding(CompoundMention))
+        transcoder.register(PydanticTranscoding(TitleMention))
+        transcoder.register(PydanticTranscoding(SummaryCandidate))
+        transcoder.register(PydanticTranscoding(TagMention))
+        transcoder.register(PydanticTranscoding(TextMention))
+        transcoder.register(PydanticTranscoding(ExtractionMetadata))
 
 
 def create_container() -> Container:
@@ -54,6 +89,9 @@ def create_container() -> Container:
 
     # Register Repositories
     container[PageRepository] = lambda c: EventSourcedPageRepository(
+        application=c[Application],
+    )
+    container[ArtifactRepository] = lambda c: EventSourcedArtifactRepository(
         application=c[Application],
     )
 
@@ -79,10 +117,63 @@ def create_container() -> Container:
     # Page Use Cases
     container[CreatePageUseCase] = lambda c: CreatePageUseCase(
         page_repository=c[PageRepository],
+        artifact_repository=c[ArtifactRepository],
         external_event_publisher=c[ExternalEventPublisher],
     )
-    container[AddCompoundsUseCase] = lambda c: AddCompoundsUseCase(
+    container[AddCompoundMentionsUseCase] = lambda c: AddCompoundMentionsUseCase(
         page_repository=c[PageRepository],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[UpdateTagMentionsUseCase] = lambda c: UpdateTagMentionsUseCase(
+        page_repository=c[PageRepository],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[UpdateTextMentionUseCase] = lambda c: UpdateTextMentionUseCase(
+        page_repository=c[PageRepository],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[UpdatePageSummaryCandidateUseCase] = lambda c: UpdatePageSummaryCandidateUseCase(
+        page_repository=c[PageRepository],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[DeletePageUseCase] = lambda c: DeletePageUseCase(
+        page_repository=c[PageRepository],
+        artifact_repository=c[ArtifactRepository],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+
+    # Artifact Use Cases
+    container[CreateArtifactUseCase] = lambda c: CreateArtifactUseCase(
+        artifact_repository=c[ArtifactRepository],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[AddPagesUseCase] = lambda c: AddPagesUseCase(
+        artifact_repository=c[ArtifactRepository],
+        page_repository=c[PageRepository],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[RemovePagesUseCase] = lambda c: RemovePagesUseCase(
+        artifact_repository=c[ArtifactRepository],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[UpdateTitleMentionUseCase] = lambda c: UpdateTitleMentionUseCase(
+        artifact_repository=c[ArtifactRepository],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[UpdateArtifactSummaryCandidateUseCase] = (
+        lambda c: UpdateArtifactSummaryCandidateUseCase(
+            artifact_repository=c[ArtifactRepository],
+            external_event_publisher=c[ExternalEventPublisher],
+        )
+    )
+    container[UpdateTagsUseCase] = lambda c: UpdateTagsUseCase(
+        artifact_repository=c[ArtifactRepository],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[DeleteArtifactUseCase] = lambda c: DeleteArtifactUseCase(
+        artifact_repository=c[ArtifactRepository],
+        page_repository=c[PageRepository],
+        external_event_publisher=c[ExternalEventPublisher],
     )
 
     # Register Read Model Infrastructure
@@ -92,10 +183,18 @@ def create_container() -> Container:
     )
 
     # Register MongoDB Client and Read Repository
-    container[AsyncIOMotorClient] = lambda _: AsyncIOMotorClient(settings.mongo_uri)
-    container[PageReadModel] = lambda c: MongoReadRepository(
-        client=c[AsyncIOMotorClient],
-        settings=settings,
-    )
+    def mongo_client_factory(_: object) -> AsyncIOMotorClient:
+        return AsyncIOMotorClient(settings.mongo_uri)
+
+    container[AsyncIOMotorClient] = mongo_client_factory
+
+    def mongo_repository_factory(c: object) -> MongoReadRepository:
+        return MongoReadRepository(
+            client=c[AsyncIOMotorClient],
+            settings=settings,
+        )
+
+    container[PageReadModel] = mongo_repository_factory
+    container[ArtifactReadModel] = mongo_repository_factory
 
     return container

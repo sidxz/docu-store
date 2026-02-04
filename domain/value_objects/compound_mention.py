@@ -1,14 +1,13 @@
-import datetime
-from uuid import UUID
+from pydantic import ConfigDict, Field, field_validator
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from domain.value_objects.extraction_metadata import ExtractionMetadata
 
 
-class Compound(BaseModel):
-    """Represents a chemical compound extracted from a document using NLP.
+class CompoundMention(ExtractionMetadata):
+    """Represents a chemical compound_mention extracted from a document using NLP.
 
     This value object captures the extracted SMILES notation and associated
-    compound metadata, including validation status and external identifiers.
+    compound_mention metadata, including validation status and external identifiers.
 
     Raises:
         ValueError: If SMILES is blank or empty.
@@ -23,7 +22,10 @@ class Compound(BaseModel):
         None,
         description="Indicates whether the SMILES notation is valid",
     )
-    internal_id: str | None = Field(None, description="Internal system identifier for the compound")
+    internal_id: str | None = Field(
+        None,
+        description="Internal system identifier for the compound_mention",
+    )
     cdd_id: str | None = Field(None, description="Collaborative Drug Discovery (CDD) identifier")
     chembl_id: str | None = Field(None, description="ChEMBL database identifier")
     pdb_id: str | None = Field(None, description="Protein Data Bank identifier")
@@ -32,30 +34,27 @@ class Compound(BaseModel):
         None,
         description="Primary chemical name as extracted from the document",
     )
-    confidence: float | None = Field(
-        None,
-        ge=0.0,
-        le=1.0,
-        description="Confidence score of the extraction (0.0 to 1.0)",
-    )
-    date_extracted: datetime.datetime | None = Field(
-        None,
-        description="Timestamp when the compound was extracted",
-    )
-    model_name: str | None = Field(None, description="Name of the NLP model used for extraction")
-    additional_model_params: dict[str, str] | None = Field(
-        None,
-        description="Additional parameters passed to the extraction model",
-    )
-    pipeline_run_id: UUID | None = Field(
-        None,
-        description="Identifier for the pipeline run that produced this extraction",
-    )
 
     @field_validator("smiles")
     @classmethod
     def validate_smiles(cls, v: str) -> str:
         """Validate that SMILES is not blank or empty."""
         if not v or not v.strip():
-            raise ValueError("SMILES cannot be blank or empty")
+            msg = "SMILES cannot be blank or empty"
+            raise ValueError(msg)
         return v
+
+    # Define a comparison method for easier testing and comparisons
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, CompoundMention):
+            return NotImplemented
+
+        if not self.canonical_smiles or not other.canonical_smiles:
+            return False
+
+        return self.canonical_smiles.strip() == other.canonical_smiles.strip()
+
+    def __hash__(self) -> int:
+        if not self.canonical_smiles:
+            return 0
+        return hash(self.canonical_smiles.strip())

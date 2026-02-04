@@ -16,17 +16,21 @@ eventsourcing.persistence to make extraction into a separate package straightfor
 from __future__ import annotations
 
 import time
-from collections.abc import Callable
 from datetime import UTC, datetime
 from threading import Event, Lock
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
-from eventsourcing.persistence import IntegrityError, Tracking, TrackingRecorder
+from eventsourcing.persistence import IntegrityError, TrackingRecorder
 from pymongo import MongoClient
-from pymongo.client_session import ClientSession
-from pymongo.collection import Collection
-from pymongo.database import Database
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from eventsourcing.persistence import Tracking
+    from pymongo.client_session import ClientSession
+    from pymongo.collection import Collection
+    from pymongo.database import Database
 
 logger = structlog.get_logger()
 
@@ -61,7 +65,7 @@ class MongoReadModelTracking(TrackingRecorder):
         try:
             self._ensure_tracking_indexes()
             self._ensure_view_indexes()
-        except Exception as exc:  # pragma: no cover - non-critical
+        except OSError as exc:  # pragma: no cover - non-critical
             logger.warning("read_model_index_setup_failed", error=str(exc))
 
     def _ensure_tracking_indexes(self) -> None:
@@ -72,7 +76,7 @@ class MongoReadModelTracking(TrackingRecorder):
         )
 
     def _ensure_view_indexes(self) -> None:
-        """Hook for subclasses to register read-model-specific indexes."""
+        """Register read-model-specific indexes in subclasses."""
 
     # ============================================================================
     # TRANSACTION HELPERS
@@ -97,7 +101,7 @@ class MongoReadModelTracking(TrackingRecorder):
         fields: dict[str, Any],
         tracking: Tracking,
     ) -> None:
-        """Generic upsert helper that also records tracking."""
+        """Upsert a document and record the tracking atomically."""
         fields[identity_field] = identity_value
         fields["updated_at"] = datetime.now(UTC)
 

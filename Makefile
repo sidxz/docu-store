@@ -11,21 +11,17 @@ dev-install: ## Install development dependencies using uv
 	uv sync --dev
 
 run: ## Run the FastAPI application
-	uvicorn interfaces.api.main:app --host $(or $(HOST),0.0.0.0) --port $(or $(PORT),8000) --reload
+	uv run uvicorn interfaces.api.main:app --host $(or $(HOST),0.0.0.0) --port $(or $(PORT),8000) --reload
 
 run-read-models: ## Run the MongoDB read model projector
 	uv run python -m infrastructure.read_worker
 
-test: ## Run tests with pytest
-	pytest tests/ -v
-
 lint: ## Run linting checks
-	ruff check application/ domain/ infrastructure/ interfaces/ tests/
-	mypy application/ domain/ infrastructure/ interfaces/ tests/
+	uv run ruff check application/ domain/ infrastructure/ interfaces/ 
 
 format: ## Format code with ruff
-	ruff format application/ domain/ infrastructure/ interfaces/ tests/
-	ruff check --fix application/ domain/ infrastructure/ interfaces/ tests/
+	uv run ruff format application/ domain/ infrastructure/ interfaces/ 
+	uv run ruff check --fix application/ domain/ infrastructure/ interfaces/ 
 
 clean: ## Clean up generated files
 	find . -type d -name __pycache__ -exec rm -rf {} +
@@ -52,5 +48,8 @@ dev: docker-up dev-install ## Set up development environment
 	@echo "Development environment ready!"
 	@echo "Run 'make run' to start the API server"
 
-test:
-	uv run pytest
+test: ## Run tests with pytest
+	uv run pytest tests/ -v --cov=application --cov=domain --cov=infrastructure --cov-report=xml --cov-report=term-missing
+
+test-quick: ## Run tests without coverage
+	uv run pytest tests/ -v

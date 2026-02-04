@@ -17,7 +17,9 @@ logger = structlog.get_logger()
 
 class KafkaPublisher:
     """Publisher for integration events using Kafka.
-    Caution: This implementation is fire and forget with no outbox pattern or dead letter queue.
+
+    Caution: This implementation is fire and forget with no outbox pattern or
+    dead letter queue.
     """
 
     def __init__(self) -> None:
@@ -55,7 +57,7 @@ class KafkaPublisher:
             payload = json.dumps(event).encode()
 
             # Callback handles logging only, no future/await interaction
-            def delivery(err: Exception | None, msg: Any) -> None:
+            def delivery(err: Exception | None, msg: dict[str, object]) -> None:
                 if err:
                     logger.error("kafka_publish_failed", subject=subject, error=str(err))
                     return
@@ -76,7 +78,7 @@ class KafkaPublisher:
             )
 
         except Exception as exc:
-            logger.error("kafka_publish_exception", subject=subject, error=str(exc))
+            logger.exception("kafka_publish_exception", subject=subject, error=str(exc))
             raise
 
     def _poll_loop(self) -> None:
