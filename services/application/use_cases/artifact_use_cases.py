@@ -394,12 +394,14 @@ class CreateArtifactWithTitleUseCase:
         self,
         request: CreateArtifactRequest,
         title_text: str,
+        artifact_id: UUID | None = None,
     ) -> Result[ArtifactResponse, AppError]:
         """Create an artifact and set its title.
 
         Args:
             request: Artifact creation request
             title_text: Text to use as title
+            artifact_id: Optional artifact ID to use
 
         Returns:
             Result containing ArtifactResponse or AppError
@@ -413,6 +415,7 @@ class CreateArtifactWithTitleUseCase:
                 artifact_type=request.artifact_type,
                 mime_type=request.mime_type,
                 storage_location=request.storage_location,
+                artifact_id=artifact_id,
             )
 
             # Set title from extracted text
