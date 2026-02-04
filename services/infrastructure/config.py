@@ -66,6 +66,13 @@ class Settings(BaseSettings):
         validation_alias="MONGO_TRACKING_COLLECTION",
     )
 
+    # Blob Storage
+    blob_base_url: str = Field(
+        default="file://" + str(Path(__file__).resolve().parents[1] / "blobs"),
+        validation_alias="BLOB_BASE_URL",
+    )
+    blob_storage_options: dict = {}
+
 
 # Global settings instance
 settings = Settings()

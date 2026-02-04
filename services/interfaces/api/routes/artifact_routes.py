@@ -3,10 +3,11 @@ from typing import Annotated
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile, status
 from returns.result import Success
 
 from application.dtos.artifact_dtos import ArtifactResponse, CreateArtifactRequest
+from application.dtos.blob_dtos import UploadBlobRequest, UploadBlobResponse
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.use_cases.artifact_use_cases import (
     AddPagesUseCase,
@@ -17,6 +18,7 @@ from application.use_cases.artifact_use_cases import (
     UpdateTagsUseCase,
     UpdateTitleMentionUseCase,
 )
+from application.use_cases.blob_use_cases import UploadBlobUseCase
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.title_mention import TitleMention
 from interfaces.api.middleware import handle_use_case_errors
@@ -72,6 +74,20 @@ async def create_artifact(
     """
     use_case = container[CreateArtifactUseCase]
     return await use_case.execute(request=request)
+
+
+@router.post("/upload", status_code=status.HTTP_201_CREATED)
+@handle_use_case_errors
+async def upload_blob(
+    container: Annotated[Container, Depends(get_container)],
+    file: UploadFile = File(...),
+) -> UploadBlobResponse:
+    """Upload a blob to the blob store."""
+    use_case = container[UploadBlobUseCase]
+    return use_case.execute(
+        stream=file.file,
+        cmd=UploadBlobRequest(filename=file.filename, mime_type=file.content_type),
+    )
 
 
 @router.post("/{artifact_id}/pages", status_code=status.HTTP_200_OK)
