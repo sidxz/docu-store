@@ -22,9 +22,19 @@ class Artifact(Aggregate):
         artifact_type: ArtifactType,
         mime_type: MimeType,
         storage_location: str,
+        artifact_id: UUID | None = None,
     ) -> "Artifact":
         """Create a new Artifact aggregate (Factory Method)."""
+        if artifact_id is None:
+            return cls(
+                source_uri=source_uri,
+                source_filename=source_filename,
+                artifact_type=artifact_type,
+                mime_type=mime_type,
+                storage_location=storage_location,
+            )
         return cls(
+            id=artifact_id,
             source_uri=source_uri,
             source_filename=source_filename,
             artifact_type=artifact_type,

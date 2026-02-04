@@ -5,6 +5,7 @@ They are idempotent and follow Temporal best practices for activity implementati
 """
 
 from dataclasses import dataclass
+from uuid import UUID
 
 import structlog
 from temporalio import activity
@@ -164,7 +165,11 @@ class PdfProcessingActivities:
         )
 
         # Call the use case
-        result = await self.create_artifact_with_title_use_case.execute(request, title_text)
+        result = await self.create_artifact_with_title_use_case.execute(
+            request,
+            title_text,
+            artifact_id=UUID(artifact_id),
+        )
 
         if result.is_success():
             artifact_response = result.unwrap()
