@@ -17,11 +17,11 @@ run-read-models: ## Run the MongoDB read model projector
 	uv run python -m infrastructure.read_worker
 
 lint: ## Run linting checks
-	ruff check application/ domain/ infrastructure/ interfaces/ 
+	uv run ruff check application/ domain/ infrastructure/ interfaces/ 
 
 format: ## Format code with ruff
-	ruff format application/ domain/ infrastructure/ interfaces/ 
-	ruff check --fix application/ domain/ infrastructure/ interfaces/ 
+	uv run ruff format application/ domain/ infrastructure/ interfaces/ 
+	uv run ruff check --fix application/ domain/ infrastructure/ interfaces/ 
 
 clean: ## Clean up generated files
 	find . -type d -name __pycache__ -exec rm -rf {} +
