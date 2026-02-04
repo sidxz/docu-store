@@ -48,5 +48,8 @@ dev: docker-up dev-install ## Set up development environment
 	@echo "Development environment ready!"
 	@echo "Run 'make run' to start the API server"
 
-test:
-	uv run pytest
+test: ## Run tests with pytest
+	uv run pytest tests/ -v --cov=application --cov=domain --cov=infrastructure --cov-report=xml --cov-report=term-missing
+
+test-quick: ## Run tests without coverage
+	uv run pytest tests/ -v
