@@ -11,6 +11,9 @@ from eventsourcing.projection import ApplicationSubscription
 
 from infrastructure.di.container import create_container
 from infrastructure.event_projectors.event_projector import EventProjector
+from infrastructure.logging import setup_logging
+
+setup_logging()
 
 logger = structlog.get_logger()
 

@@ -21,6 +21,10 @@ class Settings(BaseSettings):
         validation_alias="APP_ENV",
     )
     log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
+    log_dir: Path = Field(
+        default=Path(__file__).resolve().parents[2] / "logs",
+        validation_alias="LOG_DIR",
+    )
 
     # EventStoreDB
     eventstoredb_uri: str = Field(
