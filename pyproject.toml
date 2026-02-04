@@ -54,6 +54,24 @@ disable = [
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "pytest>=8.3.5",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=4.1.0",
     "ruff>=0.14.14",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+markers = [
+    "asyncio: marks tests as async (deselect with '-m \"not asyncio\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "slow: marks tests as slow running",
+]
+addopts = "--verbose --strict-markers --tb=short"
+minversion = "7.0"

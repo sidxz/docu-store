@@ -53,6 +53,11 @@ class Artifact(Aggregate):
         mime_type: MimeType,
         storage_location: str,
     ) -> None:
+        # Strip whitespace BEFORE validation to catch whitespace-only strings
+        source_uri = source_uri.strip()
+        source_filename = source_filename.strip()
+        storage_location = storage_location.strip()
+
         if not source_uri:
             msg = "source_uri must be provided"
             raise ValueError(msg)
@@ -68,10 +73,6 @@ class Artifact(Aggregate):
         if not storage_location:
             msg = "storage_location must be provided"
             raise ValueError(msg)
-
-        source_uri = source_uri.strip()
-        source_filename = source_filename.strip()
-        storage_location = storage_location.strip()
 
         self.source_uri = source_uri
         self.source_filename = source_filename

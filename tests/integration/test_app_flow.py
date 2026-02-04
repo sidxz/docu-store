@@ -1,9 +1,11 @@
-from domain.value_objects.compound_mention import CompoundMention
+from uuid import uuid4
+
 from eventsourcing.application import Application
 from returns.result import Success
 
 from application.dtos.page_dtos import AddCompoundMentionsRequest, CreatePageRequest
 from application.use_cases.page_use_cases import AddCompoundMentionsUseCase
+from domain.value_objects.compound_mention import CompoundMention
 from infrastructure.di.container import create_container
 
 
@@ -22,7 +24,12 @@ def test_page_compound_mentions_roundtrip():
 
     from application.use_cases.page_use_cases import CreatePageUseCase
 
-    create_page_request = CreatePageRequest(name="Test Discovery Page")
+    # Use a dummy artifact_id for the test
+    artifact_id = uuid4()
+    create_page_request = CreatePageRequest(
+        name="Test Discovery Page",
+        artifact_id=artifact_id,
+    )
     create_uc = container[CreatePageUseCase]
     result = create_uc.execute(request=create_page_request)
     print(f"Create Page Result: {result}")
@@ -38,7 +45,8 @@ def test_page_compound_mentions_roundtrip():
 
     add_compound_mentions_uc = container[AddCompoundMentionsUseCase]
     add_compound_mentions_request = AddCompoundMentionsRequest(
-        page_id=page_id, compound_mentions=sample_compound_mentions
+        page_id=page_id,
+        compound_mentions=sample_compound_mentions,
     )
     add_compound_mentions_uc.execute(request=add_compound_mentions_request)
 

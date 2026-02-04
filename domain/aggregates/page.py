@@ -84,30 +84,30 @@ class Page(Aggregate):
     # COMMAND METHOD - Update TextMention
     # ============================================================================
     class TextMentionUpdated(Aggregate.Event):
-        text_mention: TextMention
+        text_mention: TextMention | None
 
-    def update_text_mention(self, text_mention: TextMention) -> None:
+    def update_text_mention(self, text_mention: TextMention | None) -> None:
         if self.is_deleted:
             raise ValueError("Cannot update text mention on a deleted page")
         self.trigger_event(self.TextMentionUpdated, text_mention=text_mention)
 
     @event(TextMentionUpdated)
-    def _apply_text_mention_updated(self, text_mention: TextMention) -> None:
+    def _apply_text_mention_updated(self, text_mention: TextMention | None) -> None:
         self.text_mention = text_mention
 
     # ============================================================================
     # COMMAND METHOD - update SummaryCandidate
     # ============================================================================
     class SummaryCandidateUpdated(Aggregate.Event):
-        summary_candidate: SummaryCandidate
+        summary_candidate: SummaryCandidate | None
 
-    def update_summary_candidate(self, summary_candidate: SummaryCandidate) -> None:
+    def update_summary_candidate(self, summary_candidate: SummaryCandidate | None) -> None:
         if self.is_deleted:
             raise ValueError("Cannot update summary candidate on a deleted page")
         self.trigger_event(self.SummaryCandidateUpdated, summary_candidate=summary_candidate)
 
     @event(SummaryCandidateUpdated)
-    def _apply_summary_candidate_updated(self, summary_candidate: SummaryCandidate) -> None:
+    def _apply_summary_candidate_updated(self, summary_candidate: SummaryCandidate | None) -> None:
         self.summary_candidate = summary_candidate
 
     # ============================================================================
