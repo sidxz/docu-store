@@ -1,4 +1,4 @@
-.PHONY: help install dev-install run run-read-models test lint format clean docker-up docker-down
+.PHONY: help install dev-install run run-read-models run-all stop-all test lint format clean docker-up docker-down
 
 help: ## Show this help message
 	@echo "Available commands:"
@@ -21,6 +21,23 @@ run-pipeline-worker: ## Run the Temporal pipeline orchestration worker
 
 run-temporal-worker: ## Run the Temporal workflow worker
 	uv run python -m infrastructure.temporal.worker
+
+run-all: ## Start all services (API, read models, pipeline worker, temporal worker)
+	@echo "Starting all services..."
+	uv run uvicorn interfaces.api.main:app --host 0.0.0.0 --port 8000 --reload &
+	uv run python -m infrastructure.read_worker &
+	uv run python -m infrastructure.pipeline_worker &
+	uv run python -m infrastructure.temporal.worker &
+	@echo "All services started in background. Press Ctrl+C to stop all."
+	@wait
+
+stop-all: ## Stop all services started by run-all
+	@echo "Stopping all services..."
+	@pkill -f "uvicorn interfaces.api.main:app" || true
+	@pkill -f "infrastructure.read_worker" || true
+	@pkill -f "infrastructure.pipeline_worker" || true
+	@pkill -f "infrastructure.temporal.worker" || true
+	@echo "All services stopped."
 
 lint: ## Run linting checks
 	uv run ruff check application/ domain/ infrastructure/ interfaces/ 
