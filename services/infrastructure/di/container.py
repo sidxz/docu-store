@@ -8,6 +8,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from application.ports.blob_store import BlobStore
 from application.ports.external_event_publisher import ExternalEventPublisher
+from application.ports.pipeline_orchestrator import PipelineOrchestrator
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_read_models import PageReadModel
@@ -56,6 +57,7 @@ from infrastructure.read_repositories.mongo_read_model_materializer import (
 )
 from infrastructure.read_repositories.mongo_read_repository import MongoReadRepository
 from infrastructure.serialization.pydantic_transcoder import PydanticTranscoding
+from infrastructure.temporal.orchestrator import TemporalPipelineOrchestrator
 
 if TYPE_CHECKING:
     from eventsourcing.persistence import JSONTranscoder
@@ -219,5 +221,8 @@ def create_container() -> Container:
 
     container[PageReadModel] = mongo_repository_factory
     container[ArtifactReadModel] = mongo_repository_factory
+
+    # Register Pipeline Orchestrator (Temporal)
+    container[PipelineOrchestrator] = lambda _: TemporalPipelineOrchestrator()
 
     return container

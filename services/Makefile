@@ -16,6 +16,12 @@ run: ## Run the FastAPI application
 run-read-models: ## Run the MongoDB read model projector
 	uv run python -m infrastructure.read_worker
 
+run-pipeline-worker: ## Run the Temporal pipeline orchestration worker
+	uv run python -m infrastructure.pipeline_worker
+
+run-temporal-worker: ## Run the Temporal workflow worker
+	uv run python -m infrastructure.temporal.worker
+
 lint: ## Run linting checks
 	uv run ruff check application/ domain/ infrastructure/ interfaces/ 
 

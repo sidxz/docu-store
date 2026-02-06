@@ -63,13 +63,3 @@ self._handlers.update({
 ```
 
 3. The worker automatically picks up new event types from `topics` property
-
-### Design Philosophy
-
-✅ **Minimal**: Direct event-to-handler mapping, no unnecessary abstraction layers
-✅ **Explicit**: Clear where each event goes and what happens to it
-✅ **DI-based**: Everything configured in container for testability
-✅ **Pydantic Support**: Automatic serialization via `PydanticTranscoding`
-✅ **Mixed Persistence**: Event store (KurrentDB) + Read models (MongoDB)
-✅ **Idempotent**: Event tracking prevents duplicate processing
-✅ **Observable**: Structured logging at each step

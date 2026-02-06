@@ -73,6 +73,12 @@ class Settings(BaseSettings):
     )
     blob_storage_options: dict = {}
 
+    # Temporal
+    temporal_address: str = Field(
+        default="localhost:7233",
+        validation_alias="TEMPORAL_ADDRESS",
+    )
+
 
 # Global settings instance
 settings = Settings()
