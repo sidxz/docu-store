@@ -40,6 +40,10 @@ async def run() -> None:
     3. This worker receives event via ApplicationSubscription
     4. Starts TemporalPipelineOrchestrator.start_artifact_processing_pipeline()
     5. Temporal workflow begins execution
+
+    Tracking:
+    - Stores last processed event in MongoDB to resume from that point
+    - Ensures events are only processed once across restarts
     """
     container = create_container()
     app = container[Application]
@@ -61,10 +65,33 @@ async def run() -> None:
     logger.info("pipeline_worker_started", topics=topics)
 
     try:
-        subscription = ApplicationSubscription(
-            app,
-            topics=topics,
-        )
+        # Get last processed event position from tracking
+        # Use same approach as read_worker to track progress
+        application_name = app.name
+        max_tracking_id = None
+
+        # Try to get max tracking ID from MongoDB (if available)
+        try:
+            from infrastructure.read_repositories.mongo_read_model_materializer import (
+                MongoReadModelMaterializer,
+            )
+
+            materializer = container[MongoReadModelMaterializer]
+            max_tracking_id = materializer.max_tracking_id(application_name)
+            logger.info("pipeline_worker_resuming", last_position=max_tracking_id)
+        except Exception as e:
+            logger.warning(
+                "pipeline_worker_no_tracking",
+                error=str(e),
+                note="Will process all events from beginning",
+            )
+
+        # Create subscription
+        subscription_kwargs = {"topics": topics}
+        if max_tracking_id is not None:
+            subscription_kwargs["gt"] = max_tracking_id
+
+        subscription = ApplicationSubscription(app, **subscription_kwargs)
 
         event_count = 0
         with subscription:
@@ -82,11 +109,10 @@ async def run() -> None:
                             )
 
                             # Start the Temporal workflow
-                            # Note: orchestrator is async-aware
                             await orchestrator.start_artifact_processing_pipeline(
                                 artifact_id=domain_event.originator_id,
                                 storage_location=domain_event.storage_location,
-                            )  # TODO: Pass in the event directly
+                            )
 
                             logger.info(
                                 "pipeline_workflow_triggered",
