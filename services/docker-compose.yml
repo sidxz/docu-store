@@ -111,10 +111,145 @@ services:
     networks:
       - docu_store-network
 
+    # PostgreSQL: Database for Temporal
+  postgres:
+    image: postgres:16-alpine
+    container_name: docu_store-postgres
+    environment:
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_USER: temporal
+      POSTGRES_DB: temporal
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - docu_store-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Temporal Admin Tools: For database schema setup (runs first)
+  temporal-admin-tools:
+    image: temporalio/admin-tools:1.29
+    container_name: docu_store-temporal-admin-tools
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB=postgres12_pgx
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=postgres
+    networks:
+      - docu_store-network
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        # Wait for postgres to be ready
+        until pg_isready -h postgres -p 5432 -U temporal; do
+          echo "Waiting for postgres..."
+          sleep 1
+        done
+        
+        # Create temporal_visibility database if it doesn't exist
+        PGPASSWORD=temporal psql -h postgres -U temporal -d temporal -c "CREATE DATABASE temporal_visibility;" 2>/dev/null || echo "temporal_visibility database already exists"
+        
+        # Setup Temporal database schema
+        temporal-sql-tool --plugin postgres12_pgx --ep postgres -p 5432 -u temporal -pw temporal --db temporal setup-schema -v 0.0
+        temporal-sql-tool --plugin postgres12_pgx --ep postgres -p 5432 -u temporal -pw temporal --db temporal update-schema -d ./schema/postgresql/v12/temporal/versioned
+        
+        # Setup Visibility database schema  
+        temporal-sql-tool --plugin postgres12_pgx --ep postgres -p 5432 -u temporal -pw temporal --db temporal_visibility setup-schema -v 0.0
+        temporal-sql-tool --plugin postgres12_pgx --ep postgres -p 5432 -u temporal -pw temporal --db temporal_visibility update-schema -d ./schema/postgresql/v12/visibility/versioned
+        
+        echo "✅ Temporal database schema setup complete"
+        
+        # Note: Namespace will be created when Temporal server starts via configuration
+        exit 0
+
+  # Temporal Server: Workflow orchestration (starts after schema is ready)
+  temporal:
+    image: temporalio/server:1.29.2
+    container_name: docu_store-temporal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal-admin-tools:
+        condition: service_completed_successfully
+    environment:
+      - DB=postgres12_pgx
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=postgres
+    ports:
+      - "7233:7233"
+    networks:
+      - docu_store-network
+    labels:
+      kompose.volume.type: configMap
+    volumes:
+      - ./temporal-config:/etc/temporal/config/dynamicconfig
+    # healthcheck:
+    #   test: ["CMD-SHELL", "nc -z 127.0.0.1 7233"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 10
+    #   start_period: 60s
+
+  # Temporal Namespace Init: Create the default namespace
+  temporal-namespace-init:
+    image: temporalio/admin-tools:1.29
+    container_name: docu_store-temporal-namespace-init
+    depends_on:
+      temporal:
+        condition: service_started
+    networks:
+      - docu_store-network
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        # Wait for Temporal server to be ready
+        for i in {1..60}; do
+          if temporal operator namespace list --address temporal:7233 > /dev/null 2>&1; then
+            echo "✅ Temporal server is ready"
+            break
+          fi
+          echo "Waiting for Temporal server... ($i/60)"
+          sleep 2
+        done
+        
+        # Register the default namespace
+        temporal operator namespace create --address temporal:7233 default 2>/dev/null && echo "✅ Default namespace registered" || echo "⚠️  Default namespace already exists or registration failed"
+        
+        exit 0
+
+  # Temporal UI: Web interface for workflow visualization
+  temporal-ui:
+    image: temporalio/ui:2.44.1
+    container_name: docu_store-temporal-ui
+    depends_on:
+      # temporal:
+      #   condition: service_healthy
+      temporal-namespace-init:
+        condition: service_completed_successfully
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    ports:
+      - "8233:8080"
+    networks:
+      - docu_store-network
+
 volumes:
   mongo-data:
   eventstoredb-data:
   kafka-data:
+  postgres-data:
 
 networks:
   docu_store-network:

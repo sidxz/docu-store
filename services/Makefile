@@ -36,7 +36,10 @@ docker-up: ## Start infrastructure services (EventStoreDB, NATS)
 	@echo "Services ready!"
 	@echo "  - EventStoreDB UI: http://localhost:2113"
 	@echo "  - Kafka: PLAINTEXT://localhost:9092"
+	@echo "  - Kafka UI: http://localhost:5051"
 	@echo "  - MongoDB: mongodb://localhost:27017"
+	@echo "  - Temporal Server: localhost:7233"
+	@echo "  - Temporal UI: http://localhost:8233"
 
 docker-down: ## Stop infrastructure services
 	docker-compose down
