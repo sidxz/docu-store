@@ -17,26 +17,30 @@ class Artifact(Aggregate):
     @classmethod
     def create(
         cls,
-        source_uri: str,
-        source_filename: str,
+        source_uri: str | None,
+        source_filename: str | None,
         artifact_type: ArtifactType,
         mime_type: MimeType,
         storage_location: str,
+        artifact_id: UUID | None = None,
     ) -> "Artifact":
         """Create a new Artifact aggregate (Factory Method)."""
-        return cls(
-            source_uri=source_uri,
-            source_filename=source_filename,
-            artifact_type=artifact_type,
-            mime_type=mime_type,
-            storage_location=storage_location,
-        )
+        kwargs = {
+            "source_uri": source_uri,
+            "source_filename": source_filename,
+            "artifact_type": artifact_type,
+            "mime_type": mime_type,
+            "storage_location": storage_location,
+        }
+        if artifact_id is not None:
+            kwargs["originator_id"] = artifact_id
+        return cls(**kwargs)
 
     class Created(Aggregate.Created):
         """Defines the structure of the Artifact Created event."""
 
-        source_uri: str
-        source_filename: str
+        source_uri: str | None
+        source_filename: str | None
         artifact_type: ArtifactType
         mime_type: MimeType
         storage_location: str
@@ -44,23 +48,19 @@ class Artifact(Aggregate):
     @event(Created)  # Links this handler to the Created event class above
     def __init__(
         self,
-        source_uri: str,
-        source_filename: str,
+        source_uri: str | None,
+        source_filename: str | None,
         artifact_type: ArtifactType,
         mime_type: MimeType,
         storage_location: str,
     ) -> None:
         # Strip whitespace BEFORE validation to catch whitespace-only strings
-        source_uri = source_uri.strip()
-        source_filename = source_filename.strip()
+        if source_uri is not None:
+            source_uri = source_uri.strip()
+        if source_filename is not None:
+            source_filename = source_filename.strip()
         storage_location = storage_location.strip()
 
-        if not source_uri:
-            msg = "source_uri must be provided"
-            raise ValueError(msg)
-        if not source_filename:
-            msg = "source_filename must be provided"
-            raise ValueError(msg)
         if not artifact_type:
             msg = "artifact_type must be provided"
             raise ValueError(msg)

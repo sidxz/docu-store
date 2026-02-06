@@ -3,12 +3,13 @@ from typing import Annotated
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile, status
 from returns.result import Success
 
 from application.dtos.artifact_dtos import ArtifactResponse, CreateArtifactRequest
-from application.dtos.blob_dtos import UploadBlobRequest, UploadBlobResponse
+from application.dtos.blob_dtos import UploadBlobRequest
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
+from application.sagas.artifact_upload_saga import ArtifactUploadSaga
 from application.use_cases.artifact_use_cases import (
     AddPagesUseCase,
     CreateArtifactUseCase,
@@ -18,7 +19,7 @@ from application.use_cases.artifact_use_cases import (
     UpdateTagsUseCase,
     UpdateTitleMentionUseCase,
 )
-from application.use_cases.blob_use_cases import UploadBlobUseCase
+from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.title_mention import TitleMention
 from interfaces.api.middleware import handle_use_case_errors
@@ -81,12 +82,19 @@ async def create_artifact(
 async def upload_blob(
     container: Annotated[Container, Depends(get_container)],
     file: UploadFile = File(...),
-) -> UploadBlobResponse:
-    """Upload a blob to the blob store."""
-    use_case = container[UploadBlobUseCase]
-    return use_case.execute(
+    artifact_type: ArtifactType = Form(...),
+    source_uri: str | None = Form(None),
+) -> ArtifactResponse:
+    """Upload a blob to the blob store and create an artifact."""
+    saga = container[ArtifactUploadSaga]
+    return await saga.execute(
         stream=file.file,
-        cmd=UploadBlobRequest(filename=file.filename, mime_type=file.content_type),
+        upload_req=UploadBlobRequest(
+            filename=file.filename,
+            mime_type=file.content_type,
+            artifact_type=artifact_type,
+            source_uri=source_uri,
+        ),
     )
 
 

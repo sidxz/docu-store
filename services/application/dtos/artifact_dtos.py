@@ -11,8 +11,12 @@ from domain.value_objects.title_mention import TitleMention
 class CreateArtifactRequest(BaseModel):
     """Request DTO for creating a new artifact."""
 
-    source_uri: str = Field(..., description="URI pointing to the source of the artifact")
-    source_filename: str = Field(..., description="Original filename of the artifact")
+    artifact_id: UUID | None = Field(
+        None,
+        description="Optional artifact ID to use instead of generating a new one",
+    )
+    source_uri: str | None = Field(None, description="URI pointing to the source of the artifact")
+    source_filename: str | None = Field(None, description="Original filename of the artifact")
     artifact_type: ArtifactType = Field(..., description="Classification type of the artifact")
     mime_type: MimeType = Field(..., description="MIME type of the artifact")
     storage_location: str = Field(..., description="Location where the artifact is stored")
@@ -22,8 +26,8 @@ class ArtifactResponse(BaseModel):
     """Response DTO representing an artifact."""
 
     artifact_id: UUID = Field(..., description="Unique identifier of the artifact")
-    source_uri: str = Field(..., description="URI pointing to the source of the artifact")
-    source_filename: str = Field(..., description="Original filename of the artifact")
+    source_uri: str | None = Field(None, description="URI pointing to the source of the artifact")
+    source_filename: str | None = Field(None, description="Original filename of the artifact")
     artifact_type: ArtifactType = Field(..., description="Classification type of the artifact")
     mime_type: MimeType = Field(..., description="MIME type of the artifact")
     storage_location: str = Field(..., description="Location where the artifact is stored")

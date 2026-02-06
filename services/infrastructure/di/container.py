@@ -12,6 +12,7 @@ from application.ports.repositories.artifact_read_models import ArtifactReadMode
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
+from application.sagas.artifact_upload_saga import ArtifactUploadSaga
 from application.use_cases.artifact_use_cases import (
     AddPagesUseCase,
     CreateArtifactUseCase,
@@ -189,10 +190,13 @@ def create_container() -> Container:
     )
 
     container[UploadBlobUseCase] = lambda c: UploadBlobUseCase(
-        artifact_repository=c[ArtifactRepository],
-        page_repository=c[PageRepository],
-        external_event_publisher=c[ExternalEventPublisher],
         blob_store=c[BlobStore],
+    )
+
+    # Register Sagas
+    container[ArtifactUploadSaga] = lambda c: ArtifactUploadSaga(
+        upload_blob_use_case=c[UploadBlobUseCase],
+        create_artifact_use_case=c[CreateArtifactUseCase],
     )
 
     # Register Read Model Infrastructure

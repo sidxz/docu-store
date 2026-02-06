@@ -7,9 +7,6 @@ from returns.result import Failure, Result, Success
 from application.dtos.blob_dtos import UploadBlobRequest, UploadBlobResponse
 from application.dtos.errors import AppError
 from application.ports.blob_store import BlobStore, StoredBlob
-from application.ports.external_event_publisher import ExternalEventPublisher
-from application.ports.repositories.artifact_repository import ArtifactRepository
-from application.ports.repositories.page_repository import PageRepository
 from domain.exceptions import ValidationError
 
 
@@ -18,14 +15,8 @@ class UploadBlobUseCase:
 
     def __init__(
         self,
-        artifact_repository: ArtifactRepository,
-        page_repository: PageRepository,
-        external_event_publisher: ExternalEventPublisher | None = None,
         blob_store: BlobStore | None = None,
     ) -> None:
-        self.artifact_repository = artifact_repository
-        self.page_repository = page_repository
-        self.external_event_publisher = external_event_publisher
         self.blob_store = blob_store
 
     def execute(
@@ -45,11 +36,13 @@ class UploadBlobUseCase:
             )
 
             result = UploadBlobResponse(
+                artifact_id=artifact_id,
                 storage_key=stored.key,
                 sha256=stored.sha256,
                 size_bytes=stored.size_bytes,
                 mime_type=stored.mime_type,
                 filename=cmd.filename,
+                source_uri=cmd.source_uri,
             )
 
             return Success(result)
