@@ -23,6 +23,9 @@ from application.ports.pipeline_orchestrator import PipelineOrchestrator
 from domain.aggregates.artifact import Artifact
 from infrastructure.di.container import create_container
 from infrastructure.logging import setup_logging
+from infrastructure.read_repositories.mongo_read_model_materializer import (
+    MongoReadModelMaterializer,
+)
 
 setup_logging()
 logger = structlog.get_logger()
@@ -72,14 +75,11 @@ async def run() -> None:
 
         # Try to get max tracking ID from MongoDB (if available)
         try:
-            from infrastructure.read_repositories.mongo_read_model_materializer import (
-                MongoReadModelMaterializer,
-            )
-
             materializer = container[MongoReadModelMaterializer]
             max_tracking_id = materializer.max_tracking_id(application_name)
             logger.info("pipeline_worker_resuming", last_position=max_tracking_id)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
+            # Intentionally catching all errors (import, DI, connection, etc.)
             logger.warning(
                 "pipeline_worker_no_tracking",
                 error=str(e),
@@ -144,7 +144,7 @@ async def run() -> None:
 
 
 def run_sync() -> None:
-    """Synchronous entry point for the pipeline worker."""
+    """Run the pipeline worker in synchronous mode."""
     asyncio.run(run())
 
 

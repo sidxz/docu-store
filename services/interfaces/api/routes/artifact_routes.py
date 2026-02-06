@@ -81,9 +81,9 @@ async def create_artifact(
 @handle_use_case_errors
 async def upload_blob(
     container: Annotated[Container, Depends(get_container)],
-    file: UploadFile = File(...),
-    artifact_type: ArtifactType = Form(...),
-    source_uri: str | None = Form(None),
+    file: Annotated[UploadFile, File()],
+    artifact_type: Annotated[ArtifactType, Form()],
+    source_uri: Annotated[str | None, Form()] = None,
 ) -> ArtifactResponse:
     """Upload a blob to the blob store and create an artifact."""
     saga = container[ArtifactUploadSaga]

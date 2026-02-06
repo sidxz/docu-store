@@ -15,7 +15,7 @@ class Artifact(Aggregate):
     INITIAL_VERSION = 0
 
     @classmethod
-    def create(
+    def create(  # noqa: PLR0913
         cls,
         source_uri: str | None,
         source_filename: str | None,

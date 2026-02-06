@@ -17,7 +17,7 @@ class ArtifactUploadSaga:
         self,
         upload_blob_use_case: UploadBlobUseCase,
         create_artifact_use_case: CreateArtifactUseCase,
-    ):
+    ) -> None:
         self.upload_blob = upload_blob_use_case
         self.create_artifact = create_artifact_use_case
 
@@ -43,5 +43,4 @@ class ArtifactUploadSaga:
             storage_location=blob_response.storage_key,
         )
 
-        artifact_result = await self.create_artifact.execute(create_artifact_request)
-        return artifact_result
+        return await self.create_artifact.execute(create_artifact_request)

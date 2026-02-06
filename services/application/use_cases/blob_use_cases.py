@@ -48,5 +48,6 @@ class UploadBlobUseCase:
             return Success(result)
         except ValidationError as e:
             return Failure(AppError("validation", f"Validation error: {e!s}"))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
+            # Blob storage implementations can raise various exceptions (IO, network, etc.)
             return Failure(AppError("storage_error", f"Failed to upload blob: {e!s}"))

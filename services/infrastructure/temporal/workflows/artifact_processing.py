@@ -21,7 +21,7 @@ Logging is done in activities instead, not in workflows.
 from __future__ import annotations
 
 from datetime import timedelta
-from uuid import UUID
+from uuid import UUID  # noqa: TC003  # Needed at runtime for Temporal workflow decorator
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
@@ -35,7 +35,7 @@ from infrastructure.temporal.activities.artifact_activities import (
 class ProcessArtifactInput:
     """Input for the artifact processing workflow."""
 
-    def __init__(self, artifact_id: UUID, storage_location: str, mime_type: str):
+    def __init__(self, artifact_id: UUID, storage_location: str, mime_type: str) -> None:
         self.artifact_id = artifact_id
         self.storage_location = storage_location
         self.mime_type = mime_type
@@ -75,34 +75,26 @@ class ProcessArtifactPipeline:
             Will propagate activity failures after exhausting retries
 
         """
-        try:
-            # Step 1: Log and validate MIME type
-            mime_result = await workflow.execute_activity(
-                log_mime_type_activity,
-                mime_type,
-                start_to_close_timeout=timedelta(seconds=30),
-                retry_policy=RetryPolicy(maximum_attempts=2),
-            )
+        # Step 1: Log and validate MIME type
+        mime_result = await workflow.execute_activity(
+            log_mime_type_activity,
+            mime_type,
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=RetryPolicy(maximum_attempts=2),
+        )
 
-            # Step 2: Log and validate storage location
-            location_result = await workflow.execute_activity(
-                log_storage_location_activity,
-                storage_location,
-                start_to_close_timeout=timedelta(seconds=30),
-                retry_policy=RetryPolicy(maximum_attempts=2),
-            )
+        # Step 2: Log and validate storage location
+        location_result = await workflow.execute_activity(
+            log_storage_location_activity,
+            storage_location,
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=RetryPolicy(maximum_attempts=2),
+        )
 
-            # Future steps would go here:
-            # - parse_pdf_activity
-            # - extract_first_page_activity
-            # - llm_summarize_activity
-            # - update_artifact_with_results_activity
+        # Future steps would go here:
+        # - parse_pdf_activity
+        # - extract_first_page_activity
+        # - llm_summarize_activity
+        # - update_artifact_with_results_activity
 
-            completion_msg = (
-                f"✅ Artifact {artifact_id} pipeline completed: {mime_result} | {location_result}"
-            )
-            return completion_msg
-
-        except Exception as e:
-            error_msg = f"❌ Artifact {artifact_id} pipeline failed: {e}"
-            raise
+        return f"Artifact {artifact_id} pipeline completed: {mime_result} | {location_result}"

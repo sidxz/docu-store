@@ -6,9 +6,12 @@ The domain and application layers only depend on the PipelineOrchestrator port.
 
 from __future__ import annotations
 
-from uuid import UUID
+from typing import TYPE_CHECKING
 
 import structlog
+
+if TYPE_CHECKING:
+    from uuid import UUID
 from temporalio.client import Client
 
 from application.ports.pipeline_orchestrator import PipelineOrchestrator
@@ -27,7 +30,7 @@ class TemporalPipelineOrchestrator(PipelineOrchestrator):
     - Handle workflow lifecycle
     """
 
-    def __init__(self, client: Client | None = None):
+    def __init__(self, client: Client | None = None) -> None:
         """Initialize the Temporal orchestrator.
 
         Args:
@@ -78,15 +81,14 @@ class TemporalPipelineOrchestrator(PipelineOrchestrator):
             # 1. Query the artifact repository to get mime_type
             # 2. Include mime_type in the event that triggered this
             # For now, we'll pass a placeholder
-            mime_type = "application/pdf"  # TODO: get from artifact aggregate
+            # TODO(@sidxz): get mime_type from artifact aggregate (#123)  # noqa: FIX002
+            mime_type = "application/pdf"
 
             handle = await self._client.start_workflow(
                 ProcessArtifactPipeline.execute,
                 args=[artifact_id, storage_location, mime_type],
                 id=workflow_id,
                 task_queue="artifact_processing",
-                # Optional: Set retention policy to clean up old workflows
-                # retention_period=timedelta(days=7),
             )
 
             logger.info(
