@@ -29,26 +29,26 @@ class TestArtifactCreation:
         assert sample_artifact.is_deleted is False
 
     def test_artifact_initialization_validates_source_uri(self) -> None:
-        """Test that empty source_uri raises ValueError."""
-        with pytest.raises(ValueError, match="source_uri must be provided"):
-            Artifact.create(
-                source_uri="",
-                source_filename="file.pdf",
-                artifact_type=ArtifactType.RESEARCH_ARTICLE,
-                mime_type=MimeType.PDF,
-                storage_location="/storage/file.pdf",
-            )
+        """Test that source_uri can be None (optional field)."""
+        artifact = Artifact.create(
+            source_uri=None,
+            source_filename="file.pdf",
+            artifact_type=ArtifactType.RESEARCH_ARTICLE,
+            mime_type=MimeType.PDF,
+            storage_location="/storage/file.pdf",
+        )
+        assert artifact.source_uri is None
 
     def test_artifact_initialization_validates_source_filename(self) -> None:
-        """Test that empty source_filename raises ValueError."""
-        with pytest.raises(ValueError, match="source_filename must be provided"):
-            Artifact.create(
-                source_uri="https://example.com/file.pdf",
-                source_filename="",
-                artifact_type=ArtifactType.RESEARCH_ARTICLE,
-                mime_type=MimeType.PDF,
-                storage_location="/storage/file.pdf",
-            )
+        """Test that source_filename can be None (optional field)."""
+        artifact = Artifact.create(
+            source_uri="https://example.com/file.pdf",
+            source_filename=None,
+            artifact_type=ArtifactType.RESEARCH_ARTICLE,
+            mime_type=MimeType.PDF,
+            storage_location="/storage/file.pdf",
+        )
+        assert artifact.source_filename is None
 
     def test_artifact_initialization_validates_artifact_type(self) -> None:
         """Test that None artifact_type raises ValueError."""
@@ -610,26 +610,6 @@ class TestArtifactInvariants:
 
     def test_cannot_create_artifact_with_invalid_data(self) -> None:
         """Test that artifact creation validates required fields."""
-        # Empty source_uri
-        with pytest.raises(ValueError, match="source_uri"):
-            Artifact.create(
-                source_uri="",
-                source_filename="file.pdf",
-                artifact_type=ArtifactType.RESEARCH_ARTICLE,
-                mime_type=MimeType.PDF,
-                storage_location="/storage/file.pdf",
-            )
-
-        # Empty source_filename
-        with pytest.raises(ValueError, match="source_filename"):
-            Artifact.create(
-                source_uri="https://example.com/file.pdf",
-                source_filename="",
-                artifact_type=ArtifactType.RESEARCH_ARTICLE,
-                mime_type=MimeType.PDF,
-                storage_location="/storage/file.pdf",
-            )
-
         # None artifact_type
         with pytest.raises(ValueError, match="artifact_type"):
             Artifact.create(
@@ -661,14 +641,15 @@ class TestArtifactInvariants:
             )
 
     def test_whitespace_only_strings_are_treated_as_empty(self) -> None:
-        """Test that strings with only whitespace are rejected."""
-        with pytest.raises(ValueError, match="source_uri"):
+        """Test that strings with only whitespace are stripped (required fields still checked)."""
+        # Whitespace-only storage_location should still raise (required field)
+        with pytest.raises(ValueError, match="storage_location"):
             Artifact.create(
-                source_uri="   ",
+                source_uri="https://example.com/file.pdf",
                 source_filename="file.pdf",
                 artifact_type=ArtifactType.RESEARCH_ARTICLE,
                 mime_type=MimeType.PDF,
-                storage_location="/storage/file.pdf",
+                storage_location="   ",
             )
 
     def test_version_increments_with_each_event(self) -> None:
