@@ -8,6 +8,7 @@ from application.dtos.blob_dtos import UploadBlobRequest, UploadBlobResponse
 from application.dtos.errors import AppError
 from application.ports.blob_store import BlobStore, StoredBlob
 from domain.exceptions import ValidationError
+from domain.value_objects.mime_type import MimeType
 
 
 class UploadBlobUseCase:
@@ -25,6 +26,15 @@ class UploadBlobUseCase:
         cmd: UploadBlobRequest,
     ) -> Result[UploadBlobResponse, AppError]:
         try:
+            # Check MIME type is supported for artifact creation Only PDFs for now
+            if cmd.mime_type != MimeType.PDF.value:
+                return Failure(
+                    AppError(
+                        "validation",
+                        f"Unsupported MIME type for artifact creation: {cmd.mime_type}",
+                    ),
+                )
+
             artifact_id = uuid4()
             extension = Path(cmd.filename).suffix if cmd.filename else ""
             storage_key = f"artifacts/{artifact_id}/source{extension}"

@@ -42,6 +42,7 @@ class CreatePageUseCase:
             )
             # Ensure artifact exists before creating a page
             artifact = self.artifact_repository.get_by_id(request.artifact_id)
+
             # Create a new Page aggregate
             page = Page.create(
                 name=request.name,
@@ -53,16 +54,6 @@ class CreatePageUseCase:
             logger.info("saving_page", page_id=str(page.id))
             self.page_repository.save(page)
             logger.info("page_saved", page_id=str(page.id))
-
-            # Update the artifact to reference this page
-            logger.info(
-                "updating_artifact_with_page",
-                artifact_id=str(request.artifact_id),
-                page_id=str(page.id),
-            )
-            artifact.add_pages([page.id])
-            self.artifact_repository.save(artifact)
-            logger.info("artifact_updated_with_page", artifact_id=str(request.artifact_id))
 
             result = PageMapper.to_page_response(page)
 

@@ -6,8 +6,10 @@ from eventsourcing.application import Application
 from lagom import Container
 from motor.motor_asyncio import AsyncIOMotorClient
 
+from application.dtos.pdf_dtos import PDFContent
 from application.ports.blob_store import BlobStore
 from application.ports.external_event_publisher import ExternalEventPublisher
+from application.ports.pdf_service import PDFService
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_read_models import PageReadModel
@@ -52,6 +54,7 @@ from infrastructure.event_sourced_repositories.artifact_repository import (
     EventSourcedArtifactRepository,
 )
 from infrastructure.event_sourced_repositories.page_repository import EventSourcedPageRepository
+from infrastructure.file_services.py_pfd_service import PyPDFService
 from infrastructure.kafka.kafka_external_event_streamer import KafkaExternalEventPublisher
 from infrastructure.kafka.kafka_publisher import KafkaPublisher
 from infrastructure.read_repositories.mongo_read_model_materializer import (
@@ -82,6 +85,7 @@ class DocuStoreApplication(Application):
         transcoder.register(PydanticTranscoding(ExtractionMetadata))
         transcoder.register(PydanticTranscoding(BlobRef))
         transcoder.register(PydanticTranscoding(WorkflowStatus))
+        transcoder.register(PydanticTranscoding(PDFContent))
 
 
 def create_container() -> Container:
@@ -155,6 +159,9 @@ def create_container() -> Container:
     # Register Pipeline Orchestrator (Temporal)
     container[WorkflowOrchestrator] = lambda _: TemporalWorkflowOrchestrator()
 
+    # Register PDF Service with BlobStore injected
+    container[PDFService] = lambda c: PyPDFService(blob_store=c[BlobStore])
+
     # Register Use Cases
     # Page Use Cases
     container[CreatePageUseCase] = lambda c: CreatePageUseCase(
@@ -226,6 +233,10 @@ def create_container() -> Container:
     container[ArtifactUploadSaga] = lambda c: ArtifactUploadSaga(
         upload_blob_use_case=c[UploadBlobUseCase],
         create_artifact_use_case=c[CreateArtifactUseCase],
+        create_page_use_case=c[CreatePageUseCase],
+        add_pages_use_case=c[AddPagesUseCase],
+        update_text_mention_use_case=c[UpdateTextMentionUseCase],
+        pdf_service=c[PDFService],
     )
 
     # Register Workflow Use Cases

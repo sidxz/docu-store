@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import BinaryIO, Protocol
+from pathlib import Path
+from typing import BinaryIO, ContextManager, Protocol
 
 
 @dataclass(frozen=True)
@@ -21,5 +22,14 @@ class BlobStore(Protocol):
         mime_type: str | None = None,
     ) -> StoredBlob: ...
     def get_bytes(self, key: str) -> bytes: ...
+    def get_stream(self, key: str) -> BinaryIO: ...
+    def get_file(self, key: str) -> ContextManager[Path]:
+        """Context manager that provides a local file path for the blob.
+
+        Useful for tools that require a file path. Handles cleanup of temp files.
+        Yields a Path that is valid within the context manager.
+        """
+        ...
+
     def exists(self, key: str) -> bool: ...
     def delete(self, key: str) -> None: ...
