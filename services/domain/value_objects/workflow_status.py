@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from uuid import UUID
 
 from pydantic import BaseModel, field_validator
 
@@ -11,6 +12,9 @@ class WorkflowStatus(BaseModel):
     Immutable value object that tracks workflow progress with intelligent
     properties for state queries and timing calculations.
     """
+
+    workflow_id: UUID | None = None
+    """Unique identifier for the workflow run. Optional, but can be useful for tracking."""
 
     state: WorkflowState | None = None
     """Current state of the workflow run (e.g., PENDING, IN_PROGRESS, COMPLETED, FAILED)."""
@@ -140,11 +144,14 @@ class WorkflowStatus(BaseModel):
     # ========================================================================
 
     @classmethod
-    def pending(cls, message: str | None = None) -> "WorkflowStatus":
+    def pending(
+        cls, message: str | None = None, workflow_id: UUID | None = None
+    ) -> "WorkflowStatus":
         """Create a pending workflow status."""
         return cls(
             state=WorkflowState.PENDING,
             message=message,
+            workflow_id=workflow_id,
         )
 
     @classmethod
@@ -153,9 +160,11 @@ class WorkflowStatus(BaseModel):
         message: str | None = None,
         progress: float | None = None,
         started_at: datetime | None = None,
+        workflow_id: UUID | None = None,
     ) -> "WorkflowStatus":
         """Create an in-progress workflow status."""
         return cls(
+            workflow_id=workflow_id,
             state=WorkflowState.IN_PROGRESS,
             message=message,
             progress=progress,
@@ -168,9 +177,11 @@ class WorkflowStatus(BaseModel):
         message: str | None = None,
         started_at: datetime | None = None,
         completed_at: datetime | None = None,
+        workflow_id: UUID | None = None,
     ) -> "WorkflowStatus":
         """Create a completed workflow status."""
         return cls(
+            workflow_id=workflow_id,
             state=WorkflowState.COMPLETED,
             message=message,
             progress=1.0,
@@ -184,9 +195,11 @@ class WorkflowStatus(BaseModel):
         message: str,
         started_at: datetime | None = None,
         completed_at: datetime | None = None,
+        workflow_id: UUID | None = None,
     ) -> "WorkflowStatus":
         """Create a failed workflow status."""
         return cls(
+            workflow_id=workflow_id,
             state=WorkflowState.FAILED,
             message=message,
             progress=None,

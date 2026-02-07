@@ -36,6 +36,7 @@ from application.use_cases.page_use_cases import (
 from application.use_cases.page_use_cases import (
     UpdateSummaryCandidateUseCase as UpdatePageSummaryCandidateUseCase,
 )
+from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
 from domain.value_objects.blob_ref import BlobRef
 from domain.value_objects.compound_mention import CompoundMention
 from domain.value_objects.extraction_metadata import ExtractionMetadata
@@ -130,6 +131,30 @@ def create_container() -> Container:
     else:
         container[ExternalEventPublisher] = lambda _: None  # type: ignore[return-value]
 
+    # Register Read Model Infrastructure
+    container[MongoReadModelMaterializer] = lambda _: MongoReadModelMaterializer()
+    container[EventProjector] = lambda c: EventProjector(
+        materializer=c[MongoReadModelMaterializer],
+    )
+
+    # Register MongoDB Client and Read Repository
+    def mongo_client_factory(_: object) -> AsyncIOMotorClient:
+        return AsyncIOMotorClient(settings.mongo_uri)
+
+    container[AsyncIOMotorClient] = mongo_client_factory
+
+    def mongo_repository_factory(c: object) -> MongoReadRepository:
+        return MongoReadRepository(
+            client=c[AsyncIOMotorClient],
+            settings=settings,
+        )
+
+    container[PageReadModel] = mongo_repository_factory
+    container[ArtifactReadModel] = mongo_repository_factory
+
+    # Register Pipeline Orchestrator (Temporal)
+    container[WorkflowOrchestrator] = lambda _: TemporalWorkflowOrchestrator()
+
     # Register Use Cases
     # Page Use Cases
     container[CreatePageUseCase] = lambda c: CreatePageUseCase(
@@ -203,28 +228,10 @@ def create_container() -> Container:
         create_artifact_use_case=c[CreateArtifactUseCase],
     )
 
-    # Register Read Model Infrastructure
-    container[MongoReadModelMaterializer] = lambda _: MongoReadModelMaterializer()
-    container[EventProjector] = lambda c: EventProjector(
-        materializer=c[MongoReadModelMaterializer],
+    # Register Workflow Use Cases
+    container[LogArtifactSampleUseCase] = lambda c: LogArtifactSampleUseCase(
+        artifact_repository=c[ArtifactRepository],
+        workflow_orchestrator=c[WorkflowOrchestrator],
     )
-
-    # Register MongoDB Client and Read Repository
-    def mongo_client_factory(_: object) -> AsyncIOMotorClient:
-        return AsyncIOMotorClient(settings.mongo_uri)
-
-    container[AsyncIOMotorClient] = mongo_client_factory
-
-    def mongo_repository_factory(c: object) -> MongoReadRepository:
-        return MongoReadRepository(
-            client=c[AsyncIOMotorClient],
-            settings=settings,
-        )
-
-    container[PageReadModel] = mongo_repository_factory
-    container[ArtifactReadModel] = mongo_repository_factory
-
-    # Register Pipeline Orchestrator (Temporal)
-    container[WorkflowOrchestrator] = lambda _: TemporalWorkflowOrchestrator()
 
     return container
