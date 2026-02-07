@@ -12,7 +12,7 @@ class WorkflowStatus(BaseModel):
     properties for state queries and timing calculations.
     """
 
-    state: WorkflowState
+    state: WorkflowState | None = None
     """Current state of the workflow run (e.g., PENDING, IN_PROGRESS, COMPLETED, FAILED)."""
 
     message: str | None = None

@@ -43,6 +43,7 @@ from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.text_mention import TextMention
 from domain.value_objects.title_mention import TitleMention
+from domain.value_objects.workflow_status import WorkflowStatus
 from infrastructure.blob_stores.fsspec_blob_store import FsspecBlobStore
 from infrastructure.config import settings
 from infrastructure.event_projectors.event_projector import EventProjector
@@ -79,6 +80,7 @@ class DocuStoreApplication(Application):
         transcoder.register(PydanticTranscoding(TextMention))
         transcoder.register(PydanticTranscoding(ExtractionMetadata))
         transcoder.register(PydanticTranscoding(BlobRef))
+        transcoder.register(PydanticTranscoding(WorkflowStatus))
 
 
 def create_container() -> Container:

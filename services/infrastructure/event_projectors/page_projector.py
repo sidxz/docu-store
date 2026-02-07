@@ -27,6 +27,7 @@ class PageProjector:
                 "tag_mentions": [],
                 "text_mention": None,
                 "summary_candidate": None,
+                "workflow_statuses": {},
             },
             tracking=tracking,  # type: ignore[arg-type]
         )
@@ -85,6 +86,18 @@ class PageProjector:
             page_id=str(event.originator_id),  # type: ignore[attr-defined]
             fields={
                 "summary_candidate": summary_candidate_data,
+            },
+            tracking=tracking,  # type: ignore[arg-type]
+        )
+
+    def workflow_status_updated(self, event: object, tracking: object) -> None:
+        """Project WorkflowStatusUpdated event to read model."""
+        status_data = event.status.model_dump(mode="json")  # type: ignore[attr-defined]
+        workflow_key = f"workflow_statuses.{event.name}"  # type: ignore[attr-defined]
+        self._materializer.upsert_page(
+            page_id=str(event.originator_id),  # type: ignore[attr-defined]
+            fields={
+                workflow_key: status_data,
             },
             tracking=tracking,  # type: ignore[arg-type]
         )

@@ -11,6 +11,8 @@ from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.mime_type import MimeType
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.title_mention import TitleMention
+from domain.value_objects.workflow_state import WorkflowState
+from domain.value_objects.workflow_status import WorkflowStatus
 
 
 class TestArtifactCreation:
@@ -312,6 +314,30 @@ class TestArtifactTags:
         sample_artifact.delete()
         with pytest.raises(ValueError, match="Cannot update tags on a deleted artifact"):
             sample_artifact.update_tags(["chemistry"])
+
+
+class TestArtifactWorkflowStatus:
+    """Test updating workflow status on artifact."""
+
+    def test_update_workflow_status_adds_and_updates(self, sample_artifact: Artifact) -> None:
+        status_queued = WorkflowStatus(state=WorkflowState.PENDING, message="queued")
+        status_done = WorkflowStatus(state=WorkflowState.COMPLETED, progress=1.0)
+
+        sample_artifact.update_workflow_status("  extract  ", status_queued)
+        assert sample_artifact.workflow_statuses["extract"] == status_queued
+
+        sample_artifact.update_workflow_status("extract", status_done)
+        assert sample_artifact.workflow_statuses["extract"] == status_done
+
+    def test_update_workflow_status_raises_on_deleted_artifact(
+        self, sample_artifact: Artifact
+    ) -> None:
+        sample_artifact.delete()
+        with pytest.raises(ValueError, match="Cannot update workflow status on a deleted artifact"):
+            sample_artifact.update_workflow_status(
+                "extract",
+                WorkflowStatus(state=WorkflowState.PENDING),
+            )
 
 
 class TestArtifactDeletion:
