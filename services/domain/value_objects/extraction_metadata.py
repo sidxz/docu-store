@@ -31,5 +31,5 @@ class ExtractionMetadata(BaseModel):
     )
     pipeline_run_id: UUID | None = Field(
         None,
-        description="Identifier for the pipeline run that produced this extraction",
+        description="Identifier for the workflow run that produced this extraction",
     )

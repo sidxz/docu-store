@@ -45,7 +45,7 @@ services/
 │ Application Layer (Domain-Independent)          │
 ├─────────────────────────────────────────────────┤
 │                                                 │
-│  PipelineOrchestrator (port)                   │
+│  WorkflowOrchestrator (port)                   │
 │  └─ Abstraction: What orchestration must do    │
 │                                                 │
 └───────────────────┬─────────────────────────────┘
@@ -55,7 +55,7 @@ services/
 │ Infrastructure Layer - Temporal Implementation  │
 ├─────────────────────────────────────────────────┤
 │                                                 │
-│  TemporalPipelineOrchestrator                   │
+│  TemporalWorkflowOrchestrator                   │
 │  └─ Implementation: How Temporal does it        │
 │                                                 │
 └───────────────────┬─────────────────────────────┘
@@ -72,7 +72,7 @@ services/
 │                                                 │
 │  temporal/worker.py                             │
 │  ├─ Listens to: Temporal Server                │
-│  ├─ Executes: ProcessArtifactPipeline workflow │
+│  ├─ Executes: ProcessArtifactWorkflow workflow │
 │  └─ Runs: All registered activities            │
 │                                                 │
 └───────────────────┬─────────────────────────────┘
@@ -82,7 +82,7 @@ services/
 │ Infrastructure Layer - Temporal Workflow        │
 ├─────────────────────────────────────────────────┤
 │                                                 │
-│  ProcessArtifactPipeline (workflow)             │
+│  ProcessArtifactWorkflow (workflow)             │
 │  └─ Orchestrates activity execution            │
 │                                                 │
 └───────────────────┬─────────────────────────────┘
@@ -116,14 +116,14 @@ services/
    ↓
    pipeline_worker.py (subscribes, detects event)
    ↓
-   TemporalPipelineOrchestrator (starts workflow)
+   TemporalWorkflowOrchestrator (starts workflow)
    
 3. Workflow execution
    Temporal Server
    ↓
    temporal/worker.py (polls for tasks)
    ↓
-   ProcessArtifactPipeline (runs workflow)
+   ProcessArtifactWorkflow (runs workflow)
    ↓
    artifact_activities.py (execute activities)
 ```
@@ -133,16 +133,16 @@ services/
 ### Port (Abstraction)
 ```
 application/ports/pipeline_orchestrator.py
-├─ Abstract class: PipelineOrchestrator
-├─ Method: start_artifact_processing_pipeline()
+├─ Abstract class: WorkflowOrchestrator
+├─ Method: start_artifact_processing_workflow()
 └─ Implementation-agnostic
 ```
 
 ### Implementation
 ```
 infrastructure/temporal/orchestrator.py
-├─ Concrete class: TemporalPipelineOrchestrator
-├─ Implements: PipelineOrchestrator
+├─ Concrete class: TemporalWorkflowOrchestrator
+├─ Implements: WorkflowOrchestrator
 └─ Uses: Temporal SDK
 ```
 
@@ -162,7 +162,7 @@ infrastructure/temporal/worker.py
 ### Workflow
 ```
 infrastructure/temporal/workflows/artifact_processing.py
-├─ @workflow.defn ProcessArtifactPipeline
+├─ @workflow.defn ProcessArtifactWorkflow
 ├─ Orchestrates: Activities
 └─ Handles: Retries, timeouts, errors
 ```
@@ -186,7 +186,7 @@ infrastructure/temporal/activities/artifact_activities.py
 1. Follow: `PIPELINE_QUICKSTART.md`
 2. Start terminals:
    - `make run-temporal-worker`
-   - `make run-pipeline-worker`
+   - `make run-workflow-worker`
    - `make run`
 3. Test: `TESTING_PIPELINE.md`
 
@@ -196,7 +196,7 @@ infrastructure/temporal/activities/artifact_activities.py
 3. Register in worker: `infrastructure/temporal/worker.py`
 
 ### To Test
-1. Unit tests: Mock `PipelineOrchestrator` port
+1. Unit tests: Mock `WorkflowOrchestrator` port
 2. Integration tests: Use Temporal test client
 3. E2E tests: Follow `TESTING_PIPELINE.md`
 
@@ -207,13 +207,13 @@ infrastructure/temporal/activities/artifact_activities.py
 infrastructure/config.py
 ├─ temporal_address (default: localhost:7233)
 ├─ Environment: TEMPORAL_ADDRESS
-└─ Used by: TemporalPipelineOrchestrator
+└─ Used by: TemporalWorkflowOrchestrator
 ```
 
 ### DI Container Registration
 ```
 infrastructure/di/container.py
-├─ container[PipelineOrchestrator] = TemporalPipelineOrchestrator()
+├─ container[WorkflowOrchestrator] = TemporalWorkflowOrchestrator()
 ├─ Loaded by: pipeline_worker.py, (future) use cases
 └─ Allows: Easy mocking for tests
 ```
@@ -231,7 +231,7 @@ Both workers use: "artifact_processing" task queue
 ### Single Machine Development
 ```
 1 Temporal Server (docker)
-1 pipeline worker
+1 workflow worker
 1 temporal worker
 1 API server
 ```
@@ -239,7 +239,7 @@ Both workers use: "artifact_processing" task queue
 ### Production
 ```
 3+ Temporal Servers (cluster)
-N pipeline workers (independent horizontal scaling)
+N workflow workers (independent horizontal scaling)
 M temporal workers (independent horizontal scaling)
 L API servers (behind load balancer)
 ```

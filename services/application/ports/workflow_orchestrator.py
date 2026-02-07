@@ -1,16 +1,16 @@
-"""Port for pipeline orchestration (abstraction from Temporal)."""
+"""Port for workflow orchestration (abstraction from Temporal)."""
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from abc import abstractmethod
+from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from uuid import UUID
 
 
-class PipelineOrchestrator(ABC):
-    """Abstract port for orchestrating long-running pipelines.
+class WorkflowOrchestrator(Protocol):
+    """Abstract port for orchestrating long-running workflows.
 
     This port decouples the domain from the specific orchestration technology
     (Temporal, Celery, etc.). Implementations handle workflow lifecycle,
@@ -18,12 +18,12 @@ class PipelineOrchestrator(ABC):
     """
 
     @abstractmethod
-    async def start_artifact_processing_pipeline(
+    async def start_artifact_processing_workflow(
         self,
         artifact_id: UUID,
         storage_location: str,
     ) -> None:
-        """Start a pipeline to process an artifact.
+        """Start a workflow to process an artifact.
 
         Args:
             artifact_id: Unique identifier of the artifact to process

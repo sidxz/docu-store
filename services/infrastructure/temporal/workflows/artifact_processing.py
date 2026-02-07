@@ -1,10 +1,10 @@
 """Artifact processing workflow (toy implementation).
 
-This workflow orchestrates the processing of an artifact through a pipeline
+This workflow orchestrates the processing of an artifact through a workflow
 of activities. The structure follows the choreography of:
 
 1. Extract metadata from artifact
-2. Process through ML/LLM pipeline
+2. Process through ML/LLM workflow
 3. Persist results back to domain
 
 Currently this is a toy implementation that logs details.
@@ -32,18 +32,9 @@ from infrastructure.temporal.activities.artifact_activities import (
 )
 
 
-class ProcessArtifactInput:
-    """Input for the artifact processing workflow."""
-
-    def __init__(self, artifact_id: UUID, storage_location: str, mime_type: str) -> None:
-        self.artifact_id = artifact_id
-        self.storage_location = storage_location
-        self.mime_type = mime_type
-
-
 @workflow.defn
-class ProcessArtifactPipeline:
-    """Orchestrates the long-running artifact processing pipeline.
+class ProcessArtifactWorkflow:
+    """Orchestrates the long-running artifact processing workflow.
 
     Workflow features:
     - Durable: Survives worker/service restarts
@@ -61,7 +52,7 @@ class ProcessArtifactPipeline:
         storage_location: str,
         mime_type: str,
     ) -> str:
-        """Execute the artifact processing pipeline.
+        """Execute the artifact processing workflow.
 
         Args:
             artifact_id: Unique identifier of the artifact
@@ -97,4 +88,4 @@ class ProcessArtifactPipeline:
         # - llm_summarize_activity
         # - update_artifact_with_results_activity
 
-        return f"Artifact {artifact_id} pipeline completed: {mime_result} | {location_result}"
+        return f"Artifact {artifact_id} workflow completed: {mime_result} | {location_result}"

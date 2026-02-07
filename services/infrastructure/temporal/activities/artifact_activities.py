@@ -1,4 +1,4 @@
-"""Toy activities for artifact processing pipeline.
+"""Toy activities for artifact processing workflow.
 
 These activities are invoked by the Temporal workflow. Each activity
 encapsulates a unit of work that can be retried independently.
@@ -19,7 +19,7 @@ logger = structlog.get_logger()
 async def log_mime_type_activity(mime_type: str) -> str:
     """Activity that logs the MIME type of the artifact.
 
-    In a real pipeline, this might:
+    In a real workflow, this might:
     - Validate MIME type support
     - Route to appropriate parser
 
@@ -38,7 +38,7 @@ async def log_mime_type_activity(mime_type: str) -> str:
 async def log_storage_location_activity(storage_location: str) -> str:
     """Activity that logs the storage location of the artifact.
 
-    In a real pipeline, this might:
+    In a real workflow, this might:
     - Verify blob store access
     - Validate file exists
     - Check file size

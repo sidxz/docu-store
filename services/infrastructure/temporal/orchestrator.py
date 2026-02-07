@@ -1,7 +1,7 @@
-"""Temporal implementation of the PipelineOrchestrator port.
+"""Temporal implementation of the WorkflowOrchestrator port.
 
 This is the infrastructure layer implementation that knows about Temporal.
-The domain and application layers only depend on the PipelineOrchestrator port.
+The domain and application layers only depend on the WorkflowOrchestrator port.
 """
 
 from __future__ import annotations
@@ -14,14 +14,14 @@ if TYPE_CHECKING:
     from uuid import UUID
 from temporalio.client import Client
 
-from application.ports.pipeline_orchestrator import PipelineOrchestrator
+from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from infrastructure.config import settings
-from infrastructure.temporal.workflows.artifact_processing import ProcessArtifactPipeline
+from infrastructure.temporal.workflows.artifact_processing import ProcessArtifactWorkflow
 
 logger = structlog.get_logger()
 
 
-class TemporalPipelineOrchestrator(PipelineOrchestrator):
+class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
     """Orchestrates artifact processing pipelines using Temporal.
 
     Responsibilities:
@@ -46,12 +46,12 @@ class TemporalPipelineOrchestrator(PipelineOrchestrator):
             self._client = await Client.connect(settings.temporal_address)
             self._initialized = True
 
-    async def start_artifact_processing_pipeline(
+    async def start_artifact_processing_workflow(
         self,
         artifact_id: UUID,
         storage_location: str,
     ) -> None:
-        """Start a pipeline to process an artifact.
+        """Start a workflow to process an artifact.
 
         Uses artifact_id as the workflow ID to ensure idempotency:
         - Same artifact_id always produces same workflow execution
@@ -85,7 +85,7 @@ class TemporalPipelineOrchestrator(PipelineOrchestrator):
             mime_type = "application/pdf"
 
             handle = await self._client.start_workflow(
-                ProcessArtifactPipeline.execute,
+                ProcessArtifactWorkflow.execute,
                 args=[artifact_id, storage_location, mime_type],
                 id=workflow_id,
                 task_queue="artifact_processing",
