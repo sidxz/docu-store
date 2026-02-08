@@ -40,7 +40,7 @@
                  │                     │
                  │                     ↓
                  │        ┌────────────────────────────────────────┐
-                 │        │ TemporalPipelineOrchestrator           │
+                 │        │ TemporalWorkflowOrchestrator           │
                  │        │ (infrastructure/temporal/orchestrator) │
                  │        │                                        │
                  │        │ - Lazy-init Temporal client           │
@@ -67,7 +67,7 @@
                  │                     │
                  │                     ↓
                  │        ┌────────────────────────────────────────┐
-                 │        │ ProcessArtifactPipeline (workflow)     │
+                 │        │ ProcessArtifactWorkflow (workflow)     │
                  │        │                                        │
                  │        │ Execute steps:                         │
                  │        │ 1. log_mime_type_activity             │
@@ -133,13 +133,13 @@ Step 2: Event Propagation (simultaneous to multiple workers)
          │          │
 Step 3: Workflow Execution (in pipeline_worker)
          │          │
-         │          ├─ orchestrator.start_artifact_processing_pipeline(
+         │          ├─ orchestrator.start_artifact_processing_workflow(
          │          │     artifact_id=uuid,
          │          │     storage_location="/path/to/file"
          │          │ )
          │          │
          │          ├─ Temporal.start_workflow(
-         │          │     ProcessArtifactPipeline.execute,
+         │          │     ProcessArtifactWorkflow.execute,
          │          │     id=str(artifact_id),  # idempotent!
          │          │     task_queue="artifact_processing"
          │          │ )
@@ -149,7 +149,7 @@ Step 3: Workflow Execution (in pipeline_worker)
 Step 4: Worker Polling and Execution
          │
          └─ temporal/worker.py polls Temporal
-            ├─ Receives ProcessArtifactPipeline task
+            ├─ Receives ProcessArtifactWorkflow task
             │
             ├─ Execute workflow:
             │  ├─ await log_mime_type_activity("application/pdf")
@@ -175,7 +175,7 @@ Local Development Setup:
 │  - Task Queue: "artifact_processing"                          │
 │  - Registers: Workflows + Activities                          │
 │  - Polls: For new workflow tasks                              │
-│  - Executes: ProcessArtifactPipeline                          │
+│  - Executes: ProcessArtifactWorkflow                          │
 └──────────────────┬──────────────────────────────────────────────┘
                    │
                    │ Temporal binary protocol (localhost:7233)
@@ -191,7 +191,7 @@ Local Development Setup:
 
 ┌─────────────────────────────────────────────────────────────────┐
 │  Terminal 2: Pipeline Worker                                    │
-│  $ make run-pipeline-worker                                     │
+│  $ make run-workflow-worker                                     │
 │                                                                 │
 │  Process: infrastructure/pipeline_worker.py                    │
 │  - Connects to: EventStoreDB @ localhost:2113                 │
@@ -246,7 +246,7 @@ Local Development Setup:
                                │ implements
                                ↓
                     ┌─────────────────────────────────┐
-                    │TemporalPipelineOrchestrator     │
+                    │TemporalWorkflowOrchestrator     │
                     │                                 │
                     │ - _client: Temporal Client      │
                     │ - start_artifact_processing_()  │
@@ -264,7 +264,7 @@ Local Development Setup:
                     └─────────────────────┘
 
                     ┌──────────────────────────────┐
-                    │ ProcessArtifactPipeline      │ (Workflow)
+                    │ ProcessArtifactWorkflow      │ (Workflow)
                     │                              │
                     │ @workflow.defn               │
                     │ def execute(...):            │
@@ -322,7 +322,7 @@ User                API             CreateUseCase      EventStoreDB    Pipeline 
 Current State (Toy):
 ─────────────────
 ┌──────────────────────────────────────────────────────────┐
-│ ProcessArtifactPipeline                                  │
+│ ProcessArtifactWorkflow                                  │
 │                                                          │
 │ ├─ Step 1: log_mime_type_activity (toy)               │
 │ └─ Step 2: log_storage_location_activity (toy)        │
@@ -332,7 +332,7 @@ Current State (Toy):
 Fully Expanded Pipeline (Future):
 ─────────────────────────────────
 ┌──────────────────────────────────────────────────────────┐
-│ ProcessArtifactPipeline                                  │
+│ ProcessArtifactWorkflow                                  │
 │                                                          │
 │ Phase 1: Extraction                                     │
 │ ├─ parse_pdf_activity                                 │

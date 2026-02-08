@@ -12,8 +12,8 @@ This implementation creates a clean, extensible architecture for long-running ar
 - Can swap Temporal for Celery/Step Functions without changing application code
 
 ```python
-class PipelineOrchestrator(ABC):
-    async def start_artifact_processing_pipeline(
+class WorkflowOrchestrator(ABC):
+    async def start_artifact_processing_workflow(
         self, 
         artifact_id: UUID, 
         storage_location: str
@@ -31,7 +31,7 @@ class PipelineOrchestrator(ABC):
 - Package marker for workflows
 
 **`infrastructure/temporal/workflows/artifact_processing.py`** (NEW)
-- `ProcessArtifactPipeline` workflow class
+- `ProcessArtifactWorkflow` workflow class
 - Orchestrates the processing steps
 - Handles retries, timeouts, error handling
 - Currently runs toy activities (logging)
@@ -39,7 +39,7 @@ class PipelineOrchestrator(ABC):
 
 ```python
 @workflow.defn
-class ProcessArtifactPipeline:
+class ProcessArtifactWorkflow:
     @workflow.run
     async def execute(
         self,
@@ -68,14 +68,14 @@ async def log_storage_location_activity(storage_location: str) -> str: ...
 #### 2.2 Temporal Orchestrator Implementation
 
 **`infrastructure/temporal/orchestrator.py`** (NEW)
-- `TemporalPipelineOrchestrator`: Implements `PipelineOrchestrator` port
+- `TemporalWorkflowOrchestrator`: Implements `WorkflowOrchestrator` port
 - Lazy-initializes Temporal client
 - Uses artifact_id as workflow ID for idempotency
 - Handles connection, workflow startup, error handling
 
 ```python
-class TemporalPipelineOrchestrator(PipelineOrchestrator):
-    async def start_artifact_processing_pipeline(
+class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
+    async def start_artifact_processing_workflow(
         self,
         artifact_id: UUID,
         storage_location: str,
@@ -124,12 +124,12 @@ temporal_address: str = Field(
 #### 2.5 Dependency Injection
 
 **`infrastructure/di/container.py`** (MODIFIED)
-- Added import for `PipelineOrchestrator` port
-- Added import for `TemporalPipelineOrchestrator` implementation
+- Added import for `WorkflowOrchestrator` port
+- Added import for `TemporalWorkflowOrchestrator` implementation
 - Registered orchestrator in DI container
 
 ```python
-container[PipelineOrchestrator] = lambda _: TemporalPipelineOrchestrator()
+container[WorkflowOrchestrator] = lambda _: TemporalWorkflowOrchestrator()
 ```
 
 ### 3. Build Configuration
@@ -139,12 +139,12 @@ container[PipelineOrchestrator] = lambda _: TemporalPipelineOrchestrator()
 - Now required for Temporal SDK
 
 **`Makefile`** (MODIFIED)
-- Added `run-pipeline-worker` target
+- Added `run-workflow-worker` target
 - Added `run-temporal-worker` target
 - Both integrated into development workflow
 
 ```makefile
-run-pipeline-worker: ## Run the Temporal pipeline orchestration worker
+run-workflow-worker: ## Run the Temporal workflow orchestration worker
 	uv run python -m infrastructure.pipeline_worker
 
 run-temporal-worker: ## Run the Temporal workflow worker
@@ -174,7 +174,7 @@ run-temporal-worker: ## Run the Temporal workflow worker
 │ Application Layer                                       │
 ├─────────────────────────────────────────────────────────┤
 │ • CreateArtifactUseCase                                 │
-│ • PipelineOrchestrator (port - abstraction)             │
+│ • WorkflowOrchestrator (port - abstraction)             │
 │ • UpdateSummaryCandidateUseCase (future)                │
 └──────────────────────┬──────────────────────────────────┘
                        │ depends on
@@ -191,7 +191,7 @@ run-temporal-worker: ## Run the Temporal workflow worker
 ┌─────────────────────────────────────────────────────────┐
 │ Infrastructure Layer - Temporal Orchestration           │
 ├─────────────────────────────────────────────────────────┤
-│ • TemporalPipelineOrchestrator (implements port)        │
+│ • TemporalWorkflowOrchestrator (implements port)        │
 │ • Starts workflow with artifact_id as workflow ID       │
 │ • Ensures idempotency                                   │
 └──────────────────────┬──────────────────────────────────┘
@@ -201,7 +201,7 @@ run-temporal-worker: ## Run the Temporal workflow worker
 │ Infrastructure Layer - Temporal Workflow Execution      │
 ├─────────────────────────────────────────────────────────┤
 │ • temporal/worker.py (polls for tasks)                  │
-│ • ProcessArtifactPipeline workflow                      │
+│ • ProcessArtifactWorkflow workflow                      │
 │ • Orchestrates activities                               │
 └──────────────────────┬──────────────────────────────────┘
                        │
@@ -231,11 +231,11 @@ run-temporal-worker: ## Run the Temporal workflow worker
 
 ### 3. Separation of Concerns
 - **Domain**: What to do (Artifact aggregate, events)
-- **Application**: When to do it (CreateArtifactUseCase, PipelineOrchestrator port)
+- **Application**: When to do it (CreateArtifactUseCase, WorkflowOrchestrator port)
 - **Infrastructure**: How to do it (Temporal, activities, workers)
 
 ### 4. Port-Based Architecture
-- Application depends on `PipelineOrchestrator` port
+- Application depends on `WorkflowOrchestrator` port
 - Infrastructure implements port with Temporal
 - Can swap implementations without changing business logic
 - Enables testing with mock orchestrators
@@ -254,12 +254,12 @@ run-temporal-worker: ## Run the Temporal workflow worker
 make run-temporal-worker
 
 # Terminal 2: Pipeline Worker (triggers workflows on events)
-make run-pipeline-worker
+make run-workflow-worker
 
 # Terminal 3: API Server (handles requests)
 make run
 
-# Then: Create an artifact to trigger the pipeline
+# Then: Create an artifact to trigger the workflow
 curl -X POST http://localhost:8000/artifacts -F "file=@file.pdf" ...
 ```
 
@@ -270,7 +270,7 @@ curl -X POST http://localhost:8000/artifacts -F "file=@file.pdf" ...
 3. **Next**: Page extraction activity
 4. **Next**: LLM summarization activity
 5. **Next**: Update artifact with results (emit domain events)
-6. **Production**: Full pipeline with monitoring, dead letters, etc.
+6. **Production**: Full workflow with monitoring, dead letters, etc.
 
 All without changing the architecture or the domain!
 
@@ -288,7 +288,7 @@ See [PIPELINE_ARCHITECTURE.md](PIPELINE_ARCHITECTURE.md) for details.
 # Development (localhost)
 make docker-up
 make run-temporal-worker
-make run-pipeline-worker
+make run-workflow-worker
 make run
 
 # Production (considerations)

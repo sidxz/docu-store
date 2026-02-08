@@ -19,7 +19,7 @@ import structlog
 from eventsourcing.application import Application
 from eventsourcing.projection import ApplicationSubscription
 
-from application.ports.pipeline_orchestrator import PipelineOrchestrator
+from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
 from domain.aggregates.artifact import Artifact
 from infrastructure.di.container import create_container
 from infrastructure.logging import setup_logging
@@ -32,7 +32,7 @@ logger = structlog.get_logger()
 
 
 async def run() -> None:
-    """Run the pipeline orchestration worker.
+    """Run the workflow orchestration worker.
 
     Subscribes to ArtifactCreated events from EventStoreDB and starts
     Temporal workflows to process each artifact.
@@ -41,7 +41,7 @@ async def run() -> None:
     1. User uploads artifact → CreateArtifactUseCase saves to EventStoreDB
     2. ArtifactCreated event persisted
     3. This worker receives event via ApplicationSubscription
-    4. Starts TemporalPipelineOrchestrator.start_artifact_processing_pipeline()
+    4. Starts TemporalWorkflowOrchestrator.start_artifact_processing_workflow()
     5. Temporal workflow begins execution
 
     Tracking:
@@ -50,7 +50,8 @@ async def run() -> None:
     """
     container = create_container()
     app = container[Application]
-    orchestrator = container[PipelineOrchestrator]
+
+    log_artifact_sample_use_case = container[LogArtifactSampleUseCase]
 
     # Setup signal handlers
     def handle_signal(signum: int, _frame: object) -> None:
@@ -108,11 +109,7 @@ async def run() -> None:
                                 tracking_id=tracking.notification_id,
                             )
 
-                            # Start the Temporal workflow
-                            await orchestrator.start_artifact_processing_pipeline(
-                                artifact_id=domain_event.originator_id,
-                                storage_location=domain_event.storage_location,
-                            )
+                            await log_artifact_sample_use_case.execute(domain_event.originator_id)
 
                             logger.info(
                                 "pipeline_workflow_triggered",
@@ -144,7 +141,7 @@ async def run() -> None:
 
 
 def run_sync() -> None:
-    """Run the pipeline worker in synchronous mode."""
+    """Run the workflow worker in synchronous mode."""
     asyncio.run(run())
 
 

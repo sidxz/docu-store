@@ -16,13 +16,13 @@ run: ## Run the FastAPI application
 run-read-models: ## Run the MongoDB read model projector
 	uv run python -m infrastructure.read_worker
 
-run-pipeline-worker: ## Run the Temporal pipeline orchestration worker
+run-workflow-worker: ## Run the Temporal workflow orchestration worker
 	uv run python -m infrastructure.pipeline_worker
 
 run-temporal-worker: ## Run the Temporal workflow worker
 	uv run python -m infrastructure.temporal.worker
 
-run-all: ## Start all services (API, read models, pipeline worker, temporal worker)
+run-all: ## Start all services (API, read models, workflow worker, temporal worker)
 	@echo "Starting all services..."
 	uv run uvicorn interfaces.api.main:app --host 0.0.0.0 --port 8000 --reload &
 	uv run python -m infrastructure.read_worker &

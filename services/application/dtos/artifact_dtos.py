@@ -2,10 +2,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from application.dtos.page_dtos import PageResponse
 from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.mime_type import MimeType
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.title_mention import TitleMention
+from domain.value_objects.workflow_status import WorkflowStatus
 
 
 class CreateArtifactRequest(BaseModel):
@@ -31,9 +33,9 @@ class ArtifactResponse(BaseModel):
     artifact_type: ArtifactType = Field(..., description="Classification type of the artifact")
     mime_type: MimeType = Field(..., description="MIME type of the artifact")
     storage_location: str = Field(..., description="Location where the artifact is stored")
-    pages: tuple[UUID, ...] = Field(
-        default_factory=tuple,
-        description="List of page UUIDs associated with the artifact",
+    pages: list[UUID] | list[PageResponse] | None = Field(
+        default_factory=list,
+        description="List of page IDs associated with the artifact",
     )
     title_mention: TitleMention | None = Field(
         None,
@@ -46,4 +48,8 @@ class ArtifactResponse(BaseModel):
     summary_candidate: SummaryCandidate | None = Field(
         None,
         description="Summary candidate extracted from the artifact",
+    )
+    workflow_statuses: dict[str, WorkflowStatus] = Field(
+        default_factory=dict,
+        description="Workflow statuses keyed by workflow name",
     )

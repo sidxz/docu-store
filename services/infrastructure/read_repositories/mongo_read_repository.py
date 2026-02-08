@@ -24,17 +24,32 @@ class MongoReadRepository(PageReadModel, ArtifactReadModel):
         doc["page_id"] = doc.get("page_id") or str(doc.pop("_id"))
         return PageResponse(**doc)
 
+    async def get_pages_by_id(self, page_ids: list[UUID]) -> list[PageResponse]:
+        """Fetch multiple pages by their IDs in a single query."""
+        if not page_ids:
+            return []
+
+        cursor = self.pages.find({"page_id": {"$in": [str(pid) for pid in page_ids]}})
+        pages = []
+        async for doc in cursor:
+            doc["page_id"] = doc.get("page_id") or str(doc.pop("_id"))
+            pages.append(PageResponse(**doc))
+        # Sort by index to maintain page order
+        pages.sort(key=lambda p: p.index)
+        return pages
+
     async def get_artifact_by_id(self, artifact_id: UUID) -> ArtifactResponse | None:
         doc = await self.artifacts.find_one({"artifact_id": str(artifact_id)})
         if not doc:
             return None
         # Map MongoDB _id (ObjectId) to artifact_id field
         doc["artifact_id"] = doc.get("artifact_id") or str(doc.pop("_id"))
-        # Convert page IDs from strings to UUIDs
+        # Fetch full page objects instead of just IDs
         if doc.get("pages"):
-            doc["pages"] = tuple(UUID(page_id) for page_id in doc["pages"])
+            page_ids = [UUID(page_id) for page_id in doc["pages"]]
+            doc["pages"] = await self.get_pages_by_id(page_ids)
         else:
-            doc["pages"] = ()
+            doc["pages"] = []
         return ArtifactResponse(**doc)
 
     async def list_artifacts(self, skip: int = 0, limit: int = 100) -> list[ArtifactResponse]:

@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 import hashlib
-from typing import BinaryIO
+import tempfile
+from contextlib import contextmanager
+from pathlib import Path
+from typing import TYPE_CHECKING, BinaryIO
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 import fsspec
 
@@ -36,6 +42,33 @@ class FsspecBlobStore(BlobStore):
     def get_bytes(self, key: str) -> bytes:
         with fsspec.open(self._url(key), "rb", **self.storage_options) as f:
             return f.read()
+
+    def get_stream(self, key: str) -> BinaryIO:
+        """Get a file-like object for the blob."""
+        return fsspec.open(self._url(key), "rb", **self.storage_options)
+
+    @contextmanager
+    def get_file(self, key: str) -> Generator[Path, None, None]:
+        """Context manager that provides a local file path for the blob.
+
+        Yields a Path that is valid within the context. Cleans up after.
+        """
+        # Get blob content
+        content = self.get_bytes(key)
+
+        # Create temporary file with appropriate extension
+        suffix = Path(key).suffix or ".bin"
+        temp_file = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                tmp.write(content)
+                temp_file = Path(tmp.name)
+
+            yield temp_file
+        finally:
+            # Clean up
+            if temp_file and temp_file.exists():
+                temp_file.unlink()
 
     def exists(self, key: str) -> bool:
         fs, path = fsspec.core.url_to_fs(self._url(key), **self.storage_options)

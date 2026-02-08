@@ -17,16 +17,16 @@ This module implements a clean architecture for running long-running artifact pr
 - **Location**: `application/`
 - **Responsibility**: Orchestration of domain and infrastructure
 - **Ports**: Abstract interfaces that define what infrastructure must provide
-- **Key Port**: `PipelineOrchestrator` - abstraction for starting pipelines
+- **Key Port**: `WorkflowOrchestrator` - abstraction for starting pipelines
 
 ```python
-class PipelineOrchestrator(ABC):
-    async def start_artifact_processing_pipeline(
+class WorkflowOrchestrator(ABC):
+    async def start_artifact_processing_workflow(
         self, 
         artifact_id: UUID, 
         storage_location: str
     ) -> None:
-        """Start a long-running pipeline for an artifact"""
+        """Start a long-running workflow for an artifact"""
 ```
 
 **Advantage**: Application doesn't know if we're using Temporal, Celery, Step Functions, etc.
@@ -40,13 +40,13 @@ class PipelineOrchestrator(ABC):
 EventStoreDB (source of truth)
     └─ ApplicationSubscription (from eventsourcing)
         └─ Listen for ArtifactCreated events
-            └─ Call PipelineOrchestrator.start_artifact_processing_pipeline()
+            └─ Call WorkflowOrchestrator.start_artifact_processing_workflow()
 ```
 
 #### 3b. Temporal Workflow Orchestration
 ```
 infrastructure/temporal/
-├── orchestrator.py          # Implements PipelineOrchestrator port
+├── orchestrator.py          # Implements WorkflowOrchestrator port
 ├── worker.py                # Temporal worker process (executes workflows)
 ├── workflows/
 │   └── artifact_processing.py   # Workflow definition (toy example)
@@ -64,10 +64,10 @@ infrastructure/temporal/
 
 2. Event Subscription (pipeline_worker.py)
    └─ Receives ArtifactCreated event from EventStoreDB
-   └─ Calls orchestrator.start_artifact_processing_pipeline()
+   └─ Calls orchestrator.start_artifact_processing_workflow()
 
-3. Temporal Orchestration (TemporalPipelineOrchestrator)
-   └─ Starts ProcessArtifactPipeline workflow
+3. Temporal Orchestration (TemporalWorkflowOrchestrator)
+   └─ Starts ProcessArtifactWorkflow workflow
    └─ Workflow ID = artifact_id (ensures idempotency)
 
 4. Temporal Workflow Execution
@@ -103,7 +103,7 @@ python infrastructure/pipeline_worker.py
 python main.py  # Or your existing API startup
 ```
 
-### 5. Create an artifact (triggers the pipeline!)
+### 5. Create an artifact (triggers the workflow!)
 ```bash
 # POST /artifacts with a file
 # This creates ArtifactCreated event
@@ -139,7 +139,7 @@ Infrastructure implements ports (concrete)
 
 ### 5. Observability
 - Temporal UI shows all workflow executions and state
-- Structured logging throughout pipeline
+- Structured logging throughout workflow
 - Event history in EventStoreDB for audit trail
 
 ## Expanding the Pipeline
@@ -171,7 +171,7 @@ pdf_data = await workflow.execute_activity(
 worker = Worker(
     client,
     task_queue="artifact_processing",
-    workflows=[ProcessArtifactPipeline],
+    workflows=[ProcessArtifactWorkflow],
     activities=[
         log_mime_type_activity,
         log_storage_location_activity,
@@ -239,7 +239,7 @@ async def test_artifact_pipeline_workflow():
         
         # Run workflow to completion in test
         await client.start_workflow(
-            ProcessArtifactPipeline.execute,
+            ProcessArtifactWorkflow.execute,
             args=[artifact_id, location, mime_type],
             id="test-workflow",
             task_queue="test",
@@ -251,14 +251,14 @@ async def test_artifact_pipeline_workflow():
 ### Single Machine Development
 ```
 One Temporal server (docker-compose)
-One pipeline worker
+One workflow worker
 One API server
 ```
 
 ### Production Deployment
 ```
 Multiple Temporal servers (cluster)
-Multiple pipeline workers (scale independently)
+Multiple workflow workers (scale independently)
 Load balancer for API servers
 Monitoring/alerting on workflow failures
 ```

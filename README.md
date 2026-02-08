@@ -11,6 +11,7 @@ A human-first document intelligence store for drug discovery, built to keep scie
 [![Kafka](https://img.shields.io/badge/Kafka-Streaming-000000?logo=apache-kafka&logoColor=white)](https://kafka.apache.org/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-ReadModels-13aa52?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ed?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Temporal](https://img.shields.io/badge/Temporal-Workflows-000000?logo=temporal&logoColor=white)](https://temporal.io/)
 
 ## Why it exists
 

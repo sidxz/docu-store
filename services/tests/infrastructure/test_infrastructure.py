@@ -14,6 +14,8 @@ from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.text_mention import TextMention
 from domain.value_objects.title_mention import TitleMention
+from domain.value_objects.workflow_state import WorkflowState
+from domain.value_objects.workflow_status import WorkflowStatus
 from infrastructure.event_projectors.artifact_projector import ArtifactProjector
 from infrastructure.event_projectors.event_projector import EventProjector
 from infrastructure.event_projectors.page_projector import PageProjector
@@ -170,6 +172,29 @@ class TestEventProjector:
         assert materializer.upsert_artifact_calls[2][1]["tags"] == ["chemistry"]
         assert materializer.delete_artifact_calls[0][0] == str(deleted_event.originator_id)
 
+    def test_artifact_projector_workflow_status_updated(self) -> None:
+        materializer = FakeMaterializer()
+        projector = ArtifactProjector(materializer)
+
+        artifact = Artifact.create(
+            source_uri="https://example.com/paper.pdf",
+            source_filename="paper.pdf",
+            artifact_type=ArtifactType.RESEARCH_ARTICLE,
+            mime_type=MimeType.PDF,
+            storage_location="/storage/paper.pdf",
+        )
+        list(artifact.collect_events())
+
+        status = WorkflowStatus(state=WorkflowState.PENDING, message="queued")
+        artifact.update_workflow_status("extract", status)
+        status_event = list(artifact.collect_events())[0]
+
+        projector.workflow_status_updated(status_event, _tracking())
+
+        _, fields, _ = materializer.upsert_artifact_calls[0]
+        assert fields["workflow_statuses.extract"]["state"] == "PENDING"
+        assert fields["workflow_statuses.extract"]["message"] == "queued"
+
     def test_page_projector_events(self) -> None:
         materializer = FakeMaterializer()
         projector = PageProjector(materializer)
@@ -208,6 +233,23 @@ class TestEventProjector:
         assert materializer.upsert_page_calls[3][1]["text_mention"]["text"] == "Note"
         assert materializer.upsert_page_calls[4][1]["summary_candidate"]["summary"] == "Summary"
         assert materializer.delete_page_calls[0][0] == str(deleted_event.originator_id)
+
+    def test_page_projector_workflow_status_updated(self) -> None:
+        materializer = FakeMaterializer()
+        projector = PageProjector(materializer)
+
+        page = Page.create(name="Intro", artifact_id=uuid4(), index=0)
+        list(page.collect_events())
+
+        status = WorkflowStatus(state=WorkflowState.IN_PROGRESS, progress=0.4)
+        page.update_workflow_status("ocr", status)
+        status_event = list(page.collect_events())[0]
+
+        projector.workflow_status_updated(status_event, _tracking())
+
+        _, fields, _ = materializer.upsert_page_calls[0]
+        assert fields["workflow_statuses.ocr"]["state"] == "IN_PROGRESS"
+        assert fields["workflow_statuses.ocr"]["progress"] == 0.4
 
     def test_event_projector_routes_and_ignores_unknown_events(self) -> None:
         materializer = FakeMaterializer()

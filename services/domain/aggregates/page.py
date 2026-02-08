@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from domain.value_objects.summary_candidate import SummaryCandidate
     from domain.value_objects.tag_mention import TagMention
     from domain.value_objects.text_mention import TextMention
+    from domain.value_objects.workflow_status import WorkflowStatus
 
 
 class Page(Aggregate):
@@ -54,6 +55,7 @@ class Page(Aggregate):
         self.tag_mentions: list[TagMention] = []
         self.text_mention: TextMention | None = None
         self.summary_candidate: SummaryCandidate | None = None
+        self.workflow_statuses: dict[str, WorkflowStatus] = {}
         self.is_deleted: bool = False
 
     def __hash__(self) -> int:
@@ -127,6 +129,26 @@ class Page(Aggregate):
     @event(SummaryCandidateUpdated)
     def _apply_summary_candidate_updated(self, summary_candidate: SummaryCandidate | None) -> None:
         self.summary_candidate = summary_candidate
+
+    # ============================================================================
+    # COMMAND METHOD - Workflow Status Updated
+    # ============================================================================
+    class WorkflowStatusUpdated(Aggregate.Event):
+        name: str
+        status: WorkflowStatus
+
+    def update_workflow_status(self, name: str, status: WorkflowStatus) -> None:
+        if self.is_deleted:
+            msg = "Cannot update workflow status on a deleted page"
+            raise ValueError(msg)
+        if not name or not name.strip():
+            msg = "workflow name must be provided"
+            raise ValueError(msg)
+        self.trigger_event(self.WorkflowStatusUpdated, name=name.strip(), status=status)
+
+    @event(WorkflowStatusUpdated)
+    def _apply_workflow_status_updated(self, name: str, status: WorkflowStatus) -> None:
+        self.workflow_statuses[name] = status
 
     # ============================================================================
     # COMMAND METHOD - Delete Page

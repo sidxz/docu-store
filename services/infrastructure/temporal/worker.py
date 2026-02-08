@@ -20,7 +20,7 @@ from infrastructure.temporal.activities.artifact_activities import (
     log_mime_type_activity,
     log_storage_location_activity,
 )
-from infrastructure.temporal.workflows.artifact_processing import ProcessArtifactPipeline
+from infrastructure.temporal.workflows.artifact_processing import ProcessArtifactWorkflow
 
 setup_logging()
 logger = structlog.get_logger()
@@ -41,7 +41,7 @@ async def run() -> None:
     worker = Worker(
         client,
         task_queue="artifact_processing",
-        workflows=[ProcessArtifactPipeline],
+        workflows=[ProcessArtifactWorkflow],
         activities=[
             log_mime_type_activity,
             log_storage_location_activity,

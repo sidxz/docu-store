@@ -6,13 +6,15 @@ from eventsourcing.application import Application
 from lagom import Container
 from motor.motor_asyncio import AsyncIOMotorClient
 
+from application.dtos.pdf_dtos import PDFContent
 from application.ports.blob_store import BlobStore
 from application.ports.external_event_publisher import ExternalEventPublisher
-from application.ports.pipeline_orchestrator import PipelineOrchestrator
+from application.ports.pdf_service import PDFService
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
+from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
 from application.use_cases.artifact_use_cases import (
     AddPagesUseCase,
@@ -36,6 +38,7 @@ from application.use_cases.page_use_cases import (
 from application.use_cases.page_use_cases import (
     UpdateSummaryCandidateUseCase as UpdatePageSummaryCandidateUseCase,
 )
+from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
 from domain.value_objects.blob_ref import BlobRef
 from domain.value_objects.compound_mention import CompoundMention
 from domain.value_objects.extraction_metadata import ExtractionMetadata
@@ -43,6 +46,7 @@ from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.text_mention import TextMention
 from domain.value_objects.title_mention import TitleMention
+from domain.value_objects.workflow_status import WorkflowStatus
 from infrastructure.blob_stores.fsspec_blob_store import FsspecBlobStore
 from infrastructure.config import settings
 from infrastructure.event_projectors.event_projector import EventProjector
@@ -50,6 +54,7 @@ from infrastructure.event_sourced_repositories.artifact_repository import (
     EventSourcedArtifactRepository,
 )
 from infrastructure.event_sourced_repositories.page_repository import EventSourcedPageRepository
+from infrastructure.file_services.py_mu_pfd_service import PyMuPDFService
 from infrastructure.kafka.kafka_external_event_streamer import KafkaExternalEventPublisher
 from infrastructure.kafka.kafka_publisher import KafkaPublisher
 from infrastructure.read_repositories.mongo_read_model_materializer import (
@@ -57,7 +62,7 @@ from infrastructure.read_repositories.mongo_read_model_materializer import (
 )
 from infrastructure.read_repositories.mongo_read_repository import MongoReadRepository
 from infrastructure.serialization.pydantic_transcoder import PydanticTranscoding
-from infrastructure.temporal.orchestrator import TemporalPipelineOrchestrator
+from infrastructure.temporal.orchestrator import TemporalWorkflowOrchestrator
 
 if TYPE_CHECKING:
     from eventsourcing.persistence import JSONTranscoder
@@ -79,6 +84,8 @@ class DocuStoreApplication(Application):
         transcoder.register(PydanticTranscoding(TextMention))
         transcoder.register(PydanticTranscoding(ExtractionMetadata))
         transcoder.register(PydanticTranscoding(BlobRef))
+        transcoder.register(PydanticTranscoding(WorkflowStatus))
+        transcoder.register(PydanticTranscoding(PDFContent))
 
 
 def create_container() -> Container:
@@ -127,6 +134,33 @@ def create_container() -> Container:
         )
     else:
         container[ExternalEventPublisher] = lambda _: None  # type: ignore[return-value]
+
+    # Register Read Model Infrastructure
+    container[MongoReadModelMaterializer] = lambda _: MongoReadModelMaterializer()
+    container[EventProjector] = lambda c: EventProjector(
+        materializer=c[MongoReadModelMaterializer],
+    )
+
+    # Register MongoDB Client and Read Repository
+    def mongo_client_factory(_: object) -> AsyncIOMotorClient:
+        return AsyncIOMotorClient(settings.mongo_uri)
+
+    container[AsyncIOMotorClient] = mongo_client_factory
+
+    def mongo_repository_factory(c: object) -> MongoReadRepository:
+        return MongoReadRepository(
+            client=c[AsyncIOMotorClient],
+            settings=settings,
+        )
+
+    container[PageReadModel] = mongo_repository_factory
+    container[ArtifactReadModel] = mongo_repository_factory
+
+    # Register Pipeline Orchestrator (Temporal)
+    container[WorkflowOrchestrator] = lambda _: TemporalWorkflowOrchestrator()
+
+    # Register PDF Service with BlobStore injected
+    container[PDFService] = lambda c: PyMuPDFService(blob_store=c[BlobStore])
 
     # Register Use Cases
     # Page Use Cases
@@ -199,30 +233,16 @@ def create_container() -> Container:
     container[ArtifactUploadSaga] = lambda c: ArtifactUploadSaga(
         upload_blob_use_case=c[UploadBlobUseCase],
         create_artifact_use_case=c[CreateArtifactUseCase],
+        create_page_use_case=c[CreatePageUseCase],
+        add_pages_use_case=c[AddPagesUseCase],
+        update_text_mention_use_case=c[UpdateTextMentionUseCase],
+        pdf_service=c[PDFService],
     )
 
-    # Register Read Model Infrastructure
-    container[MongoReadModelMaterializer] = lambda _: MongoReadModelMaterializer()
-    container[EventProjector] = lambda c: EventProjector(
-        materializer=c[MongoReadModelMaterializer],
+    # Register Workflow Use Cases
+    container[LogArtifactSampleUseCase] = lambda c: LogArtifactSampleUseCase(
+        artifact_repository=c[ArtifactRepository],
+        workflow_orchestrator=c[WorkflowOrchestrator],
     )
-
-    # Register MongoDB Client and Read Repository
-    def mongo_client_factory(_: object) -> AsyncIOMotorClient:
-        return AsyncIOMotorClient(settings.mongo_uri)
-
-    container[AsyncIOMotorClient] = mongo_client_factory
-
-    def mongo_repository_factory(c: object) -> MongoReadRepository:
-        return MongoReadRepository(
-            client=c[AsyncIOMotorClient],
-            settings=settings,
-        )
-
-    container[PageReadModel] = mongo_repository_factory
-    container[ArtifactReadModel] = mongo_repository_factory
-
-    # Register Pipeline Orchestrator (Temporal)
-    container[PipelineOrchestrator] = lambda _: TemporalPipelineOrchestrator()
 
     return container
