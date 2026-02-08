@@ -54,7 +54,7 @@ from infrastructure.event_sourced_repositories.artifact_repository import (
     EventSourcedArtifactRepository,
 )
 from infrastructure.event_sourced_repositories.page_repository import EventSourcedPageRepository
-from infrastructure.file_services.py_pfd_service import PyPDFService
+from infrastructure.file_services.py_mu_pfd_service import PyMuPDFService
 from infrastructure.kafka.kafka_external_event_streamer import KafkaExternalEventPublisher
 from infrastructure.kafka.kafka_publisher import KafkaPublisher
 from infrastructure.read_repositories.mongo_read_model_materializer import (
@@ -160,7 +160,7 @@ def create_container() -> Container:
     container[WorkflowOrchestrator] = lambda _: TemporalWorkflowOrchestrator()
 
     # Register PDF Service with BlobStore injected
-    container[PDFService] = lambda c: PyPDFService(blob_store=c[BlobStore])
+    container[PDFService] = lambda c: PyMuPDFService(blob_store=c[BlobStore])
 
     # Register Use Cases
     # Page Use Cases
