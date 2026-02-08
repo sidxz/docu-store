@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import tempfile
-from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import BinaryIO
+from typing import TYPE_CHECKING, BinaryIO
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 import fsspec
 

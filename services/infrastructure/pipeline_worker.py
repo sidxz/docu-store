@@ -19,7 +19,6 @@ import structlog
 from eventsourcing.application import Application
 from eventsourcing.projection import ApplicationSubscription
 
-from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
 from domain.aggregates.artifact import Artifact
 from infrastructure.di.container import create_container
@@ -51,9 +50,8 @@ async def run() -> None:
     """
     container = create_container()
     app = container[Application]
-    orchestrator = container[WorkflowOrchestrator]
 
-    logArtifactSampleUseCase = container[LogArtifactSampleUseCase]
+    log_artifact_sample_use_case = container[LogArtifactSampleUseCase]
 
     # Setup signal handlers
     def handle_signal(signum: int, _frame: object) -> None:
@@ -111,13 +109,7 @@ async def run() -> None:
                                 tracking_id=tracking.notification_id,
                             )
 
-                            # # Start the Temporal workflow
-                            # await orchestrator.start_artifact_processing_workflow(
-                            #     artifact_id=domain_event.originator_id,
-                            #     storage_location=domain_event.storage_location,
-                            # )
-
-                            await logArtifactSampleUseCase.execute(domain_event.originator_id)
+                            await log_artifact_sample_use_case.execute(domain_event.originator_id)
 
                             logger.info(
                                 "pipeline_workflow_triggered",

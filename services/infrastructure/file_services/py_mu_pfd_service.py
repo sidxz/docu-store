@@ -11,7 +11,7 @@ from domain.exceptions import InfrastructureError, ValidationError
 class PageContent:
     """Simple container for page content to mimic langchain Document."""
 
-    def __init__(self, page_content: str, page_number: int):
+    def __init__(self, page_content: str, page_number: int) -> None:
         self.page_content = page_content
         self.page_number = page_number
 

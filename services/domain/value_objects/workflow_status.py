@@ -42,13 +42,12 @@ class WorkflowStatus(BaseModel):
 
     @field_validator("completed_at")
     @classmethod
-    def validate_completion_times(cls, v: datetime | None, info) -> datetime | None:
+    def validate_completion_times(cls, v: datetime | None, info: object) -> datetime | None:
         """Ensure completed_at >= started_at if both are provided."""
         data = info.data
-        if v is not None and data.get("started_at") is not None:
-            if v < data["started_at"]:
-                msg = "completed_at must be after or equal to started_at"
-                raise ValueError(msg)
+        if v is not None and data.get("started_at") is not None and v < data["started_at"]:
+            msg = "completed_at must be after or equal to started_at"
+            raise ValueError(msg)
         return v
 
     model_config = {"frozen": True}  # Immutable value object
@@ -145,7 +144,9 @@ class WorkflowStatus(BaseModel):
 
     @classmethod
     def pending(
-        cls, message: str | None = None, workflow_id: UUID | None = None
+        cls,
+        message: str | None = None,
+        workflow_id: UUID | None = None,
     ) -> "WorkflowStatus":
         """Create a pending workflow status."""
         return cls(

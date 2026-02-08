@@ -5,8 +5,6 @@ from typing import TYPE_CHECKING
 
 from eventsourcing.domain import Aggregate, event
 
-from domain.value_objects.workflow_status import WorkflowStatus
-
 if TYPE_CHECKING:
     from uuid import UUID
 
@@ -14,6 +12,7 @@ if TYPE_CHECKING:
     from domain.value_objects.summary_candidate import SummaryCandidate
     from domain.value_objects.tag_mention import TagMention
     from domain.value_objects.text_mention import TextMention
+    from domain.value_objects.workflow_status import WorkflowStatus
 
 
 class Page(Aggregate):

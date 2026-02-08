@@ -41,7 +41,7 @@ class CreatePageUseCase:
                 page_name=request.name,
             )
             # Ensure artifact exists before creating a page
-            artifact = self.artifact_repository.get_by_id(request.artifact_id)
+            self.artifact_repository.get_by_id(request.artifact_id)
 
             # Create a new Page aggregate
             page = Page.create(
