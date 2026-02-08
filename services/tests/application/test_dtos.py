@@ -58,7 +58,7 @@ class TestArtifactResponse:
             storage_location="/storage/paper.pdf",
         )
         assert response.artifact_id == artifact_id
-        assert response.pages == ()
+        assert response.pages == []
         assert response.tags == []
         assert response.title_mention is None
         assert response.summary_candidate is None

@@ -19,7 +19,7 @@ class TestArtifactMapper:
         assert response.artifact_type == sample_artifact.artifact_type
         assert response.mime_type == sample_artifact.mime_type
         assert response.storage_location == sample_artifact.storage_location
-        assert response.pages == ()
+        assert response.pages == []
         assert response.tags == []
         assert response.title_mention is None
         assert response.summary_candidate is None
@@ -32,7 +32,7 @@ class TestArtifactMapper:
         sample_artifact.add_pages(page_ids)
 
         response = ArtifactMapper.to_artifact_response(sample_artifact)
-        assert response.pages == tuple(page_ids)
+        assert response.pages == page_ids
 
     def test_map_artifact_with_tags(self, sample_artifact) -> None:
         """Test mapping artifact with tags."""
