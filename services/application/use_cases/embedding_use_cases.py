@@ -201,12 +201,7 @@ class SearchSimilarPagesUseCase:
                 page = await self.page_read_model.get_page_by_id(result.page_id)
                 text_preview = None
                 if page and page.text_mention and page.text_mention.text:
-                    # Create a preview of up to 200 characters
-                    text_preview = (
-                        page.text_mention.text[:200] + "..."
-                        if len(page.text_mention.text) > 200
-                        else page.text_mention.text
-                    )
+                    text_preview = page.text_mention.text
 
                 # Fetch artifact details
                 artifact = await self.artifact_read_model.get_artifact_by_id(

@@ -1,6 +1,5 @@
 from uuid import UUID
 
-import numpy as np
 import structlog
 from qdrant_client import AsyncQdrantClient, models
 from qdrant_client.models import Distance, PointStruct, VectorParams
@@ -48,29 +47,6 @@ class QdrantStore(VectorStore):
 
         # Lazy initialization
         self._client: AsyncQdrantClient | None = None
-
-    @staticmethod
-    def _normalize_vector(vector: list[float]) -> list[float]:
-        """Normalize an embedding vector to unit length (L2 normalization).
-
-        This is a Qdrant-specific requirement for proper cosine similarity.
-        Uses NumPy for efficient computation.
-
-        Args:
-            vector: The embedding vector to normalize
-
-        Returns:
-            Normalized vector with unit length
-
-        """
-        vector_array = np.array(vector)
-        norm = np.linalg.norm(vector_array)
-
-        if norm == 0:
-            return vector
-
-        normalized = vector_array / norm
-        return normalized.tolist()
 
     async def _get_client(self) -> AsyncQdrantClient:
         """Get or create async Qdrant client."""
@@ -164,14 +140,11 @@ class QdrantStore(VectorStore):
         if metadata:
             payload.update(metadata)
 
-        # Normalize embedding vector to unit length (for cosine similarity)
-        # This is a Qdrant-specific requirement handled by the adapter
-        normalized_vector = self._normalize_vector(embedding.vector)
-
-        # Create point with UUID as string ID (supported by modern Qdrant)
+        # Note: sentence-transformers embeddings are already L2-normalized
+        # Using them as-is ensures optimal similarity calculations in Qdrant
         point = PointStruct(
             id=str(page_id),
-            vector=normalized_vector,
+            vector=embedding.vector,
             payload=payload,
         )
 
@@ -245,10 +218,6 @@ class QdrantStore(VectorStore):
         """
         client = await self._get_client()
 
-        # Normalize query embedding vector (same as stored vectors)
-        # This is a Qdrant-specific requirement handled by the adapter
-        normalized_query_vector = self._normalize_vector(query_embedding.vector)
-
         # Build filter if artifact_id is provided
         query_filter = None
         if artifact_id_filter:
@@ -261,11 +230,13 @@ class QdrantStore(VectorStore):
                 ],
             )
 
+        # Note: sentence-transformers embeddings are already L2-normalized
+        # Using them as-is ensures optimal similarity calculations in Qdrant
         try:
             # Use the modern Query API via query_points
             search_result = await client.query_points(
                 collection_name=self.collection_name,
-                query=normalized_query_vector,
+                query=query_embedding.vector,
                 query_filter=query_filter,
                 limit=limit,
                 score_threshold=score_threshold,
