@@ -1,5 +1,6 @@
 from uuid import UUID
 
+import numpy as np
 import structlog
 from qdrant_client import AsyncQdrantClient, models
 from qdrant_client.models import Distance, PointStruct, VectorParams
@@ -47,6 +48,29 @@ class QdrantStore(VectorStore):
 
         # Lazy initialization
         self._client: AsyncQdrantClient | None = None
+
+    @staticmethod
+    def _normalize_vector(vector: list[float]) -> list[float]:
+        """Normalize an embedding vector to unit length (L2 normalization).
+
+        This is a Qdrant-specific requirement for proper cosine similarity.
+        Uses NumPy for efficient computation.
+
+        Args:
+            vector: The embedding vector to normalize
+
+        Returns:
+            Normalized vector with unit length
+
+        """
+        vector_array = np.array(vector)
+        norm = np.linalg.norm(vector_array)
+
+        if norm == 0:
+            return vector
+
+        normalized = vector_array / norm
+        return normalized.tolist()
 
     async def _get_client(self) -> AsyncQdrantClient:
         """Get or create async Qdrant client."""
@@ -140,10 +164,14 @@ class QdrantStore(VectorStore):
         if metadata:
             payload.update(metadata)
 
-        # Create point
+        # Normalize embedding vector to unit length (for cosine similarity)
+        # This is a Qdrant-specific requirement handled by the adapter
+        normalized_vector = self._normalize_vector(embedding.vector)
+
+        # Create point with UUID as string ID (supported by modern Qdrant)
         point = PointStruct(
-            id=str(page_id),  # Use page_id as the point ID
-            vector=embedding.vector,
+            id=str(page_id),
+            vector=normalized_vector,
             payload=payload,
         )
 
@@ -217,6 +245,10 @@ class QdrantStore(VectorStore):
         """
         client = await self._get_client()
 
+        # Normalize query embedding vector (same as stored vectors)
+        # This is a Qdrant-specific requirement handled by the adapter
+        normalized_query_vector = self._normalize_vector(query_embedding.vector)
+
         # Build filter if artifact_id is provided
         query_filter = None
         if artifact_id_filter:
@@ -230,23 +262,25 @@ class QdrantStore(VectorStore):
             )
 
         try:
+            # Use the modern Query API via query_points
             search_result = await client.query_points(
                 collection_name=self.collection_name,
-                query=query_embedding.vector,
-                limit=limit,
+                query=normalized_query_vector,
                 query_filter=query_filter,
+                limit=limit,
                 score_threshold=score_threshold,
+                with_payload=True,
             )
 
             results = [
                 PageSearchResult(
-                    page_id=UUID(hit.payload["page_id"]),
-                    artifact_id=UUID(hit.payload["artifact_id"]),
-                    score=hit.score,
-                    page_index=hit.payload["page_index"],
-                    metadata=hit.payload,
+                    page_id=UUID(point.payload["page_id"]),
+                    artifact_id=UUID(point.payload["artifact_id"]),
+                    score=point.score,
+                    page_index=point.payload["page_index"],
+                    metadata=point.payload,
                 )
-                for hit in search_result.points
+                for point in search_result.points
             ]
 
             logger.info(
@@ -254,6 +288,8 @@ class QdrantStore(VectorStore):
                 results_count=len(results),
                 limit=limit,
                 has_filter=artifact_id_filter is not None,
+                min_score=min((r.score for r in results), default=0.0),
+                max_score=max((r.score for r in results), default=0.0),
             )
 
             return results

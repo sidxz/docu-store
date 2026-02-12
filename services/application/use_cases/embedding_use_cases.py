@@ -6,6 +6,8 @@ from returns.result import Failure, Result, Success
 from application.dtos.embedding_dtos import EmbeddingDTO, SearchRequest, SearchResponse
 from application.dtos.errors import AppError
 from application.ports.embedding_generator import EmbeddingGenerator
+from application.ports.repositories.artifact_read_models import ArtifactReadModel
+from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
 from application.ports.vector_store import VectorStore
 from domain.exceptions import AggregateNotFoundError
@@ -145,16 +147,20 @@ class SearchSimilarPagesUseCase:
     This use case:
     1. Generates an embedding for the query text
     2. Searches the vector store for similar pages
-    3. Enriches results with data from read models (optional)
+    3. Enriches results with data from read models (text preview, artifact details)
     """
 
     def __init__(
         self,
         embedding_generator: EmbeddingGenerator,
         vector_store: VectorStore,
+        page_read_model: PageReadModel,
+        artifact_read_model: ArtifactReadModel,
     ) -> None:
         self.embedding_generator = embedding_generator
         self.vector_store = vector_store
+        self.page_read_model = page_read_model
+        self.artifact_read_model = artifact_read_model
 
     async def execute(self, request: SearchRequest) -> Result[SearchResponse, AppError]:
         """Search for pages similar to the query text.
@@ -186,20 +192,65 @@ class SearchSimilarPagesUseCase:
                 score_threshold=request.score_threshold,
             )
 
-            # 3. Convert to DTOs
-            from application.dtos.embedding_dtos import SearchResultDTO
+            # 3. Enrich results with read model data
+            from application.dtos.embedding_dtos import ArtifactDetailsDTO, SearchResultDTO
 
-            result_dtos = [
-                SearchResultDTO(
+            result_dtos = []
+            for result in search_results:
+                # Fetch page details for text preview
+                page = await self.page_read_model.get_page_by_id(result.page_id)
+                text_preview = None
+                if page and page.text_mention and page.text_mention.text:
+                    # Create a preview of up to 200 characters
+                    text_preview = (
+                        page.text_mention.text[:200] + "..."
+                        if len(page.text_mention.text) > 200
+                        else page.text_mention.text
+                    )
+
+                # Fetch artifact details
+                artifact = await self.artifact_read_model.get_artifact_by_id(
+                    result.artifact_id,
+                )
+                artifact_name = artifact.source_filename if artifact else None
+
+                # Build full artifact details if available
+                artifact_details = None
+                if artifact:
+                    # Determine page count
+                    page_count = 0
+                    if artifact.pages:
+                        page_count = (
+                            len(artifact.pages)
+                            if isinstance(artifact.pages, list)
+                            else len(list(artifact.pages))
+                        )
+
+                    artifact_details = ArtifactDetailsDTO(
+                        artifact_id=artifact.artifact_id,
+                        source_uri=artifact.source_uri,
+                        source_filename=artifact.source_filename,
+                        artifact_type=str(artifact.artifact_type),
+                        mime_type=str(artifact.mime_type),
+                        storage_location=artifact.storage_location,
+                        page_count=page_count,
+                        tags=artifact.tags or [],
+                        summary=artifact.summary_candidate.text
+                        if artifact.summary_candidate
+                        else None,
+                        title=artifact.title_mention.text if artifact.title_mention else None,
+                    )
+
+                result_dto = SearchResultDTO(
                     page_id=result.page_id,
                     artifact_id=result.artifact_id,
                     page_index=result.page_index,
                     similarity_score=result.score,
-                    # TODO: Enrich with read model data (text preview, artifact name)
-                    # This would require injecting a read model repository
+                    text_preview=text_preview,
+                    artifact_name=artifact_name,
+                    artifact_details=artifact_details,
                 )
-                for result in search_results
-            ]
+                result_dtos.append(result_dto)
 
             model_info = await self.embedding_generator.get_model_info()
 

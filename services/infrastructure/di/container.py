@@ -226,6 +226,8 @@ def create_container() -> Container:
     container[SearchSimilarPagesUseCase] = lambda c: SearchSimilarPagesUseCase(
         embedding_generator=c[EmbeddingGenerator],
         vector_store=c[VectorStore],
+        page_read_model=c[PageReadModel],
+        artifact_read_model=c[ArtifactReadModel],
     )
 
     # Artifact Use Cases
