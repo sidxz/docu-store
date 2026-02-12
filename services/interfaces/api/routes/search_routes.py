@@ -49,13 +49,8 @@ async def search_pages(
     use_case = container[SearchSimilarPagesUseCase]
     result = await use_case.execute(request)
 
-    # handle_use_case_errors decorator will handle failures
-    # For success, unwrap the result
-    if result.is_success():
-        return result.value_or(None)
-
-    # This shouldn't be reached due to decorator, but for type safety:
-    raise HTTPException(status_code=500, detail="Unexpected error")
+    # The @handle_use_case_errors decorator will handle unwrapping the result
+    return result
 
 
 @router.post("/pages/{page_id}/generate-embedding", status_code=status.HTTP_202_ACCEPTED)

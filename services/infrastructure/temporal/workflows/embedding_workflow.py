@@ -1,16 +1,7 @@
 from datetime import timedelta
 
-import structlog
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-
-with workflow.unsafe.imports_passed_through():
-    from infrastructure.temporal.activities.embedding_activities import (
-        generate_page_embedding_activity,
-        log_embedding_generated_activity,
-    )
-
-logger = structlog.get_logger()
 
 
 @workflow.defn(name="GeneratePageEmbeddingWorkflow")
@@ -40,8 +31,8 @@ class GeneratePageEmbeddingWorkflow:
             Dictionary with workflow result
 
         """
-        logger.info(
-            "embedding_workflow_started", page_id=page_id, workflow_id=workflow.info().workflow_id
+        workflow.logger.info(
+            f"Embedding workflow started for page_id={page_id}, workflow_id={workflow.info().workflow_id}",
         )
 
         # Define retry policy for activities
@@ -54,7 +45,7 @@ class GeneratePageEmbeddingWorkflow:
 
         # Step 1: Generate and store the embedding
         result = await workflow.execute_activity(
-            generate_page_embedding_activity,
+            "generate_page_embedding",
             page_id,
             start_to_close_timeout=timedelta(minutes=5),
             retry_policy=retry_policy,
@@ -62,12 +53,12 @@ class GeneratePageEmbeddingWorkflow:
 
         # Step 2: Log the result
         await workflow.execute_activity(
-            log_embedding_generated_activity,
+            "log_embedding_generated",
             result,
             start_to_close_timeout=timedelta(seconds=30),
             retry_policy=retry_policy,
         )
 
-        logger.info("embedding_workflow_completed", page_id=page_id, result=result)
+        workflow.logger.info(f"Embedding workflow completed for page_id={page_id}, result={result}")
 
         return result

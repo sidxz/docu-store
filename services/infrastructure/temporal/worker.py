@@ -14,14 +14,16 @@ import structlog
 from temporalio.client import Client
 from temporalio.worker import Worker
 
+from application.use_cases.embedding_use_cases import GeneratePageEmbeddingUseCase
 from infrastructure.config import settings
+from infrastructure.di.container import create_container
 from infrastructure.logging import setup_logging
 from infrastructure.temporal.activities.artifact_activities import (
     log_mime_type_activity,
     log_storage_location_activity,
 )
 from infrastructure.temporal.activities.embedding_activities import (
-    generate_page_embedding_activity,
+    create_generate_page_embedding_activity,
     log_embedding_generated_activity,
 )
 from infrastructure.temporal.workflows.artifact_processing import ProcessArtifactWorkflow
@@ -40,6 +42,17 @@ async def run() -> None:
     3. Executes workflows and activities as they come in
     """
     logger.info("temporal_worker_starting", address=settings.temporal_address)
+
+    # Initialize DI container
+    container = create_container()
+
+    # Resolve dependencies
+    generate_embedding_use_case = container[GeneratePageEmbeddingUseCase]
+
+    # Create activities with dependencies injected
+    generate_page_embedding_activity = create_generate_page_embedding_activity(
+        use_case=generate_embedding_use_case,
+    )
 
     client = await Client.connect(settings.temporal_address)
 

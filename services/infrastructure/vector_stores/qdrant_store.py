@@ -230,9 +230,9 @@ class QdrantStore(VectorStore):
             )
 
         try:
-            search_result = await client.search(
+            search_result = await client.query_points(
                 collection_name=self.collection_name,
-                query_vector=query_embedding.vector,
+                query=query_embedding.vector,
                 limit=limit,
                 query_filter=query_filter,
                 score_threshold=score_threshold,
@@ -246,7 +246,7 @@ class QdrantStore(VectorStore):
                     page_index=hit.payload["page_index"],
                     metadata=hit.payload,
                 )
-                for hit in search_result
+                for hit in search_result.points
             ]
 
             logger.info(
