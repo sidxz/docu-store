@@ -245,11 +245,29 @@ services:
     networks:
       - docu_store-network
 
+  # Qdrant: Vector database for embeddings
+  qdrant:
+    image: qdrant/qdrant:v1.12.4
+    container_name: docu_store-qdrant
+    ports:
+      - "6333:6333"  # HTTP API
+      - "6334:6334"  # gRPC API
+    volumes:
+      - qdrant-data:/qdrant/storage
+    networks:
+      - docu_store-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6333/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   mongo-data:
   eventstoredb-data:
   kafka-data:
   postgres-data:
+  qdrant-data:
 
 networks:
   docu_store-network:

@@ -34,3 +34,19 @@ class WorkflowOrchestrator(Protocol):
 
         """
         ...
+
+    @abstractmethod
+    async def start_embedding_workflow(
+        self,
+        page_id: UUID,
+    ) -> None:
+        """Start the embedding generation workflow for a page.
+
+        Args:
+            page_id: Unique identifier of the page to generate embeddings for
+
+        Raises:
+            May raise implementation-specific exceptions on workflow start failure.
+
+        """
+        ...

@@ -21,11 +21,13 @@ from eventsourcing.projection import ApplicationSubscription
 
 from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
 from domain.aggregates.artifact import Artifact
+from domain.aggregates.page import Page
 from infrastructure.di.container import create_container
 from infrastructure.logging import setup_logging
 from infrastructure.read_repositories.mongo_read_model_materializer import (
     MongoReadModelMaterializer,
 )
+from infrastructure.temporal import orchestrator
 
 setup_logging()
 logger = structlog.get_logger()
@@ -52,6 +54,7 @@ async def run() -> None:
     app = container[Application]
 
     log_artifact_sample_use_case = container[LogArtifactSampleUseCase]
+    workflow_orchestrator = container[orchestrator.TemporalWorkflowOrchestrator]
 
     # Setup signal handlers
     def handle_signal(signum: int, _frame: object) -> None:
@@ -64,6 +67,7 @@ async def run() -> None:
     # Topics we're interested in
     topics = [
         f"{Artifact.Created.__module__}:{Artifact.Created.__qualname__}",
+        f"{Page.TextMentionUpdated.__module__}:{Page.TextMentionUpdated.__qualname__}",
     ]
 
     logger.info("pipeline_worker_started", topics=topics)
@@ -116,6 +120,25 @@ async def run() -> None:
                                 artifact_id=str(domain_event.originator_id),
                                 tracking_id=tracking.notification_id,
                             )
+
+                        elif isinstance(domain_event, Page.TextMentionUpdated):
+                            if domain_event.text_mention is not None:
+                                # Text was added/updated - trigger embedding generation
+                                logger.info(
+                                    "pipeline_text_mention_updated",
+                                    page_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
+
+                                await workflow_orchestrator.start_embedding_workflow(
+                                    page_id=domain_event.originator_id,
+                                )
+
+                                logger.info(
+                                    "pipeline_embedding_workflow_triggered",
+                                    page_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
 
                     except Exception:
                         logger.exception(

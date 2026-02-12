@@ -1,0 +1,228 @@
+from uuid import UUID
+
+import structlog
+from returns.result import Failure, Result, Success
+
+from application.dtos.embedding_dtos import EmbeddingDTO, SearchRequest, SearchResponse
+from application.dtos.errors import AppError
+from application.ports.embedding_generator import EmbeddingGenerator
+from application.ports.repositories.page_repository import PageRepository
+from application.ports.vector_store import VectorStore
+from domain.exceptions import AggregateNotFoundError
+from domain.value_objects.embedding_metadata import EmbeddingMetadata
+
+logger = structlog.get_logger()
+
+
+class GeneratePageEmbeddingUseCase:
+    """Use case for generating and storing a page embedding.
+
+    This use case:
+    1. Retrieves the page from the repository
+    2. Generates an embedding from the page's text
+    3. Stores the embedding in the vector store
+    4. Updates the domain aggregate with embedding metadata
+    """
+
+    def __init__(
+        self,
+        page_repository: PageRepository,
+        embedding_generator: EmbeddingGenerator,
+        vector_store: VectorStore,
+    ) -> None:
+        self.page_repository = page_repository
+        self.embedding_generator = embedding_generator
+        self.vector_store = vector_store
+
+    async def execute(
+        self,
+        page_id: UUID,
+        force_regenerate: bool = False,
+    ) -> Result[EmbeddingDTO, AppError]:
+        """Generate and store an embedding for a page.
+
+        Args:
+            page_id: The ID of the page to generate embedding for
+            force_regenerate: If True, regenerate even if embedding exists
+
+        Returns:
+            Result containing EmbeddingDTO on success or AppError on failure
+
+        """
+        try:
+            logger.info("generate_page_embedding_start", page_id=str(page_id))
+
+            # 1. Retrieve the page aggregate
+            page = self.page_repository.get_by_id(page_id)
+
+            # 2. Check if we should skip generation
+            if not force_regenerate and page.text_embedding_metadata is not None:
+                logger.info(
+                    "embedding_already_exists",
+                    page_id=str(page_id),
+                    embedding_id=str(page.text_embedding_metadata.embedding_id),
+                )
+                return Success(
+                    EmbeddingDTO(
+                        embedding_id=page.text_embedding_metadata.embedding_id,
+                        page_id=page_id,
+                        artifact_id=page.artifact_id,
+                        model_name=page.text_embedding_metadata.model_name,
+                        dimensions=page.text_embedding_metadata.dimensions,
+                        generated_at=page.text_embedding_metadata.generated_at.isoformat(),
+                    ),
+                )
+
+            # 3. Ensure the page has text content
+            if not page.text_mention or not page.text_mention.text:
+                msg = f"Page {page_id} has no text content to embed"
+                logger.warning("no_text_content", page_id=str(page_id))
+                return Failure(AppError("validation", msg))
+
+            # 4. Generate the embedding
+            logger.info("generating_embedding", page_id=str(page_id))
+            embedding = await self.embedding_generator.generate_text_embedding(
+                text=page.text_mention.text,
+            )
+
+            # 5. Store in vector store
+            logger.info("storing_embedding_in_vector_store", page_id=str(page_id))
+            await self.vector_store.upsert_page_embedding(
+                page_id=page_id,
+                artifact_id=page.artifact_id,
+                embedding=embedding,
+                page_index=page.index,
+            )
+
+            # 6. Update domain aggregate with metadata
+            embedding_metadata = EmbeddingMetadata(
+                embedding_id=embedding.embedding_id,
+                model_name=embedding.model_name,
+                dimensions=embedding.dimensions,
+                generated_at=embedding.generated_at,
+                embedding_type="text",
+            )
+            page.update_text_embedding_metadata(embedding_metadata)
+
+            # 7. Save the updated aggregate (with new event)
+            self.page_repository.save(page)
+
+            logger.info(
+                "generate_page_embedding_success",
+                page_id=str(page_id),
+                embedding_id=str(embedding.embedding_id),
+            )
+
+            return Success(
+                EmbeddingDTO(
+                    embedding_id=embedding.embedding_id,
+                    page_id=page_id,
+                    artifact_id=page.artifact_id,
+                    model_name=embedding.model_name,
+                    dimensions=embedding.dimensions,
+                    generated_at=embedding.generated_at.isoformat(),
+                ),
+            )
+
+        except AggregateNotFoundError as e:
+            logger.error("page_not_found", page_id=str(page_id), error=str(e))
+            return Failure(AppError("not_found", f"Page not found: {e!s}"))
+        except Exception as e:
+            logger.error(
+                "generate_page_embedding_failed",
+                page_id=str(page_id),
+                error=str(e),
+                exc_info=True,
+            )
+            return Failure(
+                AppError("internal_error", f"Failed to generate embedding: {e!s}"),
+            )
+
+
+class SearchSimilarPagesUseCase:
+    """Use case for searching similar pages using vector similarity.
+
+    This use case:
+    1. Generates an embedding for the query text
+    2. Searches the vector store for similar pages
+    3. Enriches results with data from read models (optional)
+    """
+
+    def __init__(
+        self,
+        embedding_generator: EmbeddingGenerator,
+        vector_store: VectorStore,
+    ) -> None:
+        self.embedding_generator = embedding_generator
+        self.vector_store = vector_store
+
+    async def execute(self, request: SearchRequest) -> Result[SearchResponse, AppError]:
+        """Search for pages similar to the query text.
+
+        Args:
+            request: SearchRequest with query text and filters
+
+        Returns:
+            Result containing SearchResponse on success or AppError on failure
+
+        """
+        try:
+            logger.info(
+                "search_similar_pages_start",
+                query_length=len(request.query_text),
+                limit=request.limit,
+            )
+
+            # 1. Generate embedding for query text
+            query_embedding = await self.embedding_generator.generate_text_embedding(
+                text=request.query_text,
+            )
+
+            # 2. Search vector store
+            search_results = await self.vector_store.search_similar_pages(
+                query_embedding=query_embedding,
+                limit=request.limit,
+                artifact_id_filter=request.artifact_id,
+                score_threshold=request.score_threshold,
+            )
+
+            # 3. Convert to DTOs
+            from application.dtos.embedding_dtos import SearchResultDTO
+
+            result_dtos = [
+                SearchResultDTO(
+                    page_id=result.page_id,
+                    artifact_id=result.artifact_id,
+                    page_index=result.page_index,
+                    similarity_score=result.score,
+                    # TODO: Enrich with read model data (text preview, artifact name)
+                    # This would require injecting a read model repository
+                )
+                for result in search_results
+            ]
+
+            model_info = await self.embedding_generator.get_model_info()
+
+            logger.info(
+                "search_similar_pages_success",
+                query_length=len(request.query_text),
+                results_count=len(result_dtos),
+            )
+
+            return Success(
+                SearchResponse(
+                    query=request.query_text,
+                    results=result_dtos,
+                    total_results=len(result_dtos),
+                    model_used=str(model_info.get("model_name", "unknown")),
+                ),
+            )
+
+        except Exception as e:
+            logger.error(
+                "search_similar_pages_failed",
+                query=request.query_text[:100],
+                error=str(e),
+                exc_info=True,
+            )
+            return Failure(AppError("internal_error", f"Failed to search pages: {e!s}"))

@@ -8,12 +8,14 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from application.dtos.pdf_dtos import PDFContent
 from application.ports.blob_store import BlobStore
+from application.ports.embedding_generator import EmbeddingGenerator
 from application.ports.external_event_publisher import ExternalEventPublisher
 from application.ports.pdf_service import PDFService
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
+from application.ports.vector_store import VectorStore
 from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
 from application.use_cases.artifact_use_cases import (
@@ -28,6 +30,10 @@ from application.use_cases.artifact_use_cases import (
     UpdateSummaryCandidateUseCase as UpdateArtifactSummaryCandidateUseCase,
 )
 from application.use_cases.blob_use_cases import UploadBlobUseCase
+from application.use_cases.embedding_use_cases import (
+    GeneratePageEmbeddingUseCase,
+    SearchSimilarPagesUseCase,
+)
 from application.use_cases.page_use_cases import (
     AddCompoundMentionsUseCase,
     CreatePageUseCase,
@@ -41,6 +47,7 @@ from application.use_cases.page_use_cases import (
 from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
 from domain.value_objects.blob_ref import BlobRef
 from domain.value_objects.compound_mention import CompoundMention
+from domain.value_objects.embedding_metadata import EmbeddingMetadata
 from domain.value_objects.extraction_metadata import ExtractionMetadata
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention
@@ -49,6 +56,7 @@ from domain.value_objects.title_mention import TitleMention
 from domain.value_objects.workflow_status import WorkflowStatus
 from infrastructure.blob_stores.fsspec_blob_store import FsspecBlobStore
 from infrastructure.config import settings
+from infrastructure.embeddings.sentence_transformer_generator import SentenceTransformerGenerator
 from infrastructure.event_projectors.event_projector import EventProjector
 from infrastructure.event_sourced_repositories.artifact_repository import (
     EventSourcedArtifactRepository,
@@ -63,6 +71,7 @@ from infrastructure.read_repositories.mongo_read_model_materializer import (
 from infrastructure.read_repositories.mongo_read_repository import MongoReadRepository
 from infrastructure.serialization.pydantic_transcoder import PydanticTranscoding
 from infrastructure.temporal.orchestrator import TemporalWorkflowOrchestrator
+from infrastructure.vector_stores.qdrant_store import QdrantStore
 
 if TYPE_CHECKING:
     from eventsourcing.persistence import JSONTranscoder
@@ -86,6 +95,7 @@ class DocuStoreApplication(Application):
         transcoder.register(PydanticTranscoding(BlobRef))
         transcoder.register(PydanticTranscoding(WorkflowStatus))
         transcoder.register(PydanticTranscoding(PDFContent))
+        transcoder.register(PydanticTranscoding(EmbeddingMetadata))
 
 
 def create_container() -> Container:
@@ -162,6 +172,21 @@ def create_container() -> Container:
     # Register PDF Service with BlobStore injected
     container[PDFService] = lambda c: PyMuPDFService(blob_store=c[BlobStore])
 
+    # Embedding Generator
+    container[EmbeddingGenerator] = lambda _: SentenceTransformerGenerator(
+        model_name=settings.embedding_model_name,
+        device=settings.embedding_device,
+    )
+
+    # Vector Store
+    vector_store_instance = QdrantStore(
+        url=settings.qdrant_url,
+        api_key=settings.qdrant_api_key,
+        collection_name=settings.qdrant_collection_name,
+        vector_size=384,  # all-MiniLM-L6-v2 default
+    )
+    container[VectorStore] = vector_store_instance
+
     # Register Use Cases
     # Page Use Cases
     container[CreatePageUseCase] = lambda c: CreatePageUseCase(
@@ -189,6 +214,18 @@ def create_container() -> Container:
         page_repository=c[PageRepository],
         artifact_repository=c[ArtifactRepository],
         external_event_publisher=c[ExternalEventPublisher],
+    )
+
+    # Embedding Use Cases
+    container[GeneratePageEmbeddingUseCase] = lambda c: GeneratePageEmbeddingUseCase(
+        page_repository=c[PageRepository],
+        embedding_generator=c[EmbeddingGenerator],
+        vector_store=c[VectorStore],
+    )
+
+    container[SearchSimilarPagesUseCase] = lambda c: SearchSimilarPagesUseCase(
+        embedding_generator=c[EmbeddingGenerator],
+        vector_store=c[VectorStore],
     )
 
     # Artifact Use Cases

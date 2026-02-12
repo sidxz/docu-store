@@ -104,3 +104,30 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
                 error=str(e),
             )
             raise
+
+    async def start_embedding_workflow(
+        self,
+        page_id: UUID,
+    ) -> None:
+        """Start the embedding generation workflow for a page.
+
+        Args:
+            page_id: Unique identifier of the page to generate embeddings for
+
+        """
+        await self._ensure_client()
+
+        workflow_id = f"embedding-{page_id}"
+
+        try:
+            await self._client.start_workflow(
+                "GeneratePageEmbeddingWorkflow",
+                str(page_id),
+                id=workflow_id,
+                task_queue="artifact_processing",  # Same queue as other workflows
+            )
+            logger.info("embedding_workflow_started", page_id=str(page_id))
+        except Exception as e:
+            logger.exception(
+                "failed_to_start_embedding_workflow", page_id=str(page_id), error=str(e)
+            )

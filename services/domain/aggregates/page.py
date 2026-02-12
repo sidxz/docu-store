@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from uuid import UUID
 
     from domain.value_objects.compound_mention import CompoundMention
+    from domain.value_objects.embedding_metadata import EmbeddingMetadata
     from domain.value_objects.summary_candidate import SummaryCandidate
     from domain.value_objects.tag_mention import TagMention
     from domain.value_objects.text_mention import TextMention
@@ -55,6 +56,7 @@ class Page(Aggregate):
         self.tag_mentions: list[TagMention] = []
         self.text_mention: TextMention | None = None
         self.summary_candidate: SummaryCandidate | None = None
+        self.text_embedding_metadata: EmbeddingMetadata | None = None
         self.workflow_statuses: dict[str, WorkflowStatus] = {}
         self.is_deleted: bool = False
 
@@ -129,6 +131,29 @@ class Page(Aggregate):
     @event(SummaryCandidateUpdated)
     def _apply_summary_candidate_updated(self, summary_candidate: SummaryCandidate | None) -> None:
         self.summary_candidate = summary_candidate
+
+    # ============================================================================
+    # COMMAND METHOD - Update Text Embedding Metadata
+    # ============================================================================
+    class TextEmbeddingGenerated(Aggregate.Event):
+        """Emitted when a text embedding is generated for this page."""
+
+        embedding_metadata: EmbeddingMetadata
+
+    def update_text_embedding_metadata(self, embedding_metadata: EmbeddingMetadata) -> None:
+        """Update the page with generated embedding metadata.
+
+        The actual embedding vector is stored in the vector store.
+        This method only records metadata about the embedding in the domain.
+        """
+        if self.is_deleted:
+            msg = "Cannot update embedding on a deleted page"
+            raise ValueError(msg)
+        self.trigger_event(self.TextEmbeddingGenerated, embedding_metadata=embedding_metadata)
+
+    @event(TextEmbeddingGenerated)
+    def _apply_text_embedding_generated(self, embedding_metadata: EmbeddingMetadata) -> None:
+        self.text_embedding_metadata = embedding_metadata
 
     # ============================================================================
     # COMMAND METHOD - Workflow Status Updated

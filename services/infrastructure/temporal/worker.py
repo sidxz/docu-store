@@ -20,7 +20,12 @@ from infrastructure.temporal.activities.artifact_activities import (
     log_mime_type_activity,
     log_storage_location_activity,
 )
+from infrastructure.temporal.activities.embedding_activities import (
+    generate_page_embedding_activity,
+    log_embedding_generated_activity,
+)
 from infrastructure.temporal.workflows.artifact_processing import ProcessArtifactWorkflow
+from infrastructure.temporal.workflows.embedding_workflow import GeneratePageEmbeddingWorkflow
 
 setup_logging()
 logger = structlog.get_logger()
@@ -41,10 +46,12 @@ async def run() -> None:
     worker = Worker(
         client,
         task_queue="artifact_processing",
-        workflows=[ProcessArtifactWorkflow],
+        workflows=[ProcessArtifactWorkflow, GeneratePageEmbeddingWorkflow],
         activities=[
             log_mime_type_activity,
             log_storage_location_activity,
+            generate_page_embedding_activity,
+            log_embedding_generated_activity,
             # Future activities will be added here
         ],
     )
