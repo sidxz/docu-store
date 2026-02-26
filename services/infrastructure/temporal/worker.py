@@ -68,7 +68,11 @@ async def run() -> None:
     worker = Worker(
         client,
         task_queue="artifact_processing",
-        workflows=[ProcessArtifactWorkflow, GeneratePageEmbeddingWorkflow, ExtractCompoundMentionsWorkflow],
+        workflows=[
+            ProcessArtifactWorkflow,
+            GeneratePageEmbeddingWorkflow,
+            ExtractCompoundMentionsWorkflow,
+        ],
         activities=[
             log_mime_type_activity,
             log_storage_location_activity,

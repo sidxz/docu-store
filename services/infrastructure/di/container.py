@@ -10,13 +10,13 @@ from application.dtos.pdf_dtos import PDFContent
 from application.ports.blob_store import BlobStore
 from application.ports.cser_service import CserService
 from application.ports.embedding_generator import EmbeddingGenerator
-from application.ports.smiles_validator import SmilesValidator
 from application.ports.external_event_publisher import ExternalEventPublisher
 from application.ports.pdf_service import PDFService
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
+from application.ports.smiles_validator import SmilesValidator
 from application.ports.text_chunker import TextChunker
 from application.ports.vector_store import VectorStore
 from application.ports.workflow_orchestrator import WorkflowOrchestrator
@@ -49,7 +49,9 @@ from application.use_cases.page_use_cases import (
     UpdateSummaryCandidateUseCase as UpdatePageSummaryCandidateUseCase,
 )
 from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
-from application.workflow_use_cases.trigger_compound_extraction_use_case import TriggerCompoundExtractionUseCase
+from application.workflow_use_cases.trigger_compound_extraction_use_case import (
+    TriggerCompoundExtractionUseCase,
+)
 from application.workflow_use_cases.trigger_embedding_use_case import TriggerEmbeddingUseCase
 from domain.value_objects.blob_ref import BlobRef
 from domain.value_objects.compound_mention import CompoundMention
@@ -61,15 +63,15 @@ from domain.value_objects.text_mention import TextMention
 from domain.value_objects.title_mention import TitleMention
 from domain.value_objects.workflow_status import WorkflowStatus
 from infrastructure.blob_stores.fsspec_blob_store import FsspecBlobStore
+from infrastructure.chemistry.rdkit_smiles_validator import RdkitSmilesValidator
 from infrastructure.config import settings
+from infrastructure.cser.cser_pipeline_service import CserPipelineService
 from infrastructure.embeddings.sentence_transformer_generator import SentenceTransformerGenerator
 from infrastructure.event_projectors.event_projector import EventProjector
 from infrastructure.event_sourced_repositories.artifact_repository import (
     EventSourcedArtifactRepository,
 )
 from infrastructure.event_sourced_repositories.page_repository import EventSourcedPageRepository
-from infrastructure.chemistry.rdkit_smiles_validator import RdkitSmilesValidator
-from infrastructure.cser.cser_pipeline_service import CserPipelineService
 from infrastructure.file_services.py_mu_pfd_service import PyMuPDFService
 from infrastructure.kafka.kafka_external_event_streamer import KafkaExternalEventPublisher
 from infrastructure.kafka.kafka_publisher import KafkaPublisher

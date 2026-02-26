@@ -67,7 +67,9 @@ class SentenceTransformerGenerator(EmbeddingGenerator):
     def _ensure_model_loaded(self) -> None:
         """Lazy load the model on first use."""
         if self._model is None:
-            from sentence_transformers import SentenceTransformer  # heavy import — deferred until first use
+            from sentence_transformers import (
+                SentenceTransformer,
+            )  # heavy import — deferred until first use
 
             logger.info("loading_sentence_transformer_model", model_name=self.model_name)
             self._model = SentenceTransformer(self.model_name, device=self.device)

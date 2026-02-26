@@ -20,7 +20,9 @@ from eventsourcing.application import Application
 from eventsourcing.projection import ApplicationSubscription
 
 from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
-from application.workflow_use_cases.trigger_compound_extraction_use_case import TriggerCompoundExtractionUseCase
+from application.workflow_use_cases.trigger_compound_extraction_use_case import (
+    TriggerCompoundExtractionUseCase,
+)
 from application.workflow_use_cases.trigger_embedding_use_case import TriggerEmbeddingUseCase
 from domain.aggregates.artifact import Artifact
 from domain.aggregates.page import Page
@@ -46,6 +48,7 @@ async def run(worker_name: str = "pipeline_worker") -> None:
     Tracking:
     - Stores last processed event in MongoDB to resume from that point
     - Ensures events are only processed once across restarts (per worker_name)
+
     """
     container = create_container()
     app = container[Application]

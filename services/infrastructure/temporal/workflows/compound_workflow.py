@@ -30,7 +30,7 @@ class ExtractCompoundMentionsWorkflow:
         )
 
         workflow.logger.info(
-            f"Compound extraction workflow completed for page_id={page_id}, result={result}"
+            f"Compound extraction workflow completed for page_id={page_id}, result={result}",
         )
 
         return result

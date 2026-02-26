@@ -14,12 +14,14 @@ from application.use_cases.page_use_cases import (
     UpdateTagMentionsUseCase,
     UpdateTextMentionUseCase,
 )
-from application.workflow_use_cases.trigger_compound_extraction_use_case import TriggerCompoundExtractionUseCase
+from application.workflow_use_cases.trigger_compound_extraction_use_case import (
+    TriggerCompoundExtractionUseCase,
+)
 from application.workflow_use_cases.trigger_embedding_use_case import TriggerEmbeddingUseCase
 from domain.value_objects.summary_candidate import SummaryCandidate
-from domain.value_objects.workflow_status import WorkflowStatus
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.text_mention import TextMention
+from domain.value_objects.workflow_status import WorkflowStatus
 from interfaces.api.middleware import handle_use_case_errors
 from interfaces.dependencies import get_container
 

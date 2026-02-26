@@ -133,17 +133,17 @@ class ExtractCompoundMentionsUseCase:
 
         except AggregateNotFoundError as e:
             logger.warning(
-                "extract_compound_mentions_not_found", page_id=str(page_id), error=str(e)
+                "extract_compound_mentions_not_found", page_id=str(page_id), error=str(e),
             )
             return Failure(AppError("not_found", str(e)))
         except ValidationError as e:
             logger.warning(
-                "extract_compound_mentions_validation_error", page_id=str(page_id), error=str(e)
+                "extract_compound_mentions_validation_error", page_id=str(page_id), error=str(e),
             )
             return Failure(AppError("validation", str(e)))
         except ConcurrencyError as e:
             logger.warning(
-                "extract_compound_mentions_concurrency_error", page_id=str(page_id), error=str(e)
+                "extract_compound_mentions_concurrency_error", page_id=str(page_id), error=str(e),
             )
             return Failure(AppError("concurrency", str(e)))
         except Exception as e:
