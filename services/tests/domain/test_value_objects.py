@@ -102,22 +102,22 @@ class TestCompoundMention:
     def test_create_compound_mention(self, sample_compound_mention: CompoundMention) -> None:
         """Test creating a CompoundMention."""
         assert sample_compound_mention.smiles == "C1=CC=CC=C1"
-        assert sample_compound_mention.extracted_name == "Benzene"
+        assert sample_compound_mention.extracted_id == "Benzene"
         assert sample_compound_mention.confidence == 0.92
 
     def test_compound_mention_with_defaults(self) -> None:
         """Test creating a CompoundMention with default values."""
-        mention = CompoundMention(smiles="C", extracted_name="Methane")
+        mention = CompoundMention(smiles="C", extracted_id="Methane")
         assert mention.smiles == "C"
-        assert mention.extracted_name == "Methane"
+        assert mention.extracted_id == "Methane"
 
     def test_compound_mention_equality(self) -> None:
         """Test CompoundMention equality."""
-        mention1 = CompoundMention(smiles="C1=CC=CC=C1", extracted_name="Benzene")
-        mention2 = CompoundMention(smiles="C1=CC=CC=C1", extracted_name="Benzene")
-        # CompoundMentions are equal if they have same smiles and extracted_name
+        mention1 = CompoundMention(smiles="C1=CC=CC=C1", extracted_id="Benzene")
+        mention2 = CompoundMention(smiles="C1=CC=CC=C1", extracted_id="Benzene")
+        # CompoundMentions are equal if they have same smiles and extracted_id
         assert mention1.smiles == mention2.smiles
-        assert mention1.extracted_name == mention2.extracted_name
+        assert mention1.extracted_id == mention2.extracted_id
 
 
 class TestExtractionMetadata:

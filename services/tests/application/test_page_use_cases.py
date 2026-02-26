@@ -84,7 +84,7 @@ class TestAddCompoundMentionsUseCase:
         request = AddCompoundMentionsRequest(
             page_id=sample_page.id,
             compound_mentions=[
-                CompoundMention(smiles="C1=CC=CC=C1", extracted_name="Benzene"),
+                CompoundMention(smiles="C1=CC=CC=C1", extracted_id="Benzene"),
             ],
         )
 
@@ -103,7 +103,7 @@ class TestAddCompoundMentionsUseCase:
         request = AddCompoundMentionsRequest(
             page_id=uuid4(),
             compound_mentions=[
-                CompoundMention(smiles="C1=CC=CC=C1", extracted_name="Benzene"),
+                CompoundMention(smiles="C1=CC=CC=C1", extracted_id="Benzene"),
             ],
         )
 

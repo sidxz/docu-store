@@ -74,7 +74,7 @@ def sample_compound_mention() -> CompoundMention:
     """Create a sample CompoundMention value object."""
     return CompoundMention(
         smiles="C1=CC=CC=C1",
-        extracted_name="Benzene",
+        extracted_id="Benzene",
         confidence=0.92,
     )
 

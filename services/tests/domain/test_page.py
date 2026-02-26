@@ -84,8 +84,8 @@ class TestPageCompoundMentions:
         assert len(sample_page.compound_mentions) == 1
         assert sample_page.compound_mentions[0].smiles == sample_compound_mention.smiles
         assert (
-            sample_page.compound_mentions[0].extracted_name
-            == sample_compound_mention.extracted_name
+            sample_page.compound_mentions[0].extracted_id
+            == sample_compound_mention.extracted_id
         )
 
     def test_add_multiple_compound_mentions(self, sample_page: Page) -> None:
@@ -93,29 +93,29 @@ class TestPageCompoundMentions:
         mentions = [
             CompoundMention(
                 smiles="C1=CC=CC=C1",
-                extracted_name="Benzene",
+                extracted_id="Benzene",
                 confidence=0.92,
             ),
             CompoundMention(
                 smiles="CC(=O)O",
-                extracted_name="Acetic Acid",
+                extracted_id="Acetic Acid",
                 confidence=0.88,
             ),
         ]
         sample_page.update_compound_mentions(mentions)
         assert len(sample_page.compound_mentions) == 2
-        assert sample_page.compound_mentions[0].extracted_name == "Benzene"
-        assert sample_page.compound_mentions[1].extracted_name == "Acetic Acid"
+        assert sample_page.compound_mentions[0].extracted_id == "Benzene"
+        assert sample_page.compound_mentions[1].extracted_id == "Acetic Acid"
 
     def test_add_compound_mentions_multiple_times(self, sample_page: Page) -> None:
         """Test that updating compound mentions replaces previous ones (not accumulates)."""
         first_mention = CompoundMention(
             smiles="C1=CC=CC=C1",
-            extracted_name="Benzene",
+            extracted_id="Benzene",
         )
         second_mention = CompoundMention(
             smiles="CC(=O)O",
-            extracted_name="Acetic Acid",
+            extracted_id="Acetic Acid",
         )
 
         sample_page.update_compound_mentions([first_mention])
@@ -123,7 +123,7 @@ class TestPageCompoundMentions:
 
         # Domain model replaces mentions, not accumulates them
         assert len(sample_page.compound_mentions) == 1
-        assert sample_page.compound_mentions[0].extracted_name == "Acetic Acid"
+        assert sample_page.compound_mentions[0].extracted_id == "Acetic Acid"
 
     def test_compound_mentions_event_generated(
         self,
@@ -328,7 +328,7 @@ class TestPageDeletion:
 
         with pytest.raises(ValueError, match="Cannot update"):
             sample_page.update_compound_mentions(
-                [CompoundMention(smiles="C", extracted_name="test")],
+                [CompoundMention(smiles="C", extracted_id="test")],
             )
 
 
@@ -355,8 +355,8 @@ class TestPageEventSourcing:
     ) -> None:
         """Test that CompoundMentionsUpdated event captures all necessary data."""
         mentions = [
-            CompoundMention(smiles="C1=CC=CC=C1", extracted_name="Benzene", confidence=0.92),
-            CompoundMention(smiles="CC(=O)O", extracted_name="Acetic Acid", confidence=0.88),
+            CompoundMention(smiles="C1=CC=CC=C1", extracted_id="Benzene", confidence=0.92),
+            CompoundMention(smiles="CC(=O)O", extracted_id="Acetic Acid", confidence=0.88),
         ]
         sample_page.update_compound_mentions(mentions)
 
@@ -367,7 +367,7 @@ class TestPageEventSourcing:
         assert compound_event.compound_mentions == mentions
         assert len(compound_event.compound_mentions) == 2
         assert compound_event.compound_mentions[0].smiles == "C1=CC=CC=C1"
-        assert compound_event.compound_mentions[0].extracted_name == "Benzene"
+        assert compound_event.compound_mentions[0].extracted_id == "Benzene"
 
     def test_tag_mentions_updated_event_contains_complete_data(self, sample_page: Page) -> None:
         """Test that TagMentionsUpdated event captures all necessary data."""
@@ -423,7 +423,7 @@ class TestPageInvariants:
 
         # Every modification should fail
         with pytest.raises(ValueError, match="deleted"):
-            page.update_compound_mentions([CompoundMention(smiles="C", extracted_name="Test")])
+            page.update_compound_mentions([CompoundMention(smiles="C", extracted_id="Test")])
 
         with pytest.raises(ValueError, match="deleted"):
             page.update_tag_mentions([TagMention(tag="test", confidence=0.9)])
@@ -455,15 +455,15 @@ class TestPageInvariants:
         page = Page.create(name="Test", artifact_id=sample_artifact_id)
 
         # First update
-        first_compounds = [CompoundMention(smiles="C1", extracted_name="First")]
+        first_compounds = [CompoundMention(smiles="C1", extracted_id="First")]
         page.update_compound_mentions(first_compounds)
 
         # Second update should replace, not add
-        second_compounds = [CompoundMention(smiles="C2", extracted_name="Second")]
+        second_compounds = [CompoundMention(smiles="C2", extracted_id="Second")]
         page.update_compound_mentions(second_compounds)
 
         assert len(page.compound_mentions) == 1
-        assert page.compound_mentions[0].extracted_name == "Second"
+        assert page.compound_mentions[0].extracted_id == "Second"
 
         # Same for tag mentions
         page.update_tag_mentions([TagMention(tag="first", confidence=0.9)])
@@ -477,7 +477,7 @@ class TestPageInvariants:
         page = Page.create(name="Test", artifact_id=sample_artifact_id)
 
         # Add some mentions
-        page.update_compound_mentions([CompoundMention(smiles="C", extracted_name="Test")])
+        page.update_compound_mentions([CompoundMention(smiles="C", extracted_id="Test")])
         page.update_tag_mentions([TagMention(tag="test", confidence=0.9)])
 
         # Clear them with empty lists
@@ -508,7 +508,7 @@ class TestPageInvariants:
 
         initial_version = page.version
 
-        page.update_compound_mentions([CompoundMention(smiles="C", extracted_name="Test")])
+        page.update_compound_mentions([CompoundMention(smiles="C", extracted_id="Test")])
         assert page.version == initial_version + 1
 
         page.update_tag_mentions([TagMention(tag="test", confidence=0.9)])

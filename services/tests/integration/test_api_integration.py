@@ -112,7 +112,7 @@ def test_create_page_and_add_compound_mentions(client) -> None:
     compound_payload = {
         "page_id": page_id,
         "compound_mentions": [
-            {"smiles": "C1=CC=CC=C1", "extracted_name": "Benzene"},
+            {"smiles": "C1=CC=CC=C1", "extracted_id": "Benzene"},
         ],
     }
     compound_response = api.post(
