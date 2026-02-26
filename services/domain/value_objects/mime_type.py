@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class MimeType(str, Enum):
+class MimeType(StrEnum):
     """Represent supported MIME types for ingested artifacts."""
 
     PDF = "application/pdf"

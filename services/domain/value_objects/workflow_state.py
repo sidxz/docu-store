@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class WorkflowState(str, Enum):
+class WorkflowState(StrEnum):
     """Enumerate the possible states of a workflow run."""
 
     PENDING = "PENDING"

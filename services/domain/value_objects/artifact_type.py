@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class ArtifactType(str, Enum):
+class ArtifactType(StrEnum):
     GENERIC_PRESENTATION = "GENERIC_PRESENTATION"
     SCIENTIFIC_PRESENTATION = "SCIENTIFIC_PRESENTATION"
     RESEARCH_ARTICLE = "RESEARCH_ARTICLE"
