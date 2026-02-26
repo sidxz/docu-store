@@ -69,6 +69,33 @@ class VectorStore(Protocol):
             page_id: The ID of the page to delete
 
         Should be idempotent - no error if page doesn't exist.
+        Also deletes any chunk-level embeddings for this page.
+
+        """
+        ...
+
+    async def upsert_page_chunk_embeddings(
+        self,
+        page_id: UUID,
+        artifact_id: UUID,
+        embeddings: list["TextEmbedding"],
+        page_index: int,
+        chunk_count: int,
+        metadata: dict | None = None,
+    ) -> None:
+        """Store embeddings for multiple chunks of a single page.
+
+        Replaces any existing chunk embeddings for this page.
+        Each chunk is stored as a separate point, keyed by
+        (page_id, chunk_index).
+
+        Args:
+            page_id: The unique ID of the page
+            artifact_id: The ID of the artifact this page belongs to
+            embeddings: List of embeddings, one per chunk (ordered by chunk index)
+            page_index: The index/position of this page in the artifact
+            chunk_count: Total number of chunks for this page
+            metadata: Optional additional metadata to store
 
         """
         ...

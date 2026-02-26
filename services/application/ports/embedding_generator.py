@@ -34,6 +34,29 @@ class EmbeddingGenerator(Protocol):
         """
         ...
 
+    async def generate_batch_embeddings(
+        self,
+        texts: list[str],
+        model_name: str | None = None,
+    ) -> list[TextEmbedding]:
+        """Generate embedding vectors for multiple texts in a batch.
+
+        More efficient than calling generate_text_embedding in a loop,
+        as models can batch-encode multiple texts in a single pass.
+
+        Args:
+            texts: List of text content to embed
+            model_name: Optional override for the model name
+
+        Returns:
+            List of TextEmbedding objects, one per input text (same order)
+
+        Raises:
+            ValueError: If any text is empty or invalid
+
+        """
+        ...
+
     async def get_model_info(self) -> dict[str, str | int]:
         """Get information about the current embedding model.
 

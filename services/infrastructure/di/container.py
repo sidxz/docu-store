@@ -15,6 +15,7 @@ from application.ports.repositories.artifact_read_models import ArtifactReadMode
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
+from application.ports.text_chunker import TextChunker
 from application.ports.vector_store import VectorStore
 from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
@@ -71,6 +72,7 @@ from infrastructure.read_repositories.mongo_read_model_materializer import (
 from infrastructure.read_repositories.mongo_read_repository import MongoReadRepository
 from infrastructure.serialization.pydantic_transcoder import PydanticTranscoding
 from infrastructure.temporal.orchestrator import TemporalWorkflowOrchestrator
+from infrastructure.text_chunkers.langchain_chunker import LangChainTextChunker
 from infrastructure.vector_stores.qdrant_store import QdrantStore
 
 if TYPE_CHECKING:
@@ -187,6 +189,12 @@ def create_container() -> Container:
     )
     container[VectorStore] = vector_store_instance
 
+    # Text Chunker
+    container[TextChunker] = lambda _: LangChainTextChunker(
+        chunk_size=settings.chunk_size,
+        chunk_overlap=settings.chunk_overlap,
+    )
+
     # Register Use Cases
     # Page Use Cases
     container[CreatePageUseCase] = lambda c: CreatePageUseCase(
@@ -221,6 +229,7 @@ def create_container() -> Container:
         page_repository=c[PageRepository],
         embedding_generator=c[EmbeddingGenerator],
         vector_store=c[VectorStore],
+        text_chunker=c[TextChunker],
     )
 
     container[SearchSimilarPagesUseCase] = lambda c: SearchSimilarPagesUseCase(

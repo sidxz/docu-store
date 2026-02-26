@@ -65,13 +65,13 @@ def create_generate_page_embedding_activity(
             logger.error(
                 "generate_page_embedding_activity_failed",
                 page_id=page_id,
-                error_code=error.code,
+                error_code=error.category,
                 error_message=error.message,
             )
             return {
                 "status": "failed",
                 "page_id": page_id,
-                "error_code": error.code,
+                "error_code": error.category,
                 "error_message": error.message,
             }
 

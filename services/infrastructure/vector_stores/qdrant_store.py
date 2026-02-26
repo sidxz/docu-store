@@ -1,4 +1,4 @@
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 import structlog
 from qdrant_client import AsyncQdrantClient, models
@@ -92,6 +92,13 @@ class QdrantStore(VectorStore):
                 field_schema=models.PayloadSchemaType.KEYWORD,
             )
 
+            # Create index on page_id for chunk-level filtering/deletion
+            await client.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="page_id",
+                field_schema=models.PayloadSchemaType.KEYWORD,
+            )
+
             logger.info(
                 "collection_created",
                 collection=self.collection_name,
@@ -168,8 +175,91 @@ class QdrantStore(VectorStore):
             )
             raise
 
+    async def upsert_page_chunk_embeddings(
+        self,
+        page_id: UUID,
+        artifact_id: UUID,
+        embeddings: list[TextEmbedding],
+        page_index: int,
+        chunk_count: int,
+        metadata: dict | None = None,
+    ) -> None:
+        """Store embeddings for multiple chunks of a single page.
+
+        Each chunk is stored as a separate point with ID: {page_id}_chunk_{index}.
+        First deletes any existing chunks for this page, then inserts new ones.
+
+        Args:
+            page_id: The unique ID of the page
+            artifact_id: The ID of the artifact this page belongs to
+            embeddings: List of embeddings, one per chunk (ordered by chunk index)
+            page_index: The index/position of this page in the artifact
+            chunk_count: Total number of chunks for this page
+            metadata: Optional additional metadata to store
+
+        """
+        client = await self._get_client()
+
+        # First, delete any existing chunks for this page
+        await self.delete_page_embedding(page_id)
+
+        # Build points for all chunks
+        points = []
+        for chunk_index, embedding in enumerate(embeddings):
+            # Qdrant requires UUID or int IDs — generate a deterministic UUID
+            # from (page_id, chunk_index) so it's reproducible
+            point_id = str(uuid5(NAMESPACE_URL, f"{page_id}:chunk:{chunk_index}"))
+
+            payload = {
+                "page_id": str(page_id),
+                "artifact_id": str(artifact_id),
+                "page_index": page_index,
+                "chunk_index": chunk_index,
+                "chunk_count": chunk_count,
+                "embedding_id": str(embedding.embedding_id),
+                "model_name": embedding.model_name,
+                "dimensions": embedding.dimensions,
+                "generated_at": embedding.generated_at.isoformat(),
+            }
+
+            if metadata:
+                payload.update(metadata)
+
+            points.append(
+                PointStruct(
+                    id=point_id,
+                    vector=embedding.vector,
+                    payload=payload,
+                ),
+            )
+
+        try:
+            await client.upsert(
+                collection_name=self.collection_name,
+                points=points,
+            )
+
+            logger.info(
+                "chunk_embeddings_upserted",
+                page_id=str(page_id),
+                artifact_id=str(artifact_id),
+                chunk_count=chunk_count,
+            )
+
+        except Exception as e:
+            logger.error(
+                "failed_to_upsert_chunk_embeddings",
+                page_id=str(page_id),
+                chunk_count=chunk_count,
+                error=str(e),
+            )
+            raise
+
     async def delete_page_embedding(self, page_id: UUID) -> None:
         """Delete a page embedding from Qdrant.
+
+        Deletes both the legacy single-point format (id=page_id)
+        and the chunk-based format (payload page_id filter).
 
         Args:
             page_id: The ID of the page to delete
@@ -180,10 +270,26 @@ class QdrantStore(VectorStore):
         client = await self._get_client()
 
         try:
+            # Delete legacy single-point format
             await client.delete(
                 collection_name=self.collection_name,
                 points_selector=models.PointIdsList(
                     points=[str(page_id)],
+                ),
+            )
+
+            # Delete all chunk points for this page (by payload filter)
+            await client.delete(
+                collection_name=self.collection_name,
+                points_selector=models.FilterSelector(
+                    filter=models.Filter(
+                        must=[
+                            models.FieldCondition(
+                                key="page_id",
+                                match=models.MatchValue(value=str(page_id)),
+                            ),
+                        ],
+                    ),
                 ),
             )
 

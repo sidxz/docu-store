@@ -14,6 +14,7 @@ dependencies = [
     "langchain>=1.2.9",
     "langchain-community>=0.4.1",
     "langchain-core>=1.2.9",
+    "langchain-text-splitters>=0.3.0",
     "motor>=3.5.0",
     "pdf2image>=1.17.0",
     "pydantic>=2.12.5",

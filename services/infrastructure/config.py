@@ -106,6 +106,19 @@ class Settings(BaseSettings):
         default="cpu",
         validation_alias="EMBEDDING_DEVICE",
     )
+
+    # Text Chunking
+    chunk_size: int = Field(
+        default=1000,
+        validation_alias="CHUNK_SIZE",
+        description="Max characters per chunk (~200-250 tokens). Adjust when switching models.",
+    )
+    chunk_overlap: int = Field(
+        default=200,
+        validation_alias="CHUNK_OVERLAP",
+        description="Overlapping characters between chunks. Typically 10-20% of chunk_size.",
+    )
+
     # For OpenAI (when provider is "openai")
     openai_api_key: str | None = Field(
         default=None,

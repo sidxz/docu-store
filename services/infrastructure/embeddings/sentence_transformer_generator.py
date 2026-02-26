@@ -117,6 +117,61 @@ class SentenceTransformerGenerator(EmbeddingGenerator):
 
         return embedding
 
+    async def generate_batch_embeddings(
+        self,
+        texts: list[str],
+        model_name: str | None = None,
+    ) -> list[TextEmbedding]:
+        """Generate embeddings for multiple texts in a single batch.
+
+        Uses sentence-transformers batch encoding for efficiency.
+
+        Args:
+            texts: List of text content to embed
+            model_name: Ignored - uses the configured model
+
+        Returns:
+            List of TextEmbedding objects, one per input text
+
+        Raises:
+            ValueError: If texts is empty or any text is empty
+
+        """
+        if not texts:
+            msg = "Texts list cannot be empty"
+            raise ValueError(msg)
+
+        for i, text in enumerate(texts):
+            if not text or not text.strip():
+                msg = f"Text at index {i} cannot be empty"
+                raise ValueError(msg)
+
+        self._ensure_model_loaded()
+
+        logger.debug("generating_batch_embeddings", count=len(texts))
+
+        # Batch encode all texts at once — much faster than encoding one by one
+        vectors = self._model.encode(texts, convert_to_tensor=False).tolist()
+
+        embeddings = [
+            TextEmbedding(
+                embedding_id=uuid4(),
+                vector=vector,
+                model_name=self.model_name,
+                dimensions=len(vector),
+                generated_at=datetime.now(UTC),
+            )
+            for vector in vectors
+        ]
+
+        logger.debug(
+            "batch_embeddings_generated",
+            count=len(embeddings),
+            dimensions=embeddings[0].dimensions if embeddings else 0,
+        )
+
+        return embeddings
+
     async def get_model_info(self) -> dict[str, str | int]:
         """Get information about the current embedding model."""
         self._ensure_model_loaded()
