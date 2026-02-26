@@ -66,3 +66,19 @@ class WorkflowOrchestrator(Protocol):
 
         """
         ...
+
+    @abstractmethod
+    async def start_smiles_embedding_workflow(
+        self,
+        page_id: UUID,
+    ) -> None:
+        """Start the SMILES embedding workflow for a page.
+
+        Args:
+            page_id: Unique identifier of the page whose compounds should be embedded
+
+        Raises:
+            May raise implementation-specific exceptions on workflow start failure.
+
+        """
+        ...

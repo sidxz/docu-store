@@ -16,6 +16,7 @@ from temporalio.worker import Worker
 
 from application.use_cases.compound_use_cases import ExtractCompoundMentionsUseCase
 from application.use_cases.embedding_use_cases import GeneratePageEmbeddingUseCase
+from application.use_cases.smiles_embedding_use_cases import EmbedCompoundSmilesUseCase
 from infrastructure.config import settings
 from infrastructure.di.container import create_container
 from infrastructure.logging import setup_logging
@@ -30,9 +31,13 @@ from infrastructure.temporal.activities.embedding_activities import (
     create_generate_page_embedding_activity,
     log_embedding_generated_activity,
 )
+from infrastructure.temporal.activities.smiles_embedding_activities import (
+    create_embed_compound_smiles_activity,
+)
 from infrastructure.temporal.workflows.artifact_processing import ProcessArtifactWorkflow
 from infrastructure.temporal.workflows.compound_workflow import ExtractCompoundMentionsWorkflow
 from infrastructure.temporal.workflows.embedding_workflow import GeneratePageEmbeddingWorkflow
+from infrastructure.temporal.workflows.smiles_embedding_workflow import EmbedCompoundSmilesWorkflow
 
 setup_logging()
 logger = structlog.get_logger()
@@ -54,6 +59,7 @@ async def run() -> None:
     # Resolve dependencies
     generate_embedding_use_case = container[GeneratePageEmbeddingUseCase]
     extract_compound_mentions_use_case = container[ExtractCompoundMentionsUseCase]
+    embed_compound_smiles_use_case = container[EmbedCompoundSmilesUseCase]
 
     # Create activities with dependencies injected
     generate_page_embedding_activity = create_generate_page_embedding_activity(
@@ -61,6 +67,9 @@ async def run() -> None:
     )
     extract_compound_mentions_activity = create_extract_compound_mentions_activity(
         use_case=extract_compound_mentions_use_case,
+    )
+    embed_compound_smiles_activity = create_embed_compound_smiles_activity(
+        use_case=embed_compound_smiles_use_case,
     )
 
     client = await Client.connect(settings.temporal_address)
@@ -72,6 +81,7 @@ async def run() -> None:
             ProcessArtifactWorkflow,
             GeneratePageEmbeddingWorkflow,
             ExtractCompoundMentionsWorkflow,
+            EmbedCompoundSmilesWorkflow,
         ],
         activities=[
             log_mime_type_activity,
@@ -79,6 +89,7 @@ async def run() -> None:
             generate_page_embedding_activity,
             log_embedding_generated_activity,
             extract_compound_mentions_activity,
+            embed_compound_smiles_activity,
         ],
     )
 

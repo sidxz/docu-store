@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \":*)",
+      "Bash(python -c \"from interfaces.api.routes.page_routes import router; print\\(''Routes OK:'', [r.path for r in router.routes]\\)\")"
+    ]
+  }
+}

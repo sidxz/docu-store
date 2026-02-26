@@ -18,6 +18,7 @@ from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
 from application.ports.smiles_validator import SmilesValidator
 from application.ports.text_chunker import TextChunker
+from application.ports.compound_vector_store import CompoundVectorStore
 from application.ports.vector_store import VectorStore
 from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
@@ -38,6 +39,8 @@ from application.use_cases.embedding_use_cases import (
     GeneratePageEmbeddingUseCase,
     SearchSimilarPagesUseCase,
 )
+from application.use_cases.smiles_embedding_use_cases import EmbedCompoundSmilesUseCase
+from application.use_cases.smiles_search_use_cases import SearchSimilarCompoundsUseCase
 from application.use_cases.page_use_cases import (
     AddCompoundMentionsUseCase,
     CreatePageUseCase,
@@ -53,6 +56,9 @@ from application.workflow_use_cases.trigger_compound_extraction_use_case import 
     TriggerCompoundExtractionUseCase,
 )
 from application.workflow_use_cases.trigger_embedding_use_case import TriggerEmbeddingUseCase
+from application.workflow_use_cases.trigger_smiles_embedding_use_case import (
+    TriggerSmilesEmbeddingUseCase,
+)
 from domain.value_objects.blob_ref import BlobRef
 from domain.value_objects.compound_mention import CompoundMention
 from domain.value_objects.embedding_metadata import EmbeddingMetadata
@@ -66,6 +72,7 @@ from infrastructure.blob_stores.fsspec_blob_store import FsspecBlobStore
 from infrastructure.chemistry.rdkit_smiles_validator import RdkitSmilesValidator
 from infrastructure.config import settings
 from infrastructure.cser.cser_pipeline_service import CserPipelineService
+from infrastructure.embeddings.chemberta_generator import ChemBertaEmbeddingGenerator
 from infrastructure.embeddings.sentence_transformer_generator import SentenceTransformerGenerator
 from infrastructure.event_projectors.event_projector import EventProjector
 from infrastructure.event_sourced_repositories.artifact_repository import (
@@ -82,6 +89,7 @@ from infrastructure.read_repositories.mongo_read_repository import MongoReadRepo
 from infrastructure.serialization.pydantic_transcoder import PydanticTranscoding
 from infrastructure.temporal.orchestrator import TemporalWorkflowOrchestrator
 from infrastructure.text_chunkers.langchain_chunker import LangChainTextChunker
+from infrastructure.vector_stores.compound_qdrant_store import CompoundQdrantStore
 from infrastructure.vector_stores.qdrant_store import QdrantStore
 
 if TYPE_CHECKING:
@@ -195,7 +203,7 @@ def create_container() -> Container:
         device=settings.embedding_device,
     )
 
-    # Vector Store
+    # Vector Store (text embeddings — page chunks)
     vector_store_instance = QdrantStore(
         url=settings.qdrant_url,
         api_key=settings.qdrant_api_key,
@@ -203,6 +211,20 @@ def create_container() -> Container:
         vector_size=384,  # all-MiniLM-L6-v2 default
     )
     container[VectorStore] = vector_store_instance
+
+    # Compound Vector Store (SMILES embeddings — ChemBERTa)
+    compound_vector_store_instance = CompoundQdrantStore(
+        url=settings.qdrant_url,
+        api_key=settings.qdrant_api_key,
+        collection_name=settings.qdrant_compound_collection_name,
+    )
+    container[CompoundVectorStore] = compound_vector_store_instance
+
+    # ChemBERTa embedding generator (SMILES)
+    container[ChemBertaEmbeddingGenerator] = lambda _: ChemBertaEmbeddingGenerator(
+        model_name=settings.smiles_embedding_model_name,
+        device=settings.smiles_embedding_device,
+    )
 
     # Text Chunker
     container[TextChunker] = lambda _: LangChainTextChunker(
@@ -311,6 +333,21 @@ def create_container() -> Container:
         external_event_publisher=c[ExternalEventPublisher],
     )
 
+    # SMILES Embedding Use Case
+    container[EmbedCompoundSmilesUseCase] = lambda c: EmbedCompoundSmilesUseCase(
+        page_repository=c[PageRepository],
+        smiles_embedding_generator=c[ChemBertaEmbeddingGenerator],
+        compound_vector_store=c[CompoundVectorStore],
+    )
+
+    # SMILES Search Use Case
+    container[SearchSimilarCompoundsUseCase] = lambda c: SearchSimilarCompoundsUseCase(
+        smiles_embedding_generator=c[ChemBertaEmbeddingGenerator],
+        compound_vector_store=c[CompoundVectorStore],
+        artifact_read_model=c[ArtifactReadModel],
+        smiles_validator=c[SmilesValidator],
+    )
+
     # Register Workflow Use Cases
     container[LogArtifactSampleUseCase] = lambda c: LogArtifactSampleUseCase(
         artifact_repository=c[ArtifactRepository],
@@ -321,6 +358,10 @@ def create_container() -> Container:
         workflow_orchestrator=c[WorkflowOrchestrator],
     )
     container[TriggerEmbeddingUseCase] = lambda c: TriggerEmbeddingUseCase(
+        page_repository=c[PageRepository],
+        workflow_orchestrator=c[WorkflowOrchestrator],
+    )
+    container[TriggerSmilesEmbeddingUseCase] = lambda c: TriggerSmilesEmbeddingUseCase(
         page_repository=c[PageRepository],
         workflow_orchestrator=c[WorkflowOrchestrator],
     )

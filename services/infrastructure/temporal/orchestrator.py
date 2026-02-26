@@ -158,3 +158,25 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
             logger.exception(
                 "failed_to_start_compound_extraction_workflow", page_id=str(page_id), error=str(e),
             )
+
+    async def start_smiles_embedding_workflow(
+        self,
+        page_id: UUID,
+    ) -> None:
+        """Start the SMILES embedding workflow for a page."""
+        await self._ensure_client()
+
+        workflow_id = f"smiles-embedding-{page_id}"
+
+        try:
+            await self._client.start_workflow(
+                "EmbedCompoundSmilesWorkflow",
+                str(page_id),
+                id=workflow_id,
+                task_queue="artifact_processing",
+            )
+            logger.info("smiles_embedding_workflow_started", page_id=str(page_id))
+        except Exception as e:
+            logger.exception(
+                "failed_to_start_smiles_embedding_workflow", page_id=str(page_id), error=str(e),
+            )

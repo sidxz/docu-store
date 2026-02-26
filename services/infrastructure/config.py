@@ -92,6 +92,10 @@ class Settings(BaseSettings):
         default="page_embeddings",
         validation_alias="QDRANT_COLLECTION_NAME",
     )
+    qdrant_compound_collection_name: str = Field(
+        default="compound_embeddings",
+        validation_alias="QDRANT_COMPOUND_COLLECTION_NAME",
+    )
 
     # Embeddings
     embedding_model_provider: Literal["sentence-transformers", "openai"] = Field(
@@ -105,6 +109,16 @@ class Settings(BaseSettings):
     embedding_device: Literal["cpu", "cuda", "mps"] = Field(
         default="cpu",
         validation_alias="EMBEDDING_DEVICE",
+    )
+
+    # SMILES / ChemBERTa embeddings
+    smiles_embedding_model_name: str = Field(
+        default="DeepChem/ChemBERTa-77M-MTR",
+        validation_alias="SMILES_EMBEDDING_MODEL_NAME",
+    )
+    smiles_embedding_device: Literal["cpu", "cuda", "mps"] = Field(
+        default="cpu",
+        validation_alias="SMILES_EMBEDDING_DEVICE",
     )
 
     # Text Chunking

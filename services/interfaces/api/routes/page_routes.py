@@ -18,6 +18,9 @@ from application.workflow_use_cases.trigger_compound_extraction_use_case import 
     TriggerCompoundExtractionUseCase,
 )
 from application.workflow_use_cases.trigger_embedding_use_case import TriggerEmbeddingUseCase
+from application.workflow_use_cases.trigger_smiles_embedding_use_case import (
+    TriggerSmilesEmbeddingUseCase,
+)
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.text_mention import TextMention
@@ -159,6 +162,24 @@ async def trigger_compound_extraction(
     page once the workflow completes.
     """
     use_case = container[TriggerCompoundExtractionUseCase]
+    try:
+        return await use_case.execute(page_id=page_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+
+
+@router.post("/{page_id}/compounds/embed", status_code=status.HTTP_202_ACCEPTED)
+async def trigger_smiles_embedding(
+    page_id: UUID,
+    container: Annotated[Container, Depends(get_container)],
+) -> WorkflowStatus:
+    """Trigger SMILES embedding for a page's compounds (non-blocking).
+
+    Starts the ChemBERTa embedding Temporal workflow and returns immediately
+    with the initial workflow status. Requires the page to have extracted
+    compounds with valid canonical SMILES.
+    """
+    use_case = container[TriggerSmilesEmbeddingUseCase]
     try:
         return await use_case.execute(page_id=page_id)
     except ValueError as e:

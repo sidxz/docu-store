@@ -25,6 +25,9 @@ from application.workflow_use_cases.trigger_compound_extraction_use_case import 
     TriggerCompoundExtractionUseCase,
 )
 from application.workflow_use_cases.trigger_embedding_use_case import TriggerEmbeddingUseCase
+from application.workflow_use_cases.trigger_smiles_embedding_use_case import (
+    TriggerSmilesEmbeddingUseCase,
+)
 from domain.aggregates.artifact import Artifact
 from domain.aggregates.page import Page
 from infrastructure.di.container import create_container
@@ -57,6 +60,7 @@ async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0
     log_artifact_sample_use_case = container[LogArtifactSampleUseCase]
     trigger_compound_extraction_use_case = container[TriggerCompoundExtractionUseCase]
     trigger_embedding_use_case = container[TriggerEmbeddingUseCase]
+    trigger_smiles_embedding_use_case = container[TriggerSmilesEmbeddingUseCase]
 
     # Setup signal handlers
     def handle_signal(signum: int, _frame: object) -> None:
@@ -71,6 +75,7 @@ async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0
         f"{Artifact.Created.__module__}:{Artifact.Created.__qualname__}",
         f"{Page.Created.__module__}:{Page.Created.__qualname__}",
         f"{Page.TextMentionUpdated.__module__}:{Page.TextMentionUpdated.__qualname__}",
+        f"{Page.CompoundMentionsUpdated.__module__}:{Page.CompoundMentionsUpdated.__qualname__}",
     ]
 
     logger.info("pipeline_worker_started", worker_name=worker_name, topics=topics)
@@ -149,6 +154,23 @@ async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0
                                     page_id=str(domain_event.originator_id),
                                     tracking_id=tracking.notification_id,
                                 )
+
+                        elif isinstance(domain_event, Page.CompoundMentionsUpdated):
+                            logger.info(
+                                "pipeline_compound_mentions_updated",
+                                page_id=str(domain_event.originator_id),
+                                tracking_id=tracking.notification_id,
+                            )
+
+                            await trigger_smiles_embedding_use_case.execute(
+                                page_id=domain_event.originator_id,
+                            )
+
+                            logger.info(
+                                "pipeline_smiles_embedding_workflow_triggered",
+                                page_id=str(domain_event.originator_id),
+                                tracking_id=tracking.notification_id,
+                            )
 
                         pipeline_tracking.save_position(tracking.notification_id)
 

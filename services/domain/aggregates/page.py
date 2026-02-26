@@ -57,6 +57,7 @@ class Page(Aggregate):
         self.text_mention: TextMention | None = None
         self.summary_candidate: SummaryCandidate | None = None
         self.text_embedding_metadata: EmbeddingMetadata | None = None
+        self.smiles_embedding_metadata: EmbeddingMetadata | None = None
         self.workflow_statuses: dict[str, WorkflowStatus] = {}
         self.is_deleted: bool = False
 
@@ -154,6 +155,25 @@ class Page(Aggregate):
     @event(TextEmbeddingGenerated)
     def _apply_text_embedding_generated(self, embedding_metadata: EmbeddingMetadata) -> None:
         self.text_embedding_metadata = embedding_metadata
+
+    # ============================================================================
+    # COMMAND METHOD - Update SMILES Embedding Metadata
+    # ============================================================================
+    class SmilesEmbeddingGenerated(Aggregate.Event):
+        """Emitted when ChemBERTa SMILES embeddings are generated for this page."""
+
+        embedding_metadata: EmbeddingMetadata
+
+    def update_smiles_embedding_metadata(self, embedding_metadata: EmbeddingMetadata) -> None:
+        """Record metadata about the SMILES embedding stored in the compound vector store."""
+        if self.is_deleted:
+            msg = "Cannot update embedding on a deleted page"
+            raise ValueError(msg)
+        self.trigger_event(self.SmilesEmbeddingGenerated, embedding_metadata=embedding_metadata)
+
+    @event(SmilesEmbeddingGenerated)
+    def _apply_smiles_embedding_generated(self, embedding_metadata: EmbeddingMetadata) -> None:
+        self.smiles_embedding_metadata = embedding_metadata
 
     # ============================================================================
     # COMMAND METHOD - Workflow Status Updated
