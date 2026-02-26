@@ -29,7 +29,7 @@ class CserPipelineService(CserService):
 
     def _ensure_pipeline_loaded(self) -> None:
         if self._pipeline is None:
-            from structflo.cser.pipeline import ChemPipeline
+            from structflo.cser.pipeline import ChemPipeline  # noqa: PLC0415
 
             logger.info("cser_pipeline_loading")
             self._pipeline = ChemPipeline()
@@ -41,7 +41,7 @@ class CserPipelineService(CserService):
         page_index: int,
     ) -> list[CserCompoundResult]:
         """Render a PDF page to an image and run ChemPipeline on it."""
-        import fitz  # PyMuPDF — already a project dependency
+        import fitz  # noqa: PLC0415  # PyMuPDF — already a project dependency
 
         self._ensure_pipeline_loaded()
 
@@ -54,7 +54,7 @@ class CserPipelineService(CserService):
         with self._blob_store.get_file(storage_key) as pdf_path:
             doc = fitz.open(pdf_path)
             page = doc[page_index]
-            # 2× zoom gives ~144 dpi — good balance of quality vs. speed
+            # 2x zoom gives ~144 dpi — good balance of quality vs. speed
             mat = fitz.Matrix(2, 2)
             pix = page.get_pixmap(matrix=mat)
             image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)

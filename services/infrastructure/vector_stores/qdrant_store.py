@@ -23,7 +23,7 @@ class QdrantStore(VectorStore):
         api_key: str | None = None,
         collection_name: str = "page_embeddings",
         vector_size: int = 384,  # Default for all-MiniLM-L6-v2
-    ):
+    ) -> None:
         """Initialize Qdrant client.
 
         Args:
@@ -106,7 +106,7 @@ class QdrantStore(VectorStore):
             )
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "failed_to_create_collection",
                 collection=self.collection_name,
                 error=str(e),
@@ -168,14 +168,14 @@ class QdrantStore(VectorStore):
             )
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "failed_to_upsert_embedding",
                 page_id=str(page_id),
                 error=str(e),
             )
             raise
 
-    async def upsert_page_chunk_embeddings(
+    async def upsert_page_chunk_embeddings(  # noqa: PLR0913
         self,
         page_id: UUID,
         artifact_id: UUID,
@@ -247,7 +247,7 @@ class QdrantStore(VectorStore):
             )
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "failed_to_upsert_chunk_embeddings",
                 page_id=str(page_id),
                 chunk_count=chunk_count,
@@ -295,7 +295,7 @@ class QdrantStore(VectorStore):
 
             logger.info("embedding_deleted", page_id=str(page_id))
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(
                 "failed_to_delete_embedding",
                 page_id=str(page_id),
@@ -348,7 +348,13 @@ class QdrantStore(VectorStore):
                 score_threshold=score_threshold,
                 with_payload=True,
             )
-
+        except Exception as e:
+            logger.exception(
+                "search_failed",
+                error=str(e),
+            )
+            raise
+        else:
             results = [
                 PageSearchResult(
                     page_id=UUID(point.payload["page_id"]),
@@ -371,14 +377,6 @@ class QdrantStore(VectorStore):
 
             return results
 
-        except Exception as e:
-            logger.error(
-                "search_failed",
-                error=str(e),
-                exc_info=True,
-            )
-            raise
-
     async def get_collection_info(self) -> dict:
         """Get information about the collection.
 
@@ -390,7 +388,14 @@ class QdrantStore(VectorStore):
 
         try:
             info = await client.get_collection(collection_name=self.collection_name)
-
+        except Exception as e:
+            logger.exception(
+                "failed_to_get_collection_info",
+                collection=self.collection_name,
+                error=str(e),
+            )
+            raise
+        else:
             return {
                 "collection_name": self.collection_name,
                 "vectors_count": info.vectors_count,
@@ -398,14 +403,6 @@ class QdrantStore(VectorStore):
                 "status": info.status,
                 "vector_size": self.vector_size,
             }
-
-        except Exception as e:
-            logger.error(
-                "failed_to_get_collection_info",
-                collection=self.collection_name,
-                error=str(e),
-            )
-            raise
 
     async def close(self) -> None:
         """Close the Qdrant client connection."""

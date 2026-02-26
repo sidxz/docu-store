@@ -8,6 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from lagom import Container
 
 from application.dtos.embedding_dtos import SearchRequest, SearchResponse
+from application.ports.embedding_generator import EmbeddingGenerator
+from application.ports.vector_store import VectorStore
+from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.use_cases.embedding_use_cases import SearchSimilarPagesUseCase
 from interfaces.api.middleware import handle_use_case_errors
 from interfaces.dependencies import get_container
@@ -47,17 +50,15 @@ async def search_pages(
     logger.info("search_request", query_length=len(request.query_text), limit=request.limit)
 
     use_case = container[SearchSimilarPagesUseCase]
-    result = await use_case.execute(request)
-
     # The @handle_use_case_errors decorator will handle unwrapping the result
-    return result
+    return await use_case.execute(request)
 
 
 @router.post("/pages/{page_id}/generate-embedding", status_code=status.HTTP_202_ACCEPTED)
 async def generate_embedding_for_page(
     page_id: UUID,
     container: Annotated[Container, Depends(get_container)],
-    force_regenerate: bool = False,
+    force_regenerate: bool = False,  # noqa: FBT001, FBT002
 ) -> dict[str, str]:
     """Manually trigger embedding generation for a specific page.
 
@@ -68,14 +69,13 @@ async def generate_embedding_for_page(
 
     Args:
         page_id: UUID of the page to generate embeddings for
+        container: DI container
         force_regenerate: If True, regenerate even if embedding exists
 
     Returns:
         202 Accepted: Embedding generation workflow started
 
     """
-    from application.ports.workflow_orchestrator import WorkflowOrchestrator
-
     logger.info("manual_embedding_trigger", page_id=str(page_id), force=force_regenerate)
 
     orchestrator = container[WorkflowOrchestrator]
@@ -88,7 +88,7 @@ async def generate_embedding_for_page(
             "page_id": str(page_id),
         }
     except Exception as e:
-        logger.error("failed_to_trigger_embedding", page_id=str(page_id), error=str(e))
+        logger.exception("failed_to_trigger_embedding", page_id=str(page_id), error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to start embedding workflow: {e!s}",
@@ -106,9 +106,6 @@ async def search_health(
     - Vector store status
 
     """
-    from application.ports.embedding_generator import EmbeddingGenerator
-    from application.ports.vector_store import VectorStore
-
     generator = container[EmbeddingGenerator]
     vector_store = container[VectorStore]
 
@@ -118,15 +115,15 @@ async def search_health(
 
         # Get collection info
         collection_info = await vector_store.get_collection_info()
-
+    except Exception as e:
+        logger.exception("search_health_check_failed", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Search services unhealthy: {e!s}",
+        ) from e
+    else:
         return {
             "status": "healthy",
             "embedding_model": model_info,
             "vector_store": collection_info,
         }
-    except Exception as e:
-        logger.error("search_health_check_failed", error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Search services unhealthy: {e!s}",
-        ) from e

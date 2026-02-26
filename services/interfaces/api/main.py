@@ -26,15 +26,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
 
     # Initialize Qdrant collection on startup
     try:
-        from infrastructure.di.container import create_container
+        from infrastructure.di.container import create_container  # noqa: PLC0415
 
         container = create_container()
-        from application.ports.vector_store import VectorStore
+        from application.ports.vector_store import VectorStore  # noqa: PLC0415
 
         vector_store = container[VectorStore]
         await vector_store.ensure_collection_exists()
         logger.info("qdrant_collection_initialized")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning("qdrant_initialization_failed", error=str(e))
         # Don't fail startup - embedding features will just be unavailable
 

@@ -31,7 +31,7 @@ class SentenceTransformerGenerator(EmbeddingGenerator):
         self,
         model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
         device: Literal["cpu", "cuda", "mps"] = "cpu",
-    ):
+    ) -> None:
         """Initialize the sentence-transformers generator.
 
         Args:
@@ -54,7 +54,7 @@ class SentenceTransformerGenerator(EmbeddingGenerator):
 
     def _resolve_device(self, device: str) -> str:
         """Resolve and validate the device."""
-        import torch  # heavy import — deferred until first instantiation
+        import torch  # noqa: PLC0415  # heavy import — deferred until first instantiation
 
         if device == "cuda" and not torch.cuda.is_available():
             logger.warning("cuda_not_available_falling_back_to_cpu")
@@ -67,7 +67,7 @@ class SentenceTransformerGenerator(EmbeddingGenerator):
     def _ensure_model_loaded(self) -> None:
         """Lazy load the model on first use."""
         if self._model is None:
-            from sentence_transformers import (
+            from sentence_transformers import (  # noqa: PLC0415
                 SentenceTransformer,
             )  # heavy import — deferred until first use
 
@@ -83,7 +83,7 @@ class SentenceTransformerGenerator(EmbeddingGenerator):
     async def generate_text_embedding(
         self,
         text: str,
-        model_name: str | None = None,
+        model_name: str | None = None,  # noqa: ARG002
     ) -> TextEmbedding:
         """Generate an embedding vector for the given text.
 
@@ -129,7 +129,7 @@ class SentenceTransformerGenerator(EmbeddingGenerator):
     async def generate_batch_embeddings(
         self,
         texts: list[str],
-        model_name: str | None = None,
+        model_name: str | None = None,  # noqa: ARG002
     ) -> list[TextEmbedding]:
         """Generate embeddings for multiple texts in a single batch.
 

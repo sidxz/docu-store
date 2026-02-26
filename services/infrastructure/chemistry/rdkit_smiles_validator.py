@@ -16,13 +16,13 @@ class RdkitSmilesValidator(SmilesValidator):
 
     def validate(self, smiles: str) -> bool:
         """Return True if RDKit can parse the SMILES string."""
-        from rdkit import Chem  # lazy import — rdkit is heavy
+        from rdkit import Chem  # noqa: PLC0415  # lazy import — rdkit is heavy
 
         return Chem.MolFromSmiles(smiles) is not None
 
     def canonicalize(self, smiles: str) -> str | None:
         """Return canonical SMILES, or None if the input is invalid."""
-        from rdkit import Chem  # lazy import — rdkit is heavy
+        from rdkit import Chem  # noqa: PLC0415  # lazy import — rdkit is heavy
 
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:

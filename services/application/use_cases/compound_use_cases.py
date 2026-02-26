@@ -6,20 +6,20 @@ from typing import TYPE_CHECKING
 import structlog
 from returns.result import Failure, Result, Success
 
-from application.dtos.cser_dtos import CserCompoundResult
 from application.dtos.errors import AppError
-from application.dtos.page_dtos import PageResponse
 from application.dtos.workflow_dtos import WorkflowNames
 from application.mappers.page_mappers import PageMapper
-from application.ports.cser_service import CserService
-from application.ports.external_event_publisher import ExternalEventPublisher
-from application.ports.repositories.artifact_repository import ArtifactRepository
-from application.ports.repositories.page_repository import PageRepository
 from domain.exceptions import AggregateNotFoundError, ConcurrencyError, ValidationError
 
 if TYPE_CHECKING:
     from uuid import UUID
 
+    from application.dtos.cser_dtos import CserCompoundResult
+    from application.dtos.page_dtos import PageResponse
+    from application.ports.cser_service import CserService
+    from application.ports.external_event_publisher import ExternalEventPublisher
+    from application.ports.repositories.artifact_repository import ArtifactRepository
+    from application.ports.repositories.page_repository import PageRepository
     from application.ports.smiles_validator import SmilesValidator
 
 from domain.value_objects.compound_mention import CompoundMention

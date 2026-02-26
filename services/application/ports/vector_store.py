@@ -14,7 +14,7 @@ class PageSearchResult:
         score: float,
         page_index: int,
         metadata: dict | None = None,
-    ):
+    ) -> None:
         self.page_id = page_id
         self.artifact_id = artifact_id
         self.score = score
@@ -74,7 +74,7 @@ class VectorStore(Protocol):
         """
         ...
 
-    async def upsert_page_chunk_embeddings(
+    async def upsert_page_chunk_embeddings(  # noqa: PLR0913
         self,
         page_id: UUID,
         artifact_id: UUID,

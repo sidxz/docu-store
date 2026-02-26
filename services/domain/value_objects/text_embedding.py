@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 
 class TextEmbedding(BaseModel):
@@ -39,7 +39,7 @@ class TextEmbedding(BaseModel):
 
     @field_validator("dimensions")
     @classmethod
-    def validate_dimensions_match(cls, v: int, info) -> int:
+    def validate_dimensions_match(cls, v: int, info: ValidationInfo) -> int:
         """Ensure dimensions match the actual vector length."""
         if "vector" in info.data:
             actual_dims = len(info.data["vector"])

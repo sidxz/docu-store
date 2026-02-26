@@ -3,7 +3,13 @@ from uuid import UUID
 import structlog
 from returns.result import Failure, Result, Success
 
-from application.dtos.embedding_dtos import EmbeddingDTO, SearchRequest, SearchResponse
+from application.dtos.embedding_dtos import (
+    ArtifactDetailsDTO,
+    EmbeddingDTO,
+    SearchRequest,
+    SearchResponse,
+    SearchResultDTO,
+)
 from application.dtos.errors import AppError
 from application.dtos.workflow_dtos import WorkflowNames
 from application.ports.embedding_generator import EmbeddingGenerator
@@ -45,6 +51,7 @@ class GeneratePageEmbeddingUseCase:
     async def execute(
         self,
         page_id: UUID,
+        *,
         force_regenerate: bool = False,
     ) -> Result[EmbeddingDTO, AppError]:
         """Generate and store embeddings for a page (with chunking).
@@ -159,14 +166,13 @@ class GeneratePageEmbeddingUseCase:
             )
 
         except AggregateNotFoundError as e:
-            logger.error("page_not_found", page_id=str(page_id), error=str(e))
+            logger.warning("page_not_found", page_id=str(page_id), error=str(e))
             return Failure(AppError("not_found", f"Page not found: {e!s}"))
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "generate_page_embedding_failed",
                 page_id=str(page_id),
                 error=str(e),
-                exc_info=True,
             )
             return Failure(
                 AppError("internal_error", f"Failed to generate embedding: {e!s}"),
@@ -238,8 +244,6 @@ class SearchSimilarPagesUseCase:
             )[: request.limit]
 
             # 4. Enrich results with read model data
-            from application.dtos.embedding_dtos import ArtifactDetailsDTO, SearchResultDTO
-
             result_dtos = []
             for result in deduplicated_results:
                 # Fetch page details for text preview
@@ -310,10 +314,9 @@ class SearchSimilarPagesUseCase:
             )
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "search_similar_pages_failed",
                 query=request.query_text[:100],
                 error=str(e),
-                exc_info=True,
             )
             return Failure(AppError("internal_error", f"Failed to search pages: {e!s}"))

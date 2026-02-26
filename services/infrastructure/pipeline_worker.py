@@ -13,6 +13,7 @@ Both subscribe to the same event stream but process events independently.
 from __future__ import annotations
 
 import asyncio
+import os
 import signal
 
 import structlog
@@ -34,7 +35,7 @@ setup_logging()
 logger = structlog.get_logger()
 
 
-async def run(worker_name: str = "pipeline_worker") -> None:
+async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0912, PLR0915
     """Run the workflow orchestration worker.
 
     Subscribes to ArtifactCreated events from EventStoreDB and starts
@@ -180,8 +181,6 @@ def run_sync() -> None:
     Worker name can be set via the PIPELINE_WORKER_NAME environment variable.
     Defaults to "pipeline_worker".
     """
-    import os
-
     worker_name = os.environ.get("PIPELINE_WORKER_NAME", "pipeline_worker")
     asyncio.run(run(worker_name=worker_name))
 

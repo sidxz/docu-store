@@ -13,7 +13,7 @@ logger = structlog.get_logger()
 def create_generate_page_embedding_activity(
     use_case: GeneratePageEmbeddingUseCase,
 ) -> Callable[[str], dict]:
-    """Factory function to create the activity with dependencies injected.
+    """Create the generate_page_embedding activity with dependencies injected.
 
     Args:
         use_case: The GeneratePageEmbeddingUseCase instance
@@ -46,7 +46,15 @@ def create_generate_page_embedding_activity(
         try:
             page_uuid = UUID(page_id)
             result = await use_case.execute(page_id=page_uuid, force_regenerate=False)
-
+        except Exception as e:
+            logger.exception(
+                "generate_page_embedding_activity_exception",
+                page_id=page_id,
+                error=str(e),
+            )
+            # Re-raise for Temporal to handle retries
+            raise
+        else:
             if isinstance(result, Success):
                 embedding_dto = result.unwrap()
                 logger.info(
@@ -75,22 +83,12 @@ def create_generate_page_embedding_activity(
                 "error_message": error.message,
             }
 
-        except Exception as e:
-            logger.error(
-                "generate_page_embedding_activity_exception",
-                page_id=page_id,
-                error=str(e),
-                exc_info=True,
-            )
-            # Re-raise for Temporal to handle retries
-            raise
-
     return generate_page_embedding_activity
 
 
 @activity.defn(name="log_embedding_generated")
 async def log_embedding_generated_activity(result: dict) -> None:
-    """Simple logging activity for embedding generation result.
+    """Log the embedding generation result.
 
     Args:
         result: Result dictionary from generate_page_embedding_activity
