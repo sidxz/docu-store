@@ -5,6 +5,7 @@ from returns.result import Failure, Result, Success
 
 from application.dtos.embedding_dtos import EmbeddingDTO, SearchRequest, SearchResponse
 from application.dtos.errors import AppError
+from application.dtos.workflow_dtos import WorkflowNames
 from application.ports.embedding_generator import EmbeddingGenerator
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.ports.repositories.page_read_models import PageReadModel
@@ -13,6 +14,7 @@ from application.ports.text_chunker import TextChunker
 from application.ports.vector_store import PageSearchResult, VectorStore
 from domain.exceptions import AggregateNotFoundError
 from domain.value_objects.embedding_metadata import EmbeddingMetadata
+from domain.value_objects.workflow_status import WorkflowStatus
 
 logger = structlog.get_logger()
 
@@ -124,6 +126,16 @@ class GeneratePageEmbeddingUseCase:
                 embedding_type="text",
             )
             page.update_text_embedding_metadata(embedding_metadata)
+
+            existing = page.workflow_statuses.get(WorkflowNames.EMBEDDING_WORKFLOW)
+            page.update_workflow_status(
+                WorkflowNames.EMBEDDING_WORKFLOW,
+                WorkflowStatus.completed(
+                    message=f"generated embeddings for {len(chunks)} chunks",
+                    workflow_id=existing.workflow_id if existing else None,
+                    started_at=existing.started_at if existing else None,
+                ),
+            )
 
             # 8. Save the updated aggregate (with new event)
             self.page_repository.save(page)
