@@ -29,10 +29,10 @@ class CompoundMention(ExtractionMetadata):
     cdd_id: str | None = Field(None, description="Collaborative Drug Discovery (CDD) identifier")
     chembl_id: str | None = Field(None, description="ChEMBL database identifier")
     pdb_id: str | None = Field(None, description="Protein Data Bank identifier")
-    names: set[str] | None = Field(None, description="Set of alternative chemical names")
-    extracted_name: str | None = Field(
+    other_ids: set[str] | None = Field(None, description="Set of alternative chemical identifiers")
+    extracted_id: str | None = Field(
         None,
-        description="Primary chemical name as extracted from the document",
+        description="Primary chemical identifier as extracted from the document",
     )
 
     @field_validator("smiles")

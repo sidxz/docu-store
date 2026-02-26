@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \":*)",
+      "Bash(python -c \"from interfaces.api.routes.page_routes import router; print\\(''Routes OK:'', [r.path for r in router.routes]\\)\")",
+      "Bash(uv run ruff check --fix application/dtos/smiles_embedding_dtos.py infrastructure/di/container.py)"
+    ]
+  }
+}

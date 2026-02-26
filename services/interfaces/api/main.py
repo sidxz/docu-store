@@ -11,6 +11,7 @@ from infrastructure.config import settings
 from infrastructure.logging import setup_logging
 from interfaces.api.routes.artifact_routes import router as artifact_router
 from interfaces.api.routes.page_routes import router as page_router
+from interfaces.api.routes.search_routes import router as search_router
 
 # Configure structured logging
 setup_logging()
@@ -22,6 +23,27 @@ logger = structlog.get_logger()
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
     """Handle application startup and shutdown."""
     logger.info("app_starting", env=settings.app_env)
+
+    # Initialize Qdrant collections on startup
+    try:
+        from infrastructure.di.container import create_container  # noqa: PLC0415
+
+        container = create_container()
+
+        from application.ports.vector_store import VectorStore  # noqa: PLC0415
+
+        vector_store = container[VectorStore]
+        await vector_store.ensure_collection_exists()
+        logger.info("qdrant_page_collection_initialized")
+
+        from application.ports.compound_vector_store import CompoundVectorStore  # noqa: PLC0415
+
+        compound_vector_store = container[CompoundVectorStore]
+        await compound_vector_store.ensure_compound_collection_exists()
+        logger.info("qdrant_compound_collection_initialized")
+    except Exception as e:  # noqa: BLE001
+        logger.warning("qdrant_initialization_failed", error=str(e))
+        # Don't fail startup - embedding features will just be unavailable
 
     logger.info("app_ready")
 
@@ -53,6 +75,7 @@ def create_app() -> FastAPI:
     # Include routers
     app.include_router(artifact_router)
     app.include_router(page_router)
+    app.include_router(search_router)
 
     @app.get("/health")
     async def health_check() -> dict[str, str]:

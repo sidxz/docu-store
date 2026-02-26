@@ -79,6 +79,66 @@ class Settings(BaseSettings):
         validation_alias="TEMPORAL_ADDRESS",
     )
 
+    # Qdrant (Vector Store)
+    qdrant_url: str = Field(
+        default="http://localhost:6333",
+        validation_alias="QDRANT_URL",
+    )
+    qdrant_api_key: str | None = Field(
+        default=None,
+        validation_alias="QDRANT_API_KEY",
+    )
+    qdrant_collection_name: str = Field(
+        default="page_embeddings",
+        validation_alias="QDRANT_COLLECTION_NAME",
+    )
+    qdrant_compound_collection_name: str = Field(
+        default="compound_embeddings",
+        validation_alias="QDRANT_COMPOUND_COLLECTION_NAME",
+    )
+
+    # Embeddings
+    embedding_model_provider: Literal["sentence-transformers", "openai"] = Field(
+        default="sentence-transformers",
+        validation_alias="EMBEDDING_MODEL_PROVIDER",
+    )
+    embedding_model_name: str = Field(
+        default="sentence-transformers/all-MiniLM-L6-v2",
+        validation_alias="EMBEDDING_MODEL_NAME",
+    )
+    embedding_device: Literal["cpu", "cuda", "mps"] = Field(
+        default="cpu",
+        validation_alias="EMBEDDING_DEVICE",
+    )
+
+    # SMILES / ChemBERTa embeddings
+    smiles_embedding_model_name: str = Field(
+        default="DeepChem/ChemBERTa-77M-MTR",
+        validation_alias="SMILES_EMBEDDING_MODEL_NAME",
+    )
+    smiles_embedding_device: Literal["cpu", "cuda", "mps"] = Field(
+        default="cpu",
+        validation_alias="SMILES_EMBEDDING_DEVICE",
+    )
+
+    # Text Chunking
+    chunk_size: int = Field(
+        default=1000,
+        validation_alias="CHUNK_SIZE",
+        description="Max characters per chunk (~200-250 tokens). Adjust when switching models.",
+    )
+    chunk_overlap: int = Field(
+        default=200,
+        validation_alias="CHUNK_OVERLAP",
+        description="Overlapping characters between chunks. Typically 10-20% of chunk_size.",
+    )
+
+    # For OpenAI (when provider is "openai")
+    openai_api_key: str | None = Field(
+        default=None,
+        validation_alias="OPENAI_API_KEY",
+    )
+
 
 # Global settings instance
 settings = Settings()

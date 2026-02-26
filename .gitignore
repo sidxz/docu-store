@@ -40,3 +40,4 @@ logs/
 # Local development
 .env.local
 .env.*.local
+services/coverage.xml

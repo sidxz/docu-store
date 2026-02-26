@@ -97,7 +97,7 @@ class WorkflowStatus(BaseModel):
         if self.started_at is None:
             return None
 
-        end_time = self.completed_at if self.completed_at else datetime.now(UTC)
+        end_time = self.completed_at or datetime.now(UTC)
         return (end_time - self.started_at).total_seconds()
 
     @property

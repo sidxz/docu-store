@@ -26,10 +26,13 @@ from uuid import UUID  # noqa: TC003  # Needed at runtime for Temporal workflow 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
 
-from infrastructure.temporal.activities.artifact_activities import (
-    log_mime_type_activity,
-    log_storage_location_activity,
-)
+# Import activities safely using Temporal's passthrough mechanism
+# This avoids sandbox restrictions on imports with side effects
+with workflow.unsafe.imports_passed_through():
+    from infrastructure.temporal.activities.artifact_activities import (
+        log_mime_type_activity,
+        log_storage_location_activity,
+    )
 
 
 @workflow.defn

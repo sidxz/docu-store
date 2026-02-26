@@ -203,7 +203,7 @@ class TestEventProjector:
         created_event = list(page.collect_events())[0]
         projector.page_created(created_event, _tracking())
 
-        compound = CompoundMention(smiles="C", extracted_name="Test")
+        compound = CompoundMention(smiles="C", extracted_id="Test")
         page.update_compound_mentions([compound])
         compound_event = list(page.collect_events())[0]
         projector.compound_mentions_updated(compound_event, _tracking())

@@ -34,3 +34,51 @@ class WorkflowOrchestrator(Protocol):
 
         """
         ...
+
+    @abstractmethod
+    async def start_embedding_workflow(
+        self,
+        page_id: UUID,
+    ) -> None:
+        """Start the embedding generation workflow for a page.
+
+        Args:
+            page_id: Unique identifier of the page to generate embeddings for
+
+        Raises:
+            May raise implementation-specific exceptions on workflow start failure.
+
+        """
+        ...
+
+    @abstractmethod
+    async def start_compound_extraction_workflow(
+        self,
+        page_id: UUID,
+    ) -> None:
+        """Start the compound extraction workflow for a page.
+
+        Args:
+            page_id: Unique identifier of the page to extract compounds from
+
+        Raises:
+            May raise implementation-specific exceptions on workflow start failure.
+
+        """
+        ...
+
+    @abstractmethod
+    async def start_smiles_embedding_workflow(
+        self,
+        page_id: UUID,
+    ) -> None:
+        """Start the SMILES embedding workflow for a page.
+
+        Args:
+            page_id: Unique identifier of the page whose compounds should be embedded
+
+        Raises:
+            May raise implementation-specific exceptions on workflow start failure.
+
+        """
+        ...
