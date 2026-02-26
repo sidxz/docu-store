@@ -1,15 +1,36 @@
-name: Tests
+name: CI
 
 on:
   push:
     branches: [main]
+    paths:
+      - 'services/**'
+      - '.github/workflows/tests.yml'
   pull_request:
     branches: [main]
+    paths:
+      - 'services/**'
+      - '.github/workflows/tests.yml'
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "services/uv.lock"
+
+      - name: Run lint
+        # uvx runs ruff as an isolated tool — no project dep install needed.
+        # Ruff discovers pyproject.toml automatically from the working directory.
+        run: cd services && uvx ruff check application/ domain/ infrastructure/ interfaces/
+
   test:
     runs-on: ubuntu-latest
-    
+
     services:
       mongodb:
         image: mongo:7.0
@@ -23,44 +44,23 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v4
+
+      - uses: astral-sh/setup-uv@v5
         with:
-          python-version: '3.12'
-      
+          enable-cache: true
+          # Cache is keyed on uv.lock — invalidated when deps change
+          cache-dependency-glob: "services/uv.lock"
+
       - name: Install dependencies
-        run: |
-          pip install uv
-          cd services && uv sync --dev
-      
+        # --frozen ensures we install exactly what's in uv.lock
+        run: cd services && uv sync --frozen --dev
+
       - name: Run tests
-        run: |
-          cd services && make test
-      
+        run: cd services && make test
+
       - name: Upload coverage
         uses: codecov/codecov-action@v3
         if: always()
         with:
           files: ./services/coverage.xml
           fail_ci_if_error: false
-  
-  lint:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.12'
-      
-      - name: Install dependencies
-        run: |
-          pip install uv
-          cd services && uv sync --dev
-      
-      - name: Run lint
-        run: |
-          cd services && make lint
