@@ -63,6 +63,7 @@ docker-up: ## Start infrastructure services (EventStoreDB, NATS)
 	@echo "  - MongoDB: mongodb://localhost:27017"
 	@echo "  - Temporal Server: localhost:7233"
 	@echo "  - Temporal UI: http://localhost:8233"
+	@echo "  - Quadrant UI: http://localhost:6333/dashboard"
 
 docker-down: ## Stop infrastructure services
 	docker-compose down

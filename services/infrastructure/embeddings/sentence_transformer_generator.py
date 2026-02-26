@@ -1,13 +1,16 @@
+from __future__ import annotations
+
 from datetime import UTC, datetime
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 from uuid import uuid4
 
 import structlog
-import torch
-from sentence_transformers import SentenceTransformer
 
 from application.ports.embedding_generator import EmbeddingGenerator
 from domain.value_objects.text_embedding import TextEmbedding
+
+if TYPE_CHECKING:
+    from sentence_transformers import SentenceTransformer
 
 logger = structlog.get_logger()
 
@@ -51,6 +54,8 @@ class SentenceTransformerGenerator(EmbeddingGenerator):
 
     def _resolve_device(self, device: str) -> str:
         """Resolve and validate the device."""
+        import torch  # heavy import — deferred until first instantiation
+
         if device == "cuda" and not torch.cuda.is_available():
             logger.warning("cuda_not_available_falling_back_to_cpu")
             return "cpu"
@@ -62,6 +67,8 @@ class SentenceTransformerGenerator(EmbeddingGenerator):
     def _ensure_model_loaded(self) -> None:
         """Lazy load the model on first use."""
         if self._model is None:
+            from sentence_transformers import SentenceTransformer  # heavy import — deferred until first use
+
             logger.info("loading_sentence_transformer_model", model_name=self.model_name)
             self._model = SentenceTransformer(self.model_name, device=self.device)
             self._dimensions = self._model.get_sentence_embedding_dimension()

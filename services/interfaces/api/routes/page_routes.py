@@ -14,7 +14,10 @@ from application.use_cases.page_use_cases import (
     UpdateTagMentionsUseCase,
     UpdateTextMentionUseCase,
 )
+from application.workflow_use_cases.trigger_compound_extraction_use_case import TriggerCompoundExtractionUseCase
+from application.workflow_use_cases.trigger_embedding_use_case import TriggerEmbeddingUseCase
 from domain.value_objects.summary_candidate import SummaryCandidate
+from domain.value_objects.workflow_status import WorkflowStatus
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.text_mention import TextMention
 from interfaces.api.middleware import handle_use_case_errors
@@ -123,3 +126,38 @@ async def update_compound_mentions(
 
     use_case = container[AddCompoundMentionsUseCase]
     return await use_case.execute(request=request)
+
+
+@router.post("/{page_id}/embeddings/generate", status_code=status.HTTP_202_ACCEPTED)
+async def trigger_embedding_generation(
+    page_id: UUID,
+    container: Annotated[Container, Depends(get_container)],
+) -> WorkflowStatus:
+    """Trigger embedding generation for a page (non-blocking).
+
+    Starts the embedding Temporal workflow and returns immediately with the
+    initial workflow status. Requires the page to have text content.
+    """
+    use_case = container[TriggerEmbeddingUseCase]
+    try:
+        return await use_case.execute(page_id=page_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+
+
+@router.post("/{page_id}/compounds/extract", status_code=status.HTTP_202_ACCEPTED)
+async def trigger_compound_extraction(
+    page_id: UUID,
+    container: Annotated[Container, Depends(get_container)],
+) -> WorkflowStatus:
+    """Trigger compound extraction for a page (non-blocking).
+
+    Starts the CSER ML pipeline as a Temporal workflow and returns immediately
+    with the initial workflow status. The compounds will be available on the
+    page once the workflow completes.
+    """
+    use_case = container[TriggerCompoundExtractionUseCase]
+    try:
+        return await use_case.execute(page_id=page_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e

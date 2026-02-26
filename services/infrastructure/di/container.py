@@ -8,6 +8,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from application.dtos.pdf_dtos import PDFContent
 from application.ports.blob_store import BlobStore
+from application.ports.cser_service import CserService
 from application.ports.embedding_generator import EmbeddingGenerator
 from application.ports.external_event_publisher import ExternalEventPublisher
 from application.ports.pdf_service import PDFService
@@ -31,6 +32,7 @@ from application.use_cases.artifact_use_cases import (
     UpdateSummaryCandidateUseCase as UpdateArtifactSummaryCandidateUseCase,
 )
 from application.use_cases.blob_use_cases import UploadBlobUseCase
+from application.use_cases.compound_use_cases import ExtractCompoundMentionsUseCase
 from application.use_cases.embedding_use_cases import (
     GeneratePageEmbeddingUseCase,
     SearchSimilarPagesUseCase,
@@ -46,6 +48,8 @@ from application.use_cases.page_use_cases import (
     UpdateSummaryCandidateUseCase as UpdatePageSummaryCandidateUseCase,
 )
 from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
+from application.workflow_use_cases.trigger_compound_extraction_use_case import TriggerCompoundExtractionUseCase
+from application.workflow_use_cases.trigger_embedding_use_case import TriggerEmbeddingUseCase
 from domain.value_objects.blob_ref import BlobRef
 from domain.value_objects.compound_mention import CompoundMention
 from domain.value_objects.embedding_metadata import EmbeddingMetadata
@@ -63,6 +67,7 @@ from infrastructure.event_sourced_repositories.artifact_repository import (
     EventSourcedArtifactRepository,
 )
 from infrastructure.event_sourced_repositories.page_repository import EventSourcedPageRepository
+from infrastructure.cser.cser_pipeline_service import CserPipelineService
 from infrastructure.file_services.py_mu_pfd_service import PyMuPDFService
 from infrastructure.kafka.kafka_external_event_streamer import KafkaExternalEventPublisher
 from infrastructure.kafka.kafka_publisher import KafkaPublisher
@@ -173,6 +178,9 @@ def create_container() -> Container:
 
     # Register PDF Service with BlobStore injected
     container[PDFService] = lambda c: PyMuPDFService(blob_store=c[BlobStore])
+
+    # Register CSER Service
+    container[CserService] = lambda c: CserPipelineService(blob_store=c[BlobStore])
 
     # Embedding Generator
     container[EmbeddingGenerator] = lambda _: SentenceTransformerGenerator(
@@ -287,9 +295,25 @@ def create_container() -> Container:
         pdf_service=c[PDFService],
     )
 
+    # Compound Extraction Use Case
+    container[ExtractCompoundMentionsUseCase] = lambda c: ExtractCompoundMentionsUseCase(
+        page_repository=c[PageRepository],
+        artifact_repository=c[ArtifactRepository],
+        cser_service=c[CserService],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+
     # Register Workflow Use Cases
     container[LogArtifactSampleUseCase] = lambda c: LogArtifactSampleUseCase(
         artifact_repository=c[ArtifactRepository],
+        workflow_orchestrator=c[WorkflowOrchestrator],
+    )
+    container[TriggerCompoundExtractionUseCase] = lambda c: TriggerCompoundExtractionUseCase(
+        page_repository=c[PageRepository],
+        workflow_orchestrator=c[WorkflowOrchestrator],
+    )
+    container[TriggerEmbeddingUseCase] = lambda c: TriggerEmbeddingUseCase(
+        page_repository=c[PageRepository],
         workflow_orchestrator=c[WorkflowOrchestrator],
     )
 
