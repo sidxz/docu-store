@@ -10,6 +10,7 @@ from application.dtos.pdf_dtos import PDFContent
 from application.ports.blob_store import BlobStore
 from application.ports.cser_service import CserService
 from application.ports.embedding_generator import EmbeddingGenerator
+from application.ports.smiles_validator import SmilesValidator
 from application.ports.external_event_publisher import ExternalEventPublisher
 from application.ports.pdf_service import PDFService
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
@@ -67,6 +68,7 @@ from infrastructure.event_sourced_repositories.artifact_repository import (
     EventSourcedArtifactRepository,
 )
 from infrastructure.event_sourced_repositories.page_repository import EventSourcedPageRepository
+from infrastructure.chemistry.rdkit_smiles_validator import RdkitSmilesValidator
 from infrastructure.cser.cser_pipeline_service import CserPipelineService
 from infrastructure.file_services.py_mu_pfd_service import PyMuPDFService
 from infrastructure.kafka.kafka_external_event_streamer import KafkaExternalEventPublisher
@@ -181,6 +183,9 @@ def create_container() -> Container:
 
     # Register CSER Service
     container[CserService] = lambda c: CserPipelineService(blob_store=c[BlobStore])
+
+    # Register SMILES Validator
+    container[SmilesValidator] = lambda _: RdkitSmilesValidator()
 
     # Embedding Generator
     container[EmbeddingGenerator] = lambda _: SentenceTransformerGenerator(
@@ -300,6 +305,7 @@ def create_container() -> Container:
         page_repository=c[PageRepository],
         artifact_repository=c[ArtifactRepository],
         cser_service=c[CserService],
+        smiles_validator=c[SmilesValidator],
         external_event_publisher=c[ExternalEventPublisher],
     )
 

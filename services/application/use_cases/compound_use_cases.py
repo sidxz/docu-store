@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from uuid import UUID
+from typing import TYPE_CHECKING
 
 import structlog
 from returns.result import Failure, Result, Success
@@ -16,28 +16,18 @@ from application.ports.external_event_publisher import ExternalEventPublisher
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_repository import PageRepository
 from domain.exceptions import AggregateNotFoundError, ConcurrencyError, ValidationError
+
+if TYPE_CHECKING:
+    from uuid import UUID
+
+    from application.ports.smiles_validator import SmilesValidator
+
 from domain.value_objects.compound_mention import CompoundMention
 from domain.value_objects.workflow_status import WorkflowStatus
 
 logger = structlog.get_logger()
 
 _MODEL_NAME = "structflo-cser"
-
-
-def _map_to_compound_mention(result: CserCompoundResult) -> CompoundMention | None:
-    """Map a raw CserCompoundResult to a CompoundMention value object.
-
-    Returns None if the result has no SMILES (cannot construct a valid CompoundMention).
-    """
-    if not result.smiles or not result.smiles.strip():
-        return None
-    return CompoundMention(
-        smiles=result.smiles,
-        extracted_id=result.label_text,
-        confidence=result.match_confidence,
-        date_extracted=datetime.now(UTC),
-        model_name=_MODEL_NAME,
-    )
 
 
 class ExtractCompoundMentionsUseCase:
@@ -56,12 +46,34 @@ class ExtractCompoundMentionsUseCase:
         page_repository: PageRepository,
         artifact_repository: ArtifactRepository,
         cser_service: CserService,
+        smiles_validator: SmilesValidator,
         external_event_publisher: ExternalEventPublisher | None = None,
     ) -> None:
         self.page_repository = page_repository
         self.artifact_repository = artifact_repository
         self.cser_service = cser_service
+        self.smiles_validator = smiles_validator
         self.external_event_publisher = external_event_publisher
+
+    def _map_to_compound_mention(self, result: CserCompoundResult) -> CompoundMention | None:
+        """Map a raw CserCompoundResult to a CompoundMention value object.
+
+        Returns None if the result has no SMILES (cannot construct a valid CompoundMention).
+        Validates and canonicalizes the SMILES using the configured validator.
+        """
+        if not result.smiles or not result.smiles.strip():
+            return None
+        is_valid = self.smiles_validator.validate(result.smiles)
+        canonical = self.smiles_validator.canonicalize(result.smiles) if is_valid else None
+        return CompoundMention(
+            smiles=result.smiles,
+            canonical_smiles=canonical,
+            is_smiles_valid=is_valid,
+            extracted_id=result.label_text,
+            confidence=result.match_confidence,
+            date_extracted=datetime.now(UTC),
+            model_name=_MODEL_NAME,
+        )
 
     async def execute(self, page_id: UUID) -> Result[PageResponse, AppError]:
         try:
@@ -77,15 +89,17 @@ class ExtractCompoundMentionsUseCase:
                 page_index=page.index,
             )
 
-            raw_results: list[CserCompoundResult] = self.cser_service.extract_compounds_from_pdf_page(
-                storage_key=artifact.storage_location,
-                page_index=page.index,
+            raw_results: list[CserCompoundResult] = (
+                self.cser_service.extract_compounds_from_pdf_page(
+                    storage_key=artifact.storage_location,
+                    page_index=page.index,
+                )
             )
 
             compound_mentions = [
                 mention
                 for result in raw_results
-                if (mention := _map_to_compound_mention(result)) is not None
+                if (mention := self._map_to_compound_mention(result)) is not None
             ]
 
             logger.info(
@@ -118,13 +132,19 @@ class ExtractCompoundMentionsUseCase:
             return Success(result)
 
         except AggregateNotFoundError as e:
-            logger.warning("extract_compound_mentions_not_found", page_id=str(page_id), error=str(e))
+            logger.warning(
+                "extract_compound_mentions_not_found", page_id=str(page_id), error=str(e)
+            )
             return Failure(AppError("not_found", str(e)))
         except ValidationError as e:
-            logger.warning("extract_compound_mentions_validation_error", page_id=str(page_id), error=str(e))
+            logger.warning(
+                "extract_compound_mentions_validation_error", page_id=str(page_id), error=str(e)
+            )
             return Failure(AppError("validation", str(e)))
         except ConcurrencyError as e:
-            logger.warning("extract_compound_mentions_concurrency_error", page_id=str(page_id), error=str(e))
+            logger.warning(
+                "extract_compound_mentions_concurrency_error", page_id=str(page_id), error=str(e)
+            )
             return Failure(AppError("concurrency", str(e)))
         except Exception as e:
             logger.exception(
