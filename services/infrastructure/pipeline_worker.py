@@ -20,41 +20,39 @@ from eventsourcing.application import Application
 from eventsourcing.projection import ApplicationSubscription
 
 from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
+from application.workflow_use_cases.trigger_compound_extraction_use_case import TriggerCompoundExtractionUseCase
+from application.workflow_use_cases.trigger_embedding_use_case import TriggerEmbeddingUseCase
 from domain.aggregates.artifact import Artifact
 from domain.aggregates.page import Page
 from infrastructure.di.container import create_container
+from infrastructure.lib.pipeline_worker_tracking import PipelineWorkerTracking
 from infrastructure.logging import setup_logging
-from infrastructure.read_repositories.mongo_read_model_materializer import (
-    MongoReadModelMaterializer,
-)
-from infrastructure.temporal import orchestrator
 
 setup_logging()
 logger = structlog.get_logger()
 
 
-async def run() -> None:
+async def run(worker_name: str = "pipeline_worker") -> None:
     """Run the workflow orchestration worker.
 
     Subscribes to ArtifactCreated events from EventStoreDB and starts
     Temporal workflows to process each artifact.
 
-    Event Flow:
-    1. User uploads artifact → CreateArtifactUseCase saves to EventStoreDB
-    2. ArtifactCreated event persisted
-    3. This worker receives event via ApplicationSubscription
-    4. Starts TemporalWorkflowOrchestrator.start_artifact_processing_workflow()
-    5. Temporal workflow begins execution
+    Args:
+        worker_name: Unique name for this worker instance. Each distinct name
+            maintains its own checkpoint in MongoDB, so multiple workers with
+            different names process the event stream independently.
 
     Tracking:
     - Stores last processed event in MongoDB to resume from that point
-    - Ensures events are only processed once across restarts
+    - Ensures events are only processed once across restarts (per worker_name)
     """
     container = create_container()
     app = container[Application]
 
     log_artifact_sample_use_case = container[LogArtifactSampleUseCase]
-    workflow_orchestrator = container[orchestrator.TemporalWorkflowOrchestrator]
+    trigger_compound_extraction_use_case = container[TriggerCompoundExtractionUseCase]
+    trigger_embedding_use_case = container[TriggerEmbeddingUseCase]
 
     # Setup signal handlers
     def handle_signal(signum: int, _frame: object) -> None:
@@ -67,29 +65,21 @@ async def run() -> None:
     # Topics we're interested in
     topics = [
         f"{Artifact.Created.__module__}:{Artifact.Created.__qualname__}",
+        f"{Page.Created.__module__}:{Page.Created.__qualname__}",
         f"{Page.TextMentionUpdated.__module__}:{Page.TextMentionUpdated.__qualname__}",
     ]
 
-    logger.info("pipeline_worker_started", topics=topics)
+    logger.info("pipeline_worker_started", worker_name=worker_name, topics=topics)
+
+    pipeline_tracking = PipelineWorkerTracking(worker_name=worker_name)
 
     try:
-        # Get last processed event position from tracking
-        # Use same approach as read_worker to track progress
-        application_name = app.name
-        max_tracking_id = None
-
-        # Try to get max tracking ID from MongoDB (if available)
-        try:
-            materializer = container[MongoReadModelMaterializer]
-            max_tracking_id = materializer.max_tracking_id(application_name)
+        # Get last processed event position from our own independent checkpoint
+        max_tracking_id = pipeline_tracking.get_position()
+        if max_tracking_id is not None:
             logger.info("pipeline_worker_resuming", last_position=max_tracking_id)
-        except Exception as e:  # noqa: BLE001
-            # Intentionally catching all errors (import, DI, connection, etc.)
-            logger.warning(
-                "pipeline_worker_no_tracking",
-                error=str(e),
-                note="Will process all events from beginning",
-            )
+        else:
+            logger.info("pipeline_worker_starting_from_beginning")
 
         # Create subscription
         subscription_kwargs = {"topics": topics}
@@ -105,7 +95,24 @@ async def run() -> None:
                     try:
                         event_count += 1
 
-                        if isinstance(domain_event, Artifact.Created):
+                        if isinstance(domain_event, Page.Created):
+                            logger.info(
+                                "pipeline_page_created_event_received",
+                                page_id=str(domain_event.originator_id),
+                                tracking_id=tracking.notification_id,
+                            )
+
+                            await trigger_compound_extraction_use_case.execute(
+                                page_id=domain_event.originator_id,
+                            )
+
+                            logger.info(
+                                "pipeline_compound_extraction_workflow_triggered",
+                                page_id=str(domain_event.originator_id),
+                                tracking_id=tracking.notification_id,
+                            )
+
+                        elif isinstance(domain_event, Artifact.Created):
                             logger.info(
                                 "pipeline_artifact_created_event_received",
                                 artifact_id=str(domain_event.originator_id),
@@ -123,14 +130,13 @@ async def run() -> None:
 
                         elif isinstance(domain_event, Page.TextMentionUpdated):
                             if domain_event.text_mention is not None:
-                                # Text was added/updated - trigger embedding generation
                                 logger.info(
                                     "pipeline_text_mention_updated",
                                     page_id=str(domain_event.originator_id),
                                     tracking_id=tracking.notification_id,
                                 )
 
-                                await workflow_orchestrator.start_embedding_workflow(
+                                await trigger_embedding_use_case.execute(
                                     page_id=domain_event.originator_id,
                                 )
 
@@ -139,6 +145,8 @@ async def run() -> None:
                                     page_id=str(domain_event.originator_id),
                                     tracking_id=tracking.notification_id,
                                 )
+
+                        pipeline_tracking.save_position(tracking.notification_id)
 
                     except Exception:
                         logger.exception(
@@ -164,8 +172,15 @@ async def run() -> None:
 
 
 def run_sync() -> None:
-    """Run the workflow worker in synchronous mode."""
-    asyncio.run(run())
+    """Run the workflow worker in synchronous mode.
+
+    Worker name can be set via the PIPELINE_WORKER_NAME environment variable.
+    Defaults to "pipeline_worker".
+    """
+    import os
+
+    worker_name = os.environ.get("PIPELINE_WORKER_NAME", "pipeline_worker")
+    asyncio.run(run(worker_name=worker_name))
 
 
 if __name__ == "__main__":

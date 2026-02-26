@@ -131,3 +131,30 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
             logger.exception(
                 "failed_to_start_embedding_workflow", page_id=str(page_id), error=str(e)
             )
+
+    async def start_compound_extraction_workflow(
+        self,
+        page_id: UUID,
+    ) -> None:
+        """Start the compound extraction workflow for a page.
+
+        Args:
+            page_id: Unique identifier of the page to extract compounds from
+
+        """
+        await self._ensure_client()
+
+        workflow_id = f"compound-extraction-{page_id}"
+
+        try:
+            await self._client.start_workflow(
+                "ExtractCompoundMentionsWorkflow",
+                str(page_id),
+                id=workflow_id,
+                task_queue="artifact_processing",
+            )
+            logger.info("compound_extraction_workflow_started", page_id=str(page_id))
+        except Exception as e:
+            logger.exception(
+                "failed_to_start_compound_extraction_workflow", page_id=str(page_id), error=str(e)
+            )

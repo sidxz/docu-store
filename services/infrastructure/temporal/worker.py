@@ -14,6 +14,7 @@ import structlog
 from temporalio.client import Client
 from temporalio.worker import Worker
 
+from application.use_cases.compound_use_cases import ExtractCompoundMentionsUseCase
 from application.use_cases.embedding_use_cases import GeneratePageEmbeddingUseCase
 from infrastructure.config import settings
 from infrastructure.di.container import create_container
@@ -22,11 +23,15 @@ from infrastructure.temporal.activities.artifact_activities import (
     log_mime_type_activity,
     log_storage_location_activity,
 )
+from infrastructure.temporal.activities.compound_activities import (
+    create_extract_compound_mentions_activity,
+)
 from infrastructure.temporal.activities.embedding_activities import (
     create_generate_page_embedding_activity,
     log_embedding_generated_activity,
 )
 from infrastructure.temporal.workflows.artifact_processing import ProcessArtifactWorkflow
+from infrastructure.temporal.workflows.compound_workflow import ExtractCompoundMentionsWorkflow
 from infrastructure.temporal.workflows.embedding_workflow import GeneratePageEmbeddingWorkflow
 
 setup_logging()
@@ -48,10 +53,14 @@ async def run() -> None:
 
     # Resolve dependencies
     generate_embedding_use_case = container[GeneratePageEmbeddingUseCase]
+    extract_compound_mentions_use_case = container[ExtractCompoundMentionsUseCase]
 
     # Create activities with dependencies injected
     generate_page_embedding_activity = create_generate_page_embedding_activity(
         use_case=generate_embedding_use_case,
+    )
+    extract_compound_mentions_activity = create_extract_compound_mentions_activity(
+        use_case=extract_compound_mentions_use_case,
     )
 
     client = await Client.connect(settings.temporal_address)
@@ -59,13 +68,13 @@ async def run() -> None:
     worker = Worker(
         client,
         task_queue="artifact_processing",
-        workflows=[ProcessArtifactWorkflow, GeneratePageEmbeddingWorkflow],
+        workflows=[ProcessArtifactWorkflow, GeneratePageEmbeddingWorkflow, ExtractCompoundMentionsWorkflow],
         activities=[
             log_mime_type_activity,
             log_storage_location_activity,
             generate_page_embedding_activity,
             log_embedding_generated_activity,
-            # Future activities will be added here
+            extract_compound_mentions_activity,
         ],
     )
 
