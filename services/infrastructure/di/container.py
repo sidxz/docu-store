@@ -8,6 +8,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from application.dtos.pdf_dtos import PDFContent
 from application.ports.blob_store import BlobStore
+from application.ports.compound_vector_store import CompoundVectorStore
 from application.ports.cser_service import CserService
 from application.ports.embedding_generator import EmbeddingGenerator
 from application.ports.external_event_publisher import ExternalEventPublisher
@@ -18,7 +19,6 @@ from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
 from application.ports.smiles_validator import SmilesValidator
 from application.ports.text_chunker import TextChunker
-from application.ports.compound_vector_store import CompoundVectorStore
 from application.ports.vector_store import VectorStore
 from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
@@ -39,8 +39,6 @@ from application.use_cases.embedding_use_cases import (
     GeneratePageEmbeddingUseCase,
     SearchSimilarPagesUseCase,
 )
-from application.use_cases.smiles_embedding_use_cases import EmbedCompoundSmilesUseCase
-from application.use_cases.smiles_search_use_cases import SearchSimilarCompoundsUseCase
 from application.use_cases.page_use_cases import (
     AddCompoundMentionsUseCase,
     CreatePageUseCase,
@@ -51,6 +49,8 @@ from application.use_cases.page_use_cases import (
 from application.use_cases.page_use_cases import (
     UpdateSummaryCandidateUseCase as UpdatePageSummaryCandidateUseCase,
 )
+from application.use_cases.smiles_embedding_use_cases import EmbedCompoundSmilesUseCase
+from application.use_cases.smiles_search_use_cases import SearchSimilarCompoundsUseCase
 from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
 from application.workflow_use_cases.trigger_compound_extraction_use_case import (
     TriggerCompoundExtractionUseCase,
@@ -117,7 +117,7 @@ class DocuStoreApplication(Application):
         transcoder.register(PydanticTranscoding(EmbeddingMetadata))
 
 
-def create_container() -> Container:
+def create_container() -> Container:  # noqa: PLR0915
     container = Container()
 
     # Initialize our custom Application subclass

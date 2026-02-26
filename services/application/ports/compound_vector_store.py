@@ -7,7 +7,7 @@ from domain.value_objects.text_embedding import TextEmbedding
 class CompoundSearchResult:
     """Result from a compound vector similarity search."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         page_id: UUID,
         artifact_id: UUID,
