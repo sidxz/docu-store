@@ -30,7 +30,7 @@ class TestTriggerEmbeddingUseCase:
         use_case = TriggerEmbeddingUseCase(orchestrator)
         page_id = uuid4()
 
-        result = await use_case.execute(page_id=page_id)
+        result = await use_case.execute(page_id=page_id, text_mention="some text")
 
         assert isinstance(result, WorkflowStartedResponse)
         assert result.status == "started"
@@ -41,8 +41,14 @@ class TestTriggerEmbeddingUseCase:
     async def test_workflow_id_contains_page_id(self) -> None:
         page_id = uuid4()
         use_case = TriggerEmbeddingUseCase(MockWorkflowOrchestrator())
-        result = await use_case.execute(page_id=page_id)
+        result = await use_case.execute(page_id=page_id, text_mention="some text")
         assert str(page_id) in result.workflow_id
+
+    @pytest.mark.asyncio
+    async def test_skips_when_no_text_mention(self) -> None:
+        use_case = TriggerEmbeddingUseCase(MockWorkflowOrchestrator())
+        result = await use_case.execute(page_id=uuid4(), text_mention=None)
+        assert result is None
 
     @pytest.mark.asyncio
     async def test_propagates_orchestrator_exception(self) -> None:
@@ -50,7 +56,7 @@ class TestTriggerEmbeddingUseCase:
         use_case = TriggerEmbeddingUseCase(orchestrator)
 
         with pytest.raises(RuntimeError, match="Temporal down"):
-            await use_case.execute(page_id=uuid4())
+            await use_case.execute(page_id=uuid4(), text_mention="some text")
 
 
 class TestTriggerCompoundExtractionUseCase:
