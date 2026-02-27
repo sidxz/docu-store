@@ -14,7 +14,9 @@ class TriggerEmbeddingUseCase:
     def __init__(self, workflow_orchestrator: WorkflowOrchestrator) -> None:
         self.workflow_orchestrator = workflow_orchestrator
 
-    async def execute(self, page_id: UUID) -> WorkflowStartedResponse:
+    async def execute(self, page_id: UUID, text_mention: str | None) -> WorkflowStartedResponse | None:
+        if text_mention is None:
+            return None
         workflow_id = f"embedding-{page_id}"
         await self.workflow_orchestrator.start_embedding_workflow(page_id=page_id)
         return WorkflowStartedResponse(workflow_id=workflow_id)

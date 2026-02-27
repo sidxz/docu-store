@@ -109,44 +109,44 @@ async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0
                     try:
                         event_count += 1
 
-                        if isinstance(domain_event, Page.Created):
-                            logger.info(
-                                "pipeline_page_created_event_received",
-                                page_id=str(domain_event.originator_id),
-                                tracking_id=tracking.notification_id,
-                            )
+                        match domain_event:
+                            case Page.Created():
+                                logger.info(
+                                    "pipeline_page_created_event_received",
+                                    page_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
 
-                            await trigger_compound_extraction_use_case.execute(
-                                page_id=domain_event.originator_id,
-                            )
+                                await trigger_compound_extraction_use_case.execute(
+                                    page_id=domain_event.originator_id,
+                                )
 
-                            logger.info(
-                                "pipeline_compound_extraction_workflow_triggered",
-                                page_id=str(domain_event.originator_id),
-                                tracking_id=tracking.notification_id,
-                            )
+                                logger.info(
+                                    "pipeline_compound_extraction_workflow_triggered",
+                                    page_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
 
-                        elif isinstance(domain_event, Artifact.Created):
-                            logger.info(
-                                "pipeline_artifact_created_event_received",
-                                artifact_id=str(domain_event.originator_id),
-                                storage_location=domain_event.storage_location,
-                                tracking_id=tracking.notification_id,
-                            )
+                            case Artifact.Created():
+                                logger.info(
+                                    "pipeline_artifact_created_event_received",
+                                    artifact_id=str(domain_event.originator_id),
+                                    storage_location=domain_event.storage_location,
+                                    tracking_id=tracking.notification_id,
+                                )
 
-                            await log_artifact_sample_use_case.execute(
-                                domain_event.originator_id,
-                                storage_location=domain_event.storage_location,
-                            )
+                                await log_artifact_sample_use_case.execute(
+                                    domain_event.originator_id,
+                                    storage_location=domain_event.storage_location,
+                                )
 
-                            logger.info(
-                                "pipeline_workflow_triggered",
-                                artifact_id=str(domain_event.originator_id),
-                                tracking_id=tracking.notification_id,
-                            )
+                                logger.info(
+                                    "pipeline_workflow_triggered",
+                                    artifact_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
 
-                        elif isinstance(domain_event, Page.TextMentionUpdated):
-                            if domain_event.text_mention is not None:
+                            case Page.TextMentionUpdated():
                                 logger.info(
                                     "pipeline_text_mention_updated",
                                     page_id=str(domain_event.originator_id),
@@ -155,6 +155,7 @@ async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0
 
                                 await trigger_embedding_use_case.execute(
                                     page_id=domain_event.originator_id,
+                                    text_mention=domain_event.text_mention,
                                 )
 
                                 logger.info(
@@ -163,39 +164,46 @@ async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0
                                     tracking_id=tracking.notification_id,
                                 )
 
-                        elif isinstance(domain_event, Page.TextEmbeddingGenerated):
-                            logger.info(
-                                "pipeline_text_embedding_generated",
-                                page_id=str(domain_event.originator_id),
-                                tracking_id=tracking.notification_id,
-                            )
+                            case Page.TextEmbeddingGenerated():
+                                logger.info(
+                                    "pipeline_text_embedding_generated",
+                                    page_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
 
-                            await trigger_page_summarization_use_case.execute(
-                                page_id=domain_event.originator_id,
-                            )
+                                await trigger_page_summarization_use_case.execute(
+                                    page_id=domain_event.originator_id,
+                                )
 
-                            logger.info(
-                                "pipeline_summarization_workflow_triggered",
-                                page_id=str(domain_event.originator_id),
-                                tracking_id=tracking.notification_id,
-                            )
+                                logger.info(
+                                    "pipeline_summarization_workflow_triggered",
+                                    page_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
 
-                        elif isinstance(domain_event, Page.CompoundMentionsUpdated):
-                            logger.info(
-                                "pipeline_compound_mentions_updated",
-                                page_id=str(domain_event.originator_id),
-                                tracking_id=tracking.notification_id,
-                            )
+                            case Page.CompoundMentionsUpdated():
+                                logger.info(
+                                    "pipeline_compound_mentions_updated",
+                                    page_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
 
-                            await trigger_smiles_embedding_use_case.execute(
-                                page_id=domain_event.originator_id,
-                            )
+                                await trigger_smiles_embedding_use_case.execute(
+                                    page_id=domain_event.originator_id,
+                                )
 
-                            logger.info(
-                                "pipeline_smiles_embedding_workflow_triggered",
-                                page_id=str(domain_event.originator_id),
-                                tracking_id=tracking.notification_id,
-                            )
+                                logger.info(
+                                    "pipeline_smiles_embedding_workflow_triggered",
+                                    page_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
+
+                            case _:
+                                logger.warning(
+                                    "pipeline_unhandled_event",
+                                    event_type=type(domain_event).__name__,
+                                    tracking_id=tracking.notification_id,
+                                )
 
                         pipeline_tracking.save_position(tracking.notification_id)
 
