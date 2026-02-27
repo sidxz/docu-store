@@ -28,8 +28,14 @@ from application.workflow_use_cases.trigger_embedding_use_case import TriggerEmb
 from application.workflow_use_cases.trigger_artifact_summarization_use_case import (
     TriggerArtifactSummarizationUseCase,
 )
+from application.workflow_use_cases.trigger_artifact_summary_embedding_use_case import (
+    TriggerArtifactSummaryEmbeddingUseCase,
+)
 from application.workflow_use_cases.trigger_page_summarization_use_case import (
     TriggerPageSummarizationUseCase,
+)
+from application.workflow_use_cases.trigger_page_summary_embedding_use_case import (
+    TriggerPageSummaryEmbeddingUseCase,
 )
 from application.workflow_use_cases.trigger_smiles_embedding_use_case import (
     TriggerSmilesEmbeddingUseCase,
@@ -69,6 +75,8 @@ async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0
     trigger_smiles_embedding_use_case = container[TriggerSmilesEmbeddingUseCase]
     trigger_page_summarization_use_case = container[TriggerPageSummarizationUseCase]
     trigger_artifact_summarization_use_case = container[TriggerArtifactSummarizationUseCase]
+    trigger_page_summary_embedding_use_case = container[TriggerPageSummaryEmbeddingUseCase]
+    trigger_artifact_summary_embedding_use_case = container[TriggerArtifactSummaryEmbeddingUseCase]
 
     # Setup signal handlers
     def handle_signal(signum: int, _frame: object) -> None:
@@ -81,6 +89,7 @@ async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0
     # Topics we're interested in
     topics = [
         f"{Artifact.Created.__module__}:{Artifact.Created.__qualname__}",
+        f"{Artifact.SummaryCandidateUpdated.__module__}:{Artifact.SummaryCandidateUpdated.__qualname__}",
         f"{Page.Created.__module__}:{Page.Created.__qualname__}",
         f"{Page.TextMentionUpdated.__module__}:{Page.TextMentionUpdated.__qualname__}",
         f"{Page.CompoundMentionsUpdated.__module__}:{Page.CompoundMentionsUpdated.__qualname__}",
@@ -193,13 +202,36 @@ async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0
                                     tracking_id=tracking.notification_id,
                                 )
 
+                                # Check if all pages are done → trigger artifact summarization
                                 await trigger_artifact_summarization_use_case.execute(
                                     page_id=domain_event.originator_id,
                                 )
 
+                                # Embed this page's summary into the summary_embeddings collection
+                                await trigger_page_summary_embedding_use_case.execute(
+                                    page_id=domain_event.originator_id,
+                                )
+
                                 logger.info(
-                                    "pipeline_artifact_summarization_checked",
+                                    "pipeline_page_summary_workflows_triggered",
                                     page_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
+
+                            case Artifact.SummaryCandidateUpdated():
+                                logger.info(
+                                    "pipeline_artifact_summary_candidate_updated",
+                                    artifact_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
+
+                                await trigger_artifact_summary_embedding_use_case.execute(
+                                    artifact_id=domain_event.originator_id,
+                                )
+
+                                logger.info(
+                                    "pipeline_artifact_summary_embedding_triggered",
+                                    artifact_id=str(domain_event.originator_id),
                                     tracking_id=tracking.notification_id,
                                 )
 

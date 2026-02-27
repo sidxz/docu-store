@@ -122,6 +122,32 @@ class WorkflowOrchestrator(Protocol):
         ...
 
     @abstractmethod
+    async def start_page_summary_embedding_workflow(
+        self,
+        page_id: UUID,
+    ) -> None:
+        """Start the page summary embedding workflow.
+
+        Args:
+            page_id: Unique identifier of the page whose summary should be embedded.
+
+        """
+        ...
+
+    @abstractmethod
+    async def start_artifact_summary_embedding_workflow(
+        self,
+        artifact_id: UUID,
+    ) -> None:
+        """Start the artifact summary embedding workflow.
+
+        Args:
+            artifact_id: Unique identifier of the artifact whose summary should be embedded.
+
+        """
+        ...
+
+    @abstractmethod
     async def get_page_workflow_statuses(
         self,
         page_id: UUID,

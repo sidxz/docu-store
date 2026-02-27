@@ -8,12 +8,20 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from lagom import Container
 
 from application.dtos.embedding_dtos import SearchRequest, SearchResponse
+from application.dtos.search_dtos import (
+    HierarchicalSearchRequest,
+    HierarchicalSearchResponse,
+    SummarySearchRequest,
+    SummarySearchResponse,
+)
 from application.dtos.smiles_embedding_dtos import CompoundSearchRequest, CompoundSearchResponse
 from application.ports.compound_vector_store import CompoundVectorStore
 from application.ports.embedding_generator import EmbeddingGenerator
+from application.ports.summary_vector_store import SummaryVectorStore
 from application.ports.vector_store import VectorStore
 from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.use_cases.embedding_use_cases import SearchSimilarPagesUseCase
+from application.use_cases.search_use_cases import HierarchicalSearchUseCase, SearchSummariesUseCase
 from application.use_cases.smiles_search_use_cases import SearchSimilarCompoundsUseCase
 from infrastructure.embeddings.chemberta_generator import ChemBertaEmbeddingGenerator
 from interfaces.api.middleware import handle_use_case_errors
@@ -126,21 +134,90 @@ async def search_compounds(
     return await use_case.execute(request)
 
 
+@router.post("/summaries", status_code=status.HTTP_200_OK)
+@handle_use_case_errors
+async def search_summaries(
+    request: SummarySearchRequest,
+    container: Annotated[Container, Depends(get_container)],
+) -> SummarySearchResponse:
+    """Search page and artifact summaries by semantic similarity.
+
+    Queries the unified ``summary_embeddings`` Qdrant collection using dense
+    vector search.  Results are ordered by cosine similarity.
+
+    Use ``entity_type`` to restrict to ``"page"`` or ``"artifact"`` summaries.
+    Use ``artifact_id`` to search within a specific artifact.
+
+    Example:
+        ```
+        POST /search/summaries
+        {
+            "query_text": "NadD enzyme inhibition",
+            "limit": 10,
+            "entity_type": "artifact"
+        }
+        ```
+
+    """
+    use_case = container[SearchSummariesUseCase]
+    return await use_case.execute(request=request)
+
+
+@router.post("/hierarchical", status_code=status.HTTP_200_OK)
+async def hierarchical_search(
+    request: HierarchicalSearchRequest,
+    container: Annotated[Container, Depends(get_container)],
+) -> HierarchicalSearchResponse:
+    """Hierarchical cross-collection semantic search.
+
+    Searches both the raw text chunk collection (``page_embeddings``) and the
+    summary collection (``summary_embeddings``) with a single query embedding,
+    then returns grouped results.
+
+    This enables use cases like:
+    - "Find documents mentioning NadD with compound SACC-111 by TAMU" →
+      matches at summary level (broad context) and chunk level (exact text)
+
+    Set ``include_chunks: false`` to skip chunk search (faster, summary-only).
+
+    Returns:
+        ``summary_hits``: Ordered summary results (page or artifact level).
+        ``chunk_hits``: Ordered raw chunk results (best chunk per page, deduped).
+
+    Example:
+        ```
+        POST /search/hierarchical
+        {
+            "query_text": "NadD with compound SACC-111 by TAMU",
+            "limit": 10,
+            "include_chunks": true
+        }
+        ```
+
+    """
+    use_case = container[HierarchicalSearchUseCase]
+    result = await use_case.execute(request=request)
+
+    return result.unwrap()
+
+
 @router.get("/health", status_code=status.HTTP_200_OK)
 async def search_health(
     container: Annotated[Container, Depends(get_container)],
 ) -> dict[str, str | dict]:
-    """Check health of search/embedding services (text and compound)."""
+    """Check health of search/embedding services (text, compound, and summary)."""
     generator = container[EmbeddingGenerator]
     vector_store = container[VectorStore]
     chemberta = container[ChemBertaEmbeddingGenerator]
     compound_store = container[CompoundVectorStore]
+    summary_store = container[SummaryVectorStore]
 
     try:
         model_info = await generator.get_model_info()
         collection_info = await vector_store.get_collection_info()
         smiles_model_info = await chemberta.get_model_info()
         compound_collection_info = await compound_store.get_compound_collection_info()
+        summary_collection_info = await summary_store.get_collection_info()
     except Exception as e:
         logger.exception("search_health_check_failed", error=str(e))
         raise HTTPException(
@@ -154,4 +231,5 @@ async def search_health(
             "text_vector_store": collection_info,
             "smiles_embedding_model": smiles_model_info,
             "compound_vector_store": compound_collection_info,
+            "summary_vector_store": summary_collection_info,
         }

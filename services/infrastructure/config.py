@@ -101,6 +101,10 @@ class Settings(BaseSettings):
         default="compound_embeddings",
         validation_alias="QDRANT_COMPOUND_COLLECTION_NAME",
     )
+    qdrant_summary_collection_name: str = Field(
+        default="summary_embeddings",
+        validation_alias="QDRANT_SUMMARY_COLLECTION_NAME",
+    )
 
     # Embeddings
     embedding_model_provider: Literal["sentence-transformers", "openai"] = Field(

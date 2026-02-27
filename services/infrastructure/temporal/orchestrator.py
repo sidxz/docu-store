@@ -244,6 +244,59 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
                 error=str(e),
             )
 
+    async def start_page_summary_embedding_workflow(
+        self,
+        page_id: UUID,
+    ) -> None:
+        """Start the page summary embedding workflow."""
+        await self._ensure_client()
+
+        workflow_id = f"page-summary-embedding-{page_id}"
+
+        try:
+            await self._client.start_workflow(
+                "PageSummaryEmbeddingWorkflow",
+                str(page_id),
+                id=workflow_id,
+                task_queue="artifact_processing",
+            )
+            logger.info("page_summary_embedding_workflow_started", page_id=str(page_id))
+        except Exception as e:
+            logger.exception(
+                "failed_to_start_page_summary_embedding_workflow",
+                page_id=str(page_id),
+                error=str(e),
+            )
+
+    async def start_artifact_summary_embedding_workflow(
+        self,
+        artifact_id: UUID,
+    ) -> None:
+        """Start the artifact summary embedding workflow."""
+        await self._ensure_client()
+
+        from temporalio.common import WorkflowIDReusePolicy  # noqa: PLC0415
+
+        workflow_id = f"artifact-summary-embedding-{artifact_id}"
+
+        try:
+            await self._client.start_workflow(
+                "ArtifactSummaryEmbeddingWorkflow",
+                str(artifact_id),
+                id=workflow_id,
+                task_queue="artifact_processing",
+                id_reuse_policy=WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+            )
+            logger.info(
+                "artifact_summary_embedding_workflow_started", artifact_id=str(artifact_id)
+            )
+        except Exception as e:
+            logger.exception(
+                "failed_to_start_artifact_summary_embedding_workflow",
+                artifact_id=str(artifact_id),
+                error=str(e),
+            )
+
     async def get_page_workflow_statuses(
         self,
         page_id: UUID,
@@ -255,6 +308,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
             "compound_extraction": f"compound-extraction-{page_id}",
             "smiles_embedding": f"smiles-embedding-{page_id}",
             "page_summarization": f"page-summarization-{page_id}",
+            "page_summary_embedding": f"page-summary-embedding-{page_id}",
         }
         return await self._query_workflow_statuses(workflow_ids)
 
@@ -267,6 +321,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         workflow_ids = {
             "artifact_processing": str(artifact_id),
             "artifact_summarization": f"artifact-summarization-{artifact_id}",
+            "artifact_summary_embedding": f"artifact-summary-embedding-{artifact_id}",
         }
         return await self._query_workflow_statuses(workflow_ids)
 
