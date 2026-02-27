@@ -213,6 +213,37 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
                 error=str(e),
             )
 
+    async def start_artifact_summarization_workflow(
+        self,
+        artifact_id: UUID,
+    ) -> None:
+        """Start the artifact summarization workflow.
+
+        Uses ALLOW_DUPLICATE id-reuse policy so re-triggering after a page
+        re-summarization always produces a fresh run.
+        """
+        await self._ensure_client()
+
+        from temporalio.common import WorkflowIDReusePolicy  # noqa: PLC0415
+
+        workflow_id = f"artifact-summarization-{artifact_id}"
+
+        try:
+            await self._client.start_workflow(
+                "ArtifactSummarizationWorkflow",
+                str(artifact_id),
+                id=workflow_id,
+                task_queue="artifact_processing",
+                id_reuse_policy=WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+            )
+            logger.info("artifact_summarization_workflow_started", artifact_id=str(artifact_id))
+        except Exception as e:
+            logger.exception(
+                "failed_to_start_artifact_summarization_workflow",
+                artifact_id=str(artifact_id),
+                error=str(e),
+            )
+
     async def get_page_workflow_statuses(
         self,
         page_id: UUID,
@@ -235,6 +266,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         await self._ensure_client()
         workflow_ids = {
             "artifact_processing": str(artifact_id),
+            "artifact_summarization": f"artifact-summarization-{artifact_id}",
         }
         return await self._query_workflow_statuses(workflow_ids)
 

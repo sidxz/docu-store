@@ -1,0 +1,19 @@
+name: artifact_batch_summary
+version: "1.0"
+description: >
+  Summarize a batch of consecutive page summaries into a single concise section
+  summary. Used as the first pass in the sliding-window artifact summarization chain.
+input_variables:
+  - artifact_title
+  - page_summaries
+template: |
+  You are summarizing a section of a scientific presentation.
+
+  Presentation title: {artifact_title}
+
+  The following are summaries of consecutive slides in this section:
+  {page_summaries}
+
+  Write a concise paragraph (3-5 sentences) capturing the key scientific findings
+  and messages from this section. Focus on what was shown, measured, or concluded.
+  Do not add information not present in the slide summaries above.

@@ -1,0 +1,19 @@
+name: artifact_refinement
+version: "1.0"
+description: >
+  Refine a combined artifact summary for clarity, coherence, and logical flow.
+  Final pass in the summarization chain — no new information is added.
+input_variables:
+  - artifact_title
+  - draft_summary
+template: |
+  You are refining the summary of a scientific presentation.
+
+  Presentation title: {artifact_title}
+
+  Draft summary:
+  {draft_summary}
+
+  Rewrite the summary to improve clarity, coherence, and logical flow.
+  Preserve all factual content exactly as stated. Do not add new information.
+  The result should be a single, well-structured paragraph.

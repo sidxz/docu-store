@@ -53,8 +53,11 @@ from application.use_cases.page_use_cases import (
 )
 from application.use_cases.smiles_embedding_use_cases import EmbedCompoundSmilesUseCase
 from application.use_cases.smiles_search_use_cases import SearchSimilarCompoundsUseCase
-from application.use_cases.summarization_use_cases import SummarizePageUseCase
+from application.use_cases.summarization_use_cases import SummarizeArtifactUseCase, SummarizePageUseCase
 from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
+from application.workflow_use_cases.trigger_artifact_summarization_use_case import (
+    TriggerArtifactSummarizationUseCase,
+)
 from application.workflow_use_cases.trigger_compound_extraction_use_case import (
     TriggerCompoundExtractionUseCase,
 )
@@ -382,6 +385,21 @@ def create_container() -> Container:  # noqa: PLR0915
         external_event_publisher=c[ExternalEventPublisher],
     )
     container[TriggerPageSummarizationUseCase] = lambda c: TriggerPageSummarizationUseCase(
+        workflow_orchestrator=c[WorkflowOrchestrator],
+    )
+
+    # Artifact Summarization Use Cases
+    container[SummarizeArtifactUseCase] = lambda c: SummarizeArtifactUseCase(
+        artifact_repository=c[ArtifactRepository],
+        page_repository=c[PageRepository],
+        llm_client=c[LLMClientPort],
+        prompt_repository=c[PromptRepositoryPort],
+        external_event_publisher=c[ExternalEventPublisher],
+        batch_size=settings.artifact_summarization_batch_size,
+    )
+    container[TriggerArtifactSummarizationUseCase] = lambda c: TriggerArtifactSummarizationUseCase(
+        artifact_repository=c[ArtifactRepository],
+        page_repository=c[PageRepository],
         workflow_orchestrator=c[WorkflowOrchestrator],
     )
 

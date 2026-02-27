@@ -102,6 +102,26 @@ class WorkflowOrchestrator(Protocol):
         ...
 
     @abstractmethod
+    async def start_artifact_summarization_workflow(
+        self,
+        artifact_id: UUID,
+    ) -> None:
+        """Start the sliding-window LLM summarization workflow for an artifact.
+
+        Should only be called after all pages of the artifact are summarized.
+        Uses ALLOW_DUPLICATE id-reuse policy so the workflow re-runs when triggered
+        again (e.g. after a page is re-summarized).
+
+        Args:
+            artifact_id: Unique identifier of the artifact to summarize
+
+        Raises:
+            May raise implementation-specific exceptions on workflow start failure.
+
+        """
+        ...
+
+    @abstractmethod
     async def get_page_workflow_statuses(
         self,
         page_id: UUID,

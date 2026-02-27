@@ -8,6 +8,7 @@ import structlog
 from returns.result import Failure, Result, Success
 
 from application.dtos.errors import AppError
+from application.mappers.artifact_mappers import ArtifactMapper
 from application.mappers.page_mappers import PageMapper
 from domain.exceptions import AggregateNotFoundError, ConcurrencyError, ValidationError
 from domain.value_objects.summary_candidate import SummaryCandidate
@@ -15,6 +16,7 @@ from domain.value_objects.summary_candidate import SummaryCandidate
 if TYPE_CHECKING:
     from uuid import UUID
 
+    from application.dtos.artifact_dtos import ArtifactResponse
     from application.dtos.page_dtos import PageResponse
     from application.ports.blob_store import BlobStore
     from application.ports.external_event_publisher import ExternalEventPublisher
@@ -156,6 +158,172 @@ class SummarizePageUseCase:
         except Exception as e:
             log.exception("summarize_page.unexpected_error", page_id=str(page_id), error=str(e))
             return Failure(AppError("internal_error", f"Unexpected error: {e!s}"))
+
+
+class SummarizeArtifactUseCase:
+    """Generate an LLM summary for an artifact using a sliding-window chain over page summaries.
+
+    Pipeline:
+      1. Load all pages (sorted by index) and collect their page-level summaries.
+      2. If pages fit in one batch → single synthesis call.
+         Otherwise → summarize each batch first, then synthesize the batch summaries.
+      3. Run a final refinement pass for clarity and coherence.
+      4. Persist result as artifact.summary_candidate.
+
+    Skips artifacts whose summary_candidate.is_locked is True (human correction present).
+    Returns Failure("not_ready") if no page summaries exist yet.
+    """
+
+    def __init__(
+        self,
+        artifact_repository: ArtifactRepository,
+        page_repository: PageRepository,
+        llm_client: LLMClientPort,
+        prompt_repository: PromptRepositoryPort,
+        external_event_publisher: ExternalEventPublisher | None = None,
+        batch_size: int = 10,
+    ) -> None:
+        self.artifact_repository = artifact_repository
+        self.page_repository = page_repository
+        self.llm_client = llm_client
+        self.prompt_repository = prompt_repository
+        self.external_event_publisher = external_event_publisher
+        self.batch_size = batch_size
+
+    async def execute(self, artifact_id: UUID) -> Result[ArtifactResponse, AppError]:
+        try:
+            log.info("summarize_artifact.start", artifact_id=str(artifact_id))
+
+            artifact = self.artifact_repository.get_by_id(artifact_id)
+
+            if artifact.summary_candidate and artifact.summary_candidate.is_locked:
+                log.info("summarize_artifact.skipped_locked", artifact_id=str(artifact_id))
+                return Success(ArtifactMapper.to_artifact_response(artifact))
+
+            artifact_title = artifact.source_filename or "Unknown"
+
+            # Load pages sorted by index; collect non-empty summaries.
+            pages = [self.page_repository.get_by_id(pid) for pid in artifact.pages]
+            pages.sort(key=lambda p: p.index)
+            page_summaries = [
+                p.summary_candidate.summary
+                for p in pages
+                if p.summary_candidate and p.summary_candidate.summary
+            ]
+
+            if not page_summaries:
+                log.info("summarize_artifact.no_summaries", artifact_id=str(artifact_id))
+                return Failure(AppError("not_ready", "No page summaries available yet"))
+
+            log.info(
+                "summarize_artifact.collected_summaries",
+                artifact_id=str(artifact_id),
+                page_count=len(page_summaries),
+                batch_size=self.batch_size,
+            )
+
+            # Sliding-window chain
+            if len(page_summaries) <= self.batch_size:
+                combined = await self._synthesize(page_summaries, artifact_title)
+            else:
+                batches = _make_batches(page_summaries, self.batch_size)
+                batch_summaries = []
+                for i, batch in enumerate(batches):
+                    log.info(
+                        "summarize_artifact.batch",
+                        artifact_id=str(artifact_id),
+                        batch=i + 1,
+                        total=len(batches),
+                    )
+                    batch_summaries.append(await self._summarize_batch(batch, artifact_title))
+                combined = await self._synthesize(batch_summaries, artifact_title)
+
+            final_summary = await self._refine(combined, artifact_title)
+
+            model_info = await self.llm_client.get_model_info()
+            model_name = f"{model_info.get('provider', 'unknown')}/{model_info.get('model_name', 'unknown')}"
+
+            log.info(
+                "summarize_artifact.llm_done",
+                artifact_id=str(artifact_id),
+                model=model_name,
+                summary_len=len(final_summary),
+            )
+
+            candidate = SummaryCandidate(
+                summary=final_summary.strip(),
+                model_name=model_name,
+                date_extracted=datetime.now(UTC),
+                confidence=None,
+                additional_model_params={
+                    "mode": "sliding_window",
+                    "batch_size": str(self.batch_size),
+                    "page_count": str(len(page_summaries)),
+                },
+                pipeline_run_id=None,
+                is_locked=False,
+                hil_correction=None,
+            )
+            artifact.update_summary_candidate(candidate)
+            self.artifact_repository.save(artifact)
+
+            result = ArtifactMapper.to_artifact_response(artifact)
+
+            if self.external_event_publisher:
+                await self.external_event_publisher.notify_artifact_updated(result)
+
+            log.info("summarize_artifact.success", artifact_id=str(artifact_id))
+            return Success(result)
+
+        except AggregateNotFoundError as e:
+            log.warning("summarize_artifact.not_found", artifact_id=str(artifact_id), error=str(e))
+            return Failure(AppError("not_found", str(e)))
+        except (ValidationError, ConcurrencyError) as e:
+            category = "validation" if isinstance(e, ValidationError) else "concurrency"
+            log.warning(
+                "summarize_artifact.domain_error",
+                category=category,
+                artifact_id=str(artifact_id),
+                error=str(e),
+            )
+            return Failure(AppError(category, str(e)))
+        except Exception as e:
+            log.exception(
+                "summarize_artifact.unexpected_error",
+                artifact_id=str(artifact_id),
+                error=str(e),
+            )
+            return Failure(AppError("internal_error", f"Unexpected error: {e!s}"))
+
+    async def _summarize_batch(self, summaries: list[str], artifact_title: str) -> str:
+        numbered = "\n".join(f"{i + 1}. {s}" for i, s in enumerate(summaries))
+        rendered = await self.prompt_repository.render_prompt(
+            "artifact_batch_summary",
+            artifact_title=artifact_title,
+            page_summaries=numbered,
+        )
+        return await self.llm_client.complete(rendered)
+
+    async def _synthesize(self, summaries: list[str], artifact_title: str) -> str:
+        numbered = "\n".join(f"{i + 1}. {s}" for i, s in enumerate(summaries))
+        rendered = await self.prompt_repository.render_prompt(
+            "artifact_synthesis",
+            artifact_title=artifact_title,
+            section_summaries=numbered,
+        )
+        return await self.llm_client.complete(rendered)
+
+    async def _refine(self, draft: str, artifact_title: str) -> str:
+        rendered = await self.prompt_repository.render_prompt(
+            "artifact_refinement",
+            artifact_title=artifact_title,
+            draft_summary=draft,
+        )
+        return await self.llm_client.complete(rendered)
+
+
+def _make_batches(items: list[str], batch_size: int) -> list[list[str]]:
+    return [items[i : i + batch_size] for i in range(0, len(items), batch_size)]
 
 
 def _load_image_b64(blob_store: BlobStore, key: str) -> str:

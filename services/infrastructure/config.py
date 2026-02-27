@@ -138,6 +138,13 @@ class Settings(BaseSettings):
         description="Overlapping characters between chunks. Typically 10-20% of chunk_size.",
     )
 
+    # Artifact Summarization
+    artifact_summarization_batch_size: int = Field(
+        default=10,
+        validation_alias="ARTIFACT_SUMMARIZATION_BATCH_SIZE",
+        description="Number of page summaries per batch in the sliding-window artifact summarization chain.",
+    )
+
     # For OpenAI (when provider is "openai")
     openai_api_key: str | None = Field(
         default=None,
