@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Protocol
 if TYPE_CHECKING:
     from uuid import UUID
 
+    from application.dtos.workflow_dtos import TemporalWorkflowInfo
+
 
 class WorkflowOrchestrator(Protocol):
     """Abstract port for orchestrating long-running workflows.
@@ -97,4 +99,20 @@ class WorkflowOrchestrator(Protocol):
             May raise implementation-specific exceptions on workflow start failure.
 
         """
+        ...
+
+    @abstractmethod
+    async def get_page_workflow_statuses(
+        self,
+        page_id: UUID,
+    ) -> dict[str, TemporalWorkflowInfo]:
+        """Query Temporal for the status of all workflows associated with a page."""
+        ...
+
+    @abstractmethod
+    async def get_artifact_workflow_statuses(
+        self,
+        artifact_id: UUID,
+    ) -> dict[str, TemporalWorkflowInfo]:
+        """Query Temporal for the status of all workflows associated with an artifact."""
         ...

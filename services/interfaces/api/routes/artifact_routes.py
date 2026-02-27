@@ -9,6 +9,7 @@ from returns.result import Success
 from application.dtos.artifact_dtos import ArtifactResponse, CreateArtifactRequest
 from application.dtos.blob_dtos import UploadBlobRequest
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
+from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
 from application.use_cases.artifact_use_cases import (
     AddPagesUseCase,
@@ -189,3 +190,18 @@ async def delete_artifact(
     """Delete an artifact and all its associated pages."""
     use_case = container[DeleteArtifactUseCase]
     await use_case.execute(artifact_id=artifact_id)
+
+
+@router.get("/{artifact_id}/workflows", status_code=status.HTTP_200_OK)
+async def get_artifact_workflows(
+    artifact_id: UUID,
+    container: Annotated[Container, Depends(get_container)],
+) -> dict:
+    """Get Temporal workflow statuses for an artifact.
+
+    Proxies to Temporal to return the current status of all workflows
+    associated with the given artifact.
+    """
+    orchestrator = container[WorkflowOrchestrator]
+    workflows = await orchestrator.get_artifact_workflow_statuses(artifact_id)
+    return {"artifact_id": str(artifact_id), "workflows": workflows}

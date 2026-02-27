@@ -1,4 +1,22 @@
+from __future__ import annotations
+
+from datetime import datetime
 from enum import StrEnum
+
+from pydantic import BaseModel
+
+
+class WorkflowStartedResponse(BaseModel):
+    workflow_id: str
+    status: str = "started"
+
+
+class TemporalWorkflowInfo(BaseModel):
+    workflow_id: str
+    status: str  # "RUNNING", "COMPLETED", "FAILED", "TIMED_OUT", "NOT_FOUND"
+    run_id: str | None = None
+    started_at: datetime | None = None
+    closed_at: datetime | None = None
 
 
 class WorkflowTriggerReason(StrEnum):

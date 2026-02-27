@@ -7,7 +7,6 @@ from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.mime_type import MimeType
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.title_mention import TitleMention
-from domain.value_objects.workflow_status import WorkflowStatus
 
 
 class CreateArtifactRequest(BaseModel):
@@ -48,8 +47,4 @@ class ArtifactResponse(BaseModel):
     summary_candidate: SummaryCandidate | None = Field(
         None,
         description="Summary candidate extracted from the artifact",
-    )
-    workflow_statuses: dict[str, WorkflowStatus] = Field(
-        default_factory=dict,
-        description="Workflow statuses keyed by workflow name",
     )

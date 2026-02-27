@@ -102,6 +102,7 @@ async def run() -> None:
             embed_compound_smiles_activity,
             summarize_page_activity,
         ],
+        max_concurrent_activities=settings.temporal_max_concurrent_activities,
     )
 
     logger.info("temporal_worker_started")

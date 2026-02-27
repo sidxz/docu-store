@@ -78,6 +78,11 @@ class Settings(BaseSettings):
         default="localhost:7233",
         validation_alias="TEMPORAL_ADDRESS",
     )
+    temporal_max_concurrent_activities: int = Field(
+        default=10,
+        validation_alias="TEMPORAL_MAX_CONCURRENT_ACTIVITIES",
+        description="Max concurrent Temporal activities. Lower on dev to save memory.",
+    )
 
     # Qdrant (Vector Store)
     qdrant_url: str = Field(

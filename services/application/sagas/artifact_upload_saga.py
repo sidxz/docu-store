@@ -4,6 +4,7 @@ import io
 import structlog
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, BinaryIO
+from uuid import UUID
 
 from returns.result import Failure, Result, Success
 
@@ -107,7 +108,7 @@ class ArtifactUploadSaga:
         # Step 4 : Create pages and add to artifact
         pages_result = await self._process_pdf_pages(
             pdf_content=pdf_content,
-            artifact_id=str(artifact_id),
+            artifact_id=artifact_id,
             now=now,
         )
         if isinstance(pages_result, Failure):
@@ -121,9 +122,9 @@ class ArtifactUploadSaga:
     async def _process_pdf_pages(
         self,
         pdf_content: PDFContent,
-        artifact_id: str,
+        artifact_id: UUID,
         now: datetime,
-    ) -> Result[list[str], AppError]:
+    ) -> Result[list[UUID], AppError]:
         """Process PDF pages: create pages, persist images, and update text mentions.
 
         Args:

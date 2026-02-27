@@ -73,7 +73,6 @@ from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.text_mention import TextMention
 from domain.value_objects.title_mention import TitleMention
-from domain.value_objects.workflow_status import WorkflowStatus
 from infrastructure.blob_stores.fsspec_blob_store import FsspecBlobStore
 from infrastructure.chemistry.rdkit_smiles_validator import RdkitSmilesValidator
 from infrastructure.config import settings
@@ -119,7 +118,6 @@ class DocuStoreApplication(Application):
         transcoder.register(PydanticTranscoding(TextMention))
         transcoder.register(PydanticTranscoding(ExtractionMetadata))
         transcoder.register(PydanticTranscoding(BlobRef))
-        transcoder.register(PydanticTranscoding(WorkflowStatus))
         transcoder.register(PydanticTranscoding(PDFContent))
         transcoder.register(PydanticTranscoding(EmbeddingMetadata))
 
@@ -358,19 +356,15 @@ def create_container() -> Container:  # noqa: PLR0915
 
     # Register Workflow Use Cases
     container[LogArtifactSampleUseCase] = lambda c: LogArtifactSampleUseCase(
-        artifact_repository=c[ArtifactRepository],
         workflow_orchestrator=c[WorkflowOrchestrator],
     )
     container[TriggerCompoundExtractionUseCase] = lambda c: TriggerCompoundExtractionUseCase(
-        page_repository=c[PageRepository],
         workflow_orchestrator=c[WorkflowOrchestrator],
     )
     container[TriggerEmbeddingUseCase] = lambda c: TriggerEmbeddingUseCase(
-        page_repository=c[PageRepository],
         workflow_orchestrator=c[WorkflowOrchestrator],
     )
     container[TriggerSmilesEmbeddingUseCase] = lambda c: TriggerSmilesEmbeddingUseCase(
-        page_repository=c[PageRepository],
         workflow_orchestrator=c[WorkflowOrchestrator],
     )
 
@@ -388,7 +382,6 @@ def create_container() -> Container:  # noqa: PLR0915
         external_event_publisher=c[ExternalEventPublisher],
     )
     container[TriggerPageSummarizationUseCase] = lambda c: TriggerPageSummarizationUseCase(
-        page_repository=c[PageRepository],
         workflow_orchestrator=c[WorkflowOrchestrator],
     )
 

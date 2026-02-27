@@ -7,7 +7,6 @@ import structlog
 from returns.result import Failure, Result, Success
 
 from application.dtos.errors import AppError
-from application.dtos.workflow_dtos import WorkflowNames
 from application.mappers.page_mappers import PageMapper
 from domain.exceptions import AggregateNotFoundError, ConcurrencyError, ValidationError
 
@@ -23,7 +22,6 @@ if TYPE_CHECKING:
     from application.ports.smiles_validator import SmilesValidator
 
 from domain.value_objects.compound_mention import CompoundMention
-from domain.value_objects.workflow_status import WorkflowStatus
 
 logger = structlog.get_logger()
 
@@ -110,16 +108,6 @@ class ExtractCompoundMentionsUseCase:
             )
 
             page.update_compound_mentions(compound_mentions)
-
-            existing = page.workflow_statuses.get(WorkflowNames.COMPOUND_EXTRACTION_WORKFLOW)
-            page.update_workflow_status(
-                WorkflowNames.COMPOUND_EXTRACTION_WORKFLOW,
-                WorkflowStatus.completed(
-                    message=f"extracted {len(compound_mentions)} compounds",
-                    workflow_id=existing.workflow_id if existing else None,
-                    started_at=existing.started_at if existing else None,
-                ),
-            )
 
             self.page_repository.save(page)
 

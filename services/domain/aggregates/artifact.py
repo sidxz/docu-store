@@ -7,7 +7,6 @@ from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.mime_type import MimeType
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.title_mention import TitleMention
-from domain.value_objects.workflow_status import WorkflowStatus
 
 
 class Artifact(Aggregate):
@@ -81,7 +80,6 @@ class Artifact(Aggregate):
         self.title_mention: TitleMention | None = None
         self.summary_candidate: SummaryCandidate | None = None
         self.tags: list[str] = []
-        self.workflow_statuses: dict[str, WorkflowStatus] = {}
         self.is_deleted: bool = False
 
     def __hash__(self) -> int:
@@ -211,26 +209,6 @@ class Artifact(Aggregate):
     @event(TagsUpdated)
     def _apply_tags_updated(self, tags: list[str]) -> None:
         self.tags = tags
-
-    # ==========================================================================
-    # COMMAND METHOD - Workflow Status Updated
-    # ==========================================================================
-    class WorkflowStatusUpdated(Aggregate.Event):
-        name: str
-        status: WorkflowStatus
-
-    def update_workflow_status(self, name: str, status: WorkflowStatus) -> None:
-        if self.is_deleted:
-            msg = "Cannot update workflow status on a deleted artifact"
-            raise ValueError(msg)
-        if not name or not name.strip():
-            msg = "workflow name must be provided"
-            raise ValueError(msg)
-        self.trigger_event(self.WorkflowStatusUpdated, name=name.strip(), status=status)
-
-    @event(WorkflowStatusUpdated)
-    def _apply_workflow_status_updated(self, name: str, status: WorkflowStatus) -> None:
-        self.workflow_statuses[name] = status
 
     # ============================================================================
     # COMMAND METHOD - Delete Artifact

@@ -80,6 +80,7 @@ async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0
         f"{Page.Created.__module__}:{Page.Created.__qualname__}",
         f"{Page.TextMentionUpdated.__module__}:{Page.TextMentionUpdated.__qualname__}",
         f"{Page.CompoundMentionsUpdated.__module__}:{Page.CompoundMentionsUpdated.__qualname__}",
+        f"{Page.TextEmbeddingGenerated.__module__}:{Page.TextEmbeddingGenerated.__qualname__}",
     ]
 
     logger.info("pipeline_worker_started", worker_name=worker_name, topics=topics)
@@ -133,7 +134,10 @@ async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0
                                 tracking_id=tracking.notification_id,
                             )
 
-                            await log_artifact_sample_use_case.execute(domain_event.originator_id)
+                            await log_artifact_sample_use_case.execute(
+                                domain_event.originator_id,
+                                storage_location=domain_event.storage_location,
+                            )
 
                             logger.info(
                                 "pipeline_workflow_triggered",
@@ -159,15 +163,22 @@ async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0
                                     tracking_id=tracking.notification_id,
                                 )
 
-                                await trigger_page_summarization_use_case.execute(
-                                    page_id=domain_event.originator_id,
-                                )
+                        elif isinstance(domain_event, Page.TextEmbeddingGenerated):
+                            logger.info(
+                                "pipeline_text_embedding_generated",
+                                page_id=str(domain_event.originator_id),
+                                tracking_id=tracking.notification_id,
+                            )
 
-                                logger.info(
-                                    "pipeline_summarization_workflow_triggered",
-                                    page_id=str(domain_event.originator_id),
-                                    tracking_id=tracking.notification_id,
-                                )
+                            await trigger_page_summarization_use_case.execute(
+                                page_id=domain_event.originator_id,
+                            )
+
+                            logger.info(
+                                "pipeline_summarization_workflow_triggered",
+                                page_id=str(domain_event.originator_id),
+                                tracking_id=tracking.notification_id,
+                            )
 
                         elif isinstance(domain_event, Page.CompoundMentionsUpdated):
                             logger.info(

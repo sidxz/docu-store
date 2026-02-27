@@ -8,11 +8,9 @@ import structlog
 from returns.result import Failure, Result, Success
 
 from application.dtos.errors import AppError
-from application.dtos.workflow_dtos import WorkflowNames
 from application.mappers.page_mappers import PageMapper
 from domain.exceptions import AggregateNotFoundError, ConcurrencyError, ValidationError
 from domain.value_objects.summary_candidate import SummaryCandidate
-from domain.value_objects.workflow_status import WorkflowStatus
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -136,16 +134,6 @@ class SummarizePageUseCase:
                 hil_correction=None,
             )
             page.update_summary_candidate(candidate)
-
-            existing = page.workflow_statuses.get(WorkflowNames.PAGE_SUMMARIZATION_WORKFLOW)
-            page.update_workflow_status(
-                WorkflowNames.PAGE_SUMMARIZATION_WORKFLOW,
-                WorkflowStatus.completed(
-                    message=f"summarized via {mode}",
-                    workflow_id=existing.workflow_id if existing else None,
-                    started_at=existing.started_at if existing else None,
-                ),
-            )
 
             self.page_repository.save(page)
             result = PageMapper.to_page_response(page)

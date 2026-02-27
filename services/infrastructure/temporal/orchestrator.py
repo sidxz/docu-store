@@ -9,11 +9,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import structlog
+from temporalio.client import Client
+from temporalio.service import RPCError
 
 if TYPE_CHECKING:
     from uuid import UUID
-from temporalio.client import Client
 
+from application.dtos.workflow_dtos import TemporalWorkflowInfo
 from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from infrastructure.config import settings
 from infrastructure.temporal.workflows.artifact_processing import ProcessArtifactWorkflow
@@ -210,3 +212,62 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
                 page_id=str(page_id),
                 error=str(e),
             )
+
+    async def get_page_workflow_statuses(
+        self,
+        page_id: UUID,
+    ) -> dict[str, TemporalWorkflowInfo]:
+        """Query Temporal for the status of all workflows associated with a page."""
+        await self._ensure_client()
+        workflow_ids = {
+            "embedding": f"embedding-{page_id}",
+            "compound_extraction": f"compound-extraction-{page_id}",
+            "smiles_embedding": f"smiles-embedding-{page_id}",
+            "page_summarization": f"page-summarization-{page_id}",
+        }
+        return await self._query_workflow_statuses(workflow_ids)
+
+    async def get_artifact_workflow_statuses(
+        self,
+        artifact_id: UUID,
+    ) -> dict[str, TemporalWorkflowInfo]:
+        """Query Temporal for the status of all workflows associated with an artifact."""
+        await self._ensure_client()
+        workflow_ids = {
+            "artifact_processing": str(artifact_id),
+        }
+        return await self._query_workflow_statuses(workflow_ids)
+
+    async def _query_workflow_statuses(
+        self,
+        workflow_ids: dict[str, str],
+    ) -> dict[str, TemporalWorkflowInfo]:
+        """Query Temporal handles for each workflow ID and return status info."""
+        results: dict[str, TemporalWorkflowInfo] = {}
+        for name, wf_id in workflow_ids.items():
+            try:
+                handle = self._client.get_workflow_handle(wf_id)
+                desc = await handle.describe()
+                results[name] = TemporalWorkflowInfo(
+                    workflow_id=wf_id,
+                    status=desc.status.name if desc.status else "UNKNOWN",
+                    run_id=desc.run_id,
+                    started_at=desc.start_time,
+                    closed_at=desc.close_time,
+                )
+            except RPCError:
+                results[name] = TemporalWorkflowInfo(
+                    workflow_id=wf_id,
+                    status="NOT_FOUND",
+                )
+            except Exception as e:
+                logger.warning(
+                    "failed_to_query_workflow_status",
+                    workflow_id=wf_id,
+                    error=str(e),
+                )
+                results[name] = TemporalWorkflowInfo(
+                    workflow_id=wf_id,
+                    status="UNKNOWN",
+                )
+        return results
