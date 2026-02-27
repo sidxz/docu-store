@@ -8,7 +8,9 @@ from returns.result import Success
 
 from application.dtos.artifact_dtos import ArtifactResponse, CreateArtifactRequest
 from application.dtos.blob_dtos import UploadBlobRequest
+from application.dtos.workflow_dtos import WorkflowStartedResponse
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
+from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
 from application.use_cases.artifact_use_cases import (
     AddPagesUseCase,
@@ -189,3 +191,72 @@ async def delete_artifact(
     """Delete an artifact and all its associated pages."""
     use_case = container[DeleteArtifactUseCase]
     await use_case.execute(artifact_id=artifact_id)
+
+
+@router.post("/{artifact_id}/summarize", status_code=status.HTTP_202_ACCEPTED)
+async def trigger_artifact_summarization(
+    artifact_id: UUID,
+    container: Annotated[Container, Depends(get_container)],
+) -> WorkflowStartedResponse:
+    """Trigger LLM summarization for an artifact (non-blocking).
+
+    Starts the sliding-window artifact summarization Temporal workflow and returns
+    immediately. The summary is built from all available page-level summaries.
+
+    Unlike the automated pipeline trigger this endpoint skips the "all pages done"
+    precondition — useful for re-running after manual corrections or partial ingestion.
+    Locked summaries (human corrections) are preserved by the use case.
+    """
+    orchestrator = container[WorkflowOrchestrator]
+    await orchestrator.start_artifact_summarization_workflow(artifact_id=artifact_id)
+    return WorkflowStartedResponse(workflow_id=f"artifact-summarization-{artifact_id}")
+
+
+@router.get("/{artifact_id}/summary", status_code=status.HTTP_200_OK)
+async def get_artifact_summary(
+    artifact_id: UUID,
+    container: Annotated[Container, Depends(get_container)],
+) -> dict:
+    """Get the current summary for an artifact from the read model.
+
+    Returns the summary_candidate field. Returns 404 if the artifact has no
+    summary yet.
+    """
+    read_repository = container[ArtifactReadModel]
+    artifact = await read_repository.get_artifact_by_id(artifact_id)
+
+    if artifact is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Artifact not found",
+        )
+
+    if artifact.summary_candidate is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No summary available for this artifact yet",
+        )
+
+    return {
+        "artifact_id": str(artifact_id),
+        "summary": artifact.summary_candidate.summary,
+        "model_name": artifact.summary_candidate.model_name,
+        "date_extracted": artifact.summary_candidate.date_extracted,
+        "is_locked": artifact.summary_candidate.is_locked,
+        "hil_correction": artifact.summary_candidate.hil_correction,
+    }
+
+
+@router.get("/{artifact_id}/workflows", status_code=status.HTTP_200_OK)
+async def get_artifact_workflows(
+    artifact_id: UUID,
+    container: Annotated[Container, Depends(get_container)],
+) -> dict:
+    """Get Temporal workflow statuses for an artifact.
+
+    Proxies to Temporal to return the current status of all workflows
+    associated with the given artifact.
+    """
+    orchestrator = container[WorkflowOrchestrator]
+    workflows = await orchestrator.get_artifact_workflow_statuses(artifact_id)
+    return {"artifact_id": str(artifact_id), "workflows": workflows}

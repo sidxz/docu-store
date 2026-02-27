@@ -12,12 +12,15 @@ from application.ports.compound_vector_store import CompoundVectorStore
 from application.ports.cser_service import CserService
 from application.ports.embedding_generator import EmbeddingGenerator
 from application.ports.external_event_publisher import ExternalEventPublisher
+from application.ports.llm_client import LLMClientPort
 from application.ports.pdf_service import PDFService
+from application.ports.prompt_repository import PromptRepositoryPort
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
 from application.ports.smiles_validator import SmilesValidator
+from application.ports.summary_vector_store import SummaryVectorStore
 from application.ports.text_chunker import TextChunker
 from application.ports.vector_store import VectorStore
 from application.ports.workflow_orchestrator import WorkflowOrchestrator
@@ -49,13 +52,34 @@ from application.use_cases.page_use_cases import (
 from application.use_cases.page_use_cases import (
     UpdateSummaryCandidateUseCase as UpdatePageSummaryCandidateUseCase,
 )
+from application.use_cases.search_use_cases import HierarchicalSearchUseCase, SearchSummariesUseCase
 from application.use_cases.smiles_embedding_use_cases import EmbedCompoundSmilesUseCase
 from application.use_cases.smiles_search_use_cases import SearchSimilarCompoundsUseCase
+from application.use_cases.summarization_use_cases import (
+    SummarizeArtifactUseCase,
+    SummarizePageUseCase,
+)
+from application.use_cases.summary_embedding_use_cases import (
+    EmbedArtifactSummaryUseCase,
+    EmbedPageSummaryUseCase,
+)
 from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
+from application.workflow_use_cases.trigger_artifact_summarization_use_case import (
+    TriggerArtifactSummarizationUseCase,
+)
+from application.workflow_use_cases.trigger_artifact_summary_embedding_use_case import (
+    TriggerArtifactSummaryEmbeddingUseCase,
+)
 from application.workflow_use_cases.trigger_compound_extraction_use_case import (
     TriggerCompoundExtractionUseCase,
 )
 from application.workflow_use_cases.trigger_embedding_use_case import TriggerEmbeddingUseCase
+from application.workflow_use_cases.trigger_page_summarization_use_case import (
+    TriggerPageSummarizationUseCase,
+)
+from application.workflow_use_cases.trigger_page_summary_embedding_use_case import (
+    TriggerPageSummaryEmbeddingUseCase,
+)
 from application.workflow_use_cases.trigger_smiles_embedding_use_case import (
     TriggerSmilesEmbeddingUseCase,
 )
@@ -67,7 +91,6 @@ from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.text_mention import TextMention
 from domain.value_objects.title_mention import TitleMention
-from domain.value_objects.workflow_status import WorkflowStatus
 from infrastructure.blob_stores.fsspec_blob_store import FsspecBlobStore
 from infrastructure.chemistry.rdkit_smiles_validator import RdkitSmilesValidator
 from infrastructure.config import settings
@@ -82,6 +105,7 @@ from infrastructure.event_sourced_repositories.page_repository import EventSourc
 from infrastructure.file_services.py_mu_pfd_service import PyMuPDFService
 from infrastructure.kafka.kafka_external_event_streamer import KafkaExternalEventPublisher
 from infrastructure.kafka.kafka_publisher import KafkaPublisher
+from infrastructure.llm.factory import create_llm_client, create_prompt_repository
 from infrastructure.read_repositories.mongo_read_model_materializer import (
     MongoReadModelMaterializer,
 )
@@ -91,6 +115,7 @@ from infrastructure.temporal.orchestrator import TemporalWorkflowOrchestrator
 from infrastructure.text_chunkers.langchain_chunker import LangChainTextChunker
 from infrastructure.vector_stores.compound_qdrant_store import CompoundQdrantStore
 from infrastructure.vector_stores.qdrant_store import QdrantStore
+from infrastructure.vector_stores.summary_qdrant_store import SummaryQdrantStore
 
 if TYPE_CHECKING:
     from eventsourcing.persistence import JSONTranscoder
@@ -112,7 +137,6 @@ class DocuStoreApplication(Application):
         transcoder.register(PydanticTranscoding(TextMention))
         transcoder.register(PydanticTranscoding(ExtractionMetadata))
         transcoder.register(PydanticTranscoding(BlobRef))
-        transcoder.register(PydanticTranscoding(WorkflowStatus))
         transcoder.register(PydanticTranscoding(PDFContent))
         transcoder.register(PydanticTranscoding(EmbeddingMetadata))
 
@@ -220,6 +244,15 @@ def create_container() -> Container:  # noqa: PLR0915
     )
     container[CompoundVectorStore] = compound_vector_store_instance
 
+    # Summary Vector Store (page + artifact summary embeddings)
+    summary_vector_store_instance = SummaryQdrantStore(
+        url=settings.qdrant_url,
+        api_key=settings.qdrant_api_key,
+        collection_name=settings.qdrant_summary_collection_name,
+        vector_size=384,  # all-MiniLM-L6-v2 default
+    )
+    container[SummaryVectorStore] = summary_vector_store_instance
+
     # ChemBERTa embedding generator (SMILES)
     container[ChemBertaEmbeddingGenerator] = lambda _: ChemBertaEmbeddingGenerator(
         model_name=settings.smiles_embedding_model_name,
@@ -322,6 +355,7 @@ def create_container() -> Container:  # noqa: PLR0915
         add_pages_use_case=c[AddPagesUseCase],
         update_text_mention_use_case=c[UpdateTextMentionUseCase],
         pdf_service=c[PDFService],
+        blob_store=c[BlobStore],
     )
 
     # Compound Extraction Use Case
@@ -350,20 +384,81 @@ def create_container() -> Container:  # noqa: PLR0915
 
     # Register Workflow Use Cases
     container[LogArtifactSampleUseCase] = lambda c: LogArtifactSampleUseCase(
-        artifact_repository=c[ArtifactRepository],
         workflow_orchestrator=c[WorkflowOrchestrator],
     )
     container[TriggerCompoundExtractionUseCase] = lambda c: TriggerCompoundExtractionUseCase(
-        page_repository=c[PageRepository],
         workflow_orchestrator=c[WorkflowOrchestrator],
     )
     container[TriggerEmbeddingUseCase] = lambda c: TriggerEmbeddingUseCase(
-        page_repository=c[PageRepository],
         workflow_orchestrator=c[WorkflowOrchestrator],
     )
     container[TriggerSmilesEmbeddingUseCase] = lambda c: TriggerSmilesEmbeddingUseCase(
+        workflow_orchestrator=c[WorkflowOrchestrator],
+    )
+
+    # LLM Infrastructure (shared — provider selected via LLM_PROVIDER config)
+    container[LLMClientPort] = lambda _: create_llm_client(settings)
+    container[PromptRepositoryPort] = lambda _: create_prompt_repository(settings)
+
+    # Summarization Use Cases
+    container[SummarizePageUseCase] = lambda c: SummarizePageUseCase(
+        page_repository=c[PageRepository],
+        artifact_repository=c[ArtifactRepository],
+        llm_client=c[LLMClientPort],
+        prompt_repository=c[PromptRepositoryPort],
+        blob_store=c[BlobStore],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[TriggerPageSummarizationUseCase] = lambda c: TriggerPageSummarizationUseCase(
+        workflow_orchestrator=c[WorkflowOrchestrator],
+    )
+
+    # Artifact Summarization Use Cases
+    container[SummarizeArtifactUseCase] = lambda c: SummarizeArtifactUseCase(
+        artifact_repository=c[ArtifactRepository],
+        page_repository=c[PageRepository],
+        llm_client=c[LLMClientPort],
+        prompt_repository=c[PromptRepositoryPort],
+        external_event_publisher=c[ExternalEventPublisher],
+        batch_size=settings.artifact_summarization_batch_size,
+    )
+    container[TriggerArtifactSummarizationUseCase] = lambda c: TriggerArtifactSummarizationUseCase(
+        artifact_repository=c[ArtifactRepository],
         page_repository=c[PageRepository],
         workflow_orchestrator=c[WorkflowOrchestrator],
+    )
+
+    # Summary Embedding Use Cases
+    container[EmbedPageSummaryUseCase] = lambda c: EmbedPageSummaryUseCase(
+        page_repository=c[PageRepository],
+        artifact_repository=c[ArtifactRepository],
+        embedding_generator=c[EmbeddingGenerator],
+        summary_vector_store=c[SummaryVectorStore],
+    )
+    container[EmbedArtifactSummaryUseCase] = lambda c: EmbedArtifactSummaryUseCase(
+        artifact_repository=c[ArtifactRepository],
+        embedding_generator=c[EmbeddingGenerator],
+        summary_vector_store=c[SummaryVectorStore],
+    )
+    container[TriggerPageSummaryEmbeddingUseCase] = lambda c: TriggerPageSummaryEmbeddingUseCase(
+        workflow_orchestrator=c[WorkflowOrchestrator],
+    )
+    container[TriggerArtifactSummaryEmbeddingUseCase] = (
+        lambda c: TriggerArtifactSummaryEmbeddingUseCase(
+            workflow_orchestrator=c[WorkflowOrchestrator],
+        )
+    )
+
+    # Search Use Cases
+    container[SearchSummariesUseCase] = lambda c: SearchSummariesUseCase(
+        embedding_generator=c[EmbeddingGenerator],
+        summary_vector_store=c[SummaryVectorStore],
+    )
+    container[HierarchicalSearchUseCase] = lambda c: HierarchicalSearchUseCase(
+        embedding_generator=c[EmbeddingGenerator],
+        vector_store=c[VectorStore],
+        summary_vector_store=c[SummaryVectorStore],
+        page_read_model=c[PageReadModel],
     )
 
     return container

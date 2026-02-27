@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, BinaryIO
 
+import structlog
 from returns.result import Failure, Result, Success
 
 from application.dtos.artifact_dtos import CreateArtifactRequest
@@ -13,9 +14,13 @@ from domain.value_objects.mime_type import MimeType
 from domain.value_objects.text_mention import TextMention
 
 if TYPE_CHECKING:
+    import io
+    from uuid import UUID
+
     from application.dtos.artifact_dtos import ArtifactResponse
     from application.dtos.blob_dtos import UploadBlobRequest, UploadBlobResponse
     from application.dtos.pdf_dtos import PDFContent
+    from application.ports.blob_store import BlobStore
     from application.ports.pdf_service import PDFService
     from application.use_cases.artifact_use_cases import (
         AddPagesUseCase,
@@ -26,6 +31,8 @@ if TYPE_CHECKING:
         CreatePageUseCase,
         UpdateTextMentionUseCase,
     )
+
+log = structlog.get_logger(__name__)
 
 
 class ArtifactUploadSaga:
@@ -39,6 +46,7 @@ class ArtifactUploadSaga:
         add_pages_use_case: AddPagesUseCase,
         update_text_mention_use_case: UpdateTextMentionUseCase,
         pdf_service: PDFService,
+        blob_store: BlobStore,
     ) -> None:
         """Initialize saga with required use cases and services.
 
@@ -49,6 +57,7 @@ class ArtifactUploadSaga:
             add_pages_use_case: Use case for adding pages to artifacts
             update_text_mention_use_case: Use case for updating text mentions
             pdf_service: Service for parsing PDFs
+            blob_store: Blob store for persisting page images
 
         """
         self.upload_blob = upload_blob_use_case
@@ -57,6 +66,7 @@ class ArtifactUploadSaga:
         self.add_pages = add_pages_use_case
         self.update_text_mention = update_text_mention_use_case
         self.pdf_service = pdf_service
+        self.blob_store = blob_store
 
     async def execute(
         self,
@@ -113,13 +123,13 @@ class ArtifactUploadSaga:
     async def _process_pdf_pages(
         self,
         pdf_content: PDFContent,
-        artifact_id: str,
+        artifact_id: UUID,
         now: datetime,
-    ) -> Result[list[str], AppError]:
-        """Process PDF pages: create pages and update text mentions.
+    ) -> Result[list[UUID], AppError]:
+        """Process PDF pages: create pages, persist images, and update text mentions.
 
         Args:
-            pdf_content: Parsed PDF content with pages
+            pdf_content: Parsed PDF content with pages and PNG streams
             artifact_id: ID of the artifact
             now: Current datetime for text mention extraction
 
@@ -130,6 +140,8 @@ class ArtifactUploadSaga:
         page_ids = []
         if not pdf_content.pages:
             return Success(page_ids)
+
+        pages_png: list[io.BytesIO] = pdf_content.pages_png or []
 
         for index, pdf_page in enumerate(pdf_content.pages):
             page_name = f"Page {index + 1}"
@@ -150,6 +162,20 @@ class ArtifactUploadSaga:
 
             page_response = create_page_result.unwrap()
             page_ids.append(page_response.page_id)
+
+            # Persist page image to blob store for later use by summarization / ML pipelines
+            if index < len(pages_png):
+                png_stream = pages_png[index]
+                png_stream.seek(0)
+                image_key = f"artifacts/{artifact_id}/pages/{index}.png"
+                try:
+                    self.blob_store.put_stream(image_key, png_stream, mime_type="image/png")
+                except Exception:  # noqa: BLE001
+                    log.warning(
+                        "saga.page_image_store_failed",
+                        artifact_id=artifact_id,
+                        page_index=index,
+                    )
 
             page_content = getattr(pdf_page, "page_content", None) if pdf_page else None
             if page_content and page_content.strip():

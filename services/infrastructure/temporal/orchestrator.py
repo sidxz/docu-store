@@ -9,11 +9,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import structlog
+from temporalio.client import Client
+from temporalio.service import RPCError
 
 if TYPE_CHECKING:
     from uuid import UUID
-from temporalio.client import Client
 
+from application.dtos.workflow_dtos import TemporalWorkflowInfo
 from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from infrastructure.config import settings
 from infrastructure.temporal.workflows.artifact_processing import ProcessArtifactWorkflow
@@ -186,3 +188,171 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
                 page_id=str(page_id),
                 error=str(e),
             )
+
+    async def start_page_summarization_workflow(
+        self,
+        page_id: UUID,
+    ) -> None:
+        """Start the LLM summarization workflow for a page."""
+        await self._ensure_client()
+
+        workflow_id = f"page-summarization-{page_id}"
+
+        try:
+            await self._client.start_workflow(
+                "PageSummarizationWorkflow",
+                str(page_id),
+                id=workflow_id,
+                task_queue="artifact_processing",
+            )
+            logger.info("page_summarization_workflow_started", page_id=str(page_id))
+        except Exception as e:
+            logger.exception(
+                "failed_to_start_page_summarization_workflow",
+                page_id=str(page_id),
+                error=str(e),
+            )
+
+    async def start_artifact_summarization_workflow(
+        self,
+        artifact_id: UUID,
+    ) -> None:
+        """Start the artifact summarization workflow.
+
+        Uses ALLOW_DUPLICATE id-reuse policy so re-triggering after a page
+        re-summarization always produces a fresh run.
+        """
+        await self._ensure_client()
+
+        from temporalio.common import WorkflowIDReusePolicy  # noqa: PLC0415
+
+        workflow_id = f"artifact-summarization-{artifact_id}"
+
+        try:
+            await self._client.start_workflow(
+                "ArtifactSummarizationWorkflow",
+                str(artifact_id),
+                id=workflow_id,
+                task_queue="artifact_processing",
+                id_reuse_policy=WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+            )
+            logger.info("artifact_summarization_workflow_started", artifact_id=str(artifact_id))
+        except Exception as e:
+            logger.exception(
+                "failed_to_start_artifact_summarization_workflow",
+                artifact_id=str(artifact_id),
+                error=str(e),
+            )
+
+    async def start_page_summary_embedding_workflow(
+        self,
+        page_id: UUID,
+    ) -> None:
+        """Start the page summary embedding workflow."""
+        await self._ensure_client()
+
+        workflow_id = f"page-summary-embedding-{page_id}"
+
+        try:
+            await self._client.start_workflow(
+                "PageSummaryEmbeddingWorkflow",
+                str(page_id),
+                id=workflow_id,
+                task_queue="artifact_processing",
+            )
+            logger.info("page_summary_embedding_workflow_started", page_id=str(page_id))
+        except Exception as e:
+            logger.exception(
+                "failed_to_start_page_summary_embedding_workflow",
+                page_id=str(page_id),
+                error=str(e),
+            )
+
+    async def start_artifact_summary_embedding_workflow(
+        self,
+        artifact_id: UUID,
+    ) -> None:
+        """Start the artifact summary embedding workflow."""
+        await self._ensure_client()
+
+        from temporalio.common import WorkflowIDReusePolicy  # noqa: PLC0415
+
+        workflow_id = f"artifact-summary-embedding-{artifact_id}"
+
+        try:
+            await self._client.start_workflow(
+                "ArtifactSummaryEmbeddingWorkflow",
+                str(artifact_id),
+                id=workflow_id,
+                task_queue="artifact_processing",
+                id_reuse_policy=WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+            )
+            logger.info("artifact_summary_embedding_workflow_started", artifact_id=str(artifact_id))
+        except Exception as e:
+            logger.exception(
+                "failed_to_start_artifact_summary_embedding_workflow",
+                artifact_id=str(artifact_id),
+                error=str(e),
+            )
+
+    async def get_page_workflow_statuses(
+        self,
+        page_id: UUID,
+    ) -> dict[str, TemporalWorkflowInfo]:
+        """Query Temporal for the status of all workflows associated with a page."""
+        await self._ensure_client()
+        workflow_ids = {
+            "embedding": f"embedding-{page_id}",
+            "compound_extraction": f"compound-extraction-{page_id}",
+            "smiles_embedding": f"smiles-embedding-{page_id}",
+            "page_summarization": f"page-summarization-{page_id}",
+            "page_summary_embedding": f"page-summary-embedding-{page_id}",
+        }
+        return await self._query_workflow_statuses(workflow_ids)
+
+    async def get_artifact_workflow_statuses(
+        self,
+        artifact_id: UUID,
+    ) -> dict[str, TemporalWorkflowInfo]:
+        """Query Temporal for the status of all workflows associated with an artifact."""
+        await self._ensure_client()
+        workflow_ids = {
+            "artifact_processing": str(artifact_id),
+            "artifact_summarization": f"artifact-summarization-{artifact_id}",
+            "artifact_summary_embedding": f"artifact-summary-embedding-{artifact_id}",
+        }
+        return await self._query_workflow_statuses(workflow_ids)
+
+    async def _query_workflow_statuses(
+        self,
+        workflow_ids: dict[str, str],
+    ) -> dict[str, TemporalWorkflowInfo]:
+        """Query Temporal handles for each workflow ID and return status info."""
+        results: dict[str, TemporalWorkflowInfo] = {}
+        for name, wf_id in workflow_ids.items():
+            try:
+                handle = self._client.get_workflow_handle(wf_id)
+                desc = await handle.describe()
+                results[name] = TemporalWorkflowInfo(
+                    workflow_id=wf_id,
+                    status=desc.status.name if desc.status else "UNKNOWN",
+                    run_id=desc.run_id,
+                    started_at=desc.start_time,
+                    closed_at=desc.close_time,
+                )
+            except RPCError:
+                results[name] = TemporalWorkflowInfo(
+                    workflow_id=wf_id,
+                    status="NOT_FOUND",
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.warning(
+                    "failed_to_query_workflow_status",
+                    workflow_id=wf_id,
+                    error=str(e),
+                )
+                results[name] = TemporalWorkflowInfo(
+                    workflow_id=wf_id,
+                    status="UNKNOWN",
+                )
+        return results

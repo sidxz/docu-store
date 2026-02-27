@@ -1,4 +1,6 @@
-.PHONY: help install dev-install run run-read-models run-all stop-all test lint format clean docker-up docker-down
+COMPOSE := docker-compose -f docker-compose.yml -f docker-compose-langfuse.yml
+
+.PHONY: help install dev-install run run-read-models run-all stop-all test lint format clean docker-up docker-down docker-clean langfuse-seed
 
 help: ## Show this help message
 	@echo "Available commands:"
@@ -52,8 +54,8 @@ clean: ## Clean up generated files
 	rm -rf .pytest_cache .coverage htmlcov .mypy_cache .ruff_cache
 	rm -rf dist build *.egg-info
 
-docker-up: ## Start infrastructure services (EventStoreDB, NATS)
-	docker-compose up -d
+docker-up: ## Start all infrastructure services (core + Langfuse v3) and seed prompts
+	$(COMPOSE) up -d
 	@echo "Waiting for services to be healthy..."
 	@sleep 5
 	@echo "Services ready!"
@@ -63,13 +65,18 @@ docker-up: ## Start infrastructure services (EventStoreDB, NATS)
 	@echo "  - MongoDB: mongodb://localhost:27017"
 	@echo "  - Temporal Server: localhost:7233"
 	@echo "  - Temporal UI: http://localhost:8233"
-	@echo "  - Quadrant UI: http://localhost:6333/dashboard"
+	@echo "  - Qdrant UI: http://localhost:6333/dashboard"
+	@echo "  - Langfuse UI: http://localhost:3000  (dev@docustore.local / devpassword)"
+	@$(MAKE) langfuse-seed
 
-docker-down: ## Stop infrastructure services
-	docker-compose down
+langfuse-seed: ## Seed Langfuse with default prompts from infrastructure/llm/default_prompts/
+	uv run python scripts/seed_langfuse_prompts.py
 
-docker-clean: ## Stop services and remove volumes
-	docker-compose down -v
+docker-down: ## Stop all infrastructure services
+	$(COMPOSE) down
+
+docker-clean: ## Stop all services and remove volumes
+	$(COMPOSE) down -v
 
 dev: docker-up dev-install ## Set up development environment
 	@echo "Development environment ready!"

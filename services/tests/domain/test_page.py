@@ -9,8 +9,6 @@ from domain.value_objects.compound_mention import CompoundMention
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.text_mention import TextMention
-from domain.value_objects.workflow_state import WorkflowState
-from domain.value_objects.workflow_status import WorkflowStatus
 
 
 class TestPageCreation:
@@ -284,27 +282,6 @@ class TestPageSummaryCandidate:
         with pytest.raises(ValueError, match="Cannot update summary candidate on a deleted page"):
             sample_page.update_summary_candidate(sample_summary_candidate)
 
-
-class TestPageWorkflowStatus:
-    """Test updating workflow status on page."""
-
-    def test_update_workflow_status_adds_and_updates(self, sample_page: Page) -> None:
-        status_running = WorkflowStatus(state=WorkflowState.IN_PROGRESS, progress=0.2)
-        status_done = WorkflowStatus(state=WorkflowState.COMPLETED, progress=1.0)
-
-        sample_page.update_workflow_status("  ocr  ", status_running)
-        assert sample_page.workflow_statuses["ocr"] == status_running
-
-        sample_page.update_workflow_status("ocr", status_done)
-        assert sample_page.workflow_statuses["ocr"] == status_done
-
-    def test_update_workflow_status_raises_on_deleted_page(self, sample_page: Page) -> None:
-        sample_page.delete()
-        with pytest.raises(ValueError, match="Cannot update workflow status on a deleted page"):
-            sample_page.update_workflow_status(
-                "ocr",
-                WorkflowStatus(state=WorkflowState.PENDING),
-            )
 
 
 class TestPageDeletion:

@@ -1,0 +1,20 @@
+name: artifact_synthesis
+version: "1.0"
+description: >
+  Synthesize a set of section (or page) summaries into a single comprehensive
+  artifact-level summary. Used as the second pass in the summarization chain.
+input_variables:
+  - artifact_title
+  - section_summaries
+template: |
+  You are writing a comprehensive summary of a scientific presentation.
+
+  Presentation title: {artifact_title}
+
+  The following are summaries of the presentation's sections, in order:
+  {section_summaries}
+
+  Write a comprehensive summary (5-10 sentences) of the entire presentation.
+  Cover the main objectives, key findings, and conclusions.
+  Prioritize the most significant scientific insights.
+  Do not add information not present in the section summaries above.

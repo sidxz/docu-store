@@ -78,6 +78,11 @@ class Settings(BaseSettings):
         default="localhost:7233",
         validation_alias="TEMPORAL_ADDRESS",
     )
+    temporal_max_concurrent_activities: int = Field(
+        default=10,
+        validation_alias="TEMPORAL_MAX_CONCURRENT_ACTIVITIES",
+        description="Max concurrent Temporal activities. Lower on dev to save memory.",
+    )
 
     # Qdrant (Vector Store)
     qdrant_url: str = Field(
@@ -95,6 +100,10 @@ class Settings(BaseSettings):
     qdrant_compound_collection_name: str = Field(
         default="compound_embeddings",
         validation_alias="QDRANT_COMPOUND_COLLECTION_NAME",
+    )
+    qdrant_summary_collection_name: str = Field(
+        default="summary_embeddings",
+        validation_alias="QDRANT_SUMMARY_COLLECTION_NAME",
     )
 
     # Embeddings
@@ -133,10 +142,60 @@ class Settings(BaseSettings):
         description="Overlapping characters between chunks. Typically 10-20% of chunk_size.",
     )
 
+    # Artifact Summarization
+    artifact_summarization_batch_size: int = Field(
+        default=10,
+        validation_alias="ARTIFACT_SUMMARIZATION_BATCH_SIZE",
+        description="Number of page summaries per batch in the sliding-window artifact summarization chain.",
+    )
+
     # For OpenAI (when provider is "openai")
     openai_api_key: str | None = Field(
         default=None,
         validation_alias="OPENAI_API_KEY",
+    )
+
+    # LLM (shared infrastructure — used by summarization and future features)
+    llm_provider: Literal["ollama", "openai", "gemini"] = Field(
+        default="ollama",
+        validation_alias="LLM_PROVIDER",
+    )
+    llm_model_name: str = Field(
+        default="gemma3:27b",
+        validation_alias="LLM_MODEL_NAME",
+    )
+    llm_base_url: str = Field(
+        default="http://localhost:11434",
+        validation_alias="LLM_BASE_URL",
+        description="Ollama base URL. Ignored for cloud providers.",
+    )
+    llm_api_key: str | None = Field(
+        default=None,
+        validation_alias="LLM_API_KEY",
+        description="API key for cloud LLM providers (OpenAI, Gemini). Not needed for Ollama.",
+    )
+    llm_temperature: float = Field(
+        default=0.1,
+        validation_alias="LLM_TEMPERATURE",
+        description="Low temperature for deterministic summaries.",
+    )
+
+    # Prompt management
+    prompt_repository_type: Literal["langfuse", "yaml"] = Field(
+        default="langfuse",
+        validation_alias="PROMPT_REPOSITORY_TYPE",
+    )
+    langfuse_host: str = Field(
+        default="http://localhost:3000",
+        validation_alias="LANGFUSE_HOST",
+    )
+    langfuse_public_key: str | None = Field(
+        default=None,
+        validation_alias="LANGFUSE_PUBLIC_KEY",
+    )
+    langfuse_secret_key: str | None = Field(
+        default=None,
+        validation_alias="LANGFUSE_SECRET_KEY",
     )
 
 

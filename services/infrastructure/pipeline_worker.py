@@ -21,10 +21,22 @@ from eventsourcing.application import Application
 from eventsourcing.projection import ApplicationSubscription
 
 from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
+from application.workflow_use_cases.trigger_artifact_summarization_use_case import (
+    TriggerArtifactSummarizationUseCase,
+)
+from application.workflow_use_cases.trigger_artifact_summary_embedding_use_case import (
+    TriggerArtifactSummaryEmbeddingUseCase,
+)
 from application.workflow_use_cases.trigger_compound_extraction_use_case import (
     TriggerCompoundExtractionUseCase,
 )
 from application.workflow_use_cases.trigger_embedding_use_case import TriggerEmbeddingUseCase
+from application.workflow_use_cases.trigger_page_summarization_use_case import (
+    TriggerPageSummarizationUseCase,
+)
+from application.workflow_use_cases.trigger_page_summary_embedding_use_case import (
+    TriggerPageSummaryEmbeddingUseCase,
+)
 from application.workflow_use_cases.trigger_smiles_embedding_use_case import (
     TriggerSmilesEmbeddingUseCase,
 )
@@ -61,6 +73,10 @@ async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0
     trigger_compound_extraction_use_case = container[TriggerCompoundExtractionUseCase]
     trigger_embedding_use_case = container[TriggerEmbeddingUseCase]
     trigger_smiles_embedding_use_case = container[TriggerSmilesEmbeddingUseCase]
+    trigger_page_summarization_use_case = container[TriggerPageSummarizationUseCase]
+    trigger_artifact_summarization_use_case = container[TriggerArtifactSummarizationUseCase]
+    trigger_page_summary_embedding_use_case = container[TriggerPageSummaryEmbeddingUseCase]
+    trigger_artifact_summary_embedding_use_case = container[TriggerArtifactSummaryEmbeddingUseCase]
 
     # Setup signal handlers
     def handle_signal(signum: int, _frame: object) -> None:
@@ -73,9 +89,12 @@ async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0
     # Topics we're interested in
     topics = [
         f"{Artifact.Created.__module__}:{Artifact.Created.__qualname__}",
+        f"{Artifact.SummaryCandidateUpdated.__module__}:{Artifact.SummaryCandidateUpdated.__qualname__}",
         f"{Page.Created.__module__}:{Page.Created.__qualname__}",
         f"{Page.TextMentionUpdated.__module__}:{Page.TextMentionUpdated.__qualname__}",
         f"{Page.CompoundMentionsUpdated.__module__}:{Page.CompoundMentionsUpdated.__qualname__}",
+        f"{Page.TextEmbeddingGenerated.__module__}:{Page.TextEmbeddingGenerated.__qualname__}",
+        f"{Page.SummaryCandidateUpdated.__module__}:{Page.SummaryCandidateUpdated.__qualname__}",
     ]
 
     logger.info("pipeline_worker_started", worker_name=worker_name, topics=topics)
@@ -104,41 +123,44 @@ async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0
                     try:
                         event_count += 1
 
-                        if isinstance(domain_event, Page.Created):
-                            logger.info(
-                                "pipeline_page_created_event_received",
-                                page_id=str(domain_event.originator_id),
-                                tracking_id=tracking.notification_id,
-                            )
+                        match domain_event:
+                            case Page.Created():
+                                logger.info(
+                                    "pipeline_page_created_event_received",
+                                    page_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
 
-                            await trigger_compound_extraction_use_case.execute(
-                                page_id=domain_event.originator_id,
-                            )
+                                await trigger_compound_extraction_use_case.execute(
+                                    page_id=domain_event.originator_id,
+                                )
 
-                            logger.info(
-                                "pipeline_compound_extraction_workflow_triggered",
-                                page_id=str(domain_event.originator_id),
-                                tracking_id=tracking.notification_id,
-                            )
+                                logger.info(
+                                    "pipeline_compound_extraction_workflow_triggered",
+                                    page_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
 
-                        elif isinstance(domain_event, Artifact.Created):
-                            logger.info(
-                                "pipeline_artifact_created_event_received",
-                                artifact_id=str(domain_event.originator_id),
-                                storage_location=domain_event.storage_location,
-                                tracking_id=tracking.notification_id,
-                            )
+                            case Artifact.Created():
+                                logger.info(
+                                    "pipeline_artifact_created_event_received",
+                                    artifact_id=str(domain_event.originator_id),
+                                    storage_location=domain_event.storage_location,
+                                    tracking_id=tracking.notification_id,
+                                )
 
-                            await log_artifact_sample_use_case.execute(domain_event.originator_id)
+                                await log_artifact_sample_use_case.execute(
+                                    domain_event.originator_id,
+                                    storage_location=domain_event.storage_location,
+                                )
 
-                            logger.info(
-                                "pipeline_workflow_triggered",
-                                artifact_id=str(domain_event.originator_id),
-                                tracking_id=tracking.notification_id,
-                            )
+                                logger.info(
+                                    "pipeline_workflow_triggered",
+                                    artifact_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
 
-                        elif isinstance(domain_event, Page.TextMentionUpdated):
-                            if domain_event.text_mention is not None:
+                            case Page.TextMentionUpdated():
                                 logger.info(
                                     "pipeline_text_mention_updated",
                                     page_id=str(domain_event.originator_id),
@@ -147,6 +169,7 @@ async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0
 
                                 await trigger_embedding_use_case.execute(
                                     page_id=domain_event.originator_id,
+                                    text_mention=domain_event.text_mention,
                                 )
 
                                 logger.info(
@@ -155,22 +178,86 @@ async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0
                                     tracking_id=tracking.notification_id,
                                 )
 
-                        elif isinstance(domain_event, Page.CompoundMentionsUpdated):
-                            logger.info(
-                                "pipeline_compound_mentions_updated",
-                                page_id=str(domain_event.originator_id),
-                                tracking_id=tracking.notification_id,
-                            )
+                            case Page.TextEmbeddingGenerated():
+                                logger.info(
+                                    "pipeline_text_embedding_generated",
+                                    page_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
 
-                            await trigger_smiles_embedding_use_case.execute(
-                                page_id=domain_event.originator_id,
-                            )
+                                await trigger_page_summarization_use_case.execute(
+                                    page_id=domain_event.originator_id,
+                                )
 
-                            logger.info(
-                                "pipeline_smiles_embedding_workflow_triggered",
-                                page_id=str(domain_event.originator_id),
-                                tracking_id=tracking.notification_id,
-                            )
+                                logger.info(
+                                    "pipeline_summarization_workflow_triggered",
+                                    page_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
+
+                            case Page.SummaryCandidateUpdated():
+                                logger.info(
+                                    "pipeline_summary_candidate_updated",
+                                    page_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
+
+                                # Check if all pages are done → trigger artifact summarization
+                                await trigger_artifact_summarization_use_case.execute(
+                                    page_id=domain_event.originator_id,
+                                )
+
+                                # Embed this page's summary into the summary_embeddings collection
+                                await trigger_page_summary_embedding_use_case.execute(
+                                    page_id=domain_event.originator_id,
+                                )
+
+                                logger.info(
+                                    "pipeline_page_summary_workflows_triggered",
+                                    page_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
+
+                            case Artifact.SummaryCandidateUpdated():
+                                logger.info(
+                                    "pipeline_artifact_summary_candidate_updated",
+                                    artifact_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
+
+                                await trigger_artifact_summary_embedding_use_case.execute(
+                                    artifact_id=domain_event.originator_id,
+                                )
+
+                                logger.info(
+                                    "pipeline_artifact_summary_embedding_triggered",
+                                    artifact_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
+
+                            case Page.CompoundMentionsUpdated():
+                                logger.info(
+                                    "pipeline_compound_mentions_updated",
+                                    page_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
+
+                                await trigger_smiles_embedding_use_case.execute(
+                                    page_id=domain_event.originator_id,
+                                )
+
+                                logger.info(
+                                    "pipeline_smiles_embedding_workflow_triggered",
+                                    page_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
+
+                            case _:
+                                logger.warning(
+                                    "pipeline_unhandled_event",
+                                    event_type=type(domain_event).__name__,
+                                    tracking_id=tracking.notification_id,
+                                )
 
                         pipeline_tracking.save_position(tracking.notification_id)
 

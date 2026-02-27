@@ -41,6 +41,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
         compound_vector_store = container[CompoundVectorStore]
         await compound_vector_store.ensure_compound_collection_exists()
         logger.info("qdrant_compound_collection_initialized")
+
+        from application.ports.summary_vector_store import SummaryVectorStore  # noqa: PLC0415
+
+        summary_vector_store = container[SummaryVectorStore]
+        await summary_vector_store.ensure_collection_exists()
+        logger.info("qdrant_summary_collection_initialized")
     except Exception as e:  # noqa: BLE001
         logger.warning("qdrant_initialization_failed", error=str(e))
         # Don't fail startup - embedding features will just be unavailable

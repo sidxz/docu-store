@@ -7,10 +7,8 @@ from returns.result import Failure, Result, Success
 
 from application.dtos.errors import AppError
 from application.dtos.smiles_embedding_dtos import SmilesEmbeddingDTO
-from application.dtos.workflow_dtos import WorkflowNames
 from domain.exceptions import AggregateNotFoundError
 from domain.value_objects.embedding_metadata import EmbeddingMetadata
-from domain.value_objects.workflow_status import WorkflowStatus
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -69,17 +67,7 @@ class EmbedCompoundSmilesUseCase:
             )
 
             if not valid_compounds:
-                # Nothing to embed — mark complete and return
-                existing = page.workflow_statuses.get(WorkflowNames.SMILES_EMBEDDING_WORKFLOW)
-                page.update_workflow_status(
-                    WorkflowNames.SMILES_EMBEDDING_WORKFLOW,
-                    WorkflowStatus.completed(
-                        message="no valid compounds to embed",
-                        workflow_id=existing.workflow_id if existing else None,
-                        started_at=existing.started_at if existing else None,
-                    ),
-                )
-                self.page_repository.save(page)
+                # Nothing to embed — return early
                 return Success(
                     SmilesEmbeddingDTO(
                         page_id=page_id,
@@ -133,16 +121,6 @@ class EmbedCompoundSmilesUseCase:
                 embedding_type="smiles",
             )
             page.update_smiles_embedding_metadata(smiles_embedding_metadata)
-
-            existing = page.workflow_statuses.get(WorkflowNames.SMILES_EMBEDDING_WORKFLOW)
-            page.update_workflow_status(
-                WorkflowNames.SMILES_EMBEDDING_WORKFLOW,
-                WorkflowStatus.completed(
-                    message=f"embedded {len(valid_compounds)} compounds",
-                    workflow_id=existing.workflow_id if existing else None,
-                    started_at=existing.started_at if existing else None,
-                ),
-            )
 
             self.page_repository.save(page)
 
