@@ -61,7 +61,8 @@ class LangfusePromptRepository:
                 name=name,
                 version=lf_prompt.version,
             )
-            return rendered
         except Exception as exc:
             msg = f"Failed to render prompt '{name}' from Langfuse: {exc}"
             raise RuntimeError(msg) from exc
+        else:
+            return rendered

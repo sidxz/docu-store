@@ -1,6 +1,8 @@
 """Search use cases: summary search and hierarchical cross-collection search."""
 
-from uuid import UUID
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import structlog
 from returns.result import Failure, Result, Success
@@ -15,10 +17,14 @@ from application.dtos.search_dtos import (
     SummarySearchResponse,
     SummarySearchResultDTO,
 )
-from application.ports.embedding_generator import EmbeddingGenerator
-from application.ports.repositories.page_read_models import PageReadModel
-from application.ports.summary_vector_store import SummaryVectorStore
-from application.ports.vector_store import VectorStore
+
+if TYPE_CHECKING:
+    from uuid import UUID
+
+    from application.ports.embedding_generator import EmbeddingGenerator
+    from application.ports.repositories.page_read_models import PageReadModel
+    from application.ports.summary_vector_store import SummaryVectorStore
+    from application.ports.vector_store import VectorStore
 
 logger = structlog.get_logger()
 
@@ -38,7 +44,8 @@ class SearchSummariesUseCase:
         self.summary_vector_store = summary_vector_store
 
     async def execute(
-        self, request: SummarySearchRequest
+        self,
+        request: SummarySearchRequest,
     ) -> Result[SummarySearchResponse, AppError]:
         try:
             logger.info(
@@ -49,7 +56,7 @@ class SearchSummariesUseCase:
             )
 
             query_embedding = await self.embedding_generator.generate_text_embedding(
-                text=request.query_text
+                text=request.query_text,
             )
 
             hits = await self.summary_vector_store.search_summaries(
@@ -86,7 +93,7 @@ class SearchSummariesUseCase:
                     results=result_dtos,
                     total_results=len(result_dtos),
                     model_used=str(model_info.get("model_name", "unknown")),
-                )
+                ),
             )
 
         except Exception as e:
@@ -121,7 +128,8 @@ class HierarchicalSearchUseCase:
         self.page_read_model = page_read_model
 
     async def execute(
-        self, request: HierarchicalSearchRequest
+        self,
+        request: HierarchicalSearchRequest,
     ) -> Result[HierarchicalSearchResponse, AppError]:
         try:
             logger.info(
@@ -133,7 +141,7 @@ class HierarchicalSearchUseCase:
 
             # Single embedding — reused for both collections
             query_embedding = await self.embedding_generator.generate_text_embedding(
-                text=request.query_text
+                text=request.query_text,
             )
 
             # Query summary collection (always)
@@ -177,9 +185,7 @@ class HierarchicalSearchUseCase:
                 ]
                 for page_id, (score, page_index) in top_pages:
                     # Find artifact_id from raw results
-                    artifact_id = next(
-                        r.artifact_id for r in raw_results if r.page_id == page_id
-                    )
+                    artifact_id = next(r.artifact_id for r in raw_results if r.page_id == page_id)
                     text_preview = None
                     page = await self.page_read_model.get_page_by_id(page_id)
                     if page and page.text_mention and page.text_mention.text:
@@ -192,7 +198,7 @@ class HierarchicalSearchUseCase:
                             page_index=page_index,
                             score=score,
                             text_preview=text_preview,
-                        )
+                        ),
                     )
 
             model_info = await self.embedding_generator.get_model_info()
@@ -211,7 +217,7 @@ class HierarchicalSearchUseCase:
                     total_summary_hits=len(summary_hits),
                     total_chunk_hits=len(chunk_hits),
                     model_used=str(model_info.get("model_name", "unknown")),
-                )
+                ),
             )
 
         except Exception as e:
@@ -221,5 +227,5 @@ class HierarchicalSearchUseCase:
                 error=str(e),
             )
             return Failure(
-                AppError("internal_error", f"Failed to perform hierarchical search: {e!s}")
+                AppError("internal_error", f"Failed to perform hierarchical search: {e!s}"),
             )

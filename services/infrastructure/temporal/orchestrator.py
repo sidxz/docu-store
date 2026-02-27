@@ -287,9 +287,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
                 task_queue="artifact_processing",
                 id_reuse_policy=WorkflowIDReusePolicy.ALLOW_DUPLICATE,
             )
-            logger.info(
-                "artifact_summary_embedding_workflow_started", artifact_id=str(artifact_id)
-            )
+            logger.info("artifact_summary_embedding_workflow_started", artifact_id=str(artifact_id))
         except Exception as e:
             logger.exception(
                 "failed_to_start_artifact_summary_embedding_workflow",
@@ -347,7 +345,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
                     workflow_id=wf_id,
                     status="NOT_FOUND",
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(
                     "failed_to_query_workflow_status",
                     workflow_id=wf_id,

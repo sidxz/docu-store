@@ -12,7 +12,7 @@ Payload fields (indexed for filtering):
 """
 
 from typing import Literal
-from uuid import UUID, uuid5, NAMESPACE_URL
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 import structlog
 from qdrant_client import AsyncQdrantClient, models
@@ -103,7 +103,7 @@ class SummaryQdrantStore(SummaryVectorStore):
             )
             raise
 
-    async def upsert_page_summary_embedding(
+    async def upsert_page_summary_embedding(  # noqa: PLR0913
         self,
         page_id: UUID,
         artifact_id: UUID,
@@ -232,14 +232,14 @@ class SummaryQdrantStore(SummaryVectorStore):
                 models.FieldCondition(
                     key="entity_type",
                     match=models.MatchValue(value=entity_type_filter),
-                )
+                ),
             )
         if artifact_id_filter:
             must_conditions.append(
                 models.FieldCondition(
                     key="artifact_id",
                     match=models.MatchValue(value=str(artifact_id_filter)),
-                )
+                ),
             )
 
         query_filter = models.Filter(must=must_conditions) if must_conditions else None

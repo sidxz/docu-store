@@ -26,7 +26,7 @@ class PageSummaryEmbeddingWorkflow:
             retry_policy=_RETRY_POLICY,
         )
         workflow.logger.info(
-            f"PageSummaryEmbeddingWorkflow completed page_id={page_id} result={result}"
+            f"PageSummaryEmbeddingWorkflow completed page_id={page_id} result={result}",
         )
         return result
 
@@ -44,6 +44,6 @@ class ArtifactSummaryEmbeddingWorkflow:
             retry_policy=_RETRY_POLICY,
         )
         workflow.logger.info(
-            f"ArtifactSummaryEmbeddingWorkflow completed artifact_id={artifact_id} result={result}"
+            f"ArtifactSummaryEmbeddingWorkflow completed artifact_id={artifact_id} result={result}",
         )
         return result

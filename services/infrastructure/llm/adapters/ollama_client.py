@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -23,7 +22,7 @@ class OllamaLLMClient:
         model_name: str = "gemma3:27b",
         base_url: str = "http://localhost:11434",
         temperature: float = 0.1,
-        langfuse_handler: Any | None = None,
+        langfuse_handler: Any | None = None,  # noqa: ANN401
     ) -> None:
         self._model_name = model_name
         self._base_url = base_url

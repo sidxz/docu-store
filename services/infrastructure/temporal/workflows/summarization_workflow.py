@@ -8,7 +8,7 @@ from temporalio.common import RetryPolicy
 class PageSummarizationWorkflow:
     """Temporal workflow for generating an LLM summary of a single page.
 
-    LLM calls can be slow (5–30 s) and occasionally fail — the activity
+    LLM calls can be slow (5-30 s) and occasionally fail - the activity
     timeout and retry policy are set accordingly.
     """
 

@@ -12,16 +12,16 @@ from application.ports.compound_vector_store import CompoundVectorStore
 from application.ports.cser_service import CserService
 from application.ports.embedding_generator import EmbeddingGenerator
 from application.ports.external_event_publisher import ExternalEventPublisher
+from application.ports.llm_client import LLMClientPort
 from application.ports.pdf_service import PDFService
+from application.ports.prompt_repository import PromptRepositoryPort
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
-from application.ports.llm_client import LLMClientPort
-from application.ports.prompt_repository import PromptRepositoryPort
 from application.ports.smiles_validator import SmilesValidator
-from application.ports.text_chunker import TextChunker
 from application.ports.summary_vector_store import SummaryVectorStore
+from application.ports.text_chunker import TextChunker
 from application.ports.vector_store import VectorStore
 from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
@@ -52,10 +52,13 @@ from application.use_cases.page_use_cases import (
 from application.use_cases.page_use_cases import (
     UpdateSummaryCandidateUseCase as UpdatePageSummaryCandidateUseCase,
 )
+from application.use_cases.search_use_cases import HierarchicalSearchUseCase, SearchSummariesUseCase
 from application.use_cases.smiles_embedding_use_cases import EmbedCompoundSmilesUseCase
 from application.use_cases.smiles_search_use_cases import SearchSimilarCompoundsUseCase
-from application.use_cases.summarization_use_cases import SummarizeArtifactUseCase, SummarizePageUseCase
-from application.use_cases.search_use_cases import HierarchicalSearchUseCase, SearchSummariesUseCase
+from application.use_cases.summarization_use_cases import (
+    SummarizeArtifactUseCase,
+    SummarizePageUseCase,
+)
 from application.use_cases.summary_embedding_use_cases import (
     EmbedArtifactSummaryUseCase,
     EmbedPageSummaryUseCase,
@@ -102,12 +105,12 @@ from infrastructure.event_sourced_repositories.page_repository import EventSourc
 from infrastructure.file_services.py_mu_pfd_service import PyMuPDFService
 from infrastructure.kafka.kafka_external_event_streamer import KafkaExternalEventPublisher
 from infrastructure.kafka.kafka_publisher import KafkaPublisher
+from infrastructure.llm.factory import create_llm_client, create_prompt_repository
 from infrastructure.read_repositories.mongo_read_model_materializer import (
     MongoReadModelMaterializer,
 )
 from infrastructure.read_repositories.mongo_read_repository import MongoReadRepository
 from infrastructure.serialization.pydantic_transcoder import PydanticTranscoding
-from infrastructure.llm.factory import create_llm_client, create_prompt_repository
 from infrastructure.temporal.orchestrator import TemporalWorkflowOrchestrator
 from infrastructure.text_chunkers.langchain_chunker import LangChainTextChunker
 from infrastructure.vector_stores.compound_qdrant_store import CompoundQdrantStore

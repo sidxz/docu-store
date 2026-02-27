@@ -18,7 +18,7 @@ logger = structlog.get_logger()
 def create_embed_page_summary_activity(
     use_case: EmbedPageSummaryUseCase,
 ) -> Callable[[str], dict]:
-    """Factory: returns the embed_page_summary Temporal activity."""
+    """Return the embed_page_summary Temporal activity."""
 
     @activity.defn(name="embed_page_summary")
     async def embed_page_summary_activity(page_id: str) -> dict:
@@ -47,7 +47,8 @@ def create_embed_page_summary_activity(
                 error_message=error.message,
             )
             if error.category == "concurrency":
-                raise RuntimeError(f"Concurrency conflict (will retry): {error.message}")
+                msg = f"Concurrency conflict (will retry): {error.message}"
+                raise RuntimeError(msg)
             # validation / not_found are non-retryable — return status dict
             return {
                 "status": "failed",
@@ -62,7 +63,7 @@ def create_embed_page_summary_activity(
 def create_embed_artifact_summary_activity(
     use_case: EmbedArtifactSummaryUseCase,
 ) -> Callable[[str], dict]:
-    """Factory: returns the embed_artifact_summary Temporal activity."""
+    """Return the embed_artifact_summary Temporal activity."""
 
     @activity.defn(name="embed_artifact_summary")
     async def embed_artifact_summary_activity(artifact_id: str) -> dict:
@@ -80,9 +81,7 @@ def create_embed_artifact_summary_activity(
             raise
         else:
             if isinstance(result, Success):
-                logger.info(
-                    "embed_artifact_summary_activity.success", artifact_id=artifact_id
-                )
+                logger.info("embed_artifact_summary_activity.success", artifact_id=artifact_id)
                 return result.unwrap()
 
             error = result.failure()
@@ -93,7 +92,8 @@ def create_embed_artifact_summary_activity(
                 error_message=error.message,
             )
             if error.category == "concurrency":
-                raise RuntimeError(f"Concurrency conflict (will retry): {error.message}")
+                msg = f"Concurrency conflict (will retry): {error.message}"
+                raise RuntimeError(msg)
             return {
                 "status": "failed",
                 "artifact_id": artifact_id,

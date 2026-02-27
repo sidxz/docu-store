@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 log = structlog.get_logger(__name__)
 
 
-def _make_langfuse_callback_handler(settings: Settings) -> Any | None:
+def _make_langfuse_callback_handler(settings: Settings) -> Any | None:  # noqa: ANN401
     """Create a Langfuse LangChain CallbackHandler for LLM tracing (v3 SDK).
 
     Returns None (with a warning) if Langfuse credentials are missing or
@@ -32,11 +32,12 @@ def _make_langfuse_callback_handler(settings: Settings) -> Any | None:
             host=settings.langfuse_host,
         )
         handler = CallbackHandler()
-        log.info("llm.factory.langfuse_tracing_enabled", host=settings.langfuse_host)
-        return handler
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         log.warning("llm.factory.langfuse_tracing_unavailable", error=str(exc))
         return None
+    else:
+        log.info("llm.factory.langfuse_tracing_enabled", host=settings.langfuse_host)
+        return handler
 
 
 def create_llm_client(settings: Settings) -> LLMClientPort:

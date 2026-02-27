@@ -23,6 +23,6 @@ class TriggerArtifactSummaryEmbeddingUseCase:
     async def execute(self, artifact_id: UUID) -> WorkflowStartedResponse:
         logger.info("trigger_artifact_summary_embedding", artifact_id=str(artifact_id))
         await self.workflow_orchestrator.start_artifact_summary_embedding_workflow(
-            artifact_id=artifact_id
+            artifact_id=artifact_id,
         )
         return WorkflowStartedResponse(workflow_id=f"artifact-summary-embedding-{artifact_id}")

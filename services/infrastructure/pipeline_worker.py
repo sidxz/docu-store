@@ -21,16 +21,16 @@ from eventsourcing.application import Application
 from eventsourcing.projection import ApplicationSubscription
 
 from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
-from application.workflow_use_cases.trigger_compound_extraction_use_case import (
-    TriggerCompoundExtractionUseCase,
-)
-from application.workflow_use_cases.trigger_embedding_use_case import TriggerEmbeddingUseCase
 from application.workflow_use_cases.trigger_artifact_summarization_use_case import (
     TriggerArtifactSummarizationUseCase,
 )
 from application.workflow_use_cases.trigger_artifact_summary_embedding_use_case import (
     TriggerArtifactSummaryEmbeddingUseCase,
 )
+from application.workflow_use_cases.trigger_compound_extraction_use_case import (
+    TriggerCompoundExtractionUseCase,
+)
+from application.workflow_use_cases.trigger_embedding_use_case import TriggerEmbeddingUseCase
 from application.workflow_use_cases.trigger_page_summarization_use_case import (
     TriggerPageSummarizationUseCase,
 )

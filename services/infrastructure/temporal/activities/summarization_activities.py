@@ -53,7 +53,8 @@ def create_summarize_page_activity(
             )
             # Concurrency conflicts are retriable — raise so Temporal retries the activity.
             if error.category == "concurrency":
-                raise RuntimeError(f"Concurrency conflict (will retry): {error.message}")
+                msg = f"Concurrency conflict (will retry): {error.message}"
+                raise RuntimeError(msg)
             return {
                 "status": "failed",
                 "page_id": page_id,

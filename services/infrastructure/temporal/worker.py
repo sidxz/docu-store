@@ -17,7 +17,10 @@ from temporalio.worker import Worker
 from application.use_cases.compound_use_cases import ExtractCompoundMentionsUseCase
 from application.use_cases.embedding_use_cases import GeneratePageEmbeddingUseCase
 from application.use_cases.smiles_embedding_use_cases import EmbedCompoundSmilesUseCase
-from application.use_cases.summarization_use_cases import SummarizeArtifactUseCase, SummarizePageUseCase
+from application.use_cases.summarization_use_cases import (
+    SummarizeArtifactUseCase,
+    SummarizePageUseCase,
+)
 from application.use_cases.summary_embedding_use_cases import (
     EmbedArtifactSummaryUseCase,
     EmbedPageSummaryUseCase,
@@ -29,6 +32,9 @@ from infrastructure.temporal.activities.artifact_activities import (
     log_mime_type_activity,
     log_storage_location_activity,
 )
+from infrastructure.temporal.activities.artifact_summarization_activities import (
+    create_summarize_artifact_activity,
+)
 from infrastructure.temporal.activities.compound_activities import (
     create_extract_compound_mentions_activity,
 )
@@ -39,9 +45,6 @@ from infrastructure.temporal.activities.embedding_activities import (
 from infrastructure.temporal.activities.smiles_embedding_activities import (
     create_embed_compound_smiles_activity,
 )
-from infrastructure.temporal.activities.artifact_summarization_activities import (
-    create_summarize_artifact_activity,
-)
 from infrastructure.temporal.activities.summarization_activities import (
     create_summarize_page_activity,
 )
@@ -50,12 +53,12 @@ from infrastructure.temporal.activities.summary_embedding_activities import (
     create_embed_page_summary_activity,
 )
 from infrastructure.temporal.workflows.artifact_processing import ProcessArtifactWorkflow
-from infrastructure.temporal.workflows.compound_workflow import ExtractCompoundMentionsWorkflow
-from infrastructure.temporal.workflows.embedding_workflow import GeneratePageEmbeddingWorkflow
-from infrastructure.temporal.workflows.smiles_embedding_workflow import EmbedCompoundSmilesWorkflow
 from infrastructure.temporal.workflows.artifact_summarization_workflow import (
     ArtifactSummarizationWorkflow,
 )
+from infrastructure.temporal.workflows.compound_workflow import ExtractCompoundMentionsWorkflow
+from infrastructure.temporal.workflows.embedding_workflow import GeneratePageEmbeddingWorkflow
+from infrastructure.temporal.workflows.smiles_embedding_workflow import EmbedCompoundSmilesWorkflow
 from infrastructure.temporal.workflows.summarization_workflow import PageSummarizationWorkflow
 from infrastructure.temporal.workflows.summary_embedding_workflow import (
     ArtifactSummaryEmbeddingWorkflow,
@@ -81,8 +84,8 @@ async def run() -> None:
 
     # Ensure Qdrant collections exist (worker may start before the API)
     try:
-        from application.ports.vector_store import VectorStore  # noqa: PLC0415
         from application.ports.summary_vector_store import SummaryVectorStore  # noqa: PLC0415
+        from application.ports.vector_store import VectorStore  # noqa: PLC0415
 
         await container[VectorStore].ensure_collection_exists()
         await container[SummaryVectorStore].ensure_collection_exists()

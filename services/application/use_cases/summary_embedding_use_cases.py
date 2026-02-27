@@ -49,9 +49,7 @@ class EmbedPageSummaryUseCase:
             page = self.page_repository.get_by_id(page_id)
 
             if page.summary_candidate is None or not page.summary_candidate.summary:
-                return Failure(
-                    AppError("validation", f"Page {page_id} has no summary to embed")
-                )
+                return Failure(AppError("validation", f"Page {page_id} has no summary to embed"))
 
             summary_text = page.summary_candidate.summary
 
@@ -122,7 +120,7 @@ class EmbedArtifactSummaryUseCase:
 
             if artifact.summary_candidate is None or not artifact.summary_candidate.summary:
                 return Failure(
-                    AppError("validation", f"Artifact {artifact_id} has no summary to embed")
+                    AppError("validation", f"Artifact {artifact_id} has no summary to embed"),
                 )
 
             summary_text = artifact.summary_candidate.summary
@@ -148,13 +146,15 @@ class EmbedArtifactSummaryUseCase:
 
         except AggregateNotFoundError as e:
             logger.warning(
-                "embed_artifact_summary_not_found", artifact_id=str(artifact_id), error=str(e)
+                "embed_artifact_summary_not_found",
+                artifact_id=str(artifact_id),
+                error=str(e),
             )
             return Failure(AppError("not_found", str(e)))
         except Exception as e:
             logger.exception(
-                "embed_artifact_summary_failed", artifact_id=str(artifact_id), error=str(e)
+                "embed_artifact_summary_failed",
+                artifact_id=str(artifact_id),
+                error=str(e),
             )
-            return Failure(
-                AppError("internal_error", f"Failed to embed artifact summary: {e!s}")
-            )
+            return Failure(AppError("internal_error", f"Failed to embed artifact summary: {e!s}"))

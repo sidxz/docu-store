@@ -53,7 +53,8 @@ def create_summarize_artifact_activity(
             )
             # Concurrency conflicts are retriable — raise so Temporal retries the activity.
             if error.category == "concurrency":
-                raise RuntimeError(f"Concurrency conflict (will retry): {error.message}")
+                msg = f"Concurrency conflict (will retry): {error.message}"
+                raise RuntimeError(msg)
             return {
                 "status": "failed",
                 "artifact_id": artifact_id,

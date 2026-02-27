@@ -9,7 +9,7 @@ from domain.value_objects.text_embedding import TextEmbedding
 class SummarySearchResult:
     """Result from a summary similarity search."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         point_id: str,
         entity_type: Literal["page", "artifact"],
@@ -42,7 +42,7 @@ class SummaryVectorStore(Protocol):
         """Ensure the collection exists with proper schema. Idempotent."""
         ...
 
-    async def upsert_page_summary_embedding(
+    async def upsert_page_summary_embedding(  # noqa: PLR0913
         self,
         page_id: UUID,
         artifact_id: UUID,
@@ -94,7 +94,7 @@ class SummaryVectorStore(Protocol):
             limit: Max results to return.
             entity_type_filter: Restrict to "page" or "artifact" summaries.
             artifact_id_filter: Restrict to a specific artifact.
-            score_threshold: Minimum cosine similarity (0.0–1.0).
+            score_threshold: Minimum cosine similarity (0.0-1.0).
 
         Returns:
             List of SummarySearchResult ordered by score descending.

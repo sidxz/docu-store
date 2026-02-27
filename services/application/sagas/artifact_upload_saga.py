@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import io
-import structlog
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, BinaryIO
-from uuid import UUID
 
+import structlog
 from returns.result import Failure, Result, Success
 
 from application.dtos.artifact_dtos import CreateArtifactRequest
@@ -16,6 +14,9 @@ from domain.value_objects.mime_type import MimeType
 from domain.value_objects.text_mention import TextMention
 
 if TYPE_CHECKING:
+    import io
+    from uuid import UUID
+
     from application.dtos.artifact_dtos import ArtifactResponse
     from application.dtos.blob_dtos import UploadBlobRequest, UploadBlobResponse
     from application.dtos.pdf_dtos import PDFContent

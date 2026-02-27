@@ -42,7 +42,7 @@ class SummarizePageUseCase:
     Skips pages whose summary_candidate.is_locked is True (human correction present).
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         page_repository: PageRepository,
         artifact_repository: ArtifactRepository,
@@ -71,7 +71,9 @@ class SummarizePageUseCase:
                 return Success(PageMapper.to_page_response(page))
 
             slide_text = (
-                page.text_mention.text.strip() if page.text_mention and page.text_mention.text else ""
+                page.text_mention.text.strip()
+                if page.text_mention and page.text_mention.text
+                else ""
             )
             artifact_title = artifact.source_filename or "Unknown"
             page_index = page.index + 1  # 1-based for the prompt
@@ -115,7 +117,9 @@ class SummarizePageUseCase:
                 summary_text = await self.llm_client.complete(rendered)
 
             model_info = await self.llm_client.get_model_info()
-            model_name = f"{model_info.get('provider', 'unknown')}/{model_info.get('model_name', 'unknown')}"
+            model_name = (
+                f"{model_info.get('provider', 'unknown')}/{model_info.get('model_name', 'unknown')}"
+            )
 
             log.info(
                 "summarize_page.llm_done",
@@ -174,7 +178,7 @@ class SummarizeArtifactUseCase:
     Returns Failure("not_ready") if no page summaries exist yet.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         artifact_repository: ArtifactRepository,
         page_repository: PageRepository,
@@ -241,7 +245,9 @@ class SummarizeArtifactUseCase:
             final_summary = await self._refine(combined, artifact_title)
 
             model_info = await self.llm_client.get_model_info()
-            model_name = f"{model_info.get('provider', 'unknown')}/{model_info.get('model_name', 'unknown')}"
+            model_name = (
+                f"{model_info.get('provider', 'unknown')}/{model_info.get('model_name', 'unknown')}"
+            )
 
             log.info(
                 "summarize_artifact.llm_done",
