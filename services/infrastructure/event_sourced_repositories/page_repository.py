@@ -1,10 +1,11 @@
 from uuid import UUID
 
 from eventsourcing.application import Application
+from eventsourcing.persistence import IntegrityError as EventSourcingIntegrityError
 
 from application.ports.repositories.page_repository import PageRepository
 from domain.aggregates.page import Page
-from domain.exceptions import AggregateNotFoundError, InfrastructureError
+from domain.exceptions import AggregateNotFoundError, ConcurrencyError, InfrastructureError
 
 
 def _raise_page_not_found(page_id: UUID) -> None:
@@ -32,6 +33,9 @@ class EventSourcedPageRepository(PageRepository):
         """
         try:
             self.application.save(page)
+        except EventSourcingIntegrityError as e:
+            msg = f"Concurrency conflict saving page: {e!s}"
+            raise ConcurrencyError(msg) from e
         except Exception as e:
             # Let infrastructure errors bubble up for proper error handling at API layer
             msg = f"Failed to save page: {e!s}"

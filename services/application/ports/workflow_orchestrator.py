@@ -82,3 +82,19 @@ class WorkflowOrchestrator(Protocol):
 
         """
         ...
+
+    @abstractmethod
+    async def start_page_summarization_workflow(
+        self,
+        page_id: UUID,
+    ) -> None:
+        """Start the LLM summarization workflow for a page.
+
+        Args:
+            page_id: Unique identifier of the page to summarize
+
+        Raises:
+            May raise implementation-specific exceptions on workflow start failure.
+
+        """
+        ...

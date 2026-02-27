@@ -1,0 +1,23 @@
+name: page_summarization_hybrid
+version: "1.0"
+description: >
+  Summarize a single presentation slide using both the extracted text and
+  the slide image. Used when text content is substantial (>=100 characters).
+input_variables:
+  - slide_text
+  - artifact_title
+  - page_index
+template: |
+  You are summarizing a single slide from a scientific presentation.
+
+  Presentation title: {artifact_title}
+  Slide number: {page_index}
+
+  Extracted slide text:
+  {slide_text}
+
+  The slide image is also provided for additional context (charts, figures, structures).
+
+  Write a concise summary (2-4 sentences) of this slide. Focus on the key scientific
+  finding, data, or message being communicated. Do not speculate beyond what is shown.
+  Do not start with "This slide".

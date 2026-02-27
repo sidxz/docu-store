@@ -12,3 +12,4 @@ class WorkflowNames(StrEnum):
     COMPOUND_EXTRACTION_WORKFLOW = "compound_extraction_workflow"
     EMBEDDING_WORKFLOW = "embedding_workflow"
     SMILES_EMBEDDING_WORKFLOW = "smiles_embedding_workflow"
+    PAGE_SUMMARIZATION_WORKFLOW = "page_summarization_workflow"

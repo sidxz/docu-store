@@ -1,0 +1,21 @@
+name: page_summarization_image_only
+version: "1.0"
+description: >
+  Summarize a single presentation slide from its image alone. Used when
+  extracted text is sparse (<100 characters), such as diagram-heavy slides.
+input_variables:
+  - artifact_title
+  - page_index
+template: |
+  You are summarizing a single slide from a scientific presentation.
+
+  Presentation title: {artifact_title}
+  Slide number: {page_index}
+
+  No reliable text was extracted from this slide. Use the slide image to
+  understand its content.
+
+  Write a concise summary (2-4 sentences) of what this slide shows. Focus on
+  the key scientific finding, data, or message being communicated. If the slide
+  contains a figure, chart, or chemical structure, describe what it represents.
+  Do not start with "This slide".

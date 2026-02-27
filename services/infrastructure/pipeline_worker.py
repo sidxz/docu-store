@@ -25,6 +25,9 @@ from application.workflow_use_cases.trigger_compound_extraction_use_case import 
     TriggerCompoundExtractionUseCase,
 )
 from application.workflow_use_cases.trigger_embedding_use_case import TriggerEmbeddingUseCase
+from application.workflow_use_cases.trigger_page_summarization_use_case import (
+    TriggerPageSummarizationUseCase,
+)
 from application.workflow_use_cases.trigger_smiles_embedding_use_case import (
     TriggerSmilesEmbeddingUseCase,
 )
@@ -61,6 +64,7 @@ async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0
     trigger_compound_extraction_use_case = container[TriggerCompoundExtractionUseCase]
     trigger_embedding_use_case = container[TriggerEmbeddingUseCase]
     trigger_smiles_embedding_use_case = container[TriggerSmilesEmbeddingUseCase]
+    trigger_page_summarization_use_case = container[TriggerPageSummarizationUseCase]
 
     # Setup signal handlers
     def handle_signal(signum: int, _frame: object) -> None:
@@ -151,6 +155,16 @@ async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0
 
                                 logger.info(
                                     "pipeline_embedding_workflow_triggered",
+                                    page_id=str(domain_event.originator_id),
+                                    tracking_id=tracking.notification_id,
+                                )
+
+                                await trigger_page_summarization_use_case.execute(
+                                    page_id=domain_event.originator_id,
+                                )
+
+                                logger.info(
+                                    "pipeline_summarization_workflow_triggered",
                                     page_id=str(domain_event.originator_id),
                                     tracking_id=tracking.notification_id,
                                 )

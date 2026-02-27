@@ -17,6 +17,8 @@ from application.ports.repositories.artifact_read_models import ArtifactReadMode
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
+from application.ports.llm_client import LLMClientPort
+from application.ports.prompt_repository import PromptRepositoryPort
 from application.ports.smiles_validator import SmilesValidator
 from application.ports.text_chunker import TextChunker
 from application.ports.vector_store import VectorStore
@@ -51,11 +53,15 @@ from application.use_cases.page_use_cases import (
 )
 from application.use_cases.smiles_embedding_use_cases import EmbedCompoundSmilesUseCase
 from application.use_cases.smiles_search_use_cases import SearchSimilarCompoundsUseCase
+from application.use_cases.summarization_use_cases import SummarizePageUseCase
 from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
 from application.workflow_use_cases.trigger_compound_extraction_use_case import (
     TriggerCompoundExtractionUseCase,
 )
 from application.workflow_use_cases.trigger_embedding_use_case import TriggerEmbeddingUseCase
+from application.workflow_use_cases.trigger_page_summarization_use_case import (
+    TriggerPageSummarizationUseCase,
+)
 from application.workflow_use_cases.trigger_smiles_embedding_use_case import (
     TriggerSmilesEmbeddingUseCase,
 )
@@ -87,6 +93,7 @@ from infrastructure.read_repositories.mongo_read_model_materializer import (
 )
 from infrastructure.read_repositories.mongo_read_repository import MongoReadRepository
 from infrastructure.serialization.pydantic_transcoder import PydanticTranscoding
+from infrastructure.llm.factory import create_llm_client, create_prompt_repository
 from infrastructure.temporal.orchestrator import TemporalWorkflowOrchestrator
 from infrastructure.text_chunkers.langchain_chunker import LangChainTextChunker
 from infrastructure.vector_stores.compound_qdrant_store import CompoundQdrantStore
@@ -322,6 +329,7 @@ def create_container() -> Container:  # noqa: PLR0915
         add_pages_use_case=c[AddPagesUseCase],
         update_text_mention_use_case=c[UpdateTextMentionUseCase],
         pdf_service=c[PDFService],
+        blob_store=c[BlobStore],
     )
 
     # Compound Extraction Use Case
@@ -362,6 +370,24 @@ def create_container() -> Container:  # noqa: PLR0915
         workflow_orchestrator=c[WorkflowOrchestrator],
     )
     container[TriggerSmilesEmbeddingUseCase] = lambda c: TriggerSmilesEmbeddingUseCase(
+        page_repository=c[PageRepository],
+        workflow_orchestrator=c[WorkflowOrchestrator],
+    )
+
+    # LLM Infrastructure (shared — provider selected via LLM_PROVIDER config)
+    container[LLMClientPort] = lambda _: create_llm_client(settings)
+    container[PromptRepositoryPort] = lambda _: create_prompt_repository(settings)
+
+    # Summarization Use Cases
+    container[SummarizePageUseCase] = lambda c: SummarizePageUseCase(
+        page_repository=c[PageRepository],
+        artifact_repository=c[ArtifactRepository],
+        llm_client=c[LLMClientPort],
+        prompt_repository=c[PromptRepositoryPort],
+        blob_store=c[BlobStore],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[TriggerPageSummarizationUseCase] = lambda c: TriggerPageSummarizationUseCase(
         page_repository=c[PageRepository],
         workflow_orchestrator=c[WorkflowOrchestrator],
     )
