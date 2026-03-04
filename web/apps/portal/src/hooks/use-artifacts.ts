@@ -1,0 +1,129 @@
+"use client";
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiClient } from "@docu-store/api-client";
+import { queryKeys } from "@/lib/query-keys";
+
+export function useArtifacts(skip = 0, limit = 50) {
+  return useQuery({
+    queryKey: [...queryKeys.artifacts.list(), { skip, limit }],
+    queryFn: async () => {
+      const { data, error } = await apiClient.GET("/artifacts", {
+        params: { query: { skip, limit } },
+      });
+      if (error) throw new Error("Failed to fetch artifacts");
+      return data;
+    },
+  });
+}
+
+export function useArtifact(id: string) {
+  return useQuery({
+    queryKey: queryKeys.artifacts.detail(id),
+    queryFn: async () => {
+      const { data, error } = await apiClient.GET(
+        "/artifacts/{artifact_id}",
+        { params: { path: { artifact_id: id } } },
+      );
+      if (error) throw new Error("Failed to fetch artifact");
+      return data;
+    },
+    enabled: !!id,
+  });
+}
+
+export function useArtifactWorkflows(id: string) {
+  return useQuery({
+    queryKey: queryKeys.artifacts.workflows(id),
+    queryFn: async () => {
+      const { data, error } = await apiClient.GET(
+        "/artifacts/{artifact_id}/workflows",
+        { params: { path: { artifact_id: id } } },
+      );
+      if (error) throw new Error("Failed to fetch workflows");
+      return data;
+    },
+    enabled: !!id,
+    refetchInterval: (query) => {
+      // Poll every 3s if any workflow is still running
+      const result = query.state.data as
+        | { workflows?: Record<string, { status?: string }> }
+        | undefined;
+      const workflows = result?.workflows;
+      const hasRunning = workflows
+        ? Object.values(workflows).some((w) => w.status === "RUNNING")
+        : false;
+      return hasRunning ? 3000 : false;
+    },
+  });
+}
+
+export function useArtifactSummary(id: string) {
+  return useQuery({
+    queryKey: queryKeys.artifacts.summary(id),
+    queryFn: async () => {
+      const { data, error } = await apiClient.GET(
+        "/artifacts/{artifact_id}/summary",
+        { params: { path: { artifact_id: id } } },
+      );
+      if (error) throw new Error("Failed to fetch summary");
+      return data;
+    },
+    enabled: !!id,
+  });
+}
+
+export function useUploadArtifact() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      file,
+      artifactType,
+      sourceUri,
+    }: {
+      file: File;
+      artifactType: string;
+      sourceUri?: string;
+    }) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("artifact_type", artifactType);
+      if (sourceUri) formData.append("source_uri", sourceUri);
+
+      const baseUrl =
+        process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+      const res = await fetch(`${baseUrl}/artifacts/upload`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errorBody = await res.text();
+        throw new Error(`Upload failed: ${res.status} ${errorBody}`);
+      }
+
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.artifacts.all });
+    },
+  });
+}
+
+export function useDeleteArtifact() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await apiClient.DELETE(
+        "/artifacts/{artifact_id}",
+        { params: { path: { artifact_id: id } } },
+      );
+      if (error) throw new Error("Failed to delete artifact");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.artifacts.all });
+    },
+  });
+}
