@@ -75,6 +75,7 @@ class SearchSummariesUseCase:
                     similarity_score=h.score,
                     summary_text=h.summary_text,
                     artifact_title=h.artifact_title,
+                    page_index=h.metadata.get("page_index"),
                     metadata=h.metadata,
                 )
                 for h in hits
@@ -158,6 +159,7 @@ class HierarchicalSearchUseCase:
                     score=h.score,
                     summary_text=h.summary_text,
                     artifact_title=h.artifact_title,
+                    page_index=h.metadata.get("page_index"),
                 )
                 for h in summary_hits_raw
             ]

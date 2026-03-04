@@ -1,5 +1,7 @@
 import { SearchResultCard } from "./SearchResultCard";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
 interface SummaryResult {
   entity_type: "page" | "artifact";
   entity_id: string;
@@ -7,6 +9,7 @@ interface SummaryResult {
   similarity_score: number;
   summary_text?: string | null;
   artifact_title?: string | null;
+  page_index?: number | null;
 }
 
 interface SummarySearchResultsProps {
@@ -50,6 +53,7 @@ export function SummarySearchResults({
             score={r.similarity_score}
             preview={r.summary_text}
             entityType={r.entity_type}
+            thumbnailSrc={`${API_URL}/artifacts/${r.artifact_id}/pages/${r.page_index ?? 0}/image`}
           />
         ))}
       </div>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Column } from "primereact/column";
 import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 import { DataTable } from "primereact/datatable";
@@ -31,6 +31,26 @@ type PageResponse = components["schemas"]["PageResponse"];
 
 interface WorkflowMap {
   workflows?: Record<string, { workflow_id: string; status: string }>;
+}
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+function PdfEmbed({ artifactId }: { artifactId: string }) {
+  const [loaded, setLoaded] = useState(false);
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-border-default">
+      {!loaded && (
+        <div className="h-[80vh] w-full animate-pulse bg-surface-elevated" />
+      )}
+      <iframe
+        src={`${API_URL}/artifacts/${artifactId}/pdf`}
+        className={`h-[80vh] w-full ${loaded ? "" : "hidden"}`}
+        title="PDF Viewer"
+        onLoad={() => setLoaded(true)}
+      />
+    </div>
+  );
 }
 
 export default function ArtifactDetailPage() {
@@ -132,6 +152,13 @@ export default function ArtifactDetailPage() {
       />
 
       <TabView className="mt-2">
+        {/* PDF Tab */}
+        <TabPanel header="PDF">
+          <div className="pt-4">
+            <PdfEmbed artifactId={id} />
+          </div>
+        </TabPanel>
+
         {/* Overview Tab */}
         <TabPanel header="Overview">
           <div className="space-y-6 pt-4">

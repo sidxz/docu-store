@@ -1,13 +1,23 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, BookOpen, Loader2 } from "lucide-react";
+import { useState } from "react";
+import {
+  ArrowLeft,
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Image,
+  FileText,
+} from "lucide-react";
 
 import { MoleculeStructure } from "@docu-store/ui";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { ScoreBadge } from "@/components/ui/ScoreBadge";
 import { WorkflowStatusBadge } from "@/components/WorkflowStatusBadge";
+import { useArtifact } from "@/hooks/use-artifacts";
 import { usePage, usePageWorkflows } from "@/hooks/use-pages";
 
 const ENTITY_TYPE_COLORS: Record<string, string> = {
@@ -16,6 +26,67 @@ const ENTITY_TYPE_COLORS: Record<string, string> = {
   disease: "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400",
 };
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+function PageImage({
+  artifactId,
+  pageIndex,
+}: {
+  artifactId: string;
+  pageIndex: number;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+
+  return (
+    <div className="flex justify-center">
+      {!loaded && !error && (
+        <div className="h-[600px] w-full animate-pulse rounded-lg bg-surface-elevated" />
+      )}
+      {error ? (
+        <div className="flex h-48 w-full items-center justify-center rounded-lg border border-border-default bg-surface-elevated">
+          <p className="text-sm text-text-muted">Page image not available</p>
+        </div>
+      ) : (
+        <img
+          src={`${API_URL}/artifacts/${artifactId}/pages/${pageIndex}/image`}
+          alt={`Page ${pageIndex + 1}`}
+          className={`max-h-[80vh] rounded-lg border border-border-default object-contain ${loaded ? "" : "hidden"}`}
+          onLoad={() => setLoaded(true)}
+          onError={() => {
+            setError(true);
+            setLoaded(true);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function PagePdfEmbed({
+  artifactId,
+  pageNumber,
+}: {
+  artifactId: string;
+  pageNumber: number;
+}) {
+  const [loaded, setLoaded] = useState(false);
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-border-default">
+      {!loaded && (
+        <div className="h-[80vh] w-full animate-pulse bg-surface-elevated" />
+      )}
+      <iframe
+        src={`${API_URL}/artifacts/${artifactId}/pdf#page=${pageNumber}`}
+        className={`h-[80vh] w-full ${loaded ? "" : "hidden"}`}
+        title={`PDF page ${pageNumber}`}
+        onLoad={() => setLoaded(true)}
+      />
+    </div>
+  );
+}
+
 export default function PageViewerPage() {
   const { workspace, id, pageId } = useParams<{
     workspace: string;
@@ -23,8 +94,33 @@ export default function PageViewerPage() {
     pageId: string;
   }>();
   const router = useRouter();
+  const [viewMode, setViewMode] = useState<"image" | "pdf">("image");
   const { data: page, isLoading, error } = usePage(pageId);
+  const { data: artifact } = useArtifact(id);
   const { data: workflowData } = usePageWorkflows(pageId);
+
+  // Derive prev/next page IDs from the artifact's page list
+  const siblingPages = (() => {
+    if (!artifact?.pages || !page) return { prev: null, next: null };
+    const pages = artifact.pages;
+    const currentIndex = page.index;
+    let prevId: string | null = null;
+    let nextId: string | null = null;
+
+    for (let i = 0; i < pages.length; i++) {
+      const p = pages[i];
+      if (typeof p === "string") {
+        // pages is list[UUID] — ordered by index
+        if (i === currentIndex - 1) prevId = p;
+        if (i === currentIndex + 1) nextId = p;
+      } else {
+        // pages is list[PageResponse]
+        if (p.index === currentIndex - 1) prevId = p.page_id;
+        if (p.index === currentIndex + 1) nextId = p.page_id;
+      }
+    }
+    return { prev: prevId, next: nextId };
+  })();
 
   if (isLoading) {
     return (
@@ -75,7 +171,78 @@ export default function PageViewerPage() {
         icon={BookOpen}
         title={page.name}
         subtitle={`Page ${page.index + 1} · ${page.compound_mentions?.length ?? 0} compounds`}
+        actions={
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              disabled={!siblingPages.prev}
+              onClick={() =>
+                siblingPages.prev &&
+                router.push(
+                  `/${workspace}/documents/${id}/pages/${siblingPages.prev}`,
+                )
+              }
+              className="flex items-center gap-1 rounded-lg border border-border-default px-2.5 py-1.5 text-sm text-text-secondary transition-colors hover:bg-surface-elevated disabled:opacity-30 disabled:pointer-events-none"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Prev
+            </button>
+            <button
+              type="button"
+              disabled={!siblingPages.next}
+              onClick={() =>
+                siblingPages.next &&
+                router.push(
+                  `/${workspace}/documents/${id}/pages/${siblingPages.next}`,
+                )
+              }
+              className="flex items-center gap-1 rounded-lg border border-border-default px-2.5 py-1.5 text-sm text-text-secondary transition-colors hover:bg-surface-elevated disabled:opacity-30 disabled:pointer-events-none"
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        }
       />
+
+      {/* Page visual — PNG image or full PDF */}
+      <Card className="mb-6">
+        <div className="mb-3 flex items-center justify-between">
+          <CardHeader title="Page View" />
+          <div className="flex items-center gap-1 rounded-lg border border-border-default p-0.5">
+            <button
+              type="button"
+              onClick={() => setViewMode("image")}
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                viewMode === "image"
+                  ? "bg-accent text-white"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              <Image className="h-3.5 w-3.5" />
+              Image
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("pdf")}
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                viewMode === "pdf"
+                  ? "bg-accent text-white"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              <FileText className="h-3.5 w-3.5" />
+              Full PDF
+            </button>
+          </div>
+        </div>
+
+        {viewMode === "image" ? (
+          <PageImage artifactId={id} pageIndex={page.index} />
+        ) : (
+          <PagePdfEmbed artifactId={id} pageNumber={page.index + 1} />
+        )}
+      </Card>
 
       {/* Two-panel: text + summary */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

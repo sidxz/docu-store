@@ -1,5 +1,7 @@
 import { SearchResultCard } from "./SearchResultCard";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
 interface TextResult {
   page_id: string;
   artifact_id: string;
@@ -42,6 +44,7 @@ export function TextSearchResults({ data, workspace }: TextSearchResultsProps) {
             href={`/${workspace}/documents/${r.artifact_id}/pages/${r.page_id}`}
             score={r.similarity_score}
             preview={r.text_preview}
+            thumbnailSrc={`${API_URL}/artifacts/${r.artifact_id}/pages/${r.page_index}/image`}
             secondaryLink={{
               label: "View document",
               href: `/${workspace}/documents/${r.artifact_id}`,

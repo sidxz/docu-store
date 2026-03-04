@@ -36,6 +36,7 @@ class SummarySearchResultDTO(BaseModel):
     similarity_score: float
     summary_text: str | None = None
     artifact_title: str | None = None
+    page_index: int | None = None
     metadata: dict = Field(default_factory=dict)
 
 
@@ -83,6 +84,7 @@ class SummaryHit(BaseModel):
     score: float
     summary_text: str | None = None
     artifact_title: str | None = None
+    page_index: int | None = None
 
 
 class HierarchicalSearchResponse(BaseModel):

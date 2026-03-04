@@ -1,13 +1,16 @@
 from collections.abc import Container
+from io import BytesIO
 from typing import Annotated
 from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi.responses import StreamingResponse
 from returns.result import Success
 
 from application.dtos.artifact_dtos import ArtifactResponse, CreateArtifactRequest
 from application.dtos.blob_dtos import UploadBlobRequest
+from application.ports.blob_store import BlobStore
 from application.dtos.workflow_dtos import WorkflowStartedResponse
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.ports.workflow_orchestrator import WorkflowOrchestrator
@@ -260,3 +263,70 @@ async def get_artifact_workflows(
     orchestrator = container[WorkflowOrchestrator]
     workflows = await orchestrator.get_artifact_workflow_statuses(artifact_id)
     return {"artifact_id": str(artifact_id), "workflows": workflows}
+
+
+@router.get("/{artifact_id}/pdf", status_code=status.HTTP_200_OK)
+async def stream_artifact_pdf(
+    artifact_id: UUID,
+    container: Annotated[Container, Depends(get_container)],
+) -> StreamingResponse:
+    """Stream the source PDF for an artifact.
+
+    Returns the raw PDF binary from blob storage. The artifact must exist
+    and have a valid storage_location.
+    """
+    read_repository = container[ArtifactReadModel]
+    artifact = await read_repository.get_artifact_by_id(artifact_id)
+
+    if artifact is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Artifact not found",
+        )
+
+    blob_store = container[BlobStore]
+
+    if not blob_store.exists(artifact.storage_location):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="PDF file not found in storage",
+        )
+
+    pdf_bytes = blob_store.get_bytes(artifact.storage_location)
+    filename = artifact.source_filename or f"{artifact_id}.pdf"
+
+    return StreamingResponse(
+        BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"',
+        },
+    )
+
+
+@router.get("/{artifact_id}/pages/{page_index}/image", status_code=status.HTTP_200_OK)
+async def stream_page_image(
+    artifact_id: UUID,
+    page_index: int,
+    container: Annotated[Container, Depends(get_container)],
+) -> StreamingResponse:
+    """Stream the rendered PNG image for a specific page of an artifact.
+
+    Returns the pre-rendered page image from blob storage. Page images
+    are generated during PDF ingestion.
+    """
+    blob_store = container[BlobStore]
+    image_key = f"artifacts/{artifact_id}/pages/{page_index}.png"
+
+    if not blob_store.exists(image_key):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Page image not found for index {page_index}",
+        )
+
+    image_bytes = blob_store.get_bytes(image_key)
+
+    return StreamingResponse(
+        BytesIO(image_bytes),
+        media_type="image/png",
+    )

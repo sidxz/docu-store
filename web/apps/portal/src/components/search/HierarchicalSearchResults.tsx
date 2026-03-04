@@ -1,5 +1,7 @@
 import { SearchResultCard } from "./SearchResultCard";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
 interface SummaryHit {
   entity_type: "page" | "artifact";
   entity_id: string;
@@ -7,6 +9,7 @@ interface SummaryHit {
   score: number;
   summary_text?: string | null;
   artifact_title?: string | null;
+  page_index?: number | null;
 }
 
 interface ChunkHit {
@@ -69,6 +72,7 @@ export function HierarchicalSearchResults({
                 score={h.score}
                 preview={h.summary_text}
                 entityType={h.entity_type}
+                thumbnailSrc={`${API_URL}/artifacts/${h.artifact_id}/pages/${h.page_index ?? 0}/image`}
               />
             ))}
           </div>
@@ -89,6 +93,7 @@ export function HierarchicalSearchResults({
                 href={`/${workspace}/documents/${c.artifact_id}/pages/${c.page_id}`}
                 score={c.score}
                 preview={c.text_preview}
+                thumbnailSrc={`${API_URL}/artifacts/${c.artifact_id}/pages/${c.page_index}/image`}
                 secondaryLink={{
                   label: "View document",
                   href: `/${workspace}/documents/${c.artifact_id}`,
