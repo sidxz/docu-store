@@ -12,6 +12,8 @@ interface DashboardStats {
 }
 
 export function useDashboard() {
+  // Fetches up to 100 artifacts in one call and aggregates KPIs client-side.
+  // A dedicated /dashboard/stats endpoint could replace this in the future.
   const { data, isLoading, error } = useArtifacts(0, 100);
 
   const stats = useMemo<DashboardStats>(() => {

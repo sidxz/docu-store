@@ -1,3 +1,12 @@
+/**
+ * Centralized TanStack Query key factory.
+ *
+ * Using a factory (functions that return arrays) rather than bare string arrays
+ * makes it easy to invalidate whole subtrees:
+ *   - invalidate all artifact data:       queryKeys.artifacts.all
+ *   - invalidate one artifact + children: queryKeys.artifacts.detail(id)
+ *   - invalidate just workflows for one:  queryKeys.artifacts.workflows(id)
+ */
 export const queryKeys = {
   artifacts: {
     all: ["artifacts"] as const,

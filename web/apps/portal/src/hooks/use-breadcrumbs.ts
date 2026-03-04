@@ -7,6 +7,8 @@ interface Breadcrumb {
   href: string;
 }
 
+// Human-readable label overrides for known route segments.
+// Segments not in this map are auto-formatted by formatSegment().
 const LABEL_MAP: Record<string, string> = {
   documents: "Documents",
   search: "Search",
@@ -25,7 +27,8 @@ export function useBreadcrumbs(): Breadcrumb[] {
     return [{ label: "Dashboard", href: `/${segments[0] || "default"}` }];
   }
 
-  // segments[0] = workspace slug
+  // segments[0] is the workspace slug ([workspace] dynamic segment).
+  // We intentionally skip it — the sidebar already shows the workspace name.
   const workspace = segments[0];
   const crumbs: Breadcrumb[] = [];
 

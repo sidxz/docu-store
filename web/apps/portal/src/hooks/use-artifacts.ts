@@ -49,6 +49,8 @@ export function useArtifactWorkflows(id: string) {
       return data as WorkflowMap;
     },
     enabled: !!id,
+    // Poll every 3 s while any workflow is RUNNING; stop once all settle.
+    // The backend proxies to Temporal, so this drives real-time status updates.
     refetchInterval: (query) => {
       const workflows = (query.state.data as WorkflowMap | undefined)?.workflows;
       const hasRunning = workflows

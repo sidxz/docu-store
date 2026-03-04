@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+// localStorage key — must match the key read by the inline anti-flash script
+// in app/layout.tsx, which runs before React hydrates.
+const STORAGE_KEY = "ds-theme";
+
 type Theme = "light" | "dark";
 
 interface ThemeState {
@@ -18,7 +22,7 @@ export const useThemeStore = create<ThemeState>()(
       setTheme: (theme) => set({ theme }),
     }),
     {
-      name: "ds-theme",
+      name: STORAGE_KEY,
     },
   ),
 );

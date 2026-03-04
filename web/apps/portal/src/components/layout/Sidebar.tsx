@@ -40,6 +40,8 @@ export function Sidebar({ workspaceSlug }: { workspaceSlug: string }) {
   const { theme, toggleTheme } = useThemeStore();
   const { collapsed, toggleCollapsed } = useSidebarStore();
 
+  // Dashboard (href="") matches only the exact workspace root;
+  // all other items use startsWith so child routes stay highlighted.
   const isActive = (href: string) => {
     const fullHref = `/${workspaceSlug}${href}`;
     return href === ""

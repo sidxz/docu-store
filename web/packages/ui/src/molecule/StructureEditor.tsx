@@ -81,6 +81,9 @@ export function StructureEditor({
       } catch {
         // Invalid SMILES — leave editor empty
       }
+      // 300 ms cooldown: Ketcher fires internal changeEvents after setMolecule
+      // finishes; this flag prevents those programmatic events from echoing
+      // back to the parent as user-initiated changes.
       setTimeout(() => {
         isSettingMolecule.current = false;
       }, 300);
@@ -90,6 +93,8 @@ export function StructureEditor({
     const handler = () => {
       if (isSettingMolecule.current) return;
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      // 500 ms debounce: Ketcher fires multiple events per stroke; wait until
+      // the user pauses before calling getSmiles() (an async WASM operation).
       debounceTimer.current = setTimeout(async () => {
         const k = ketcherRef.current;
         if (!k || isSettingMolecule.current) return;
@@ -125,6 +130,9 @@ export function StructureEditor({
     if (trimmed === lastEmittedSmiles.current) return;
 
     if (setMoleculeTimer.current) clearTimeout(setMoleculeTimer.current);
+    // 600 ms debounce: slightly longer than the Ketcher→text debounce (500 ms)
+    // so that rapid typing doesn't trigger repeated setMolecule calls while
+    // the user is still mid-input.
     setMoleculeTimer.current = setTimeout(async () => {
       const k = ketcherRef.current;
       if (!k) return;

@@ -35,6 +35,7 @@ export function usePageWorkflows(pageId: string) {
       return data as WorkflowMap;
     },
     enabled: !!pageId,
+    // Poll every 3 s while any workflow is RUNNING; same strategy as useArtifactWorkflows.
     refetchInterval: (query) => {
       const workflows = (query.state.data as WorkflowMap | undefined)?.workflows;
       const hasRunning = workflows

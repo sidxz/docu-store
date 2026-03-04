@@ -1,6 +1,9 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+// Persisted so the sidebar stays collapsed/expanded across page navigations
+// and browser sessions without a server round-trip.
+
 interface SidebarState {
   collapsed: boolean;
   toggleCollapsed: () => void;

@@ -28,6 +28,14 @@ export type WorkflowTriggerReason =
   | "manual_rerun"
   | "failed_retry";
 
+/**
+ * Temporal workflow names used as Workflow IDs (prefixed with entity ID).
+ *  artifact_sample_workflow     — PDF parsing + page creation
+ *  compound_extraction_workflow — CSER compound extraction from a page
+ *  embedding_workflow           — text chunk embedding for a page
+ *  smiles_embedding_workflow    — SMILES vector embedding for compound mentions
+ *  page_summarization_workflow  — LLM summarization of a single page
+ */
 export type WorkflowName =
   | "artifact_sample_workflow"
   | "compound_extraction_workflow"

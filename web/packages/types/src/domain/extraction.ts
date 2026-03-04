@@ -27,12 +27,13 @@ export interface CompoundMention extends ExtractionMetadata {
   smiles: string;
   canonical_smiles: string | null;
   is_smiles_valid: boolean | null;
-  internal_id: string | null;
-  cdd_id: string | null;
-  chembl_id: string | null;
-  pdb_id: string | null;
-  other_ids: string[] | null;
-  extracted_id: string | null;
+  // Cross-database identifiers resolved during extraction:
+  internal_id: string | null;   // DAIKON internal compound registry
+  cdd_id: string | null;        // Collaborative Drug Discovery Vault
+  chembl_id: string | null;     // ChEMBL
+  pdb_id: string | null;        // RCSB Protein Data Bank
+  other_ids: string[] | null;   // Any additional identifiers not categorized above
+  extracted_id: string | null;  // Raw ID string as found in the source document
 }
 
 export interface SummaryCandidate extends ExtractionMetadata {

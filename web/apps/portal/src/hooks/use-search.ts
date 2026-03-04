@@ -3,6 +3,11 @@
 import { useMutation } from "@tanstack/react-query";
 import { apiClient } from "@docu-store/api-client";
 
+// All search operations use useMutation instead of useQuery because:
+// - Search is triggered by explicit user action (button click), not on mount
+// - The same query text may return different results over time as the index grows
+// - useMutation gives us isPending / isSuccess / reset without stale-time caching
+
 export function useSearchPages() {
   return useMutation({
     mutationFn: async (params: {

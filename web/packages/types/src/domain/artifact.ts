@@ -28,6 +28,8 @@ export interface ArtifactResponse {
   artifact_type: ArtifactType;
   mime_type: MimeType;
   storage_location: string;
+  // `pages` is a union because the backend returns either embedded PageResponse
+  // objects (when ?include_pages=true) or bare page ID strings (default list).
   pages: string[] | PageResponse[] | null;
   title_mention: TitleMention | null;
   tags: string[];
@@ -43,6 +45,10 @@ export interface CreateArtifactRequest {
   storage_location: string;
 }
 
+/**
+ * Flat summary DTO embedded inside search results.
+ * Lighter than ArtifactResponse — no page objects or mention detail.
+ */
 export interface ArtifactDetailsDTO {
   artifact_id: string;
   source_uri: string | null;

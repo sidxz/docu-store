@@ -3,6 +3,14 @@ import type { ReactNode } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 
+/**
+ * Persistent shell for all workspace routes: /[workspace]/**
+ *
+ * Renders a fixed-height viewport split into Sidebar (left) and
+ * a scrollable main content area (right).
+ *
+ * Note: `params` is a Promise in Next.js 16 — always await before accessing.
+ */
 export default async function WorkspaceLayout({
   children,
   params,
