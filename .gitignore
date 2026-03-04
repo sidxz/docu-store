@@ -33,6 +33,23 @@ node_modules/
 package-lock.json
 yarn.lock
 
+# Next.js
+.next/
+out/
+
+# Turbopack
+.turbo/
+
+# Playwright
+test-results/
+playwright-report/
+
+# Storybook
+storybook-static/
+
+# Build output (frontend packages)
+web/packages/*/dist/
+
 # Logs
 *.log
 logs/

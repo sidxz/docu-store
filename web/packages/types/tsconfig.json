@@ -1,0 +1,8 @@
+{
+  "extends": "@docu-store/tsconfig/base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": ["src"]
+}

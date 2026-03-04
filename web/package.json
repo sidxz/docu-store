@@ -1,0 +1,14 @@
+{
+  "name": "docu-store-web",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter portal dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "generate": "pnpm --filter api-client generate"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
