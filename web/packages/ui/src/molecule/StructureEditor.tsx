@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentType } from "react";
 import type { Ketcher } from "ketcher-core";
 import type { EditorProps } from "ketcher-react";
@@ -20,21 +20,29 @@ export function StructureEditor({
   height = 400,
 }: StructureEditorProps) {
   const ketcherRef = useRef<Ketcher | null>(null);
-  const initialValueSet = useRef(false);
   const isSettingMolecule = useRef(false);
   const lastEmittedSmiles = useRef<string>("");
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const setMoleculeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const changeHandler = useRef<(() => void) | null>(null);
 
   const [KetcherEditor, setKetcherEditor] =
     useState<ComponentType<EditorProps> | null>(null);
-  const [ServiceProvider, setServiceProvider] = useState<
+  const [ServiceProviderClass, setServiceProviderClass] = useState<
     (new () => unknown) | null
   >(null);
 
-  // Stable ref for onChange to avoid re-subscribing changeEvent
+  // Stable refs to avoid stale closures in changeEvent handler
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
+  // Memoize the service provider instance to prevent Ketcher re-initialization
+  const serviceProviderInstance = useMemo(
+    () => (ServiceProviderClass ? new ServiceProviderClass() : null),
+    [ServiceProviderClass],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -44,7 +52,9 @@ export function StructureEditor({
     ]).then(([reactMod, standaloneMod]) => {
       if (cancelled) return;
       setKetcherEditor(() => reactMod.Editor);
-      setServiceProvider(() => standaloneMod.StandaloneStructServiceProvider);
+      setServiceProviderClass(
+        () => standaloneMod.StandaloneStructServiceProvider,
+      );
     });
     import("ketcher-react/dist/index.css");
     return () => {
@@ -53,51 +63,56 @@ export function StructureEditor({
   }, []);
 
   // Subscribe to Ketcher changeEvent for real-time Ketcher→text sync
-  const handleInit = useCallback(
-    async (ketcher: Ketcher) => {
-      ketcherRef.current = ketcher;
+  const handleInit = useCallback(async (ketcher: Ketcher) => {
+    // Clean up previous subscription if Ketcher re-initializes
+    if (ketcherRef.current && changeHandler.current) {
+      ketcherRef.current.changeEvent.remove(changeHandler.current);
+    }
 
-      // Load initial value
-      if (value && !initialValueSet.current) {
-        initialValueSet.current = true;
-        isSettingMolecule.current = true;
-        try {
-          await ketcher.setMolecule(value);
-          lastEmittedSmiles.current = value;
-        } catch {
-          // Invalid SMILES — leave editor empty
-        }
-        // Small delay before clearing the guard so the resulting changeEvent is ignored
-        setTimeout(() => {
-          isSettingMolecule.current = false;
-        }, 200);
+    ketcherRef.current = ketcher;
+
+    // Load initial value if present
+    const initialValue = valueRef.current;
+    if (initialValue) {
+      isSettingMolecule.current = true;
+      try {
+        await ketcher.setMolecule(initialValue);
+        lastEmittedSmiles.current = initialValue;
+      } catch {
+        // Invalid SMILES — leave editor empty
       }
+      setTimeout(() => {
+        isSettingMolecule.current = false;
+      }, 300);
+    }
 
-      // Subscribe to structure changes
-      const handler = () => {
-        if (isSettingMolecule.current) return;
-        if (debounceTimer.current) clearTimeout(debounceTimer.current);
-        debounceTimer.current = setTimeout(async () => {
-          if (!ketcherRef.current || isSettingMolecule.current) return;
-          try {
-            const smiles = await ketcherRef.current.getSmiles();
-            const trimmed = smiles?.trim() ?? "";
-            if (trimmed !== lastEmittedSmiles.current) {
-              lastEmittedSmiles.current = trimmed;
-              onChangeRef.current?.(trimmed);
-            }
-          } catch {
-            // Empty canvas or invalid structure
+    // Create the change handler
+    const handler = () => {
+      if (isSettingMolecule.current) return;
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      debounceTimer.current = setTimeout(async () => {
+        const k = ketcherRef.current;
+        if (!k || isSettingMolecule.current) return;
+        try {
+          const smiles = await k.getSmiles();
+          const trimmed = smiles?.trim() ?? "";
+          if (trimmed !== lastEmittedSmiles.current) {
+            lastEmittedSmiles.current = trimmed;
+            onChangeRef.current?.(trimmed);
           }
-        }, 500);
-      };
+        } catch {
+          // Empty canvas or invalid structure — emit empty string
+          if (lastEmittedSmiles.current !== "") {
+            lastEmittedSmiles.current = "";
+            onChangeRef.current?.("");
+          }
+        }
+      }, 500);
+    };
 
-      ketcher.changeEvent.add(handler);
-    },
-    // Only depend on initial value — we use refs for the rest
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [value],
-  );
+    changeHandler.current = handler;
+    ketcher.changeEvent.add(handler);
+  }, []);
 
   // Text→Ketcher sync: when value prop changes externally, push into Ketcher
   useEffect(() => {
@@ -111,29 +126,33 @@ export function StructureEditor({
 
     if (setMoleculeTimer.current) clearTimeout(setMoleculeTimer.current);
     setMoleculeTimer.current = setTimeout(async () => {
-      if (!ketcherRef.current) return;
+      const k = ketcherRef.current;
+      if (!k) return;
       isSettingMolecule.current = true;
       try {
-        await ketcherRef.current.setMolecule(trimmed || "");
+        await k.setMolecule(trimmed || "");
         lastEmittedSmiles.current = trimmed;
       } catch {
         // Invalid SMILES — Ketcher can't parse it (yet)
       }
       setTimeout(() => {
         isSettingMolecule.current = false;
-      }, 200);
+      }, 300);
     }, 600);
   }, [value]);
 
-  // Cleanup timers
+  // Cleanup
   useEffect(() => {
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       if (setMoleculeTimer.current) clearTimeout(setMoleculeTimer.current);
+      if (ketcherRef.current && changeHandler.current) {
+        ketcherRef.current.changeEvent.remove(changeHandler.current);
+      }
     };
   }, []);
 
-  if (!KetcherEditor || !ServiceProvider) {
+  if (!KetcherEditor || !serviceProviderInstance) {
     return (
       <div
         style={{ height }}
@@ -153,7 +172,7 @@ export function StructureEditor({
     >
       <KetcherEditor
         staticResourcesUrl=""
-        structServiceProvider={new ServiceProvider()}
+        structServiceProvider={serviceProviderInstance}
         onInit={handleInit}
         errorHandler={() => {
           // Ketcher internal errors are non-actionable; suppress.
