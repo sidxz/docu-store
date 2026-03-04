@@ -1,0 +1,27 @@
+/*
+ * CSS Layer ordering — critical for PrimeReact + Tailwind coexistence.
+ *
+ * Order (lowest → highest specificity):
+ *   theme → base (Tailwind preflight) → primereact → components → utilities
+ *
+ * This ensures:
+ *   - PrimeReact styles override Tailwind resets
+ *   - Tailwind utilities can override PrimeReact when needed
+ */
+@layer theme, base, primereact, components, utilities;
+
+@import "tailwindcss/preflight" layer(base);
+@import "tailwindcss/theme" layer(theme);
+@import "tailwindcss/utilities" layer(utilities);
+
+@import "primereact/resources/themes/lara-light-blue/theme.css" layer(primereact);
+@import "primeicons/primeicons.css" layer(primereact);
+
+/* App-level custom styles */
+@layer components {
+  body {
+    font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}

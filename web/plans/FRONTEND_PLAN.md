@@ -191,7 +191,7 @@ apps/portal/src/app/
 
 - **`[workspace]`** param is always present. Default workspace slug: `default`.
 - Root `/` redirects to `/default` (no auth yet) — later will redirect based on session.
-- Middleware (`middleware.ts`) is stubbed: logs the workspace param, passes through. Later it enforces auth + workspace membership.
+- Middleware (`proxy.ts`) is stubbed: logs the workspace param, passes through. Later it enforces auth + workspace membership.
 - All navigation is relative to `[workspace]` — no hard-coded workspace names in components.
 - The `(auth)` group is intentionally outside `[workspace]` — login must be accessible before workspace context.
 
@@ -275,7 +275,7 @@ Add to dev workflow: regenerate when backend models change.
 ## 8. Auth Strategy (Stubs Now, Implement in Phase 6)
 
 ### What is stubbed now
-- `middleware.ts` — passes all requests through, logs `[workspace]` param
+- `proxy.ts` — passes all requests through, logs `[workspace]` param
 - `(auth)/login/page.tsx` — placeholder page, no real providers
 - `src/lib/auth.ts` — exports a stub `useSession()` hook returning a mock user/workspace
 - User menu in topbar — shows a static avatar placeholder
@@ -286,7 +286,7 @@ Add to dev workflow: regenerate when backend models change.
 - **Library**: Better Auth (preferred) or Auth.js v5 — decision deferred
 - Providers: Keycloak (enterprise SSO), Microsoft Entra ID, Google, GitHub
 - JWT sessions carrying: `userId`, `workspaceIds[]`, `roles`
-- Middleware enforces: authenticated, workspace membership
+- Proxy enforces: authenticated, workspace membership
 - FastAPI receives the JWT — validates and scopes all queries to workspace
 
 ### Multi-tenancy shape (to be designed separately)
@@ -353,7 +353,7 @@ Add to dev workflow: regenerate when backend models change.
 - [ ] Auth stub — library-agnostic (no real providers, just session context placeholder)
 - [ ] Root layout + `[workspace]` layout (sidebar + topbar)
 - [ ] Workspace-aware routing — all stubs wired
-- [ ] Middleware stub
+- [ ] Proxy stub (Next.js 16 convention, replaces middleware)
 - [ ] Navigation working end-to-end (all pages render "coming soon" shell)
 
 ### Phase 2 — Documents (Artifacts)
@@ -384,7 +384,7 @@ Add to dev workflow: regenerate when backend models change.
 ### Phase 6 — Auth + Multi-tenancy (Separate Planning Session)
 - [ ] Evaluate and select auth library (Better Auth vs Auth.js v5)
 - [ ] OAuth2 providers (Keycloak, Entra ID, Google, GitHub)
-- [ ] Middleware enforcement (route protection, workspace membership)
+- [ ] Proxy enforcement (route protection, workspace membership)
 - [ ] Workspace management UI (create, invite, switch)
 - [ ] Access control + ownership model (RBAC: owner, editor, viewer)
 
