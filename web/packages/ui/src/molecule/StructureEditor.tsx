@@ -82,8 +82,8 @@ export function StructureEditor({
         staticResourcesUrl=""
         structServiceProvider={new ServiceProvider()}
         onInit={handleInit}
-        errorHandler={(message: string) => {
-          console.warn("[Ketcher]", message);
+        errorHandler={() => {
+          // Ketcher internal errors are non-actionable; suppress.
         }}
       />
       {onChange && (

@@ -7,7 +7,10 @@ import { Column } from "primereact/column";
 import { DataTable } from "primereact/datatable";
 import { Tag } from "primereact/tag";
 
+import type { components } from "@docu-store/api-client";
 import { useArtifacts } from "@/hooks/use-artifacts";
+
+type ArtifactResponse = components["schemas"]["ArtifactResponse"];
 
 const ARTIFACT_TYPE_LABELS: Record<string, string> = {
   GENERIC_PRESENTATION: "Presentation",
@@ -23,11 +26,9 @@ export default function DocumentsPage() {
   const { workspace } = useParams<{ workspace: string }>();
   const { data: artifacts, isLoading, error } = useArtifacts();
 
-  const titleTemplate = (row: Record<string, unknown>) => {
+  const titleTemplate = (row: ArtifactResponse) => {
     const title =
-      (row.title_mention as { title?: string } | null)?.title ??
-      (row.source_filename as string | null) ??
-      "Untitled";
+      row.title_mention?.title ?? row.source_filename ?? "Untitled";
     return (
       <Link
         href={`/${workspace}/documents/${row.artifact_id}`}
@@ -38,20 +39,18 @@ export default function DocumentsPage() {
     );
   };
 
-  const typeTemplate = (row: Record<string, unknown>) => {
+  const typeTemplate = (row: ArtifactResponse) => {
     const label =
-      ARTIFACT_TYPE_LABELS[row.artifact_type as string] ??
-      (row.artifact_type as string);
+      ARTIFACT_TYPE_LABELS[row.artifact_type] ?? row.artifact_type;
     return <Tag value={label} severity="info" />;
   };
 
-  const pagesTemplate = (row: Record<string, unknown>) => {
-    const pages = row.pages as unknown[] | null;
-    return <span>{pages?.length ?? 0}</span>;
+  const pagesTemplate = (row: ArtifactResponse) => {
+    return <span>{row.pages?.length ?? 0}</span>;
   };
 
-  const tagsTemplate = (row: Record<string, unknown>) => {
-    const tags = row.tags as string[] | undefined;
+  const tagsTemplate = (row: ArtifactResponse) => {
+    const tags = row.tags;
     if (!tags?.length) return <span className="text-gray-400">—</span>;
     return (
       <div className="flex flex-wrap gap-1">

@@ -49,9 +49,9 @@ export default function PageViewerPage() {
   }
 
   const workflowMap = (
-    workflowData as {
-      workflows?: Record<string, { workflow_id: string; status: string }>;
-    } | undefined
+    workflowData as
+      | { workflows?: Record<string, { workflow_id: string; status: string }> }
+      | undefined
   )?.workflows;
   const workflows = workflowMap
     ? Object.entries(workflowMap).map(([name, info]) => ({ name, ...info }))

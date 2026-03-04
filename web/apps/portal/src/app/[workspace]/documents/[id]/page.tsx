@@ -2,13 +2,17 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useRef } from "react";
 import { Button } from "primereact/button";
 import { Card } from "primereact/card";
 import { Column } from "primereact/column";
+import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 import { DataTable } from "primereact/datatable";
 import { ProgressSpinner } from "primereact/progressspinner";
 import { Tag } from "primereact/tag";
+import { Toast } from "primereact/toast";
 
+import type { components } from "@docu-store/api-client";
 import { WorkflowStatusBadge } from "@/components/WorkflowStatusBadge";
 import {
   useArtifact,
@@ -16,9 +20,17 @@ import {
   useDeleteArtifact,
 } from "@/hooks/use-artifacts";
 
+type PageResponse = components["schemas"]["PageResponse"];
+
+/** Shape of the workflow endpoint response (untyped in OpenAPI schema) */
+interface WorkflowMap {
+  workflows?: Record<string, { workflow_id: string; status: string }>;
+}
+
 export default function ArtifactDetailPage() {
   const { workspace, id } = useParams<{ workspace: string; id: string }>();
   const router = useRouter();
+  const toast = useRef<Toast>(null);
   const { data: artifact, isLoading, error } = useArtifact(id);
   const { data: workflowData } = useArtifactWorkflows(id);
   const deleteMutation = useDeleteArtifact();
@@ -58,23 +70,37 @@ export default function ArtifactDetailPage() {
   const pages = artifact.pages ?? [];
   const isPageObjects = pages.length > 0 && typeof pages[0] === "object";
 
-  const handleDelete = async () => {
-    if (!confirm("Delete this artifact and all its pages?")) return;
-    await deleteMutation.mutateAsync(id);
-    router.push(`/${workspace}/documents`);
+  const handleDelete = () => {
+    confirmDialog({
+      message: "Delete this artifact and all its pages?",
+      header: "Confirm Deletion",
+      icon: "pi pi-exclamation-triangle",
+      acceptClassName: "p-button-danger",
+      accept: async () => {
+        try {
+          await deleteMutation.mutateAsync(id);
+          router.push(`/${workspace}/documents`);
+        } catch {
+          toast.current?.show({
+            severity: "error",
+            summary: "Delete failed",
+            detail: "Could not delete the artifact. Please try again.",
+          });
+        }
+      },
+    });
   };
 
-  const workflowMap = (
-    workflowData as {
-      workflows?: Record<string, { workflow_id: string; status: string }>;
-    } | undefined
-  )?.workflows;
+  const workflowMap = (workflowData as WorkflowMap | undefined)?.workflows;
   const workflows = workflowMap
     ? Object.entries(workflowMap).map(([name, info]) => ({ name, ...info }))
     : undefined;
 
   return (
     <div className="p-6">
+      <Toast ref={toast} />
+      <ConfirmDialog />
+
       {/* Header */}
       <div className="mb-6 flex items-start justify-between">
         <div>
@@ -164,27 +190,27 @@ export default function ArtifactDetailPage() {
         <h2 className="mb-2 text-sm font-medium text-gray-700">Pages</h2>
         {isPageObjects ? (
           <DataTable
-            value={pages as Record<string, unknown>[]}
+            value={pages as PageResponse[]}
             stripedRows
             className="rounded-lg border border-gray-200"
             emptyMessage="No pages."
           >
             <Column
               header="Name"
-              body={(row: Record<string, unknown>) => (
+              body={(row: PageResponse) => (
                 <Link
                   href={`/${workspace}/documents/${id}/pages/${row.page_id}`}
                   className="text-blue-600 hover:underline"
                 >
-                  {(row.name as string) ?? `Page ${row.index}`}
+                  {row.name ?? `Page ${row.index}`}
                 </Link>
               )}
             />
             <Column field="index" header="Index" style={{ width: "80px" }} />
             <Column
               header="Text"
-              body={(row: Record<string, unknown>) => {
-                const text = (row.text_mention as { text?: string } | null)?.text;
+              body={(row: PageResponse) => {
+                const text = row.text_mention?.text;
                 return text ? (
                   <span className="text-sm text-gray-600 truncate block max-w-md">
                     {text.slice(0, 120)}...
@@ -196,10 +222,7 @@ export default function ArtifactDetailPage() {
             />
             <Column
               header="Compounds"
-              body={(row: Record<string, unknown>) => {
-                const compounds = row.compound_mentions as unknown[] | undefined;
-                return compounds?.length ?? 0;
-              }}
+              body={(row: PageResponse) => row.compound_mentions?.length ?? 0}
               style={{ width: "100px" }}
             />
           </DataTable>

@@ -4,6 +4,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@docu-store/api-client";
 import { queryKeys } from "@/lib/query-keys";
 
+/** Shape of the workflow endpoint response (untyped in OpenAPI schema) */
+interface WorkflowMap {
+  workflows?: Record<string, { workflow_id: string; status: string }>;
+}
+
 export function useArtifacts(skip = 0, limit = 50) {
   return useQuery({
     queryKey: [...queryKeys.artifacts.list(), { skip, limit }],
@@ -41,15 +46,11 @@ export function useArtifactWorkflows(id: string) {
         { params: { path: { artifact_id: id } } },
       );
       if (error) throw new Error("Failed to fetch workflows");
-      return data;
+      return data as WorkflowMap;
     },
     enabled: !!id,
     refetchInterval: (query) => {
-      // Poll every 3s if any workflow is still running
-      const result = query.state.data as
-        | { workflows?: Record<string, { status?: string }> }
-        | undefined;
-      const workflows = result?.workflows;
+      const workflows = (query.state.data as WorkflowMap | undefined)?.workflows;
       const hasRunning = workflows
         ? Object.values(workflows).some((w) => w.status === "RUNNING")
         : false;
@@ -86,13 +87,15 @@ export function useUploadArtifact() {
       artifactType: string;
       sourceUri?: string;
     }) => {
+      // apiClient doesn't support multipart/form-data, so use fetch directly.
+      // Base URL is shared with apiClient via the same env var.
+      const baseUrl =
+        process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
       const formData = new FormData();
       formData.append("file", file);
       formData.append("artifact_type", artifactType);
       if (sourceUri) formData.append("source_uri", sourceUri);
 
-      const baseUrl =
-        process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
       const res = await fetch(`${baseUrl}/artifacts/upload`, {
         method: "POST",
         body: formData,
