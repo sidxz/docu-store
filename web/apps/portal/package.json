@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "postinstall": "node scripts/copy-rdkit-wasm.mjs",
+    "postinstall": "node scripts/copy-rdkit-wasm.mjs && node scripts/copy-primereact-themes.mjs",
     "dev": "next dev --port 15000",
     "build": "next build",
     "start": "next start",

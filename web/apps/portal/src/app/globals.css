@@ -14,14 +14,268 @@
 @import "tailwindcss/theme" layer(theme);
 @import "tailwindcss/utilities" layer(utilities);
 
-@import "primereact/resources/themes/lara-light-blue/theme.css" layer(primereact);
+/* PrimeReact theme loaded dynamically via ThemeProvider — no static import */
 @import "primeicons/primeicons.css" layer(primereact);
 
-/* App-level custom styles */
+/* ---------------------------------------------------------------------------
+ * Design Tokens
+ * Light (default) and dark variants via data-theme attribute
+ * ------------------------------------------------------------------------- */
+
+:root {
+  /* Surfaces */
+  --ds-surface: #ffffff;
+  --ds-surface-elevated: #ffffff;
+  --ds-surface-sunken: #f8fafc;
+  --ds-surface-overlay: #ffffff;
+
+  /* Borders */
+  --ds-border: #e2e8f0;
+  --ds-border-subtle: #f1f5f9;
+
+  /* Text */
+  --ds-text-primary: #0f172a;
+  --ds-text-secondary: #475569;
+  --ds-text-muted: #94a3b8;
+  --ds-text-inverse: #ffffff;
+
+  /* Accent — Teal */
+  --ds-accent: #0d9488;
+  --ds-accent-hover: #0f766e;
+  --ds-accent-light: #f0fdfa;
+  --ds-accent-muted: #ccfbf1;
+  --ds-accent-text: #0d9488;
+
+  /* Sidebar (always dark) */
+  --ds-sidebar: #0f172a;
+  --ds-sidebar-text: #cbd5e1;
+  --ds-sidebar-text-active: #ffffff;
+  --ds-sidebar-hover: rgba(255, 255, 255, 0.05);
+  --ds-sidebar-active: rgba(255, 255, 255, 0.1);
+  --ds-sidebar-border: rgba(255, 255, 255, 0.06);
+
+  /* Semantic */
+  --ds-success: #16a34a;
+  --ds-warning: #d97706;
+  --ds-error: #dc2626;
+  --ds-info: #0d9488;
+
+  /* Shadows */
+  --ds-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --ds-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --ds-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] {
+  /* Surfaces */
+  --ds-surface: #0f172a;
+  --ds-surface-elevated: #1e293b;
+  --ds-surface-sunken: #020617;
+  --ds-surface-overlay: #1e293b;
+
+  /* Borders */
+  --ds-border: #334155;
+  --ds-border-subtle: #1e293b;
+
+  /* Text */
+  --ds-text-primary: #f1f5f9;
+  --ds-text-secondary: #94a3b8;
+  --ds-text-muted: #64748b;
+  --ds-text-inverse: #0f172a;
+
+  /* Accent — Teal */
+  --ds-accent: #2dd4bf;
+  --ds-accent-hover: #5eead4;
+  --ds-accent-light: rgba(13, 148, 136, 0.15);
+  --ds-accent-muted: rgba(13, 148, 136, 0.1);
+  --ds-accent-text: #2dd4bf;
+
+  /* Semantic */
+  --ds-success: #22c55e;
+  --ds-warning: #f59e0b;
+  --ds-error: #ef4444;
+  --ds-info: #2dd4bf;
+
+  /* Shadows */
+  --ds-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --ds-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.3);
+  --ds-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+}
+
+/* ---------------------------------------------------------------------------
+ * Tailwind v4 theme mapping — @theme inline makes these available as
+ * Tailwind color utilities (bg-surface, text-primary, border-default, etc.)
+ * ------------------------------------------------------------------------- */
+
+@theme inline {
+  --color-surface: var(--ds-surface);
+  --color-surface-elevated: var(--ds-surface-elevated);
+  --color-surface-sunken: var(--ds-surface-sunken);
+  --color-surface-overlay: var(--ds-surface-overlay);
+
+  --color-border-default: var(--ds-border);
+  --color-border-subtle: var(--ds-border-subtle);
+
+  --color-text-primary: var(--ds-text-primary);
+  --color-text-secondary: var(--ds-text-secondary);
+  --color-text-muted: var(--ds-text-muted);
+  --color-text-inverse: var(--ds-text-inverse);
+
+  --color-accent: var(--ds-accent);
+  --color-accent-hover: var(--ds-accent-hover);
+  --color-accent-light: var(--ds-accent-light);
+  --color-accent-muted: var(--ds-accent-muted);
+  --color-accent-text: var(--ds-accent-text);
+
+  --color-sidebar: var(--ds-sidebar);
+  --color-sidebar-text: var(--ds-sidebar-text);
+  --color-sidebar-text-active: var(--ds-sidebar-text-active);
+  --color-sidebar-hover: var(--ds-sidebar-hover);
+  --color-sidebar-active: var(--ds-sidebar-active);
+  --color-sidebar-border: var(--ds-sidebar-border);
+
+  --color-ds-success: var(--ds-success);
+  --color-ds-warning: var(--ds-warning);
+  --color-ds-error: var(--ds-error);
+  --color-ds-info: var(--ds-info);
+
+  --shadow-ds-sm: var(--ds-shadow-sm);
+  --shadow-ds: var(--ds-shadow);
+  --shadow-ds-md: var(--ds-shadow-md);
+}
+
+/* ---------------------------------------------------------------------------
+ * Global styles
+ * ------------------------------------------------------------------------- */
+
 @layer components {
   body {
     font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    background-color: var(--ds-surface);
+    color: var(--ds-text-primary);
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* Focus ring — teal accent */
+  *:focus-visible {
+    outline: 2px solid var(--ds-accent);
+    outline-offset: 2px;
+  }
+
+  /* Selection color */
+  ::selection {
+    background-color: var(--ds-accent-muted);
+    color: var(--ds-text-primary);
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--ds-text-muted);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--ds-text-secondary);
+  }
+
+  /* PrimeReact dark overrides */
+  [data-theme="dark"] .p-datatable .p-datatable-thead > tr > th {
+    background: var(--ds-surface-elevated);
+    color: var(--ds-text-primary);
+    border-color: var(--ds-border);
+  }
+
+  [data-theme="dark"] .p-datatable .p-datatable-tbody > tr {
+    background: var(--ds-surface);
+    color: var(--ds-text-primary);
+    border-color: var(--ds-border);
+  }
+
+  [data-theme="dark"] .p-datatable .p-datatable-tbody > tr:hover {
+    background: var(--ds-surface-elevated);
+  }
+
+  [data-theme="dark"] .p-paginator {
+    background: var(--ds-surface);
+    color: var(--ds-text-primary);
+    border-color: var(--ds-border);
+  }
+
+  [data-theme="dark"] .p-card {
+    background: var(--ds-surface-elevated);
+    color: var(--ds-text-primary);
+    box-shadow: var(--ds-shadow);
+  }
+
+  [data-theme="dark"] .p-inputtext {
+    background: var(--ds-surface-elevated);
+    color: var(--ds-text-primary);
+    border-color: var(--ds-border);
+  }
+
+  [data-theme="dark"] .p-dropdown {
+    background: var(--ds-surface-elevated);
+    color: var(--ds-text-primary);
+    border-color: var(--ds-border);
+  }
+
+  [data-theme="dark"] .p-dropdown-panel {
+    background: var(--ds-surface-elevated);
+    color: var(--ds-text-primary);
+    border-color: var(--ds-border);
+  }
+
+  [data-theme="dark"] .p-dropdown-item:hover {
+    background: var(--ds-sidebar-hover);
+  }
+
+  [data-theme="dark"] .p-tabview .p-tabview-nav {
+    background: var(--ds-surface);
+    border-color: var(--ds-border);
+  }
+
+  [data-theme="dark"] .p-tabview .p-tabview-nav li .p-tabview-nav-link {
+    color: var(--ds-text-secondary);
+  }
+
+  [data-theme="dark"] .p-tabview .p-tabview-panels {
+    background: var(--ds-surface);
+    color: var(--ds-text-primary);
+  }
+
+  [data-theme="dark"] .p-tag {
+    color: var(--ds-text-primary);
+  }
+
+  [data-theme="dark"] .p-fileupload {
+    background: var(--ds-surface-elevated);
+    border-color: var(--ds-border);
+  }
+
+  [data-theme="dark"] .p-selectbutton .p-button {
+    background: var(--ds-surface-elevated);
+    color: var(--ds-text-primary);
+    border-color: var(--ds-border);
+  }
+
+  /* Page transitions */
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .page-enter {
+    animation: fade-in 0.2s ease-out;
   }
 }

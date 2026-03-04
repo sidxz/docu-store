@@ -1,15 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { Button } from "primereact/button";
-import { Card } from "primereact/card";
-import { InputText } from "primereact/inputtext";
-import { ProgressSpinner } from "primereact/progressspinner";
-import { SelectButton } from "primereact/selectbutton";
-import { Tag } from "primereact/tag";
+import { Search as SearchIcon, Loader2 } from "lucide-react";
 
+import { PageHeader } from "@/components/ui/PageHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { TextSearchResults } from "@/components/search/TextSearchResults";
+import { SummarySearchResults } from "@/components/search/SummarySearchResults";
+import { HierarchicalSearchResults } from "@/components/search/HierarchicalSearchResults";
 import {
   useSearchPages,
   useSearchSummaries,
@@ -18,26 +17,11 @@ import {
 
 type SearchMode = "text" | "summary" | "hierarchical";
 
-const SEARCH_MODES = [
-  { label: "Text Chunks", value: "text" as const },
-  { label: "Summaries", value: "summary" as const },
-  { label: "Hierarchical", value: "hierarchical" as const },
+const SEARCH_MODES: { label: string; value: SearchMode }[] = [
+  { label: "Text Chunks", value: "text" },
+  { label: "Summaries", value: "summary" },
+  { label: "Hierarchical", value: "hierarchical" },
 ];
-
-function ScoreBar({ score }: { score: number }) {
-  const pct = Math.round(score * 100);
-  return (
-    <div className="flex items-center gap-2">
-      <div className="h-2 w-24 rounded-full bg-gray-200">
-        <div
-          className="h-2 rounded-full bg-blue-500"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <span className="text-xs text-gray-500">{pct}%</span>
-    </div>
-  );
-}
 
 export default function SearchPage() {
   const { workspace } = useParams<{ workspace: string }>();
@@ -52,6 +36,11 @@ export default function SearchPage() {
     textSearch.isPending ||
     summarySearch.isPending ||
     hierarchicalSearch.isPending;
+
+  const hasResults =
+    (mode === "text" && textSearch.data) ||
+    (mode === "summary" && summarySearch.data) ||
+    (mode === "hierarchical" && hierarchicalSearch.data);
 
   const handleSearch = () => {
     const trimmed = query.trim();
@@ -71,68 +60,68 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-semibold text-gray-900">Search</h1>
-      <p className="mt-1 text-sm text-gray-500">
-        Semantic search across documents, summaries, and compounds.
-      </p>
+    <div>
+      <PageHeader
+        icon={SearchIcon}
+        title="Search"
+        subtitle="Semantic search across documents, summaries, and compounds"
+      />
 
       {/* Search controls */}
-      <div className="mt-6 space-y-4">
+      <div className="space-y-4">
+        {/* Search input */}
         <div className="flex gap-3">
-          <div className="flex-1">
-            <InputText
+          <div className="relative flex-1">
+            <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+            <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Enter search query..."
-              className="w-full"
+              className="w-full rounded-lg border border-border-default bg-surface-elevated py-2.5 pl-10 pr-4 text-sm text-text-primary placeholder:text-text-muted transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
             />
           </div>
-          <Button
-            label="Search"
-            icon="pi pi-search"
+          <button
             onClick={handleSearch}
-            loading={isPending}
-            disabled={!query.trim()}
-          />
+            disabled={!query.trim() || isPending}
+            className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+          >
+            {isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <SearchIcon className="h-4 w-4" />
+            )}
+            Search
+          </button>
         </div>
 
-        <SelectButton
-          value={mode}
-          onChange={(e) => {
-            if (e.value) setMode(e.value);
-          }}
-          options={SEARCH_MODES}
-          optionLabel="label"
-          optionValue="value"
-        />
+        {/* Mode selector — custom segmented control */}
+        <div className="inline-flex rounded-lg border border-border-default bg-surface-elevated p-0.5">
+          {SEARCH_MODES.map((m) => (
+            <button
+              key={m.value}
+              onClick={() => setMode(m.value)}
+              className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+                mode === m.value
+                  ? "bg-accent text-white shadow-sm"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Loading */}
-      {isPending && (
-        <div className="mt-8 flex items-center justify-center">
-          <ProgressSpinner style={{ width: "40px", height: "40px" }} />
-        </div>
-      )}
-
-      {/* Text search results */}
+      {/* Results */}
       {mode === "text" && textSearch.data && !textSearch.isPending && (
-        <TextSearchResults
-          data={textSearch.data}
-          workspace={workspace}
-        />
+        <TextSearchResults data={textSearch.data} workspace={workspace} />
       )}
 
-      {/* Summary search results */}
       {mode === "summary" && summarySearch.data && !summarySearch.isPending && (
-        <SummarySearchResults
-          data={summarySearch.data}
-          workspace={workspace}
-        />
+        <SummarySearchResults data={summarySearch.data} workspace={workspace} />
       )}
 
-      {/* Hierarchical search results */}
       {mode === "hierarchical" &&
         hierarchicalSearch.data &&
         !hierarchicalSearch.isPending && (
@@ -142,275 +131,26 @@ export default function SearchPage() {
           />
         )}
 
+      {/* Loading */}
+      {isPending && (
+        <div className="mt-12 flex items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-accent" />
+        </div>
+      )}
+
+      {/* Empty state — no search yet */}
+      {!hasResults && !isPending && (
+        <EmptyState
+          icon={SearchIcon}
+          title="Search your documents"
+          description="Enter a query above to find relevant content across your documents, summaries, and text chunks."
+        />
+      )}
+
       {/* Error states */}
       {(textSearch.error || summarySearch.error || hierarchicalSearch.error) && (
-        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="mt-6 rounded-lg border border-ds-error/20 bg-ds-error/5 p-4 text-sm text-ds-error">
           Search failed. Please check that the backend is running and try again.
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─── Text chunk results ────────────────────────────────────── */
-
-function TextSearchResults({
-  data,
-  workspace,
-}: {
-  data: {
-    query: string;
-    results: {
-      page_id: string;
-      artifact_id: string;
-      page_index: number;
-      similarity_score: number;
-      text_preview?: string | null;
-      artifact_name?: string | null;
-    }[];
-    total_results: number;
-    model_used: string;
-  };
-  workspace: string;
-}) {
-  return (
-    <div className="mt-6">
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm text-gray-500">
-          {data.total_results} result{data.total_results !== 1 ? "s" : ""} for{" "}
-          <span className="font-medium text-gray-700">
-            &ldquo;{data.query}&rdquo;
-          </span>
-        </p>
-        <span className="text-xs text-gray-400">Model: {data.model_used}</span>
-      </div>
-
-      <div className="space-y-3">
-        {data.results.map((r) => (
-          <Card key={`${r.page_id}-${r.similarity_score}`} className="shadow-sm">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <Link
-                    href={`/${workspace}/documents/${r.artifact_id}/pages/${r.page_id}`}
-                    className="text-sm font-medium text-blue-600 hover:underline"
-                  >
-                    {r.artifact_name ?? "Untitled"} — Page {r.page_index}
-                  </Link>
-                </div>
-                {r.text_preview && (
-                  <p className="mt-1 text-sm text-gray-600 line-clamp-3">
-                    {r.text_preview}
-                  </p>
-                )}
-                <div className="mt-2 flex items-center gap-3">
-                  <Link
-                    href={`/${workspace}/documents/${r.artifact_id}`}
-                    className="text-xs text-gray-400 hover:text-gray-600"
-                  >
-                    View artifact
-                  </Link>
-                </div>
-              </div>
-              <ScoreBar score={r.similarity_score} />
-            </div>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Summary search results ────────────────────────────────── */
-
-function SummarySearchResults({
-  data,
-  workspace,
-}: {
-  data: {
-    query: string;
-    results: {
-      entity_type: "page" | "artifact";
-      entity_id: string;
-      artifact_id: string;
-      similarity_score: number;
-      summary_text?: string | null;
-      artifact_title?: string | null;
-    }[];
-    total_results: number;
-    model_used: string;
-  };
-  workspace: string;
-}) {
-  return (
-    <div className="mt-6">
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm text-gray-500">
-          {data.total_results} result{data.total_results !== 1 ? "s" : ""} for{" "}
-          <span className="font-medium text-gray-700">
-            &ldquo;{data.query}&rdquo;
-          </span>
-        </p>
-        <span className="text-xs text-gray-400">Model: {data.model_used}</span>
-      </div>
-
-      <div className="space-y-3">
-        {data.results.map((r) => (
-          <Card key={`${r.entity_id}-${r.similarity_score}`} className="shadow-sm">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <Tag
-                    value={r.entity_type}
-                    severity={r.entity_type === "artifact" ? "info" : "secondary"}
-                  />
-                  <Link
-                    href={
-                      r.entity_type === "artifact"
-                        ? `/${workspace}/documents/${r.artifact_id}`
-                        : `/${workspace}/documents/${r.artifact_id}/pages/${r.entity_id}`
-                    }
-                    className="text-sm font-medium text-blue-600 hover:underline"
-                  >
-                    {r.artifact_title ?? r.entity_id}
-                  </Link>
-                </div>
-                {r.summary_text && (
-                  <p className="mt-1 text-sm text-gray-600 line-clamp-3">
-                    {r.summary_text}
-                  </p>
-                )}
-              </div>
-              <ScoreBar score={r.similarity_score} />
-            </div>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Hierarchical search results ───────────────────────────── */
-
-function HierarchicalSearchResults({
-  data,
-  workspace,
-}: {
-  data: {
-    query: string;
-    summary_hits: {
-      entity_type: "page" | "artifact";
-      entity_id: string;
-      artifact_id: string;
-      score: number;
-      summary_text?: string | null;
-      artifact_title?: string | null;
-    }[];
-    chunk_hits: {
-      page_id: string;
-      artifact_id: string;
-      page_index: number;
-      score: number;
-      text_preview?: string | null;
-    }[];
-    total_summary_hits: number;
-    total_chunk_hits: number;
-    model_used: string;
-  };
-  workspace: string;
-}) {
-  return (
-    <div className="mt-6">
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm text-gray-500">
-          {data.total_summary_hits} summary hit
-          {data.total_summary_hits !== 1 ? "s" : ""},{" "}
-          {data.total_chunk_hits} chunk hit
-          {data.total_chunk_hits !== 1 ? "s" : ""} for{" "}
-          <span className="font-medium text-gray-700">
-            &ldquo;{data.query}&rdquo;
-          </span>
-        </p>
-        <span className="text-xs text-gray-400">Model: {data.model_used}</span>
-      </div>
-
-      {/* Summary hits */}
-      {data.summary_hits.length > 0 && (
-        <div className="mb-6">
-          <h2 className="mb-2 text-sm font-medium text-gray-700">
-            Summary Matches
-          </h2>
-          <div className="space-y-3">
-            {data.summary_hits.map((h) => (
-              <Card key={`${h.entity_id}-${h.score}`} className="shadow-sm">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <Tag
-                        value={h.entity_type}
-                        severity={
-                          h.entity_type === "artifact" ? "info" : "secondary"
-                        }
-                      />
-                      <Link
-                        href={
-                          h.entity_type === "artifact"
-                            ? `/${workspace}/documents/${h.artifact_id}`
-                            : `/${workspace}/documents/${h.artifact_id}/pages/${h.entity_id}`
-                        }
-                        className="text-sm font-medium text-blue-600 hover:underline"
-                      >
-                        {h.artifact_title ?? h.entity_id}
-                      </Link>
-                    </div>
-                    {h.summary_text && (
-                      <p className="mt-1 text-sm text-gray-600 line-clamp-3">
-                        {h.summary_text}
-                      </p>
-                    )}
-                  </div>
-                  <ScoreBar score={h.score} />
-                </div>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Chunk hits */}
-      {data.chunk_hits.length > 0 && (
-        <div>
-          <h2 className="mb-2 text-sm font-medium text-gray-700">
-            Text Chunk Matches
-          </h2>
-          <div className="space-y-3">
-            {data.chunk_hits.map((c) => (
-              <Card key={`${c.page_id}-${c.score}`} className="shadow-sm">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <Link
-                      href={`/${workspace}/documents/${c.artifact_id}/pages/${c.page_id}`}
-                      className="text-sm font-medium text-blue-600 hover:underline"
-                    >
-                      Page {c.page_index}
-                    </Link>
-                    {c.text_preview && (
-                      <p className="mt-1 text-sm text-gray-600 line-clamp-3">
-                        {c.text_preview}
-                      </p>
-                    )}
-                    <Link
-                      href={`/${workspace}/documents/${c.artifact_id}`}
-                      className="mt-1 text-xs text-gray-400 hover:text-gray-600"
-                    >
-                      View artifact
-                    </Link>
-                  </div>
-                  <ScoreBar score={c.score} />
-                </div>
-              </Card>
-            ))}
-          </div>
         </div>
       )}
     </div>

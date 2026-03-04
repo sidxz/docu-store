@@ -1,81 +1,127 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  LayoutDashboard,
+  FileText,
+  Search,
+  Atom,
+  MessageSquare,
+  Settings,
+  Sun,
+  Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
+  FlaskConical,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
+import { useThemeStore } from "@/lib/stores/theme-store";
+import { useSidebarStore } from "@/lib/stores/sidebar-store";
+
+import { SidebarNavItem } from "./SidebarNavItem";
 
 interface NavItem {
   label: string;
-  icon: string;
+  icon: LucideIcon;
   href: string;
 }
 
 const mainNav: NavItem[] = [
-  { label: "Dashboard", icon: "pi pi-home", href: "" },
-  { label: "Documents", icon: "pi pi-file", href: "/documents" },
-  { label: "Search", icon: "pi pi-search", href: "/search" },
-  { label: "Compounds", icon: "pi pi-th-large", href: "/compounds" },
-  { label: "Chat", icon: "pi pi-comments", href: "/chat" },
+  { label: "Dashboard", icon: LayoutDashboard, href: "" },
+  { label: "Documents", icon: FileText, href: "/documents" },
+  { label: "Search", icon: Search, href: "/search" },
+  { label: "Compounds", icon: Atom, href: "/compounds" },
+  { label: "Chat", icon: MessageSquare, href: "/chat" },
 ];
-
-const bottomNav: NavItem[] = [
-  { label: "Settings", icon: "pi pi-cog", href: "/settings" },
-];
-
-function NavLink({
-  item,
-  workspaceSlug,
-  pathname,
-}: {
-  item: NavItem;
-  workspaceSlug: string;
-  pathname: string;
-}) {
-  const fullHref = `/${workspaceSlug}${item.href}`;
-  const isActive =
-    item.href === ""
-      ? pathname === `/${workspaceSlug}`
-      : pathname.startsWith(fullHref);
-
-  return (
-    <Link
-      href={fullHref}
-      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
-        isActive
-          ? "bg-blue-50 text-blue-700 font-medium"
-          : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-      }`}
-    >
-      <i className={`${item.icon} text-base`} />
-      <span>{item.label}</span>
-    </Link>
-  );
-}
 
 export function Sidebar({ workspaceSlug }: { workspaceSlug: string }) {
   const pathname = usePathname();
+  const { theme, toggleTheme } = useThemeStore();
+  const { collapsed, toggleCollapsed } = useSidebarStore();
+
+  const isActive = (href: string) => {
+    const fullHref = `/${workspaceSlug}${href}`;
+    return href === ""
+      ? pathname === `/${workspaceSlug}`
+      : pathname.startsWith(fullHref);
+  };
 
   return (
-    <aside className="flex h-full w-56 flex-col border-r border-gray-200 bg-white">
-      <nav className="flex flex-1 flex-col gap-1 px-3 py-4">
+    <aside
+      className={`flex h-full flex-col bg-sidebar transition-[width] duration-200 ${
+        collapsed ? "w-16" : "w-56"
+      }`}
+    >
+      {/* Brand */}
+      <div className="flex h-14 items-center gap-2.5 border-b border-sidebar-border px-4">
+        <FlaskConical className="h-5 w-5 shrink-0 text-accent" />
+        {!collapsed && (
+          <div className="flex flex-col">
+            <span className="text-sm font-bold tracking-wide text-white">
+              DAIKON
+            </span>
+            <span className="text-[10px] uppercase tracking-widest text-sidebar-text">
+              {workspaceSlug}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Main navigation */}
+      <nav className="flex flex-1 flex-col gap-0.5 px-2 py-3">
         {mainNav.map((item) => (
-          <NavLink
+          <SidebarNavItem
             key={item.label}
-            item={item}
-            workspaceSlug={workspaceSlug}
-            pathname={pathname}
+            icon={item.icon}
+            label={item.label}
+            href={`/${workspaceSlug}${item.href}`}
+            isActive={isActive(item.href)}
+            collapsed={collapsed}
           />
         ))}
       </nav>
-      <nav className="border-t border-gray-200 px-3 py-4">
-        {bottomNav.map((item) => (
-          <NavLink
-            key={item.label}
-            item={item}
-            workspaceSlug={workspaceSlug}
-            pathname={pathname}
-          />
-        ))}
-      </nav>
+
+      {/* Bottom section */}
+      <div className="border-t border-sidebar-border px-2 py-3 space-y-0.5">
+        <SidebarNavItem
+          icon={Settings}
+          label="Settings"
+          href={`/${workspaceSlug}/settings`}
+          isActive={pathname.startsWith(`/${workspaceSlug}/settings`)}
+          collapsed={collapsed}
+        />
+
+        {/* Theme toggle */}
+        <button
+          onClick={toggleTheme}
+          title={collapsed ? (theme === "light" ? "Dark mode" : "Light mode") : undefined}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-text transition-colors duration-150 hover:bg-sidebar-hover hover:text-sidebar-text-active"
+        >
+          {theme === "light" ? (
+            <Moon className="h-[18px] w-[18px] shrink-0" />
+          ) : (
+            <Sun className="h-[18px] w-[18px] shrink-0" />
+          )}
+          {!collapsed && (
+            <span>{theme === "light" ? "Dark mode" : "Light mode"}</span>
+          )}
+        </button>
+
+        {/* Collapse toggle */}
+        <button
+          onClick={toggleCollapsed}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-text transition-colors duration-150 hover:bg-sidebar-hover hover:text-sidebar-text-active"
+        >
+          {collapsed ? (
+            <PanelLeftOpen className="h-[18px] w-[18px] shrink-0" />
+          ) : (
+            <PanelLeftClose className="h-[18px] w-[18px] shrink-0" />
+          )}
+          {!collapsed && <span>Collapse</span>}
+        </button>
+      </div>
     </aside>
   );
 }

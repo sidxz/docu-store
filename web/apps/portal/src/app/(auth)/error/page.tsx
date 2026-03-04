@@ -1,12 +1,16 @@
+import { AlertTriangle } from "lucide-react";
+
 export default function AuthErrorPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
-      <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-        <i className="pi pi-exclamation-triangle mb-4 text-4xl text-red-500" />
-        <h1 className="text-xl font-semibold text-gray-900">
+    <div className="flex min-h-screen items-center justify-center bg-surface-sunken">
+      <div className="w-full max-w-sm rounded-xl border border-border-default bg-surface-elevated p-8 text-center shadow-ds">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-ds-error/10">
+          <AlertTriangle className="h-6 w-6 text-ds-error" />
+        </div>
+        <h1 className="text-xl font-semibold text-text-primary">
           Authentication Error
         </h1>
-        <p className="mt-2 text-sm text-gray-500">
+        <p className="mt-2 text-sm text-text-secondary">
           Something went wrong during sign-in. Please try again.
         </p>
       </div>

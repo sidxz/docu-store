@@ -6,6 +6,8 @@ import type { ReactNode } from "react";
 
 import { getQueryClient } from "@/lib/query-client";
 
+import { ThemeProvider } from "./ThemeProvider";
+
 const primeReactConfig = {
   ripple: true,
 };
@@ -16,7 +18,7 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <PrimeReactProvider value={primeReactConfig}>
-        {children}
+        <ThemeProvider>{children}</ThemeProvider>
       </PrimeReactProvider>
     </QueryClientProvider>
   );
