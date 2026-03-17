@@ -75,7 +75,7 @@ langfuse-seed: ## Seed Langfuse with default prompts from infrastructure/llm/def
 docker-down: ## Stop all infrastructure services
 	$(COMPOSE) down
 
-docker-clean: ## Stop all services and remove volumes
+nuke: ## Stop all services and remove volumes
 	$(COMPOSE) down -v
 
 dev: docker-up dev-install ## Set up development environment

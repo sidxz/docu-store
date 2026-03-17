@@ -372,10 +372,10 @@ async def get_artifact_permissions(
     container: Annotated[Container, Depends(get_container)],
     auth: Annotated[RequestAuth, Depends(get_auth)],
 ) -> dict:
-    """Get the permission ACL for an artifact, including current shares."""
+    """Get the permission ACL for an artifact with user profiles resolved."""
     await require_workspace_artifact(artifact_id, auth, container)
     await require_artifact_permission(artifact_id, auth, "view")
-    return await auth.get_resource_acl("artifact", artifact_id)
+    return await auth.get_enriched_resource_acl("artifact", artifact_id)
 
 
 @router.post("/{artifact_id}/shares", status_code=status.HTTP_201_CREATED)

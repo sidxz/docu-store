@@ -4,8 +4,11 @@ export interface ResourceShare {
   id: string;
   grantee_type: "user" | "group";
   grantee_id: string;
+  grantee_name: string | null;
+  grantee_email: string | null;
   permission: "view" | "edit";
   granted_by: string | null;
+  granted_by_name: string | null;
   granted_at: string;
 }
 
@@ -15,6 +18,8 @@ export interface ResourceACL {
   resource_id: string;
   workspace_id: string;
   owner_id: string | null;
+  owner_name: string | null;
+  owner_email: string | null;
   visibility: "private" | "workspace";
   shares: ResourceShare[];
 }
@@ -27,4 +32,13 @@ export interface ShareRequest {
 
 export interface UpdateVisibilityRequest {
   visibility: "private" | "workspace";
+}
+
+export interface WorkspaceMember {
+  user_id: string;
+  email: string;
+  name: string;
+  avatar_url: string | null;
+  role: string;
+  joined_at: string;
 }

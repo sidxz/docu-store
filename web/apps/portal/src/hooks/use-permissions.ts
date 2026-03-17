@@ -7,11 +7,7 @@ import { getAuthzClient } from "@/lib/authz-client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-/**
- * Authenticated fetch helper. The new permission endpoints are not yet in the
- * generated OpenAPI schema, so we use raw fetch with Sentinel auth headers
- * until the schema is regenerated.
- */
+/** Authenticated fetch for docu-store API (endpoints not yet in OpenAPI schema). */
 async function authFetch(path: string, init?: RequestInit): Promise<Response> {
   const headers = {
     ...getAuthzClient().getHeaders(),

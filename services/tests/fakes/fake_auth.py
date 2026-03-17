@@ -59,3 +59,29 @@ class FakeAuth:
         self, resource_type: str, resource_id: UUID,
     ) -> dict:
         return {"id": str(uuid4()), "visibility": "workspace", "shares": []}
+
+    async def get_enriched_resource_acl(
+        self, resource_type: str, resource_id: UUID,
+    ) -> dict:
+        return {
+            "id": str(uuid4()),
+            "visibility": "workspace",
+            "owner_id": str(self.user_id),
+            "owner_name": "Test User",
+            "owner_email": "test@example.com",
+            "shares": [],
+        }
+
+    async def search_members(
+        self, query: str | None = None, limit: int | None = None,
+    ) -> list[dict]:
+        return []
+
+    async def list_members(self, limit: int | None = None) -> list[dict]:
+        return []
+
+    async def list_groups(self) -> list[dict]:
+        return []
+
+    async def get_group_members(self, group_id: UUID) -> list[dict]:
+        return []

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Dialog } from "primereact/dialog";
-import { InputText } from "primereact/inputtext";
+import { AutoComplete } from "primereact/autocomplete";
 import { Dropdown } from "primereact/dropdown";
 import { InputSwitch } from "primereact/inputswitch";
 import { Toast } from "primereact/toast";
@@ -16,22 +16,18 @@ import {
   Users,
   User,
 } from "lucide-react";
-import type { ResourceShare, ShareRequest } from "@docu-store/types";
+import type { ResourceShare, WorkspaceMember } from "@docu-store/types";
 import {
   useArtifactPermissions,
   useShareArtifact,
   useRevokeShare,
   useUpdateVisibility,
 } from "@/hooks/use-permissions";
+import { getAuthzClient } from "@/lib/authz-client";
 
 const PERMISSION_OPTIONS = [
   { label: "View", value: "view" as const },
   { label: "Edit", value: "edit" as const },
-];
-
-const GRANTEE_TYPE_OPTIONS = [
-  { label: "User", value: "user" as const },
-  { label: "Group", value: "group" as const },
 ];
 
 interface ShareDialogProps {
@@ -48,29 +44,51 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
   const revokeMutation = useRevokeShare();
   const visibilityMutation = useUpdateVisibility();
 
-  // Share form state
-  const [granteeId, setGranteeId] = useState("");
-  const [granteeType, setGranteeType] = useState<"user" | "group">("user");
+  // Autocomplete state
+  const [selectedMember, setSelectedMember] = useState<
+    WorkspaceMember | undefined
+  >(undefined);
+  const [suggestions, setSuggestions] = useState<WorkspaceMember[]>([]);
   const [permission, setPermission] = useState<"view" | "edit">("view");
 
   const isWorkspaceVisible = acl?.visibility === "workspace";
 
-  const handleShare = async () => {
-    if (!granteeId.trim()) return;
+  const searchMembers = async (event: { query: string }) => {
+    if (event.query.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    try {
+      // searchMembers() added in @sentinel-auth/js 0.9.7
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const client = getAuthzClient() as any;
+      const results = (await client.searchMembers(
+        event.query,
+        10,
+      )) as WorkspaceMember[];
+      setSuggestions(results);
+    } catch {
+      setSuggestions([]);
+    }
+  };
 
-    const share: ShareRequest = {
-      grantee_type: granteeType,
-      grantee_id: granteeId.trim(),
-      permission,
-    };
+  const handleShare = async () => {
+    if (!selectedMember) return;
 
     try {
-      await shareMutation.mutateAsync({ artifactId, share });
-      setGranteeId("");
+      await shareMutation.mutateAsync({
+        artifactId,
+        share: {
+          grantee_type: "user",
+          grantee_id: selectedMember.user_id,
+          permission,
+        },
+      });
+      setSelectedMember(undefined);
       toast.current?.show({
         severity: "success",
         summary: "Shared",
-        detail: `Access granted to ${granteeType}`,
+        detail: `Access granted to ${selectedMember.name}`,
         life: 3000,
       });
     } catch {
@@ -96,7 +114,7 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
       toast.current?.show({
         severity: "success",
         summary: "Revoked",
-        detail: "Access removed",
+        detail: `Access removed for ${share.grantee_name ?? share.grantee_id}`,
         life: 3000,
       });
     } catch {
@@ -125,6 +143,23 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
       });
     }
   };
+
+  const memberTemplate = (member: WorkspaceMember) => (
+    <div className="flex items-center gap-3 py-1">
+      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/10 text-xs font-medium text-accent-text">
+        {member.name
+          .split(" ")
+          .map((n) => n[0])
+          .join("")
+          .slice(0, 2)
+          .toUpperCase()}
+      </div>
+      <div>
+        <p className="text-sm font-medium">{member.name}</p>
+        <p className="text-xs text-text-muted">{member.email}</p>
+      </div>
+    </div>
+  );
 
   return (
     <>
@@ -162,9 +197,7 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
                   )}
                   <div>
                     <p className="text-sm font-medium text-text-primary">
-                      {isWorkspaceVisible
-                        ? "Workspace visible"
-                        : "Private"}
+                      {isWorkspaceVisible ? "Workspace visible" : "Private"}
                     </p>
                     <p className="text-xs text-text-muted">
                       {isWorkspaceVisible
@@ -189,18 +222,20 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
                   Share with
                 </h4>
                 <div className="flex gap-2">
-                  <Dropdown
-                    value={granteeType}
-                    options={GRANTEE_TYPE_OPTIONS}
-                    onChange={(e) => setGranteeType(e.value)}
-                    className="w-28"
-                  />
-                  <InputText
-                    value={granteeId}
-                    onChange={(e) => setGranteeId(e.target.value)}
-                    placeholder="User or group ID"
+                  <AutoComplete
+                    value={selectedMember}
+                    suggestions={suggestions}
+                    completeMethod={searchMembers}
+                    field="name"
+                    itemTemplate={memberTemplate}
+                    selectedItemTemplate={(m: WorkspaceMember) => m.name}
+                    onChange={(e) => setSelectedMember(e.value)}
+                    placeholder="Search by name or email..."
                     className="flex-1"
-                    onKeyDown={(e) => e.key === "Enter" && handleShare()}
+                    inputClassName="w-full"
+                    minLength={2}
+                    delay={300}
+                    forceSelection
                   />
                   <Dropdown
                     value={permission}
@@ -210,7 +245,7 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
                   />
                   <button
                     onClick={handleShare}
-                    disabled={!granteeId.trim() || shareMutation.isPending}
+                    disabled={!selectedMember || shareMutation.isPending}
                     className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-50"
                   >
                     {shareMutation.isPending ? (
@@ -223,7 +258,7 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
               </div>
             )}
 
-            {/* Current shares */}
+            {/* Current access */}
             <div>
               <h4 className="mb-3 flex items-center gap-2 text-sm font-medium text-text-primary">
                 <Users className="h-4 w-4" />
@@ -234,18 +269,25 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
               {acl?.owner_id && (
                 <div className="flex items-center justify-between rounded-lg border border-border-default bg-surface-default px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <User className="h-4 w-4 text-text-muted" />
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/10 text-xs font-medium text-accent-text">
+                      {(acl.owner_name ?? "?")
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase()}
+                    </div>
                     <div>
                       <p className="text-sm font-medium text-text-primary">
-                        Owner
+                        {acl.owner_name ?? "Owner"}
                       </p>
-                      <p className="font-mono text-xs text-text-muted">
-                        {acl.owner_id}
+                      <p className="text-xs text-text-muted">
+                        {acl.owner_email ?? acl.owner_id}
                       </p>
                     </div>
                   </div>
                   <span className="rounded-md bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent-text">
-                    Full access
+                    Owner
                   </span>
                 </div>
               )}
@@ -260,18 +302,30 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
                     >
                       <div className="flex items-center gap-3">
                         {share.grantee_type === "group" ? (
-                          <Users className="h-4 w-4 text-text-muted" />
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-border-subtle">
+                            <Users className="h-4 w-4 text-text-muted" />
+                          </div>
                         ) : (
-                          <User className="h-4 w-4 text-text-muted" />
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-border-subtle text-xs font-medium text-text-secondary">
+                            {(share.grantee_name ?? "?")
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .slice(0, 2)
+                              .toUpperCase()}
+                          </div>
                         )}
                         <div>
-                          <p className="text-sm text-text-primary">
-                            <span className="capitalize">
-                              {share.grantee_type}
-                            </span>
+                          <p className="text-sm font-medium text-text-primary">
+                            {share.grantee_name ?? (
+                              <span className="font-mono text-xs">
+                                {share.grantee_id}
+                              </span>
+                            )}
                           </p>
-                          <p className="font-mono text-xs text-text-muted">
-                            {share.grantee_id}
+                          <p className="text-xs text-text-muted">
+                            {share.grantee_email ??
+                              `${share.grantee_type}`}
                           </p>
                         </div>
                       </div>
@@ -284,6 +338,7 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
                             onClick={() => handleRevoke(share)}
                             disabled={revokeMutation.isPending}
                             className="rounded p-1 text-text-muted transition-colors hover:bg-ds-error/10 hover:text-ds-error"
+                            title="Revoke access"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -293,17 +348,11 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
                   ))}
                 </div>
               ) : (
-                !acl?.owner_id && (
-                  <p className="py-4 text-center text-sm text-text-muted">
-                    No shares configured.
+                acl?.owner_id && (
+                  <p className="mt-2 py-2 text-center text-xs text-text-muted">
+                    No additional shares.
                   </p>
                 )
-              )}
-
-              {acl?.shares?.length === 0 && acl?.owner_id && (
-                <p className="mt-2 py-2 text-center text-xs text-text-muted">
-                  No additional shares.
-                </p>
               )}
             </div>
           </div>
