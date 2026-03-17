@@ -30,7 +30,11 @@ from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.title_mention import TitleMention
 from application.dtos.permission_dtos import ShareResourceRequest, UpdateVisibilityRequest
 from interfaces.api.middleware import handle_use_case_errors
-from interfaces.api.routes.helpers import require_artifact_permission, require_workspace_artifact
+from interfaces.api.routes.helpers import (
+    get_allowed_artifact_ids as _get_allowed_artifact_ids,
+    require_artifact_permission,
+    require_workspace_artifact,
+)
 from interfaces.dependencies import get_auth, get_container
 
 logger = structlog.get_logger()
@@ -45,10 +49,14 @@ async def list_artifacts(
     skip: Annotated[int, Query(...)] = 0,
     limit: Annotated[int, Query(...)] = 100,
 ) -> list[ArtifactResponse]:
-    """List all artifacts with pagination."""
+    """List all artifacts with pagination, filtered by permissions."""
+    allowed_artifact_ids = await _get_allowed_artifact_ids(auth)
     read_repository = container[ArtifactReadModel]
     return await read_repository.list_artifacts(
-        workspace_id=auth.workspace_id, skip=skip, limit=limit
+        workspace_id=auth.workspace_id,
+        skip=skip,
+        limit=limit,
+        allowed_artifact_ids=allowed_artifact_ids,
     )
 
 

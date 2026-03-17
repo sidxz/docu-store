@@ -16,6 +16,8 @@ export const queryKeys = {
       [...queryKeys.artifacts.all, id, "workflows"] as const,
     summary: (id: string) =>
       [...queryKeys.artifacts.all, id, "summary"] as const,
+    permissions: (id: string) =>
+      [...queryKeys.artifacts.all, id, "permissions"] as const,
   },
   pages: {
     all: ["pages"] as const,

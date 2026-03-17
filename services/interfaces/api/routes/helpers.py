@@ -48,6 +48,23 @@ def _map_app_error_to_http_exception(error: AppError) -> HTTPException:
     )
 
 
+async def get_allowed_artifact_ids(auth: RequestAuth) -> list[UUID] | None:
+    """Get artifact IDs the user can access, or None for full access.
+
+    Calls Sentinel's accessible() endpoint. Returns None (no filtering)
+    when the user has full access or when Sentinel is unavailable (graceful
+    degradation to workspace-only filtering).
+    """
+    try:
+        ids, has_full_access = await auth.accessible("artifact", "view")
+        if has_full_access:
+            return None
+        return ids
+    except Exception:
+        logger.warning("permission_accessible_failed", exc_info=True)
+        return None
+
+
 async def require_workspace_artifact(
     artifact_id: UUID, auth: RequestAuth, container: Container
 ) -> ArtifactResponse:

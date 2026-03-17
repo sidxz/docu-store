@@ -26,29 +26,12 @@ from application.use_cases.search_use_cases import HierarchicalSearchUseCase, Se
 from application.use_cases.smiles_search_use_cases import SearchSimilarCompoundsUseCase
 from infrastructure.embeddings.chemberta_generator import ChemBertaEmbeddingGenerator
 from interfaces.api.middleware import handle_use_case_errors
-from interfaces.api.routes.helpers import require_workspace_page
+from interfaces.api.routes.helpers import get_allowed_artifact_ids as _get_allowed_artifact_ids, require_workspace_page
 from interfaces.dependencies import get_auth, get_container
 
 logger = structlog.get_logger()
 
 router = APIRouter(prefix="/search", tags=["search"])
-
-
-async def _get_allowed_artifact_ids(auth: RequestAuth) -> list[UUID] | None:
-    """Get artifact IDs the user can access, or None for full access.
-
-    Calls Sentinel's accessible() endpoint. Returns None (no filtering)
-    when the user has full access or when Sentinel is unavailable (graceful
-    degradation to workspace-only filtering).
-    """
-    try:
-        ids, has_full_access = await auth.accessible("artifact", "view")
-        if has_full_access:
-            return None
-        return ids
-    except Exception:
-        logger.warning("permission_accessible_failed", exc_info=True)
-        return None
 
 
 @router.post("/pages", status_code=status.HTTP_200_OK)

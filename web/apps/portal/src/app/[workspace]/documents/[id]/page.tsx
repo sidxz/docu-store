@@ -27,6 +27,8 @@ import {
   useArtifactWorkflows,
   useDeleteArtifact,
 } from "@/hooks/use-artifacts";
+import { ShareDialog } from "@/components/sharing/ShareDialog";
+import { useSession } from "@/lib/auth";
 
 type PageResponse = components["schemas"]["PageResponse"];
 
@@ -69,9 +71,15 @@ export default function ArtifactDetailPage() {
   const { workspace, id } = useParams<{ workspace: string; id: string }>();
   const router = useRouter();
   const toast = useRef<Toast>(null);
+  const { user } = useSession();
   const { data: artifact, isLoading, error } = useArtifact(id);
   const { data: workflowData } = useArtifactWorkflows(id);
   const deleteMutation = useDeleteArtifact();
+
+  // owner_id is present in the API response but not yet in generated OpenAPI types
+  const ownerId = (artifact as Record<string, unknown> | undefined)
+    ?.owner_id as string | undefined;
+  const isOwnerOrAdmin = !!ownerId && ownerId === user.id;
 
   if (isLoading) {
     return (
@@ -152,14 +160,20 @@ export default function ArtifactDetailPage() {
         title={title}
         subtitle={`${artifact.artifact_type.replace(/_/g, " ")} · ${pages.length} pages`}
         actions={
-          <button
-            onClick={handleDelete}
-            disabled={deleteMutation.isPending}
-            className="flex items-center gap-2 rounded-lg border border-ds-error/20 px-3 py-2 text-sm text-ds-error transition-colors hover:bg-ds-error/5"
-          >
-            <Trash2 className="h-4 w-4" />
-            Delete
-          </button>
+          <div className="flex items-center gap-2">
+            <ShareDialog
+              artifactId={id}
+              isOwnerOrAdmin={isOwnerOrAdmin}
+            />
+            <button
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+              className="flex items-center gap-2 rounded-lg border border-ds-error/20 px-3 py-2 text-sm text-ds-error transition-colors hover:bg-ds-error/5"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </button>
+          </div>
         }
       />
 
