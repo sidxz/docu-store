@@ -17,3 +17,9 @@ class PermissionRegistrar(Protocol):
         owner_id: UUID,
         visibility: str = "workspace",
     ) -> None: ...
+
+    async def deregister_resource(
+        self,
+        resource_type: str,
+        resource_id: UUID,
+    ) -> None: ...

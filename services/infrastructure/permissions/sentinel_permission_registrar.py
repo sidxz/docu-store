@@ -38,3 +38,18 @@ class SentinelPermissionRegistrar:
             workspace_id=str(workspace_id),
             owner_id=str(owner_id),
         )
+
+    async def deregister_resource(
+        self,
+        resource_type: str,
+        resource_id: UUID,
+    ) -> None:
+        await self._client.deregister_resource(
+            resource_type=resource_type,
+            resource_id=resource_id,
+        )
+        logger.info(
+            "resource_deregistered",
+            resource_type=resource_type,
+            resource_id=str(resource_id),
+        )

@@ -369,6 +369,11 @@ def create_container() -> Container:  # noqa: PLR0915
         artifact_repository=c[ArtifactRepository],
         page_repository=c[PageRepository],
         external_event_publisher=c[ExternalEventPublisher],
+        vector_store=c[VectorStore],
+        compound_vector_store=c[CompoundVectorStore],
+        summary_vector_store=c[SummaryVectorStore],
+        blob_store=c[BlobStore],
+        permission_registrar=c[PermissionRegistrar],
     )
 
     container[UploadBlobUseCase] = lambda c: UploadBlobUseCase(

@@ -15,9 +15,12 @@ import { useAuthBlobUrl } from "@/hooks/use-auth-blob-url";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { ScoreBadge } from "@/components/ui/ScoreBadge";
+import { CopySmiles } from "@/components/ui/CopySmiles";
 import { WorkflowStatusBadge } from "@/components/WorkflowStatusBadge";
 import { useArtifact } from "@/hooks/use-artifacts";
 import { usePage, usePageWorkflows } from "@/hooks/use-pages";
+import { usePlugins } from "@/plugins";
+import { usePubChemEnrichments, PubChemBadge } from "@/plugins/pubchem";
 import { API_URL } from "@/lib/constants";
 
 const ENTITY_TYPE_COLORS: Record<string, { severity: "success" | "warning" | "danger" | "secondary" }> = {
@@ -108,6 +111,10 @@ export default function PageViewerPage() {
   const { data: page, isLoading, error } = usePage(pageId);
   const { data: artifact } = useArtifact(id);
   const { data: workflowData } = usePageWorkflows(pageId);
+  const { isPluginEnabled } = usePlugins();
+  const { enrichmentBySmiles } = usePubChemEnrichments(pageId, {
+    enabled: isPluginEnabled("pubchem_enrichment"),
+  });
 
   // Derive prev/next page IDs from the artifact's page list
   const siblingPages = (() => {
@@ -315,12 +322,7 @@ export default function PageViewerPage() {
                   />
                 </div>
                 <div className="space-y-1.5 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-text-muted">SMILES</span>
-                    <span className="font-mono text-text-secondary max-w-[180px] truncate">
-                      {cm.smiles}
-                    </span>
-                  </div>
+                  <CopySmiles smiles={cm.smiles} />
                   {cm.extracted_id && (
                     <div className="flex items-center justify-between">
                       <span className="text-text-muted">ID</span>
@@ -345,6 +347,11 @@ export default function PageViewerPage() {
                       <ScoreBadge score={cm.confidence} variant="pill" />
                     </div>
                   )}
+                  <PubChemBadge
+                    enrichment={enrichmentBySmiles?.get(
+                      cm.canonical_smiles ?? "",
+                    )}
+                  />
                 </div>
               </Card>
             ))}

@@ -27,6 +27,11 @@ export const queryKeys = {
     workflows: (id: string) =>
       [...queryKeys.pages.all, id, "workflows"] as const,
   },
+  plugins: {
+    all: ["plugins"] as const,
+    enrichments: (plugin: string, pageId: string) =>
+      ["plugins", plugin, "enrichments", pageId] as const,
+  },
   search: {
     text: (query: string) => ["search", "text", query] as const,
     summary: (query: string) => ["search", "summary", query] as const,

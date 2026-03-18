@@ -22,6 +22,12 @@ from domain.services.artifact_deletion_service import ArtifactDeletionService
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.title_mention import TitleMention
 
+from application.ports.blob_store import BlobStore
+from application.ports.compound_vector_store import CompoundVectorStore
+from application.ports.permission_registrar import PermissionRegistrar
+from application.ports.summary_vector_store import SummaryVectorStore
+from application.ports.vector_store import VectorStore
+
 if TYPE_CHECKING:
     from application.ports.auth import AuthContext
 
@@ -395,17 +401,32 @@ class UpdateTagsUseCase:
 
 
 class DeleteArtifactUseCase:
-    """Delete an artifact and all its associated pages."""
+    """Delete an artifact and all its associated pages.
+
+    After the event-sourced deletion, performs best-effort cleanup of
+    secondary stores (vector DBs, blob storage).  Cleanup failures are
+    logged but never fail the overall operation.
+    """
 
     def __init__(
         self,
         artifact_repository: ArtifactRepository,
         page_repository: PageRepository,
         external_event_publisher: ExternalEventPublisher | None = None,
+        vector_store: VectorStore | None = None,
+        compound_vector_store: CompoundVectorStore | None = None,
+        summary_vector_store: SummaryVectorStore | None = None,
+        blob_store: BlobStore | None = None,
+        permission_registrar: PermissionRegistrar | None = None,
     ) -> None:
         self.artifact_repository = artifact_repository
         self.page_repository = page_repository
         self.external_event_publisher = external_event_publisher
+        self._vector_store = vector_store
+        self._compound_vector_store = compound_vector_store
+        self._summary_vector_store = summary_vector_store
+        self._blob_store = blob_store
+        self._permission_registrar = permission_registrar
 
     async def execute(
         self, artifact_id: UUID, auth: AuthContext | None = None
@@ -419,7 +440,10 @@ class DeleteArtifactUseCase:
 
             if auth and artifact.workspace_id is not None and artifact.workspace_id != auth.workspace_id:
                 return Failure(AppError("not_found", "Artifact not found"))
-            pages = [self.page_repository.get_by_id(page_id) for page_id in artifact.pages]
+
+            page_ids = list(artifact.pages)
+            storage_location = artifact.storage_location
+            pages = [self.page_repository.get_by_id(pid) for pid in page_ids]
 
             # Use the domain service to delete artifact and all its pages
             ArtifactDeletionService.delete_artifact_with_pages(artifact, pages)
@@ -431,6 +455,9 @@ class DeleteArtifactUseCase:
 
             if self.external_event_publisher:
                 await self.external_event_publisher.notify_artifact_deleted(artifact_id)
+
+            # Best-effort cleanup of secondary stores
+            await self._cleanup_secondary_stores(artifact_id, page_ids, storage_location)
 
             # Return a successful result
             return Success(None)
@@ -444,3 +471,53 @@ class DeleteArtifactUseCase:
             )
         except ValueError as e:
             return Failure(AppError("invalid_operation", str(e)))
+
+    async def _cleanup_secondary_stores(
+        self,
+        artifact_id: UUID,
+        page_ids: list[UUID],
+        storage_location: str,
+    ) -> None:
+        """Best-effort cleanup — errors are logged, never raised."""
+        for page_id in page_ids:
+            if self._vector_store:
+                try:
+                    await self._vector_store.delete_page_embedding(page_id)
+                except Exception:
+                    logger.warning("cleanup_page_embedding_failed", page_id=str(page_id), exc_info=True)
+
+            if self._compound_vector_store:
+                try:
+                    await self._compound_vector_store.delete_compound_embeddings_for_page(page_id)
+                except Exception:
+                    logger.warning("cleanup_compound_embedding_failed", page_id=str(page_id), exc_info=True)
+
+            if self._summary_vector_store:
+                try:
+                    await self._summary_vector_store.delete_page_summary(page_id)
+                except Exception:
+                    logger.warning("cleanup_page_summary_embedding_failed", page_id=str(page_id), exc_info=True)
+
+        if self._summary_vector_store:
+            try:
+                await self._summary_vector_store.delete_artifact_summary(artifact_id)
+            except Exception:
+                logger.warning("cleanup_artifact_summary_embedding_failed", artifact_id=str(artifact_id), exc_info=True)
+
+        if self._blob_store and storage_location:
+            try:
+                self._blob_store.delete(storage_location)
+            except Exception:
+                logger.warning("cleanup_blob_failed", storage_location=storage_location, exc_info=True)
+
+        if self._permission_registrar:
+            try:
+                await self._permission_registrar.deregister_resource("artifact", artifact_id)
+            except Exception:
+                logger.warning("cleanup_permission_failed", artifact_id=str(artifact_id), exc_info=True)
+
+        logger.info(
+            "secondary_store_cleanup_complete",
+            artifact_id=str(artifact_id),
+            pages_cleaned=len(page_ids),
+        )

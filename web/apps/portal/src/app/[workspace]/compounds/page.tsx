@@ -11,6 +11,7 @@ import { MoleculeStructure, StructureInput } from "@docu-store/ui";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { ScoreBadge } from "@/components/ui/ScoreBadge";
+import { CopySmiles } from "@/components/ui/CopySmiles";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useSearchCompounds } from "@/hooks/use-search";
 
@@ -98,12 +99,7 @@ export default function CompoundsPage() {
                     <span className="text-text-muted">Similarity</span>
                     <ScoreBadge score={r.similarity_score} variant="pill" />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-text-muted">SMILES</span>
-                    <span className="max-w-[160px] truncate font-mono text-text-secondary">
-                      {r.smiles}
-                    </span>
-                  </div>
+                  <CopySmiles smiles={r.smiles} maxWidth="max-w-[160px]" />
                   {r.extracted_id && (
                     <div className="flex items-center justify-between">
                       <span className="text-text-muted">ID</span>

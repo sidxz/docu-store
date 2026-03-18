@@ -225,7 +225,7 @@ async def delete_artifact(
     await require_workspace_artifact(artifact_id, auth, container)
     await require_artifact_permission(artifact_id, auth, "edit")
     use_case = container[DeleteArtifactUseCase]
-    await use_case.execute(artifact_id=artifact_id, auth=auth)
+    return await use_case.execute(artifact_id=artifact_id, auth=auth)
 
 
 @router.post("/{artifact_id}/summarize", status_code=status.HTTP_202_ACCEPTED)
