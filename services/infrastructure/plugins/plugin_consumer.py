@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import signal
 from typing import Any
 
@@ -126,13 +125,23 @@ async def _dispatch(
             )
 
 
-def run_sync() -> None:
-    """Entry point for running the plugin consumer as a standalone process."""
-    from infrastructure.config import settings  # noqa: PLC0415
-    from infrastructure.logging import setup_logging  # noqa: PLC0415
-    from infrastructure.plugins.loader import discover_plugins  # noqa: PLC0415
+async def _run_async() -> None:
+    """Async entry point — connects to Temporal & MongoDB, then runs concurrently.
 
-    setup_logging()
+    Starts the Kafka consumer loop and plugin Temporal workers side-by-side
+    so that event routing and workflow execution both run in this process.
+    """
+    from motor.motor_asyncio import AsyncIOMotorClient  # noqa: PLC0415
+    from temporalio.client import Client as TemporalClient  # noqa: PLC0415
+    from temporalio.worker import Worker as TemporalWorker  # noqa: PLC0415
+    from temporalio.worker.workflow_sandbox import (  # noqa: PLC0415
+        SandboxedWorkflowRunner,
+        SandboxRestrictions,
+    )
+
+    from infrastructure.config import settings  # noqa: PLC0415
+    from infrastructure.plugins.context import DefaultPluginContext  # noqa: PLC0415
+    from infrastructure.plugins.loader import discover_plugins  # noqa: PLC0415
 
     enabled = settings.enabled_plugins_list
     registry = discover_plugins(enabled, settings.plugin_dir)
@@ -141,28 +150,75 @@ def run_sync() -> None:
         logger.info("plugin_consumer.no_plugins_to_run")
         return
 
-    # Build a minimal PluginContext
-    # In production this would be richer; for now we provide what's available
-    from infrastructure.plugins.context import DefaultPluginContext  # noqa: PLC0415
+    # Connect to Temporal and MongoDB
+    temporal_client = await TemporalClient.connect(settings.temporal_address)
+    mongo_client = AsyncIOMotorClient(settings.mongo_uri)
+    mongo_db = mongo_client[settings.mongo_db]
 
     context = DefaultPluginContext(
         page_read_model=None,
         artifact_read_model=None,
         smiles_validator=None,
         embedding_generator=None,
-        mongo_db=None,
-        temporal_client=None,
+        mongo_db=mongo_db,
+        temporal_client=temporal_client,
         plugin_config={},
     )
 
-    asyncio.run(
+    # Collect plugin Temporal workflows and activities
+    all_workflows = registry.collect_workflows()
+    all_activities = registry.collect_activities(context)
+
+    # Build one Temporal worker per unique plugin task queue
+    unique_task_queues = {m.effective_task_queue() for m in registry.list_manifests()}
+
+    # Plugin packages may import libraries (structlog, rich, etc.) that are
+    # incompatible with the Temporal workflow sandbox.  Pass the entire
+    # "plugins" tree through so the sandbox doesn't choke on those imports.
+    plugin_sandbox_runner = SandboxedWorkflowRunner(
+        restrictions=SandboxRestrictions.default.with_passthrough_modules("plugins"),
+    )
+
+    async def run_temporal_workers() -> None:
+        workers = []
+        for task_queue in sorted(unique_task_queues):
+            worker = TemporalWorker(
+                temporal_client,
+                task_queue=task_queue,
+                workflows=all_workflows,
+                activities=all_activities,
+                max_concurrent_activities=settings.plugin_max_concurrent_activities,
+                workflow_runner=plugin_sandbox_runner,
+            )
+            workers.append(worker)
+            logger.info("plugin_consumer.temporal_worker_registered", task_queue=task_queue)
+
+        await asyncio.gather(*[w.run() for w in workers])
+
+    logger.info(
+        "plugin_consumer.starting_all",
+        plugins=registry.list_names(),
+        task_queues=sorted(unique_task_queues),
+    )
+
+    # Run Kafka consumer + Temporal workers concurrently
+    await asyncio.gather(
         run_plugin_consumer(
             registry=registry,
             context=context,
             kafka_bootstrap_servers=settings.kafka_bootstrap_servers,
             kafka_topic=settings.kafka_topic,
-        )
+        ),
+        run_temporal_workers(),
     )
+
+
+def run_sync() -> None:
+    """Entry point for running the plugin consumer as a standalone process."""
+    from infrastructure.logging import setup_logging  # noqa: PLC0415
+
+    setup_logging()
+    asyncio.run(_run_async())
 
 
 if __name__ == "__main__":

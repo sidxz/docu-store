@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from temporalio import workflow
+from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
     pass
@@ -25,7 +26,7 @@ class PubChemEnrichmentWorkflow:
             "enrich_compounds_from_pubchem",
             page_data_json,
             start_to_close_timeout=timedelta(minutes=5),
-            retry_policy=workflow.RetryPolicy(
+            retry_policy=RetryPolicy(
                 maximum_attempts=3,
                 initial_interval=timedelta(seconds=5),
             ),
