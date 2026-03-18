@@ -41,8 +41,6 @@ dependencies = [
     "uvicorn>=0.40.0",
 ]
 
-[tool.uv.sources]
-sentinel-auth-sdk = { path = "/Users/sidx/workspace/identity-service/sdk", editable = true }
 
 [tool.ruff]
 line-length = 100
