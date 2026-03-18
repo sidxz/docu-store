@@ -13,7 +13,7 @@ export interface paths {
         };
         /**
          * List Artifacts
-         * @description List all artifacts with pagination.
+         * @description List all artifacts with pagination, filtered by permissions.
          */
         get: operations["list_artifacts_artifacts_get"];
         put?: never;
@@ -248,6 +248,119 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/artifacts/{artifact_id}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream Artifact Pdf
+         * @description Stream the source PDF for an artifact.
+         *
+         *     Returns the raw PDF binary from blob storage. The artifact must exist
+         *     and have a valid storage_location.
+         */
+        get: operations["stream_artifact_pdf_artifacts__artifact_id__pdf_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artifacts/{artifact_id}/pages/{page_index}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream Page Image
+         * @description Stream the rendered PNG image for a specific page of an artifact.
+         *
+         *     Returns the pre-rendered page image from blob storage. Page images
+         *     are generated during PDF ingestion.
+         */
+        get: operations["stream_page_image_artifacts__artifact_id__pages__page_index__image_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artifacts/{artifact_id}/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Artifact Permissions
+         * @description Get the permission ACL for an artifact with user profiles resolved.
+         */
+        get: operations["get_artifact_permissions_artifacts__artifact_id__permissions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artifacts/{artifact_id}/shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Share Artifact
+         * @description Share an artifact with a user or group.
+         *
+         *     Only the artifact owner or workspace admin can share.
+         *     Sentinel enforces this server-side; the route also fast-fails.
+         */
+        post: operations["share_artifact_artifacts__artifact_id__shares_post"];
+        /**
+         * Revoke Artifact Share
+         * @description Revoke a share on an artifact.
+         */
+        delete: operations["revoke_artifact_share_artifacts__artifact_id__shares_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artifacts/{artifact_id}/visibility": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Artifact Visibility
+         * @description Toggle artifact visibility between private and workspace.
+         */
+        patch: operations["update_artifact_visibility_artifacts__artifact_id__visibility_patch"];
         trace?: never;
     };
     "/pages/{page_id}": {
@@ -728,6 +841,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspace/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Members
+         * @description Search workspace members by name or email.
+         *
+         *     Proxies to Sentinel's workspace member list endpoint.
+         */
+        get: operations["search_members_workspace_members_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Groups
+         * @description List groups in the current workspace.
+         */
+        get: operations["list_groups_workspace_groups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -850,6 +1005,16 @@ export interface components {
              * @description Location where the artifact is stored
              */
             storage_location: string;
+            /**
+             * Workspace Id
+             * @description Workspace this artifact belongs to
+             */
+            workspace_id?: string | null;
+            /**
+             * Owner Id
+             * @description User who created this artifact
+             */
+            owner_id?: string | null;
             /**
              * Pages
              * @description List of page IDs associated with the artifact
@@ -1185,6 +1350,10 @@ export interface components {
             tag_mentions: components["schemas"]["TagMention"][];
             text_mention?: components["schemas"]["TextMention"] | null;
             summary_candidate?: components["schemas"]["SummaryCandidate"] | null;
+            /** Workspace Id */
+            workspace_id?: string | null;
+            /** Owner Id */
+            owner_id?: string | null;
         };
         /**
          * SearchRequest
@@ -1254,6 +1423,21 @@ export interface components {
             artifact_name?: string | null;
             /** @description Full artifact details including metadata, pages, and tags */
             artifact_details?: components["schemas"]["ArtifactDetailsDTO"] | null;
+        };
+        /** ShareResourceRequest */
+        ShareResourceRequest: {
+            /** Grantee Type */
+            grantee_type: string;
+            /**
+             * Grantee Id
+             * Format: uuid
+             */
+            grantee_id: string;
+            /**
+             * Permission
+             * @default view
+             */
+            permission: string;
         };
         /**
          * SummaryCandidate
@@ -1333,6 +1517,8 @@ export interface components {
             summary_text?: string | null;
             /** Artifact Title */
             artifact_title?: string | null;
+            /** Page Index */
+            page_index?: number | null;
         };
         /**
          * SummarySearchRequest
@@ -1402,6 +1588,8 @@ export interface components {
             summary_text?: string | null;
             /** Artifact Title */
             artifact_title?: string | null;
+            /** Page Index */
+            page_index?: number | null;
             /** Metadata */
             metadata?: {
                 [key: string]: unknown;
@@ -1522,6 +1710,11 @@ export interface components {
             pipeline_run_id?: string | null;
             /** Title */
             title: string;
+        };
+        /** UpdateVisibilityRequest */
+        UpdateVisibilityRequest: {
+            /** Visibility */
+            visibility: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -1958,6 +2151,213 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_artifact_pdf_artifacts__artifact_id__pdf_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_page_image_artifacts__artifact_id__pages__page_index__image_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                artifact_id: string;
+                page_index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_artifact_permissions_artifacts__artifact_id__permissions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    share_artifact_artifacts__artifact_id__shares_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShareResourceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_artifact_share_artifacts__artifact_id__shares_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShareResourceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_artifact_visibility_artifacts__artifact_id__visibility_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateVisibilityRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -2591,6 +2991,62 @@ export interface operations {
                             [key: string]: unknown;
                         };
                     };
+                };
+            };
+        };
+    };
+    search_members_workspace_members_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_groups_workspace_groups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
                 };
             };
         };

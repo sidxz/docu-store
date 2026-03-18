@@ -1,29 +1,20 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ResourceACL, ShareRequest } from "@docu-store/types";
+import { apiClient } from "@docu-store/api-client";
+import type { ResourceACL } from "@docu-store/types";
 import { queryKeys } from "@/lib/query-keys";
-import { getAuthzClient } from "@/lib/authz-client";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-
-/** Authenticated fetch for docu-store API (endpoints not yet in OpenAPI schema). */
-async function authFetch(path: string, init?: RequestInit): Promise<Response> {
-  const headers = {
-    ...getAuthzClient().getHeaders(),
-    "Content-Type": "application/json",
-    ...init?.headers,
-  };
-  return fetch(`${API_URL}${path}`, { ...init, headers });
-}
 
 export function useArtifactPermissions(artifactId: string) {
   return useQuery({
     queryKey: queryKeys.artifacts.permissions(artifactId),
     queryFn: async () => {
-      const res = await authFetch(`/artifacts/${artifactId}/permissions`);
-      if (!res.ok) throw new Error("Failed to fetch permissions");
-      return (await res.json()) as ResourceACL;
+      const { data, error } = await apiClient.GET(
+        "/artifacts/{artifact_id}/permissions",
+        { params: { path: { artifact_id: artifactId } } },
+      );
+      if (error) throw new Error("Failed to fetch permissions");
+      return data as unknown as ResourceACL;
     },
     enabled: !!artifactId,
   });
@@ -37,14 +28,17 @@ export function useShareArtifact() {
       share,
     }: {
       artifactId: string;
-      share: ShareRequest;
+      share: { grantee_type: string; grantee_id: string; permission: string };
     }) => {
-      const res = await authFetch(`/artifacts/${artifactId}/shares`, {
-        method: "POST",
-        body: JSON.stringify(share),
-      });
-      if (!res.ok) throw new Error("Failed to share artifact");
-      return res.json();
+      const { data, error } = await apiClient.POST(
+        "/artifacts/{artifact_id}/shares",
+        {
+          params: { path: { artifact_id: artifactId } },
+          body: share,
+        },
+      );
+      if (error) throw new Error("Failed to share artifact");
+      return data;
     },
     onSuccess: (_, { artifactId }) => {
       queryClient.invalidateQueries({
@@ -62,14 +56,17 @@ export function useRevokeShare() {
       share,
     }: {
       artifactId: string;
-      share: ShareRequest;
+      share: { grantee_type: string; grantee_id: string; permission: string };
     }) => {
-      const res = await authFetch(`/artifacts/${artifactId}/shares`, {
-        method: "DELETE",
-        body: JSON.stringify(share),
-      });
-      if (!res.ok) throw new Error("Failed to revoke share");
-      return res.json();
+      const { data, error } = await apiClient.DELETE(
+        "/artifacts/{artifact_id}/shares",
+        {
+          params: { path: { artifact_id: artifactId } },
+          body: share,
+        },
+      );
+      if (error) throw new Error("Failed to revoke share");
+      return data;
     },
     onSuccess: (_, { artifactId }) => {
       queryClient.invalidateQueries({
@@ -87,14 +84,17 @@ export function useUpdateVisibility() {
       visibility,
     }: {
       artifactId: string;
-      visibility: "private" | "workspace";
+      visibility: string;
     }) => {
-      const res = await authFetch(`/artifacts/${artifactId}/visibility`, {
-        method: "PATCH",
-        body: JSON.stringify({ visibility }),
-      });
-      if (!res.ok) throw new Error("Failed to update visibility");
-      return res.json();
+      const { data, error } = await apiClient.PATCH(
+        "/artifacts/{artifact_id}/visibility",
+        {
+          params: { path: { artifact_id: artifactId } },
+          body: { visibility },
+        },
+      );
+      if (error) throw new Error("Failed to update visibility");
+      return data;
     },
     onSuccess: (_, { artifactId }) => {
       queryClient.invalidateQueries({

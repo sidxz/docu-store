@@ -33,12 +33,3 @@ export interface ShareRequest {
 export interface UpdateVisibilityRequest {
   visibility: "private" | "workspace";
 }
-
-export interface WorkspaceMember {
-  user_id: string;
-  email: string;
-  name: string;
-  avatar_url: string | null;
-  role: string;
-  joined_at: string;
-}

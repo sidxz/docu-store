@@ -60,7 +60,17 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
       return;
     }
     try {
-      const results = await getAuthzClient().searchMembers(event.query, 10);
+      const headers = {
+        ...getAuthzClient().getHeaders(),
+        "Content-Type": "application/json",
+      };
+      const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+      const res = await fetch(
+        `${API_URL}/workspace/members?q=${encodeURIComponent(event.query)}&limit=10`,
+        { headers },
+      );
+      if (!res.ok) throw new Error("Search failed");
+      const results: WorkspaceMember[] = await res.json();
       setSuggestions(results);
     } catch {
       setSuggestions([]);

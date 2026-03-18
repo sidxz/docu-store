@@ -76,10 +76,8 @@ export default function ArtifactDetailPage() {
   const { data: workflowData } = useArtifactWorkflows(id);
   const deleteMutation = useDeleteArtifact();
 
-  // owner_id is present in the API response but not yet in generated OpenAPI types
-  const ownerId = (artifact as Record<string, unknown> | undefined)
-    ?.owner_id as string | undefined;
-  const isOwnerOrAdmin = !!ownerId && ownerId === user.id;
+  const isOwnerOrAdmin =
+    !!artifact?.owner_id && artifact.owner_id === user.id;
 
   if (isLoading) {
     return (

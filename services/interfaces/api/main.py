@@ -13,6 +13,7 @@ from infrastructure.logging import setup_logging
 from interfaces.api.routes.artifact_routes import router as artifact_router
 from interfaces.api.routes.page_routes import router as page_router
 from interfaces.api.routes.search_routes import router as search_router
+from interfaces.api.routes.workspace_routes import router as workspace_router
 
 # Configure structured logging
 setup_logging()
@@ -87,6 +88,7 @@ def create_app() -> FastAPI:
     app.include_router(artifact_router)
     app.include_router(page_router)
     app.include_router(search_router)
+    app.include_router(workspace_router)
 
     @app.get("/health")
     async def health_check() -> dict[str, str]:
