@@ -35,6 +35,11 @@ export function useArtifact(id: string) {
   });
 }
 
+/** Artifact workflow keys (from backend) that have rerun API endpoints. */
+export const RERUNNABLE_ARTIFACT_WORKFLOWS = new Set([
+  "artifact_summarization",
+]);
+
 export function useArtifactWorkflows(id: string) {
   return useQuery({
     queryKey: queryKeys.artifacts.workflows(id),
@@ -44,13 +49,30 @@ export function useArtifactWorkflows(id: string) {
         { params: { path: { artifact_id: id } } },
       );
       if (error) throw new Error("Failed to fetch workflows");
-      return data as WorkflowMap;
+      const result = data as WorkflowMap;
+
+      if (process.env.NODE_ENV === "development" && result?.workflows) {
+        console.groupCollapsed(
+          `[docu-store] Artifact workflows · ${id.slice(0, 8)}…`,
+        );
+        console.table(
+          Object.entries(result.workflows).map(([name, info]) => ({
+            workflow: name,
+            status: info.status,
+            id: info.workflow_id,
+          })),
+        );
+        console.groupEnd();
+      }
+
+      return result;
     },
     enabled: !!id,
     // Poll every 3 s while any workflow is RUNNING; stop once all settle.
     // The backend proxies to Temporal, so this drives real-time status updates.
     refetchInterval: (query) => {
-      const workflows = (query.state.data as WorkflowMap | undefined)?.workflows;
+      const workflows = (query.state.data as WorkflowMap | undefined)
+        ?.workflows;
       const hasRunning = workflows
         ? Object.values(workflows).some((w) => w.status === "RUNNING")
         : false;
@@ -130,6 +152,45 @@ export function useDeleteArtifact() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.artifacts.all });
+    },
+  });
+}
+
+export function useRerunArtifactWorkflow(artifactId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (workflowName: string) => {
+      if (process.env.NODE_ENV === "development") {
+        console.log(
+          `[docu-store] ▶ Rerunning ${workflowName} · artifact ${artifactId.slice(0, 8)}…`,
+        );
+      }
+
+      switch (workflowName) {
+        case "artifact_summarization": {
+          const { data, error } = await apiClient.POST(
+            "/artifacts/{artifact_id}/summarize",
+            { params: { path: { artifact_id: artifactId } } },
+          );
+          if (error) throw new Error(`Failed to rerun ${workflowName}`);
+
+          if (process.env.NODE_ENV === "development") {
+            console.log(
+              `[docu-store] ✓ ${workflowName} rerun accepted:`,
+              data,
+            );
+          }
+          return data;
+        }
+        default:
+          throw new Error(`No rerun endpoint for workflow: ${workflowName}`);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.artifacts.workflows(artifactId),
+      });
     },
   });
 }

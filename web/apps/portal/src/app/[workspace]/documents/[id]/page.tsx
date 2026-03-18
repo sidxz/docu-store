@@ -24,6 +24,8 @@ import {
   useArtifact,
   useArtifactWorkflows,
   useDeleteArtifact,
+  useRerunArtifactWorkflow,
+  RERUNNABLE_ARTIFACT_WORKFLOWS,
 } from "@/hooks/use-artifacts";
 import { ShareDialog } from "@/components/sharing/ShareDialog";
 import { useSession } from "@/lib/auth";
@@ -68,6 +70,7 @@ export default function ArtifactDetailPage() {
   const { data: artifact, isLoading, error } = useArtifact(id);
   const { data: workflowData } = useArtifactWorkflows(id);
   const deleteMutation = useDeleteArtifact();
+  const rerunMutation = useRerunArtifactWorkflow(id);
 
   const isOwnerOrAdmin =
     !!artifact?.owner_id && artifact.owner_id === user.id;
@@ -349,7 +352,38 @@ export default function ArtifactDetailPage() {
                       <span className="text-sm font-medium text-text-primary">
                         {w.name.replace(/_/g, " ")}
                       </span>
-                      <WorkflowStatusBadge status={w.status} />
+                      <div className="flex items-center gap-2">
+                        <WorkflowStatusBadge status={w.status} />
+                        {RERUNNABLE_ARTIFACT_WORKFLOWS.has(w.name) &&
+                          w.status !== "RUNNING" && (
+                            <Button
+                              icon="pi pi-replay"
+                              onClick={async () => {
+                                try {
+                                  await rerunMutation.mutateAsync(w.name);
+                                } catch {
+                                  toast.current?.show({
+                                    severity: "error",
+                                    summary: "Rerun failed",
+                                    detail: `Could not rerun ${w.name.replace(/_/g, " ")}`,
+                                    life: 5000,
+                                  });
+                                }
+                              }}
+                              loading={
+                                rerunMutation.isPending &&
+                                rerunMutation.variables === w.name
+                              }
+                              disabled={rerunMutation.isPending}
+                              text
+                              severity="secondary"
+                              size="small"
+                              rounded
+                              tooltip="Rerun"
+                              tooltipOptions={{ position: "top" }}
+                            />
+                          )}
+                      </div>
                     </div>
                     <p className="mt-2 truncate font-mono text-xs text-text-muted">
                       {w.workflow_id}

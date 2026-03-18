@@ -1,4 +1,5 @@
 import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -25,9 +26,9 @@ class ExtractionMetadata(BaseModel):
         None,
         description="Name of the NLP model used for extraction",
     )
-    additional_model_params: dict[str, str] | None = Field(
+    additional_model_params: dict[str, Any] | None = Field(
         None,
-        description="Additional parameters passed to the extraction model",
+        description="Additional parameters from the extraction model (may contain nested structures)",
     )
     pipeline_run_id: UUID | None = Field(
         None,

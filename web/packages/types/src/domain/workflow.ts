@@ -38,10 +38,15 @@ export type WorkflowTriggerReason =
  */
 export type WorkflowName =
   | "artifact_sample_workflow"
+  | "artifact_summarization_workflow"
+  | "artifact_summary_embedding_workflow"
+  | "artifact_tag_aggregation_workflow"
   | "compound_extraction_workflow"
   | "embedding_workflow"
-  | "smiles_embedding_workflow"
-  | "page_summarization_workflow";
+  | "ner_extraction_workflow"
+  | "page_summarization_workflow"
+  | "page_summary_embedding_workflow"
+  | "smiles_embedding_workflow";
 
 /** Shape of the workflow endpoint response (untyped in OpenAPI schema) */
 export interface WorkflowMap {

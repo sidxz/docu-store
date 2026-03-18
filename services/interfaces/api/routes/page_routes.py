@@ -23,6 +23,9 @@ from application.workflow_use_cases.trigger_embedding_use_case import TriggerEmb
 from application.workflow_use_cases.trigger_page_summarization_use_case import (
     TriggerPageSummarizationUseCase,
 )
+from application.workflow_use_cases.trigger_ner_extraction_use_case import (
+    TriggerNERExtractionUseCase,
+)
 from application.workflow_use_cases.trigger_smiles_embedding_use_case import (
     TriggerSmilesEmbeddingUseCase,
 )
@@ -228,6 +231,29 @@ async def trigger_page_summarization(
     page = await require_workspace_page(page_id, auth, container)
     await require_page_permission(page, auth, "edit")
     use_case = container[TriggerPageSummarizationUseCase]
+    try:
+        return await use_case.execute(page_id=page_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+
+
+@router.post("/{page_id}/ner/extract", status_code=status.HTTP_202_ACCEPTED)
+async def trigger_ner_extraction(
+    page_id: UUID,
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> WorkflowStartedResponse:
+    """Trigger NER extraction for a page (non-blocking).
+
+    Starts the named-entity recognition Temporal workflow and returns immediately
+    with the initial workflow status. Extracts compound names, targets, diseases,
+    and other entities from the page text.
+
+    Re-triggering is safe — uses ALLOW_DUPLICATE reuse policy.
+    """
+    page = await require_workspace_page(page_id, auth, container)
+    await require_page_permission(page, auth, "edit")
+    use_case = container[TriggerNERExtractionUseCase]
     try:
         return await use_case.execute(page_id=page_id)
     except ValueError as e:

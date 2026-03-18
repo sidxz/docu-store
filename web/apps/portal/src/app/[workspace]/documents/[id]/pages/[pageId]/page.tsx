@@ -1,13 +1,14 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowLeft, BookOpen } from "lucide-react";
 import { Button } from "primereact/button";
 import { Message } from "primereact/message";
 import { ProgressSpinner } from "primereact/progressspinner";
 import { SelectButton } from "primereact/selectbutton";
 import { Tag } from "primereact/tag";
+import { Toast } from "primereact/toast";
 
 import { MoleculeStructure } from "@docu-store/ui";
 import type { WorkflowMap } from "@docu-store/types";
@@ -18,7 +19,12 @@ import { ScoreBadge } from "@/components/ui/ScoreBadge";
 import { CopySmiles } from "@/components/ui/CopySmiles";
 import { WorkflowStatusBadge } from "@/components/WorkflowStatusBadge";
 import { useArtifact } from "@/hooks/use-artifacts";
-import { usePage, usePageWorkflows } from "@/hooks/use-pages";
+import {
+  usePage,
+  usePageWorkflows,
+  useRerunPageWorkflow,
+  RERUNNABLE_PAGE_WORKFLOWS,
+} from "@/hooks/use-pages";
 import { usePlugins } from "@/plugins";
 import { usePubChemEnrichments, PubChemBadge } from "@/plugins/pubchem";
 import { API_URL } from "@/lib/constants";
@@ -111,6 +117,8 @@ export default function PageViewerPage() {
   const { data: page, isLoading, error } = usePage(pageId);
   const { data: artifact } = useArtifact(id);
   const { data: workflowData } = usePageWorkflows(pageId);
+  const rerunMutation = useRerunPageWorkflow(pageId);
+  const toast = useRef<Toast>(null);
   const { isPluginEnabled } = usePlugins();
   const { enrichmentBySmiles } = usePubChemEnrichments(pageId, {
     enabled: isPluginEnabled("pubchem_enrichment"),
@@ -175,6 +183,8 @@ export default function PageViewerPage() {
 
   return (
     <div>
+      <Toast ref={toast} />
+
       {/* Back link */}
       <Button
         label="Back to document"
@@ -282,28 +292,117 @@ export default function PageViewerPage() {
         </Card>
       </div>
 
-      {/* Tag mentions */}
-      {page.tag_mentions && page.tag_mentions.length > 0 && (
-        <div className="mt-6">
-          <h3 className="mb-3 text-sm font-medium text-text-secondary">
-            Tag Mentions
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {page.tag_mentions.map((tm, i) => {
-              const config =
-                ENTITY_TYPE_COLORS[tm.entity_type ?? ""];
-              return (
-                <Tag
-                  key={`${tm.tag}-${i}`}
-                  value={tm.tag}
-                  severity={config?.severity ?? "secondary"}
-                  rounded
-                />
-              );
-            })}
+      {/* Tag mentions — grouped by entity type */}
+      {page.tag_mentions && page.tag_mentions.length > 0 && (() => {
+        // Separate compounds (which may carry bioactivities) from other entity types
+        type TagMentionItem = NonNullable<typeof page.tag_mentions>[number];
+        type Bioactivity = { assay_type: string; value: string; unit: string; raw_text: string };
+        const compounds: TagMentionItem[] = [];
+        const grouped = new Map<string, TagMentionItem[]>();
+
+        for (const tm of page.tag_mentions!) {
+          const key = tm.entity_type ?? "other";
+          if (key === "compound_name") {
+            compounds.push(tm);
+          } else {
+            const arr = grouped.get(key);
+            if (arr) arr.push(tm);
+            else grouped.set(key, [tm]);
+          }
+        }
+
+        return (
+          <div className="mt-6">
+            <h3 className="mb-3 text-sm font-medium text-text-secondary">
+              Tag Mentions
+            </h3>
+            <div className="space-y-3">
+              {/* Compounds — shown as cards with bioactivity tables */}
+              {compounds.length > 0 && (
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 min-w-[120px] shrink-0 text-xs font-medium text-text-muted">
+                    compound name
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {compounds.map((tm, i) => {
+                      const params = tm.additional_model_params as Record<string, unknown> | undefined;
+                      const activities = params?.bioactivities as Bioactivity[] | undefined;
+                      const synonyms = params?.synonyms as string | undefined;
+                      return (
+                        <div
+                          key={`${tm.tag}-${i}`}
+                          className="rounded-lg border border-border-default bg-surface-elevated px-3 py-2"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Tag
+                              value={tm.tag}
+                              severity="success"
+                              rounded
+                            />
+                            {synonyms && (
+                              <span className="text-xs text-text-muted">
+                                aka {synonyms}
+                              </span>
+                            )}
+                          </div>
+                          {activities && activities.length > 0 && (
+                            <table className="mt-2 w-full text-xs">
+                              <thead>
+                                <tr className="border-b border-border-subtle text-text-muted">
+                                  <th className="pb-1 pr-3 text-left font-medium">Assay</th>
+                                  <th className="pb-1 pr-3 text-left font-medium">Value</th>
+                                  <th className="pb-1 text-left font-medium">Source</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {activities.map((a, j) => (
+                                  <tr key={j} className="border-b border-border-subtle last:border-0">
+                                    <td className="py-1 pr-3 font-mono font-medium text-text-primary">
+                                      {a.assay_type}
+                                    </td>
+                                    <td className="py-1 pr-3 font-mono text-text-primary">
+                                      {a.value}{a.unit ? ` ${a.unit}` : ""}
+                                    </td>
+                                    <td className="py-1 text-text-muted">
+                                      {a.raw_text}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Other entity types — simple tag pills */}
+              {[...grouped.entries()].map(([entityType, tags]) => {
+                const config = ENTITY_TYPE_COLORS[entityType];
+                return (
+                  <div key={entityType} className="flex items-start gap-3">
+                    <span className="mt-0.5 min-w-[120px] shrink-0 text-xs font-medium text-text-muted">
+                      {entityType.replace(/_/g, " ")}
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {tags.map((tm, i) => (
+                        <Tag
+                          key={`${tm.tag}-${i}`}
+                          value={tm.tag}
+                          severity={config?.severity ?? "secondary"}
+                          rounded
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Compound mentions — card grid */}
       {page.compound_mentions && page.compound_mentions.length > 0 && (
@@ -375,6 +474,36 @@ export default function PageViewerPage() {
                   {w.name.replace(/_/g, " ")}
                 </span>
                 <WorkflowStatusBadge status={w.status} />
+                {RERUNNABLE_PAGE_WORKFLOWS.has(w.name) &&
+                  w.status !== "RUNNING" && (
+                    <Button
+                      icon="pi pi-replay"
+                      onClick={async () => {
+                        try {
+                          await rerunMutation.mutateAsync(w.name);
+                        } catch {
+                          toast.current?.show({
+                            severity: "error",
+                            summary: "Rerun failed",
+                            detail: `Could not rerun ${w.name.replace(/_/g, " ")}`,
+                            life: 5000,
+                          });
+                        }
+                      }}
+                      loading={
+                        rerunMutation.isPending &&
+                        rerunMutation.variables === w.name
+                      }
+                      disabled={rerunMutation.isPending}
+                      text
+                      severity="secondary"
+                      size="small"
+                      rounded
+                      tooltip="Rerun"
+                      tooltipOptions={{ position: "top" }}
+                      className="!p-1"
+                    />
+                  )}
               </div>
             ))}
           </div>
