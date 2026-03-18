@@ -1,6 +1,5 @@
 import { SearchResultCard } from "./SearchResultCard";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import { API_URL } from "@/lib/constants";
 
 interface SummaryHit {
   entity_type: "page" | "artifact";
@@ -18,6 +17,8 @@ interface ChunkHit {
   page_index: number;
   score: number;
   text_preview?: string | null;
+  artifact_name?: string | null;
+  page_name?: string | null;
 }
 
 interface HierarchicalSearchResultsProps {
@@ -63,7 +64,11 @@ export function HierarchicalSearchResults({
             {data.summary_hits.map((h) => (
               <SearchResultCard
                 key={`${h.entity_id}-${h.score}`}
-                title={h.artifact_title ?? h.entity_id}
+                title={
+                  h.entity_type === "page" && h.artifact_title
+                    ? `${h.artifact_title} | Page ${(h.page_index ?? 0) + 1}`
+                    : h.artifact_title ?? h.entity_id.slice(0, 8)
+                }
                 href={
                   h.entity_type === "artifact"
                     ? `/${workspace}/documents/${h.artifact_id}`
@@ -89,7 +94,11 @@ export function HierarchicalSearchResults({
             {data.chunk_hits.map((c) => (
               <SearchResultCard
                 key={`${c.page_id}-${c.score}`}
-                title={`Page ${c.page_index}`}
+                title={
+                  c.artifact_name
+                    ? `${c.artifact_name} | ${c.page_name ?? `Page ${c.page_index + 1}`}`
+                    : c.page_name ?? `Page ${c.page_index + 1}`
+                }
                 href={`/${workspace}/documents/${c.artifact_id}/pages/${c.page_id}`}
                 score={c.score}
                 preview={c.text_preview}

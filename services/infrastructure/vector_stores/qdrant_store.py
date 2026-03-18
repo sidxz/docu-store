@@ -315,7 +315,7 @@ class QdrantStore(VectorStore):
             )
             # Don't raise - deletion is idempotent
 
-    async def search_similar_pages(
+    async def search_similar_pages(  # noqa: PLR0913
         self,
         query_embedding: TextEmbedding,
         limit: int = 10,
@@ -331,6 +331,7 @@ class QdrantStore(VectorStore):
             limit: Maximum number of results to return
             artifact_id_filter: Optional filter to search within a specific artifact
             score_threshold: Optional minimum similarity score (0.0 to 1.0)
+            allowed_artifact_ids: Optional whitelist of accessible artifact IDs
             workspace_id: Optional workspace filter for tenant isolation
 
         Returns:

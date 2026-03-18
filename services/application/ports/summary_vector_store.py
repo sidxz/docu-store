@@ -99,6 +99,8 @@ class SummaryVectorStore(Protocol):
             entity_type_filter: Restrict to "page" or "artifact" summaries.
             artifact_id_filter: Restrict to a specific artifact.
             score_threshold: Minimum cosine similarity (0.0-1.0).
+            allowed_artifact_ids: Optional whitelist of accessible artifact IDs.
+            workspace_id: Optional workspace scope for multi-tenant filtering.
 
         Returns:
             List of SummarySearchResult ordered by score descending.

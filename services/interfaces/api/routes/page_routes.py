@@ -7,7 +7,6 @@ from sentinel_auth import RequestAuth
 
 from application.dtos.page_dtos import AddCompoundMentionsRequest, CreatePageRequest, PageResponse
 from application.dtos.workflow_dtos import WorkflowStartedResponse
-from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.use_cases.page_use_cases import (
     AddCompoundMentionsUseCase,

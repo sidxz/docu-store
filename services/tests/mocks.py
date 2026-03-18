@@ -85,7 +85,7 @@ class MockExternalEventPublisher:
         self.artifact_created_called = True
         self.artifact_created_data = artifact
 
-    async def notify_artifact_updated(self, artifact: Any) -> None:
+    async def notify_artifact_updated(self, artifact: Any, *, sub_type: str | None = None) -> None:
         self.artifact_updated_called = True
 
     async def notify_artifact_deleted(self, artifact_id: UUID) -> None:
@@ -95,7 +95,7 @@ class MockExternalEventPublisher:
     async def notify_page_created(self, page: Any) -> None:
         self.page_created_called = True
 
-    async def notify_page_updated(self, page: Any) -> None:
+    async def notify_page_updated(self, page: Any, *, sub_type: str | None = None) -> None:
         self.page_updated_called = True
         self.page_updated_data = page
 

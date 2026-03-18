@@ -73,6 +73,8 @@ class ChunkHit(BaseModel):
     page_index: int
     score: float
     text_preview: str | None = None
+    artifact_name: str | None = None
+    page_name: str | None = None
 
 
 class SummaryHit(BaseModel):

@@ -2,22 +2,20 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useRef } from "react";
+import { Button } from "primereact/button";
 import { Column } from "primereact/column";
 import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 import { DataTable } from "primereact/datatable";
+import { Message } from "primereact/message";
+import { ProgressSpinner } from "primereact/progressspinner";
 import { TabPanel, TabView } from "primereact/tabview";
+import { Tag } from "primereact/tag";
 import { Toast } from "primereact/toast";
-import {
-  FileText,
-  Trash2,
-  ArrowLeft,
-  Loader2,
-  BookOpen,
-  CheckCircle2,
-} from "lucide-react";
+import { FileText, ArrowLeft, CheckCircle2 } from "lucide-react";
 
 import type { components } from "@docu-store/api-client";
+import type { WorkflowMap } from "@docu-store/types";
 import { useAuthBlobUrl } from "@/hooks/use-auth-blob-url";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
@@ -29,14 +27,9 @@ import {
 } from "@/hooks/use-artifacts";
 import { ShareDialog } from "@/components/sharing/ShareDialog";
 import { useSession } from "@/lib/auth";
+import { API_URL } from "@/lib/constants";
 
 type PageResponse = components["schemas"]["PageResponse"];
-
-interface WorkflowMap {
-  workflows?: Record<string, { workflow_id: string; status: string }>;
-}
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 function PdfEmbed({ artifactId }: { artifactId: string }) {
   const { blobUrl, error } = useAuthBlobUrl(
@@ -82,7 +75,10 @@ export default function ArtifactDetailPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+        <ProgressSpinner
+          style={{ width: "2rem", height: "2rem" }}
+          strokeWidth="3"
+        />
       </div>
     );
   }
@@ -90,17 +86,19 @@ export default function ArtifactDetailPage() {
   if (error || !artifact) {
     return (
       <div>
-        <div className="rounded-lg border border-ds-error/20 bg-ds-error/5 p-4 text-ds-error">
-          Failed to load artifact. It may not exist or the backend is
-          unreachable.
-        </div>
-        <button
-          className="mt-4 flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary"
+        <Message
+          severity="error"
+          text="Failed to load artifact. It may not exist or the backend is unreachable."
+        />
+        <Button
+          label="Back to Documents"
+          icon={<ArrowLeft className="h-4 w-4" />}
           onClick={() => router.push(`/${workspace}/documents`)}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Documents
-        </button>
+          text
+          severity="secondary"
+          size="small"
+          className="mt-4"
+        />
       </div>
     );
   }
@@ -145,13 +143,15 @@ export default function ArtifactDetailPage() {
       <ConfirmDialog />
 
       {/* Back link */}
-      <button
-        className="mb-4 flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
+      <Button
+        label="Documents"
+        icon={<ArrowLeft className="h-3.5 w-3.5" />}
         onClick={() => router.push(`/${workspace}/documents`)}
-      >
-        <ArrowLeft className="h-3.5 w-3.5" />
-        Documents
-      </button>
+        text
+        severity="secondary"
+        size="small"
+        className="mb-4"
+      />
 
       <PageHeader
         icon={FileText}
@@ -163,14 +163,16 @@ export default function ArtifactDetailPage() {
               artifactId={id}
               isOwnerOrAdmin={isOwnerOrAdmin}
             />
-            <button
+            <Button
+              label="Delete"
+              icon="pi pi-trash"
               onClick={handleDelete}
               disabled={deleteMutation.isPending}
-              className="flex items-center gap-2 rounded-lg border border-ds-error/20 px-3 py-2 text-sm text-ds-error transition-colors hover:bg-ds-error/5"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </button>
+              loading={deleteMutation.isPending}
+              severity="danger"
+              outlined
+              size="small"
+            />
           </div>
         }
       />
@@ -224,12 +226,7 @@ export default function ArtifactDetailPage() {
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {artifact.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-md bg-border-subtle px-2.5 py-1 text-xs font-medium text-text-secondary"
-                    >
-                      {tag}
-                    </span>
+                    <Tag key={tag} value={tag} severity="secondary" rounded />
                   ))}
                 </div>
               </div>

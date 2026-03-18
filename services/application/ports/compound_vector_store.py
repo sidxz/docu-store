@@ -63,6 +63,7 @@ class CompoundVectorStore(Protocol):
             compounds: List of compound metadata dicts with keys:
                 smiles, canonical_smiles, extracted_id, confidence, is_smiles_valid
             embeddings: Corresponding TextEmbedding objects (one per compound)
+            workspace_id: Optional workspace scope for multi-tenant filtering
 
         """
         ...
@@ -74,7 +75,7 @@ class CompoundVectorStore(Protocol):
         """
         ...
 
-    async def search_similar_compounds(
+    async def search_similar_compounds(  # noqa: PLR0913
         self,
         query_embedding: TextEmbedding,
         limit: int = 10,
@@ -90,6 +91,8 @@ class CompoundVectorStore(Protocol):
             limit: Maximum number of results to return
             artifact_id_filter: Optional filter to scope search to one artifact
             score_threshold: Optional minimum cosine similarity (0.0 to 1.0)
+            allowed_artifact_ids: Optional whitelist of accessible artifact IDs
+            workspace_id: Optional workspace scope for multi-tenant filtering
 
         Returns:
             List of CompoundSearchResult ordered by similarity (highest first)

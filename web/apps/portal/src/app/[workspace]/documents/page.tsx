@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { Button } from "primereact/button";
 import { Column } from "primereact/column";
 import { DataTable } from "primereact/datatable";
-import { FileText, Upload } from "lucide-react";
+import { Message } from "primereact/message";
+import { Tag } from "primereact/tag";
+import { FileText } from "lucide-react";
 
 import type { components } from "@docu-store/api-client";
 import { useArtifacts } from "@/hooks/use-artifacts";
@@ -43,11 +46,7 @@ export default function DocumentsPage() {
   const typeTemplate = (row: ArtifactResponse) => {
     const label =
       ARTIFACT_TYPE_LABELS[row.artifact_type] ?? row.artifact_type;
-    return (
-      <span className="inline-flex rounded-md bg-accent-light px-2 py-0.5 text-xs font-medium text-accent-text">
-        {label}
-      </span>
-    );
+    return <Tag value={label} severity="info" rounded />;
   };
 
   const pagesTemplate = (row: ArtifactResponse) => (
@@ -60,12 +59,7 @@ export default function DocumentsPage() {
     return (
       <div className="flex flex-wrap gap-1">
         {tags.slice(0, 3).map((tag) => (
-          <span
-            key={tag}
-            className="rounded bg-border-subtle px-1.5 py-0.5 text-xs text-text-secondary"
-          >
-            {tag}
-          </span>
+          <Tag key={tag} value={tag} severity="secondary" rounded />
         ))}
         {tags.length > 3 && (
           <span className="text-xs text-text-muted">+{tags.length - 3}</span>
@@ -83,19 +77,18 @@ export default function DocumentsPage() {
         title="Documents"
         subtitle="Manage your uploaded documents"
         actions={
-          <Link
-            href={`/${workspace}/documents/upload`}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
-          >
-            <Upload className="h-4 w-4" />
-            Upload
+          <Link href={`/${workspace}/documents/upload`}>
+            <Button label="Upload" icon="pi pi-upload" />
           </Link>
         }
       />
 
       {error && (
-        <div className="mb-4 rounded-lg border border-ds-error/20 bg-ds-error/5 p-3 text-sm text-ds-error">
-          Failed to load documents. Is the backend running?
+        <div className="mb-4">
+          <Message
+            severity="error"
+            text="Failed to load documents. Is the backend running?"
+          />
         </div>
       )}
 
@@ -105,12 +98,8 @@ export default function DocumentsPage() {
           title="No documents yet"
           description="Upload your first document to start extracting insights."
           action={
-            <Link
-              href={`/${workspace}/documents/upload`}
-              className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
-            >
-              <Upload className="h-4 w-4" />
-              Upload Document
+            <Link href={`/${workspace}/documents/upload`}>
+              <Button label="Upload Document" icon="pi pi-upload" />
             </Link>
           }
         />

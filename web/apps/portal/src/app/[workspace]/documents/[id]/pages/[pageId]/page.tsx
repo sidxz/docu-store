@@ -2,32 +2,37 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import {
-  ArrowLeft,
-  BookOpen,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-  Image,
-  FileText,
-} from "lucide-react";
+import { ArrowLeft, BookOpen } from "lucide-react";
+import { Button } from "primereact/button";
+import { Message } from "primereact/message";
+import { ProgressSpinner } from "primereact/progressspinner";
+import { SelectButton } from "primereact/selectbutton";
+import { Tag } from "primereact/tag";
 
 import { MoleculeStructure } from "@docu-store/ui";
+import type { WorkflowMap } from "@docu-store/types";
 import { useAuthBlobUrl } from "@/hooks/use-auth-blob-url";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { ScoreBadge } from "@/components/ui/ScoreBadge";
+import { CopySmiles } from "@/components/ui/CopySmiles";
 import { WorkflowStatusBadge } from "@/components/WorkflowStatusBadge";
 import { useArtifact } from "@/hooks/use-artifacts";
 import { usePage, usePageWorkflows } from "@/hooks/use-pages";
+import { usePlugins } from "@/plugins";
+import { usePubChemEnrichments, PubChemBadge } from "@/plugins/pubchem";
+import { API_URL } from "@/lib/constants";
 
-const ENTITY_TYPE_COLORS: Record<string, string> = {
-  compound_name: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
-  target: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
-  disease: "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400",
+const ENTITY_TYPE_COLORS: Record<string, { severity: "success" | "warning" | "danger" | "secondary" }> = {
+  compound_name: { severity: "success" },
+  target: { severity: "warning" },
+  disease: { severity: "danger" },
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const VIEW_MODES = [
+  { label: "Image", value: "image" as const, icon: "pi pi-image" },
+  { label: "Full PDF", value: "pdf" as const, icon: "pi pi-file-pdf" },
+];
 
 function PageImage({
   artifactId,
@@ -106,6 +111,10 @@ export default function PageViewerPage() {
   const { data: page, isLoading, error } = usePage(pageId);
   const { data: artifact } = useArtifact(id);
   const { data: workflowData } = usePageWorkflows(pageId);
+  const { isPluginEnabled } = usePlugins();
+  const { enrichmentBySmiles } = usePubChemEnrichments(pageId, {
+    enabled: isPluginEnabled("pubchem_enrichment"),
+  });
 
   // Derive prev/next page IDs from the artifact's page list
   const siblingPages = (() => {
@@ -118,11 +127,9 @@ export default function PageViewerPage() {
     for (let i = 0; i < pages.length; i++) {
       const p = pages[i];
       if (typeof p === "string") {
-        // pages is list[UUID] — ordered by index
         if (i === currentIndex - 1) prevId = p;
         if (i === currentIndex + 1) nextId = p;
       } else {
-        // pages is list[PageResponse]
         if (p.index === currentIndex - 1) prevId = p.page_id;
         if (p.index === currentIndex + 1) nextId = p.page_id;
       }
@@ -133,7 +140,10 @@ export default function PageViewerPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+        <ProgressSpinner
+          style={{ width: "2rem", height: "2rem" }}
+          strokeWidth="3"
+        />
       </div>
     );
   }
@@ -141,25 +151,24 @@ export default function PageViewerPage() {
   if (error || !page) {
     return (
       <div>
-        <div className="rounded-lg border border-ds-error/20 bg-ds-error/5 p-4 text-ds-error">
-          Failed to load page.
-        </div>
-        <button
-          className="mt-4 flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary"
+        <Message
+          severity="error"
+          text="Failed to load page."
+        />
+        <Button
+          label="Back to Artifact"
+          icon={<ArrowLeft className="h-4 w-4" />}
           onClick={() => router.push(`/${workspace}/documents/${id}`)}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Artifact
-        </button>
+          text
+          severity="secondary"
+          size="small"
+          className="mt-4"
+        />
       </div>
     );
   }
 
-  const workflowMap = (
-    workflowData as
-      | { workflows?: Record<string, { workflow_id: string; status: string }> }
-      | undefined
-  )?.workflows;
+  const workflowMap = (workflowData as WorkflowMap | undefined)?.workflows;
   const workflows = workflowMap
     ? Object.entries(workflowMap).map(([name, info]) => ({ name, ...info }))
     : undefined;
@@ -167,13 +176,15 @@ export default function PageViewerPage() {
   return (
     <div>
       {/* Back link */}
-      <button
-        className="mb-4 flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
+      <Button
+        label="Back to document"
+        icon={<ArrowLeft className="h-3.5 w-3.5" />}
         onClick={() => router.push(`/${workspace}/documents/${id}`)}
-      >
-        <ArrowLeft className="h-3.5 w-3.5" />
-        Back to document
-      </button>
+        text
+        severity="secondary"
+        size="small"
+        className="mb-4"
+      />
 
       <PageHeader
         icon={BookOpen}
@@ -181,8 +192,9 @@ export default function PageViewerPage() {
         subtitle={`Page ${page.index + 1} · ${page.compound_mentions?.length ?? 0} compounds`}
         actions={
           <div className="flex items-center gap-1">
-            <button
-              type="button"
+            <Button
+              label="Prev"
+              icon="pi pi-chevron-left"
               disabled={!siblingPages.prev}
               onClick={() =>
                 siblingPages.prev &&
@@ -190,13 +202,14 @@ export default function PageViewerPage() {
                   `/${workspace}/documents/${id}/pages/${siblingPages.prev}`,
                 )
               }
-              className="flex items-center gap-1 rounded-lg border border-border-default px-2.5 py-1.5 text-sm text-text-secondary transition-colors hover:bg-surface-elevated disabled:opacity-30 disabled:pointer-events-none"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              Prev
-            </button>
-            <button
-              type="button"
+              outlined
+              severity="secondary"
+              size="small"
+            />
+            <Button
+              label="Next"
+              icon="pi pi-chevron-right"
+              iconPos="right"
               disabled={!siblingPages.next}
               onClick={() =>
                 siblingPages.next &&
@@ -204,11 +217,10 @@ export default function PageViewerPage() {
                   `/${workspace}/documents/${id}/pages/${siblingPages.next}`,
                 )
               }
-              className="flex items-center gap-1 rounded-lg border border-border-default px-2.5 py-1.5 text-sm text-text-secondary transition-colors hover:bg-surface-elevated disabled:opacity-30 disabled:pointer-events-none"
-            >
-              Next
-              <ChevronRight className="h-4 w-4" />
-            </button>
+              outlined
+              severity="secondary"
+              size="small"
+            />
           </div>
         }
       />
@@ -217,32 +229,13 @@ export default function PageViewerPage() {
       <Card className="mb-6">
         <div className="mb-3 flex items-center justify-between">
           <CardHeader title="Page View" />
-          <div className="flex items-center gap-1 rounded-lg border border-border-default p-0.5">
-            <button
-              type="button"
-              onClick={() => setViewMode("image")}
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                viewMode === "image"
-                  ? "bg-accent text-white"
-                  : "text-text-secondary hover:text-text-primary"
-              }`}
-            >
-              <Image className="h-3.5 w-3.5" />
-              Image
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("pdf")}
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                viewMode === "pdf"
-                  ? "bg-accent text-white"
-                  : "text-text-secondary hover:text-text-primary"
-              }`}
-            >
-              <FileText className="h-3.5 w-3.5" />
-              Full PDF
-            </button>
-          </div>
+          <SelectButton
+            value={viewMode}
+            options={VIEW_MODES}
+            onChange={(e) => {
+              if (e.value) setViewMode(e.value);
+            }}
+          />
         </div>
 
         {viewMode === "image" ? (
@@ -297,16 +290,15 @@ export default function PageViewerPage() {
           </h3>
           <div className="flex flex-wrap gap-2">
             {page.tag_mentions.map((tm, i) => {
-              const colorClass =
-                ENTITY_TYPE_COLORS[tm.entity_type ?? ""] ??
-                "bg-border-subtle text-text-secondary";
+              const config =
+                ENTITY_TYPE_COLORS[tm.entity_type ?? ""];
               return (
-                <span
+                <Tag
                   key={`${tm.tag}-${i}`}
-                  className={`rounded-md px-2 py-0.5 text-xs font-medium ${colorClass}`}
-                >
-                  {tm.tag}
-                </span>
+                  value={tm.tag}
+                  severity={config?.severity ?? "secondary"}
+                  rounded
+                />
               );
             })}
           </div>
@@ -330,12 +322,7 @@ export default function PageViewerPage() {
                   />
                 </div>
                 <div className="space-y-1.5 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-text-muted">SMILES</span>
-                    <span className="font-mono text-text-secondary max-w-[180px] truncate">
-                      {cm.smiles}
-                    </span>
-                  </div>
+                  <CopySmiles smiles={cm.smiles} />
                   {cm.extracted_id && (
                     <div className="flex items-center justify-between">
                       <span className="text-text-muted">ID</span>
@@ -360,6 +347,11 @@ export default function PageViewerPage() {
                       <ScoreBadge score={cm.confidence} variant="pill" />
                     </div>
                   )}
+                  <PubChemBadge
+                    enrichment={enrichmentBySmiles?.get(
+                      cm.canonical_smiles ?? "",
+                    )}
+                  />
                 </div>
               </Card>
             ))}

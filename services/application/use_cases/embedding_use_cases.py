@@ -204,6 +204,8 @@ class SearchSimilarPagesUseCase:
 
         Args:
             request: SearchRequest with query text and filters
+            workspace_id: Optional workspace scope for multi-tenant filtering
+            allowed_artifact_ids: Optional whitelist of accessible artifact IDs
 
         Returns:
             Result containing SearchResponse on success or AppError on failure

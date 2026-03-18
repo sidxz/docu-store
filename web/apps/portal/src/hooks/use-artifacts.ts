@@ -2,13 +2,10 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@docu-store/api-client";
+import type { WorkflowMap } from "@docu-store/types";
 import { queryKeys } from "@/lib/query-keys";
 import { getAuthzClient } from "@/lib/authz-client";
-
-/** Shape of the workflow endpoint response (untyped in OpenAPI schema) */
-interface WorkflowMap {
-  workflows?: Record<string, { workflow_id: string; status: string }>;
-}
+import { API_URL } from "@/lib/constants";
 
 export function useArtifacts(skip = 0, limit = 50) {
   return useQuery({
@@ -85,23 +82,23 @@ export function useUploadArtifact() {
       file,
       artifactType,
       sourceUri,
+      visibility,
     }: {
       file: File;
       artifactType: string;
       sourceUri?: string;
+      visibility?: "workspace" | "private";
     }) => {
       // apiClient doesn't support multipart/form-data, so use fetch directly.
-      // Base URL is shared with apiClient via the same env var.
-      const baseUrl =
-        process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
       const formData = new FormData();
       formData.append("file", file);
       formData.append("artifact_type", artifactType);
       if (sourceUri) formData.append("source_uri", sourceUri);
+      if (visibility) formData.append("visibility", visibility);
 
       const authHeaders = getAuthzClient().getHeaders();
 
-      const res = await fetch(`${baseUrl}/artifacts/upload`, {
+      const res = await fetch(`${API_URL}/artifacts/upload`, {
         method: "POST",
         body: formData,
         headers: authHeaders,

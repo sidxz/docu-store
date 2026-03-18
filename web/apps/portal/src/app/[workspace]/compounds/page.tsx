@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { Atom, Search, Loader2 } from "lucide-react";
+import { Atom } from "lucide-react";
+import { Button } from "primereact/button";
+import { Message } from "primereact/message";
 
 import { MoleculeStructure, StructureInput } from "@docu-store/ui";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { ScoreBadge } from "@/components/ui/ScoreBadge";
+import { CopySmiles } from "@/components/ui/CopySmiles";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useSearchCompounds } from "@/hooks/use-search";
 
@@ -46,26 +49,22 @@ export default function CompoundsPage() {
       <Card className="mb-6">
         <StructureInput value={smiles} onChange={setSmiles} />
         <div className="mt-4">
-          <button
+          <Button
+            label="Search"
+            icon={search.isPending ? "pi pi-spin pi-spinner" : "pi pi-search"}
             onClick={handleSearch}
             disabled={!smiles.trim() || search.isPending}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
-          >
-            {search.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Search className="h-4 w-4" />
-            )}
-            Search
-          </button>
+          />
         </div>
       </Card>
 
       {/* Error */}
       {search.error && (
-        <div className="mb-6 rounded-lg border border-ds-error/20 bg-ds-error/5 p-4 text-sm text-ds-error">
-          Compound search failed. Ensure the SMILES string is valid and the
-          backend is running.
+        <div className="mb-6">
+          <Message
+            severity="error"
+            text="Compound search failed. Ensure the SMILES string is valid and the backend is running."
+          />
         </div>
       )}
 
@@ -100,12 +99,7 @@ export default function CompoundsPage() {
                     <span className="text-text-muted">Similarity</span>
                     <ScoreBadge score={r.similarity_score} variant="pill" />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-text-muted">SMILES</span>
-                    <span className="max-w-[160px] truncate font-mono text-text-secondary">
-                      {r.smiles}
-                    </span>
-                  </div>
+                  <CopySmiles smiles={r.smiles} maxWidth="max-w-[160px]" />
                   {r.extracted_id && (
                     <div className="flex items-center justify-between">
                       <span className="text-text-muted">ID</span>

@@ -95,7 +95,59 @@ def create_app() -> FastAPI:
         """Health check endpoint."""
         return {"status": "healthy"}
 
+    # Plugin routes — mount dynamically from enabled plugins
+    _mount_plugin_routes(app)
+
     return app
+
+
+def _mount_plugin_routes(app: FastAPI) -> None:
+    """Discover enabled plugins and mount their API routers."""
+    try:
+        from infrastructure.plugins.context import DefaultPluginContext  # noqa: PLC0415
+        from infrastructure.plugins.loader import discover_plugins  # noqa: PLC0415
+
+        enabled = settings.enabled_plugins_list
+        if not enabled:
+            return
+
+        registry = discover_plugins(enabled, settings.plugin_dir)
+        if len(registry) == 0:
+            return
+
+        # Minimal context for route creation (routes mostly just read from MongoDB)
+        context = DefaultPluginContext(
+            page_read_model=None,
+            artifact_read_model=None,
+            smiles_validator=None,
+            embedding_generator=None,
+            mongo_db=None,
+            temporal_client=None,
+            plugin_config={},
+        )
+
+        for manifest in registry.list_manifests():
+            if manifest.has_api_routes and manifest.api_prefix:
+                plugin = registry.get_plugin(manifest.name)
+                router = plugin.create_router(context)
+                if router:
+                    app.include_router(router, prefix=manifest.api_prefix, tags=[manifest.name])
+                    logger.info(
+                        "plugin_router_mounted",
+                        plugin=manifest.name,
+                        prefix=manifest.api_prefix,
+                    )
+
+        # Plugin discovery endpoint
+        manifests = registry.list_manifests()
+
+        @app.get("/plugins")
+        async def list_plugins() -> list[dict]:
+            """List all enabled plugins and their manifests."""
+            return [m.model_dump() for m in manifests]
+
+    except Exception:  # noqa: BLE001
+        logger.warning("plugin_routes_mount_failed", exc_info=True)
 
 
 # Create app instance

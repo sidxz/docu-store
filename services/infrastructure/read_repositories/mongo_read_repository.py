@@ -17,7 +17,9 @@ class MongoReadRepository(PageReadModel, ArtifactReadModel):
         self.artifacts = self.db[settings.mongo_artifacts_collection]
 
     async def get_page_by_id(
-        self, page_id: UUID, workspace_id: UUID | None = None
+        self,
+        page_id: UUID,
+        workspace_id: UUID | None = None,
     ) -> PageResponse | None:
         query: dict = {"page_id": str(page_id)}
         if workspace_id is not None:
@@ -30,7 +32,9 @@ class MongoReadRepository(PageReadModel, ArtifactReadModel):
         return PageResponse(**doc)
 
     async def get_pages_by_id(
-        self, page_ids: list[UUID], workspace_id: UUID | None = None
+        self,
+        page_ids: list[UUID],
+        workspace_id: UUID | None = None,
     ) -> list[PageResponse]:
         """Fetch multiple pages by their IDs in a single query."""
         if not page_ids:
@@ -49,7 +53,9 @@ class MongoReadRepository(PageReadModel, ArtifactReadModel):
         return pages
 
     async def get_artifact_by_id(
-        self, artifact_id: UUID, workspace_id: UUID | None = None
+        self,
+        artifact_id: UUID,
+        workspace_id: UUID | None = None,
     ) -> ArtifactResponse | None:
         query: dict = {"artifact_id": str(artifact_id)}
         if workspace_id is not None:

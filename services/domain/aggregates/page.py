@@ -24,7 +24,7 @@ class Page(Aggregate):
     INITIAL_VERSION = 0
 
     @classmethod
-    def create(  # noqa: PLR0913
+    def create(
         cls,
         name: str,
         artifact_id: UUID,
@@ -51,7 +51,7 @@ class Page(Aggregate):
         owner_id: UUID | None = None
 
     @event(Created)  # Links this handler to the Created event class above
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         name: str,
         artifact_id: UUID,

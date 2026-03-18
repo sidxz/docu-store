@@ -42,3 +42,8 @@ export type WorkflowName =
   | "embedding_workflow"
   | "smiles_embedding_workflow"
   | "page_summarization_workflow";
+
+/** Shape of the workflow endpoint response (untyped in OpenAPI schema) */
+export interface WorkflowMap {
+  workflows?: Record<string, { workflow_id: string; status: string }>;
+}

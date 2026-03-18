@@ -18,11 +18,13 @@ class ExternalEventPublisher(ABC):
         """
 
     @abstractmethod
-    async def notify_page_updated(self, page: PageResponse) -> None:
+    async def notify_page_updated(self, page: PageResponse, *, sub_type: str | None = None) -> None:
         """Notify that a page has been updated.
 
         Args:
             page: PageResponse object containing the updated page details
+            sub_type: Fine-grained event sub-type for plugin routing
+                (e.g. "CompoundMentionsUpdated", "TextMentionUpdated").
 
         """
 
@@ -45,11 +47,18 @@ class ExternalEventPublisher(ABC):
         """
 
     @abstractmethod
-    async def notify_artifact_updated(self, artifact: ArtifactResponse) -> None:
+    async def notify_artifact_updated(
+        self,
+        artifact: ArtifactResponse,
+        *,
+        sub_type: str | None = None,
+    ) -> None:
         """Notify that an artifact has been updated.
 
         Args:
             artifact: ArtifactResponse object containing the updated artifact details
+            sub_type: Fine-grained event sub-type for plugin routing
+                (e.g. "SummaryCandidateUpdated", "TagsUpdated").
 
         """
 

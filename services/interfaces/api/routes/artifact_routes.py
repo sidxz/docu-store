@@ -11,6 +11,7 @@ from sentinel_auth import RequestAuth
 
 from application.dtos.artifact_dtos import ArtifactResponse, CreateArtifactRequest
 from application.dtos.blob_dtos import UploadBlobRequest
+from application.dtos.permission_dtos import ShareResourceRequest, UpdateVisibilityRequest
 from application.dtos.workflow_dtos import WorkflowStartedResponse
 from application.ports.blob_store import BlobStore
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
@@ -28,10 +29,11 @@ from application.use_cases.artifact_use_cases import (
 from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.title_mention import TitleMention
-from application.dtos.permission_dtos import ShareResourceRequest, UpdateVisibilityRequest
 from interfaces.api.middleware import handle_use_case_errors
 from interfaces.api.routes.helpers import (
     get_allowed_artifact_ids as _get_allowed_artifact_ids,
+)
+from interfaces.api.routes.helpers import (
     require_artifact_permission,
     require_workspace_artifact,
 )
@@ -93,12 +95,13 @@ async def create_artifact(
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
 @handle_use_case_errors
-async def upload_blob(
+async def upload_blob(  # noqa: PLR0913
     container: Annotated[Container, Depends(get_container)],
     auth: Annotated[RequestAuth, Depends(get_auth)],
     file: Annotated[UploadFile, File()],
     artifact_type: Annotated[ArtifactType, Form()],
     source_uri: Annotated[str | None, Form()] = None,
+    visibility: Annotated[str, Form()] = "workspace",
 ) -> ArtifactResponse:
     """Upload a blob to the blob store and create an artifact."""
     saga = container[ArtifactUploadSaga]
@@ -109,6 +112,7 @@ async def upload_blob(
             mime_type=file.content_type,
             artifact_type=artifact_type,
             source_uri=source_uri,
+            visibility=visibility,
         ),
         auth=auth,
     )
@@ -223,7 +227,7 @@ async def delete_artifact(
     await require_workspace_artifact(artifact_id, auth, container)
     await require_artifact_permission(artifact_id, auth, "edit")
     use_case = container[DeleteArtifactUseCase]
-    await use_case.execute(artifact_id=artifact_id, auth=auth)
+    return await use_case.execute(artifact_id=artifact_id, auth=auth)
 
 
 @router.post("/{artifact_id}/summarize", status_code=status.HTTP_202_ACCEPTED)
@@ -397,8 +401,11 @@ async def share_artifact(
             detail="Only the owner or an admin can share this artifact",
         )
     return await auth.share(
-        "artifact", artifact_id,
-        request.grantee_type, request.grantee_id, request.permission,
+        "artifact",
+        artifact_id,
+        request.grantee_type,
+        request.grantee_id,
+        request.permission,
     )
 
 
@@ -417,8 +424,11 @@ async def revoke_artifact_share(
             detail="Only the owner or an admin can revoke shares",
         )
     return await auth.unshare(
-        "artifact", artifact_id,
-        request.grantee_type, request.grantee_id, request.permission,
+        "artifact",
+        artifact_id,
+        request.grantee_type,
+        request.grantee_id,
+        request.permission,
     )
 
 

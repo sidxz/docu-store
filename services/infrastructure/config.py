@@ -184,11 +184,36 @@ class Settings(BaseSettings):
     sentinel_url: str = Field(default="http://localhost:9003", validation_alias="SENTINEL_URL")
     sentinel_service_key: str = Field(default="", validation_alias="SENTINEL_SERVICE_KEY")
     sentinel_service_name: str = Field(
-        default="docu-store", validation_alias="SENTINEL_SERVICE_NAME"
+        default="docu-store",
+        validation_alias="SENTINEL_SERVICE_NAME",
     )
     sentinel_idp_jwks_url: str = Field(
         default="https://www.googleapis.com/oauth2/v3/certs",
         validation_alias="SENTINEL_IDP_JWKS_URL",
+    )
+
+    # Plugin system
+    enabled_plugins: str = Field(
+        default="",
+        validation_alias="ENABLED_PLUGINS",
+        description="Comma-separated list of plugin package names to load.",
+    )
+
+    @property
+    def enabled_plugins_list(self) -> list[str]:
+        """Parse the comma-separated ENABLED_PLUGINS string into a list."""
+        if not self.enabled_plugins:
+            return []
+        return [p.strip() for p in self.enabled_plugins.split(",") if p.strip()]
+
+    plugin_dir: Path = Field(
+        default=Path(__file__).resolve().parents[1] / "plugins",
+        validation_alias="PLUGIN_DIR",
+    )
+    plugin_max_concurrent_activities: int = Field(
+        default=5,
+        validation_alias="PLUGIN_MAX_CONCURRENT_ACTIVITIES",
+        description="Max concurrent Temporal activities for all plugin workers.",
     )
 
     # Prompt management

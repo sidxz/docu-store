@@ -26,7 +26,12 @@ from application.use_cases.search_use_cases import HierarchicalSearchUseCase, Se
 from application.use_cases.smiles_search_use_cases import SearchSimilarCompoundsUseCase
 from infrastructure.embeddings.chemberta_generator import ChemBertaEmbeddingGenerator
 from interfaces.api.middleware import handle_use_case_errors
-from interfaces.api.routes.helpers import get_allowed_artifact_ids as _get_allowed_artifact_ids, require_workspace_page
+from interfaces.api.routes.helpers import (
+    get_allowed_artifact_ids as _get_allowed_artifact_ids,
+)
+from interfaces.api.routes.helpers import (
+    require_workspace_page,
+)
 from interfaces.dependencies import get_auth, get_container
 
 logger = structlog.get_logger()
@@ -46,6 +51,7 @@ async def search_pages(
     Args:
         request: Search request with query text and optional filters
         container: DI container
+        auth: Request authentication context
 
     Returns:
         Search results with similarity scores
@@ -68,7 +74,9 @@ async def search_pages(
 
     use_case = container[SearchSimilarPagesUseCase]
     return await use_case.execute(
-        request, workspace_id=auth.workspace_id, allowed_artifact_ids=allowed_artifact_ids,
+        request,
+        workspace_id=auth.workspace_id,
+        allowed_artifact_ids=allowed_artifact_ids,
     )
 
 
@@ -80,6 +88,12 @@ async def generate_embedding_for_page(
     force_regenerate: bool = False,  # noqa: FBT001, FBT002
 ) -> dict[str, str]:
     """Manually trigger embedding generation for a specific page.
+
+    Args:
+        page_id: UUID of the page to generate embeddings for
+        container: DI container
+        auth: Request authentication context
+        force_regenerate: Whether to overwrite existing embeddings
 
     Useful for:
     - Testing the embedding pipeline
@@ -144,7 +158,9 @@ async def search_compounds(
 
     use_case = container[SearchSimilarCompoundsUseCase]
     return await use_case.execute(
-        request, workspace_id=auth.workspace_id, allowed_artifact_ids=allowed_artifact_ids,
+        request,
+        workspace_id=auth.workspace_id,
+        allowed_artifact_ids=allowed_artifact_ids,
     )
 
 
@@ -178,7 +194,9 @@ async def search_summaries(
 
     use_case = container[SearchSummariesUseCase]
     return await use_case.execute(
-        request=request, workspace_id=auth.workspace_id, allowed_artifact_ids=allowed_artifact_ids,
+        request=request,
+        workspace_id=auth.workspace_id,
+        allowed_artifact_ids=allowed_artifact_ids,
     )
 
 
@@ -219,7 +237,9 @@ async def hierarchical_search(
 
     use_case = container[HierarchicalSearchUseCase]
     result = await use_case.execute(
-        request=request, workspace_id=auth.workspace_id, allowed_artifact_ids=allowed_artifact_ids,
+        request=request,
+        workspace_id=auth.workspace_id,
+        allowed_artifact_ids=allowed_artifact_ids,
     )
 
     return result.unwrap()

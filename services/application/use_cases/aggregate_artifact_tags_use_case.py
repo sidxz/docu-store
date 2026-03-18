@@ -70,6 +70,15 @@ class AggregateArtifactTagsUseCase:
             artifact.update_tags(deduped)
             self.artifact_repository.save(artifact)
 
+            if self.external_event_publisher:
+                from application.mappers.artifact_mappers import ArtifactMapper  # noqa: PLC0415
+
+                artifact_response = ArtifactMapper.to_artifact_response(artifact)
+                await self.external_event_publisher.notify_artifact_updated(
+                    artifact_response,
+                    sub_type="TagsUpdated",
+                )
+
             logger.info(
                 "aggregate_artifact_tags.success",
                 artifact_id=str(artifact_id),

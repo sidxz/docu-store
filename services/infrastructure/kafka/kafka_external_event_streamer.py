@@ -24,13 +24,15 @@ class KafkaExternalEventPublisher(ExternalEventPublisher):
         await self.publisher.publish(subject="PageCreated", event=event)
         logger.info("kafka notified_page_created", page_id=str(page.page_id))
 
-    async def notify_page_updated(self, page: PageResponse) -> None:
-        event = {
+    async def notify_page_updated(self, page: PageResponse, *, sub_type: str | None = None) -> None:
+        event: dict[str, object] = {
             "event_type": "PageUpdated",
             "data": page.model_dump(mode="json"),
         }
+        if sub_type is not None:
+            event["sub_type"] = sub_type
         await self.publisher.publish(subject="PageUpdated", event=event)
-        logger.info("kafka notified_page_updated", page_id=str(page.page_id))
+        logger.info("kafka notified_page_updated", page_id=str(page.page_id), sub_type=sub_type)
 
     async def notify_page_deleted(self, page_id: UUID) -> None:
         event = {
@@ -48,13 +50,24 @@ class KafkaExternalEventPublisher(ExternalEventPublisher):
         await self.publisher.publish(subject="ArtifactCreated", event=event)
         logger.info("kafka notified_artifact_created", artifact_id=str(artifact.artifact_id))
 
-    async def notify_artifact_updated(self, artifact: ArtifactResponse) -> None:
-        event = {
+    async def notify_artifact_updated(
+        self,
+        artifact: ArtifactResponse,
+        *,
+        sub_type: str | None = None,
+    ) -> None:
+        event: dict[str, object] = {
             "event_type": "ArtifactUpdated",
             "data": artifact.model_dump(mode="json"),
         }
+        if sub_type is not None:
+            event["sub_type"] = sub_type
         await self.publisher.publish(subject="ArtifactUpdated", event=event)
-        logger.info("kafka notified_artifact_updated", artifact_id=str(artifact.artifact_id))
+        logger.info(
+            "kafka notified_artifact_updated",
+            artifact_id=str(artifact.artifact_id),
+            sub_type=sub_type,
+        )
 
     async def notify_artifact_deleted(self, artifact_id: UUID) -> None:
         event = {

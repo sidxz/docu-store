@@ -1,6 +1,7 @@
 "use client";
 
 import { AuthzGuard } from "@sentinel-auth/react";
+import { ProgressSpinner } from "primereact/progressspinner";
 import { useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 
@@ -18,7 +19,10 @@ export function AuthGuardWrapper({ children }: { children: ReactNode }) {
       fallback={<RedirectToLogin />}
       loading={
         <div className="flex h-screen items-center justify-center bg-surface-sunken">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-border-default border-t-accent" />
+          <ProgressSpinner
+            style={{ width: "2rem", height: "2rem" }}
+            strokeWidth="3"
+          />
         </div>
       }
     >

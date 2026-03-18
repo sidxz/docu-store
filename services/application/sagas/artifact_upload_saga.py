@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from application.ports.auth import AuthContext
     from application.ports.blob_store import BlobStore
     from application.ports.pdf_service import PDFService
+    from application.ports.permission_registrar import PermissionRegistrar
     from application.use_cases.artifact_use_cases import (
         AddPagesUseCase,
         CreateArtifactUseCase,
@@ -48,6 +49,7 @@ class ArtifactUploadSaga:
         update_text_mention_use_case: UpdateTextMentionUseCase,
         pdf_service: PDFService,
         blob_store: BlobStore,
+        permission_registrar: PermissionRegistrar,
     ) -> None:
         """Initialize saga with required use cases and services.
 
@@ -59,6 +61,7 @@ class ArtifactUploadSaga:
             update_text_mention_use_case: Use case for updating text mentions
             pdf_service: Service for parsing PDFs
             blob_store: Blob store for persisting page images
+            permission_registrar: Registrar for entity-level permissions (Sentinel)
 
         """
         self.upload_blob = upload_blob_use_case
@@ -68,6 +71,7 @@ class ArtifactUploadSaga:
         self.update_text_mention = update_text_mention_use_case
         self.pdf_service = pdf_service
         self.blob_store = blob_store
+        self.permission_registrar = permission_registrar
 
     async def execute(
         self,
@@ -108,7 +112,24 @@ class ArtifactUploadSaga:
         artifact_response = artifact_result.unwrap()
         artifact_id = artifact_response.artifact_id
 
-        # Step 4 : Create pages and add to artifact
+        # Step 4: Register artifact with permission system (visibility from request)
+        if auth:
+            try:
+                await self.permission_registrar.register_resource(
+                    resource_type="artifact",
+                    resource_id=artifact_id,
+                    workspace_id=auth.workspace_id,
+                    owner_id=auth.user_id,
+                    visibility=upload_req.visibility,
+                )
+            except Exception:  # noqa: BLE001
+                log.warning(
+                    "saga.permission_registration_failed",
+                    artifact_id=str(artifact_id),
+                    exc_info=True,
+                )
+
+        # Step 5: Create pages and add to artifact
         pages_result = await self._process_pdf_pages(
             pdf_content=pdf_content,
             artifact_id=artifact_id,
@@ -136,6 +157,7 @@ class ArtifactUploadSaga:
             pdf_content: Parsed PDF content with pages and PNG streams
             artifact_id: ID of the artifact
             now: Current datetime for text mention extraction
+            auth: Optional auth context for workspace/owner scoping
 
         Returns:
             Result containing list of page IDs or error

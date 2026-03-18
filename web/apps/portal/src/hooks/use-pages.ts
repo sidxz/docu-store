@@ -2,12 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@docu-store/api-client";
+import type { WorkflowMap } from "@docu-store/types";
 import { queryKeys } from "@/lib/query-keys";
-
-/** Shape of the workflow endpoint response (untyped in OpenAPI schema) */
-interface WorkflowMap {
-  workflows?: Record<string, { workflow_id: string; status: string }>;
-}
 
 export function usePage(pageId: string) {
   return useQuery({

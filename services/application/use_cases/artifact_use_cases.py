@@ -1,29 +1,35 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from uuid import UUID
 
 import structlog
 from returns.result import Failure, Result, Success
 
-from application.dtos.artifact_dtos import ArtifactResponse, CreateArtifactRequest
 from application.dtos.errors import AppError
 from application.mappers.artifact_mappers import ArtifactMapper
-from application.ports.external_event_publisher import ExternalEventPublisher
-from application.ports.repositories.artifact_repository import ArtifactRepository
-from application.ports.repositories.page_repository import PageRepository
-from domain.aggregates.artifact import Artifact
-from domain.exceptions import (
-    AggregateNotFoundError,
-    ConcurrencyError,
-    ValidationError,
+from application.use_cases._guards import (
+    handle_domain_errors,
+    require_artifact_workspace,
+    require_editor,
 )
+from domain.aggregates.artifact import Artifact
 from domain.services.artifact_deletion_service import ArtifactDeletionService
-from domain.value_objects.summary_candidate import SummaryCandidate
-from domain.value_objects.title_mention import TitleMention
 
 if TYPE_CHECKING:
+    from uuid import UUID
+
+    from application.dtos.artifact_dtos import ArtifactResponse, CreateArtifactRequest
     from application.ports.auth import AuthContext
+    from application.ports.blob_store import BlobStore
+    from application.ports.compound_vector_store import CompoundVectorStore
+    from application.ports.external_event_publisher import ExternalEventPublisher
+    from application.ports.permission_registrar import PermissionRegistrar
+    from application.ports.repositories.artifact_repository import ArtifactRepository
+    from application.ports.repositories.page_repository import PageRepository
+    from application.ports.summary_vector_store import SummaryVectorStore
+    from application.ports.vector_store import VectorStore
+    from domain.value_objects.summary_candidate import SummaryCandidate
+    from domain.value_objects.title_mention import TitleMention
 
 logger = structlog.get_logger()
 
@@ -39,42 +45,32 @@ class CreateArtifactUseCase:
         self.artifact_repository = artifact_repository
         self.external_event_publisher = external_event_publisher
 
+    @handle_domain_errors
     async def execute(
-        self, request: CreateArtifactRequest, auth: AuthContext | None = None
+        self,
+        request: CreateArtifactRequest,
+        auth: AuthContext | None = None,
     ) -> Result[ArtifactResponse, AppError]:
-        try:
-            if auth and not auth.has_role("editor"):
-                return Failure(AppError("forbidden", "Requires editor role"))
+        require_editor(auth)
 
-            # Create a new Artifact aggregate
-            artifact = Artifact.create(
-                source_uri=request.source_uri,
-                source_filename=request.source_filename,
-                artifact_type=request.artifact_type,
-                mime_type=request.mime_type,
-                storage_location=request.storage_location,
-                workspace_id=auth.workspace_id if auth else None,
-                owner_id=auth.user_id if auth else None,
-            )
+        artifact = Artifact.create(
+            source_uri=request.source_uri,
+            source_filename=request.source_filename,
+            artifact_type=request.artifact_type,
+            mime_type=request.mime_type,
+            storage_location=request.storage_location,
+            workspace_id=auth.workspace_id if auth else None,
+            owner_id=auth.user_id if auth else None,
+        )
 
-            # Save the Artifact using the repository
-            self.artifact_repository.save(artifact)
+        self.artifact_repository.save(artifact)
 
-            result = ArtifactMapper.to_artifact_response(artifact)
+        result = ArtifactMapper.to_artifact_response(artifact)
 
-            if self.external_event_publisher:
-                await self.external_event_publisher.notify_artifact_created(result)
+        if self.external_event_publisher:
+            await self.external_event_publisher.notify_artifact_created(result)
 
-            # Return a successful result with the ArtifactResponse
-            return Success(result)
-        except ValidationError as e:
-            # Domain validation errors - client's fault (400 Bad Request)
-            return Failure(AppError("validation", f"Validation error: {e!s}"))
-        except ConcurrencyError as e:
-            # Concurrency conflicts (409 Conflict)
-            return Failure(
-                AppError("concurrency", f"Resource was modified by another request: {e!s}"),
-            )
+        return Success(result)
 
 
 class AddPagesUseCase:
@@ -90,56 +86,41 @@ class AddPagesUseCase:
         self.page_repository = page_repository
         self.external_event_publisher = external_event_publisher
 
+    @handle_domain_errors
     async def execute(
         self,
         artifact_id: UUID,
         page_ids: list[UUID],
         auth: AuthContext | None = None,
     ) -> Result[ArtifactResponse, AppError]:
-        try:
-            if auth and not auth.has_role("editor"):
-                return Failure(AppError("forbidden", "Requires editor role"))
+        require_editor(auth)
 
-            # Retrieve the artifact by ID
-            artifact = self.artifact_repository.get_by_id(artifact_id)
+        artifact = self.artifact_repository.get_by_id(artifact_id)
+        require_artifact_workspace(auth, artifact)
 
-            if auth and artifact.workspace_id is not None and artifact.workspace_id != auth.workspace_id:
-                return Failure(AppError("not_found", "Artifact not found"))
+        # Validate that all page IDs exist and their artifact_id matches
+        for page_id in page_ids:
+            page = self.page_repository.get_by_id(page_id)
+            if page.artifact_id != artifact_id:
+                return Failure(
+                    AppError(
+                        "validation",
+                        f"Page {page_id} does not belong to Artifact {artifact_id}",
+                    ),
+                )
 
-            # Validate that all page IDs exist and their artifact_id matches
-            for page_id in page_ids:
-                page = self.page_repository.get_by_id(page_id)
-                if page.artifact_id != artifact_id:
-                    return Failure(
-                        AppError(
-                            "validation",
-                            f"Page {page_id} does not belong to Artifact {artifact_id}",
-                        ),
-                    )
+        artifact.add_pages(page_ids)
+        self.artifact_repository.save(artifact)
 
-            # Add pages to the artifact
-            artifact.add_pages(page_ids)
+        result = ArtifactMapper.to_artifact_response(artifact)
 
-            # Save the updated artifact
-            self.artifact_repository.save(artifact)
-
-            # Return a successful result with the updated ArtifactResponse
-            result = ArtifactMapper.to_artifact_response(artifact)
-
-            if self.external_event_publisher:
-                await self.external_event_publisher.notify_artifact_updated(result)
-
-            return Success(result)
-        except AggregateNotFoundError as e:
-            return Failure(AppError("not_found", f"Artifact not found: {e!s}"))
-        except ValidationError as e:
-            return Failure(AppError("validation", f"Validation error: {e!s}"))
-        except ConcurrencyError as e:
-            return Failure(
-                AppError("concurrency", f"Resource was modified by another request: {e!s}"),
+        if self.external_event_publisher:
+            await self.external_event_publisher.notify_artifact_updated(
+                result,
+                sub_type="PagesAdded",
             )
-        except ValueError as e:
-            return Failure(AppError("invalid_operation", str(e)))
+
+        return Success(result)
 
 
 class RemovePagesUseCase:
@@ -153,45 +134,30 @@ class RemovePagesUseCase:
         self.artifact_repository = artifact_repository
         self.external_event_publisher = external_event_publisher
 
+    @handle_domain_errors
     async def execute(
         self,
         artifact_id: UUID,
         page_ids: list[UUID],
         auth: AuthContext | None = None,
     ) -> Result[ArtifactResponse, AppError]:
-        try:
-            if auth and not auth.has_role("editor"):
-                return Failure(AppError("forbidden", "Requires editor role"))
+        require_editor(auth)
 
-            # Retrieve the artifact by ID
-            artifact = self.artifact_repository.get_by_id(artifact_id)
+        artifact = self.artifact_repository.get_by_id(artifact_id)
+        require_artifact_workspace(auth, artifact)
 
-            if auth and artifact.workspace_id is not None and artifact.workspace_id != auth.workspace_id:
-                return Failure(AppError("not_found", "Artifact not found"))
+        artifact.remove_pages(page_ids)
+        self.artifact_repository.save(artifact)
 
-            # Remove pages from the artifact
-            artifact.remove_pages(page_ids)
+        result = ArtifactMapper.to_artifact_response(artifact)
 
-            # Save the updated artifact
-            self.artifact_repository.save(artifact)
-
-            # Return a successful result with the updated ArtifactResponse
-            result = ArtifactMapper.to_artifact_response(artifact)
-
-            if self.external_event_publisher:
-                await self.external_event_publisher.notify_artifact_updated(result)
-
-            return Success(result)
-        except AggregateNotFoundError as e:
-            return Failure(AppError("not_found", f"Artifact not found: {e!s}"))
-        except ValidationError as e:
-            return Failure(AppError("validation", f"Validation error: {e!s}"))
-        except ConcurrencyError as e:
-            return Failure(
-                AppError("concurrency", f"Resource was modified by another request: {e!s}"),
+        if self.external_event_publisher:
+            await self.external_event_publisher.notify_artifact_updated(
+                result,
+                sub_type="PagesRemoved",
             )
-        except ValueError as e:
-            return Failure(AppError("invalid_operation", str(e)))
+
+        return Success(result)
 
 
 class UpdateTitleMentionUseCase:
@@ -205,79 +171,38 @@ class UpdateTitleMentionUseCase:
         self.artifact_repository = artifact_repository
         self.external_event_publisher = external_event_publisher
 
+    @handle_domain_errors
     async def execute(
         self,
         artifact_id: UUID,
         title_mention: TitleMention | None,
         auth: AuthContext | None = None,
     ) -> Result[ArtifactResponse, AppError]:
-        try:
-            if auth and not auth.has_role("editor"):
-                return Failure(AppError("forbidden", "Requires editor role"))
+        require_editor(auth)
 
-            logger.info(
-                "update_title_mention_use_case_start",
-                artifact_id=str(artifact_id),
-                title_mention=title_mention,
-                title_mention_type=type(title_mention).__name__ if title_mention else "None",
+        logger.info(
+            "update_title_mention_use_case_start",
+            artifact_id=str(artifact_id),
+            title_mention=title_mention,
+            title_mention_type=type(title_mention).__name__ if title_mention else "None",
+        )
+
+        artifact = self.artifact_repository.get_by_id(artifact_id)
+        require_artifact_workspace(auth, artifact)
+
+        artifact.update_title_mention(title_mention)
+        self.artifact_repository.save(artifact)
+
+        result = ArtifactMapper.to_artifact_response(artifact)
+
+        if self.external_event_publisher:
+            await self.external_event_publisher.notify_artifact_updated(
+                result,
+                sub_type="TitleMentionUpdated",
             )
-            # Retrieve the artifact by ID
-            logger.info("retrieving_artifact", artifact_id=str(artifact_id))
-            artifact = self.artifact_repository.get_by_id(artifact_id)
 
-            if auth and artifact.workspace_id is not None and artifact.workspace_id != auth.workspace_id:
-                return Failure(AppError("not_found", "Artifact not found"))
-
-            logger.info("artifact_retrieved", artifact_id=str(artifact_id))
-
-            # Update title mention
-            logger.info(
-                "updating_title_mention",
-                artifact_id=str(artifact_id),
-                title_mention=title_mention,
-            )
-            artifact.update_title_mention(title_mention)
-            logger.info("title_mention_updated", artifact_id=str(artifact_id))
-
-            # Save the updated artifact
-            logger.info("saving_artifact", artifact_id=str(artifact_id))
-            self.artifact_repository.save(artifact)
-            logger.info("artifact_saved", artifact_id=str(artifact_id))
-
-            # Return a successful result with the updated ArtifactResponse
-            logger.info("mapping_to_response", artifact_id=str(artifact_id))
-            result = ArtifactMapper.to_artifact_response(artifact)
-            logger.info("response_mapped", artifact_id=str(artifact_id))
-
-            if self.external_event_publisher:
-                logger.info("publishing_event", artifact_id=str(artifact_id))
-                await self.external_event_publisher.notify_artifact_updated(result)
-                logger.info("event_published", artifact_id=str(artifact_id))
-
-            logger.info("update_title_mention_use_case_success", artifact_id=str(artifact_id))
-            return Success(result)
-        except AggregateNotFoundError as e:
-            logger.warning("artifact_not_found", artifact_id=str(artifact_id), error=str(e))
-            return Failure(AppError("not_found", f"Artifact not found: {e!s}"))
-        except ValidationError as e:
-            logger.warning("validation_error", artifact_id=str(artifact_id), error=str(e))
-            return Failure(AppError("validation", f"Validation error: {e!s}"))
-        except ConcurrencyError as e:
-            logger.warning("concurrency_error", artifact_id=str(artifact_id), error=str(e))
-            return Failure(
-                AppError("concurrency", f"Resource was modified by another request: {e!s}"),
-            )
-        except ValueError as e:
-            logger.warning("value_error", artifact_id=str(artifact_id), error=str(e))
-            return Failure(AppError("invalid_operation", str(e)))
-        except Exception as e:
-            logger.exception(
-                "unexpected_error_in_update_title_mention_use_case",
-                artifact_id=str(artifact_id),
-                error=str(e),
-                error_type=type(e).__name__,
-            )
-            return Failure(AppError("internal_error", f"Unexpected error: {e!s}"))
+        logger.info("update_title_mention_use_case_success", artifact_id=str(artifact_id))
+        return Success(result)
 
 
 class UpdateSummaryCandidateUseCase:
@@ -291,45 +216,30 @@ class UpdateSummaryCandidateUseCase:
         self.artifact_repository = artifact_repository
         self.external_event_publisher = external_event_publisher
 
+    @handle_domain_errors
     async def execute(
         self,
         artifact_id: UUID,
         summary_candidate: SummaryCandidate | None,
         auth: AuthContext | None = None,
     ) -> Result[ArtifactResponse, AppError]:
-        try:
-            if auth and not auth.has_role("editor"):
-                return Failure(AppError("forbidden", "Requires editor role"))
+        require_editor(auth)
 
-            # Retrieve the artifact by ID
-            artifact = self.artifact_repository.get_by_id(artifact_id)
+        artifact = self.artifact_repository.get_by_id(artifact_id)
+        require_artifact_workspace(auth, artifact)
 
-            if auth and artifact.workspace_id is not None and artifact.workspace_id != auth.workspace_id:
-                return Failure(AppError("not_found", "Artifact not found"))
+        artifact.update_summary_candidate(summary_candidate)
+        self.artifact_repository.save(artifact)
 
-            # Update summary candidate
-            artifact.update_summary_candidate(summary_candidate)
+        result = ArtifactMapper.to_artifact_response(artifact)
 
-            # Save the updated artifact
-            self.artifact_repository.save(artifact)
-
-            # Return a successful result with the updated ArtifactResponse
-            result = ArtifactMapper.to_artifact_response(artifact)
-
-            if self.external_event_publisher:
-                await self.external_event_publisher.notify_artifact_updated(result)
-
-            return Success(result)
-        except AggregateNotFoundError as e:
-            return Failure(AppError("not_found", f"Artifact not found: {e!s}"))
-        except ValidationError as e:
-            return Failure(AppError("validation", f"Validation error: {e!s}"))
-        except ConcurrencyError as e:
-            return Failure(
-                AppError("concurrency", f"Resource was modified by another request: {e!s}"),
+        if self.external_event_publisher:
+            await self.external_event_publisher.notify_artifact_updated(
+                result,
+                sub_type="SummaryCandidateUpdated",
             )
-        except ValueError as e:
-            return Failure(AppError("invalid_operation", str(e)))
+
+        return Success(result)
 
 
 class UpdateTagsUseCase:
@@ -343,94 +253,175 @@ class UpdateTagsUseCase:
         self.artifact_repository = artifact_repository
         self.external_event_publisher = external_event_publisher
 
+    @handle_domain_errors
     async def execute(
         self,
         artifact_id: UUID,
         tags: list[str],
         auth: AuthContext | None = None,
     ) -> Result[ArtifactResponse, AppError]:
-        try:
-            if auth and not auth.has_role("editor"):
-                return Failure(AppError("forbidden", "Requires editor role"))
+        require_editor(auth)
 
-            # Retrieve the artifact by ID
-            artifact = self.artifact_repository.get_by_id(artifact_id)
+        artifact = self.artifact_repository.get_by_id(artifact_id)
+        require_artifact_workspace(auth, artifact)
 
-            if auth and artifact.workspace_id is not None and artifact.workspace_id != auth.workspace_id:
-                return Failure(AppError("not_found", "Artifact not found"))
+        artifact.update_tags(tags)
+        self.artifact_repository.save(artifact)
 
-            # Update tags
-            artifact.update_tags(tags)
+        result = ArtifactMapper.to_artifact_response(artifact)
 
-            # Save the updated artifact
-            self.artifact_repository.save(artifact)
-
-            # Return a successful result with the updated ArtifactResponse
-            result = ArtifactMapper.to_artifact_response(artifact)
-
-            if self.external_event_publisher:
-                await self.external_event_publisher.notify_artifact_updated(result)
-
-            return Success(result)
-        except AggregateNotFoundError as e:
-            return Failure(AppError("not_found", f"Artifact not found: {e!s}"))
-        except ValidationError as e:
-            return Failure(AppError("validation", f"Validation error: {e!s}"))
-        except ConcurrencyError as e:
-            return Failure(
-                AppError("concurrency", f"Resource was modified by another request: {e!s}"),
+        if self.external_event_publisher:
+            await self.external_event_publisher.notify_artifact_updated(
+                result,
+                sub_type="TagsUpdated",
             )
-        except ValueError as e:
-            return Failure(AppError("invalid_operation", str(e)))
+
+        return Success(result)
 
 
 class DeleteArtifactUseCase:
-    """Delete an artifact and all its associated pages."""
+    """Delete an artifact and all its associated pages.
 
-    def __init__(
+    After the event-sourced deletion, performs best-effort cleanup of
+    secondary stores (vector DBs, blob storage).  Cleanup failures are
+    logged but never fail the overall operation.
+    """
+
+    def __init__(  # noqa: PLR0913
         self,
         artifact_repository: ArtifactRepository,
         page_repository: PageRepository,
         external_event_publisher: ExternalEventPublisher | None = None,
+        vector_store: VectorStore | None = None,
+        compound_vector_store: CompoundVectorStore | None = None,
+        summary_vector_store: SummaryVectorStore | None = None,
+        blob_store: BlobStore | None = None,
+        permission_registrar: PermissionRegistrar | None = None,
     ) -> None:
         self.artifact_repository = artifact_repository
         self.page_repository = page_repository
         self.external_event_publisher = external_event_publisher
+        self._vector_store = vector_store
+        self._compound_vector_store = compound_vector_store
+        self._summary_vector_store = summary_vector_store
+        self._blob_store = blob_store
+        self._permission_registrar = permission_registrar
 
+    @handle_domain_errors
     async def execute(
-        self, artifact_id: UUID, auth: AuthContext | None = None
+        self,
+        artifact_id: UUID,
+        auth: AuthContext | None = None,
     ) -> Result[None, AppError]:
-        try:
-            if auth and not auth.has_role("editor"):
-                return Failure(AppError("forbidden", "Requires editor role"))
+        require_editor(auth)
 
-            # Retrieve the artifact and its pages
-            artifact = self.artifact_repository.get_by_id(artifact_id)
+        artifact = self.artifact_repository.get_by_id(artifact_id)
+        require_artifact_workspace(auth, artifact)
 
-            if auth and artifact.workspace_id is not None and artifact.workspace_id != auth.workspace_id:
-                return Failure(AppError("not_found", "Artifact not found"))
-            pages = [self.page_repository.get_by_id(page_id) for page_id in artifact.pages]
+        page_ids = list(artifact.pages)
+        storage_location = artifact.storage_location
+        pages = [self.page_repository.get_by_id(pid) for pid in page_ids]
 
-            # Use the domain service to delete artifact and all its pages
-            ArtifactDeletionService.delete_artifact_with_pages(artifact, pages)
+        ArtifactDeletionService.delete_artifact_with_pages(artifact, pages)
 
-            # Persist all deleted aggregates
-            for page in pages:
-                self.page_repository.save(page)
-            self.artifact_repository.save(artifact)
+        for page in pages:
+            self.page_repository.save(page)
+        self.artifact_repository.save(artifact)
 
-            if self.external_event_publisher:
-                await self.external_event_publisher.notify_artifact_deleted(artifact_id)
+        if self.external_event_publisher:
+            await self.external_event_publisher.notify_artifact_deleted(artifact_id)
 
-            # Return a successful result
-            return Success(None)
-        except AggregateNotFoundError as e:
-            return Failure(AppError("not_found", f"Artifact not found: {e!s}"))
-        except ValidationError as e:
-            return Failure(AppError("validation", f"Validation error: {e!s}"))
-        except ConcurrencyError as e:
-            return Failure(
-                AppError("concurrency", f"Resource was modified by another request: {e!s}"),
+        await self._cleanup_secondary_stores(artifact_id, page_ids, storage_location)
+
+        return Success(None)
+
+    async def _cleanup_secondary_stores(
+        self,
+        artifact_id: UUID,
+        page_ids: list[UUID],
+        storage_location: str,
+    ) -> None:
+        """Best-effort cleanup — errors are logged, never raised."""
+        for page_id in page_ids:
+            await self._cleanup_page_stores(page_id)
+        await self._cleanup_artifact_stores(artifact_id, storage_location)
+
+        logger.info(
+            "secondary_store_cleanup_complete",
+            artifact_id=str(artifact_id),
+            pages_cleaned=len(page_ids),
+        )
+
+    async def _cleanup_page_stores(self, page_id: UUID) -> None:
+        """Best-effort cleanup of all vector stores for a single page."""
+        await _safe_cleanup(
+            self._vector_store,
+            "delete_page_embedding",
+            "page_embedding",
+            page_id=str(page_id),
+            args=(page_id,),
+        )
+        await _safe_cleanup(
+            self._compound_vector_store,
+            "delete_compound_embeddings_for_page",
+            "compound_embedding",
+            page_id=str(page_id),
+            args=(page_id,),
+        )
+        await _safe_cleanup(
+            self._summary_vector_store,
+            "delete_page_summary",
+            "page_summary_embedding",
+            page_id=str(page_id),
+            args=(page_id,),
+        )
+
+    async def _cleanup_artifact_stores(
+        self,
+        artifact_id: UUID,
+        storage_location: str,
+    ) -> None:
+        """Best-effort cleanup of artifact-level stores."""
+        await _safe_cleanup(
+            self._summary_vector_store,
+            "delete_artifact_summary",
+            "artifact_summary_embedding",
+            artifact_id=str(artifact_id),
+            args=(artifact_id,),
+        )
+        if self._blob_store and storage_location:
+            await _safe_cleanup(
+                self._blob_store,
+                "delete",
+                "blob",
+                storage_location=storage_location,
+                args=(storage_location,),
+                is_sync=True,
             )
-        except ValueError as e:
-            return Failure(AppError("invalid_operation", str(e)))
+        await _safe_cleanup(
+            self._permission_registrar,
+            "deregister_resource",
+            "permission",
+            artifact_id=str(artifact_id),
+            args=("artifact", artifact_id),
+        )
+
+
+async def _safe_cleanup(
+    store: object | None,
+    method_name: str,
+    label: str,
+    *,
+    args: tuple = (),
+    is_sync: bool = False,
+    **log_kwargs: str,
+) -> None:
+    """Call *store.method_name(*args)* and swallow any exception."""
+    if store is None:
+        return
+    try:
+        result = getattr(store, method_name)(*args)
+        if not is_sync:
+            await result
+    except Exception:  # noqa: BLE001
+        logger.warning("cleanup_%s_failed", label, exc_info=True, **log_kwargs)

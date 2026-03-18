@@ -10,6 +10,7 @@ class UploadBlobRequest(BaseModel):
     artifact_type: ArtifactType = Field(..., description="Classification type of the artifact")
     filename: str | None = Field(None, description="Original filename of the artifact")
     mime_type: str | None
+    visibility: str = Field("workspace", description="Initial visibility: 'workspace' or 'private'")
 
 
 class UploadBlobResponse(BaseModel):

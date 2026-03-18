@@ -195,7 +195,7 @@ class CompoundQdrantStore(CompoundVectorStore):
                 error=str(e),
             )
 
-    async def search_similar_compounds(
+    async def search_similar_compounds(  # noqa: PLR0913
         self,
         query_embedding: TextEmbedding,
         limit: int = 10,

@@ -13,6 +13,8 @@ from application.dtos.smiles_embedding_dtos import (
 )
 
 if TYPE_CHECKING:
+    from uuid import UUID
+
     from application.ports.compound_vector_store import CompoundVectorStore
     from application.ports.embedding_generator import EmbeddingGenerator
     from application.ports.repositories.artifact_read_models import ArtifactReadModel

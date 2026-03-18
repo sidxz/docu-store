@@ -82,6 +82,15 @@ class ExtractPageEntitiesUseCase:
             page.update_tag_mentions(tag_mentions)
             self.page_repository.save(page)
 
+            if self.external_event_publisher:
+                from application.mappers.page_mappers import PageMapper  # noqa: PLC0415
+
+                page_response = PageMapper.to_page_response(page)
+                await self.external_event_publisher.notify_page_updated(
+                    page_response,
+                    sub_type="TagMentionsUpdated",
+                )
+
             logger.info(
                 "extract_page_entities.success",
                 page_id=str(page_id),

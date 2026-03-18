@@ -94,10 +94,12 @@ async def run() -> None:
 
     # Ensure Qdrant collections exist (worker may start before the API)
     try:
+        from application.ports.compound_vector_store import CompoundVectorStore  # noqa: PLC0415
         from application.ports.summary_vector_store import SummaryVectorStore  # noqa: PLC0415
         from application.ports.vector_store import VectorStore  # noqa: PLC0415
 
         await container[VectorStore].ensure_collection_exists()
+        await container[CompoundVectorStore].ensure_compound_collection_exists()
         await container[SummaryVectorStore].ensure_collection_exists()
         logger.info("qdrant_collections_initialized")
     except Exception as e:  # noqa: BLE001

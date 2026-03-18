@@ -2,14 +2,17 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button } from "primereact/button";
 import { Dropdown } from "primereact/dropdown";
 import { FileUpload, type FileUploadHandlerEvent } from "primereact/fileupload";
 import { InputText } from "primereact/inputtext";
-import { Upload, ArrowLeft, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { Message } from "primereact/message";
+import { Upload, ArrowLeft } from "lucide-react";
 
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { useUploadArtifact } from "@/hooks/use-artifacts";
+import { useScopeStore } from "@/lib/stores/scope-store";
 
 const ARTIFACT_TYPES = [
   { label: "Research Article", value: "RESEARCH_ARTICLE" },
@@ -25,6 +28,7 @@ export default function UploadPage() {
   const { workspace } = useParams<{ workspace: string }>();
   const router = useRouter();
   const uploadMutation = useUploadArtifact();
+  const { defaultScope } = useScopeStore();
 
   const [artifactType, setArtifactType] = useState("RESEARCH_ARTICLE");
   const [sourceUri, setSourceUri] = useState("");
@@ -38,6 +42,7 @@ export default function UploadPage() {
         file,
         artifactType,
         sourceUri: sourceUri || undefined,
+        visibility: defaultScope,
       });
       router.push(`/${workspace}/documents`);
     } catch {
@@ -48,13 +53,15 @@ export default function UploadPage() {
   return (
     <div>
       {/* Back link */}
-      <button
-        className="mb-4 flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
+      <Button
+        label="Documents"
+        icon={<ArrowLeft className="h-3.5 w-3.5" />}
         onClick={() => router.push(`/${workspace}/documents`)}
-      >
-        <ArrowLeft className="h-3.5 w-3.5" />
-        Documents
-      </button>
+        text
+        severity="secondary"
+        size="small"
+        className="mb-4"
+      />
 
       <PageHeader
         icon={Upload}
@@ -119,24 +126,25 @@ export default function UploadPage() {
 
           {/* Status messages */}
           {uploadMutation.isPending && (
-            <div className="flex items-center gap-2 rounded-lg border border-accent/20 bg-accent-light p-3 text-sm text-accent-text">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Uploading...
-            </div>
+            <Message
+              severity="info"
+              text="Uploading..."
+              icon="pi pi-spin pi-spinner"
+            />
           )}
 
           {uploadMutation.isError && (
-            <div className="flex items-center gap-2 rounded-lg border border-ds-error/20 bg-ds-error/5 p-3 text-sm text-ds-error">
-              <AlertCircle className="h-4 w-4" />
-              {uploadMutation.error?.message ?? "Upload failed"}
-            </div>
+            <Message
+              severity="error"
+              text={uploadMutation.error?.message ?? "Upload failed"}
+            />
           )}
 
           {uploadMutation.isSuccess && (
-            <div className="flex items-center gap-2 rounded-lg border border-ds-success/20 bg-ds-success/5 p-3 text-sm text-ds-success">
-              <CheckCircle2 className="h-4 w-4" />
-              Upload successful! Redirecting...
-            </div>
+            <Message
+              severity="success"
+              text="Upload successful! Redirecting..."
+            />
           )}
         </div>
       </Card>

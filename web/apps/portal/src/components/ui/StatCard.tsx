@@ -1,3 +1,4 @@
+import { Skeleton } from "primereact/skeleton";
 import type { LucideIcon } from "lucide-react";
 
 interface StatCardProps {
@@ -6,6 +7,7 @@ interface StatCardProps {
   value: string | number;
   trend?: string;
   loading?: boolean;
+  accentColor?: string;
 }
 
 export function StatCard({
@@ -14,29 +16,32 @@ export function StatCard({
   value,
   trend,
   loading,
+  accentColor,
 }: StatCardProps) {
   if (loading) {
     return (
-      <div className="rounded-xl border border-border-default bg-surface-elevated p-5 shadow-ds-sm animate-pulse">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-border-subtle" />
-          <div className="h-4 w-20 rounded bg-border-subtle" />
+      <div className="rounded-xl border border-border-default bg-surface-elevated p-5">
+        <div className="flex items-center justify-between">
+          <Skeleton width="5rem" height="0.875rem" />
+          <Skeleton width="2.25rem" height="2.25rem" borderRadius="0.5rem" />
         </div>
-        <div className="mt-3 h-8 w-16 rounded bg-border-subtle" />
+        <div className="mt-4">
+          <Skeleton width="4rem" height="1.75rem" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-border-default bg-surface-elevated p-5 shadow-ds-sm transition-shadow hover:shadow-ds">
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent-light">
+    <div className="group rounded-xl border border-border-default bg-surface-elevated p-5 transition-all duration-200 hover:shadow-ds hover:border-border-default/80">
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-text-muted">{label}</span>
+        <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${accentColor ?? "bg-accent-light"}`}>
           <Icon className="h-[18px] w-[18px] text-accent-text" />
         </div>
-        <span className="text-sm font-medium text-text-secondary">{label}</span>
       </div>
       <div className="mt-3 flex items-baseline gap-2">
-        <span className="text-2xl font-semibold text-text-primary">
+        <span className="text-2xl font-bold tracking-tight text-text-primary">
           {value}
         </span>
         {trend && (

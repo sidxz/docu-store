@@ -1,29 +1,34 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from uuid import UUID
 
 import structlog
-from returns.result import Failure, Result, Success
+from returns.result import Result, Success
 
-from application.dtos.errors import AppError
-from application.dtos.page_dtos import AddCompoundMentionsRequest, CreatePageRequest, PageResponse
 from application.mappers.page_mappers import PageMapper
-from application.ports.external_event_publisher import ExternalEventPublisher
-from application.ports.repositories.artifact_repository import ArtifactRepository
-from application.ports.repositories.page_repository import PageRepository
-from domain.aggregates.page import Page
-from domain.exceptions import (
-    AggregateNotFoundError,
-    ConcurrencyError,
-    ValidationError,
+from application.use_cases._guards import (
+    handle_domain_errors,
+    require_editor,
+    require_page_workspace,
 )
-from domain.value_objects.summary_candidate import SummaryCandidate
-from domain.value_objects.tag_mention import TagMention
-from domain.value_objects.text_mention import TextMention
+from domain.aggregates.page import Page
 
 if TYPE_CHECKING:
+    from uuid import UUID
+
+    from application.dtos.errors import AppError
+    from application.dtos.page_dtos import (
+        AddCompoundMentionsRequest,
+        CreatePageRequest,
+        PageResponse,
+    )
     from application.ports.auth import AuthContext
+    from application.ports.external_event_publisher import ExternalEventPublisher
+    from application.ports.repositories.artifact_repository import ArtifactRepository
+    from application.ports.repositories.page_repository import PageRepository
+    from domain.value_objects.summary_candidate import SummaryCandidate
+    from domain.value_objects.tag_mention import TagMention
+    from domain.value_objects.text_mention import TextMention
 
 logger = structlog.get_logger()
 
@@ -39,63 +44,39 @@ class CreatePageUseCase:
         self.artifact_repository = artifact_repository
         self.external_event_publisher = external_event_publisher
 
+    @handle_domain_errors
     async def execute(
-        self, request: CreatePageRequest, auth: AuthContext | None = None
+        self,
+        request: CreatePageRequest,
+        auth: AuthContext | None = None,
     ) -> Result[PageResponse, AppError]:
-        try:
-            if auth and not auth.has_role("editor"):
-                return Failure(AppError("forbidden", "Requires editor role"))
+        require_editor(auth)
 
-            logger.info(
-                "create_page_use_case_start",
-                artifact_id=str(request.artifact_id),
-                page_name=request.name,
-            )
-            # Ensure artifact exists before creating a page
-            self.artifact_repository.get_by_id(request.artifact_id)
+        logger.info(
+            "create_page_use_case_start",
+            artifact_id=str(request.artifact_id),
+            page_name=request.name,
+        )
+        # Ensure artifact exists before creating a page
+        self.artifact_repository.get_by_id(request.artifact_id)
 
-            # Create a new Page aggregate
-            page = Page.create(
-                name=request.name,
-                artifact_id=request.artifact_id,
-                index=request.index,
-                workspace_id=auth.workspace_id if auth else None,
-                owner_id=auth.user_id if auth else None,
-            )
+        page = Page.create(
+            name=request.name,
+            artifact_id=request.artifact_id,
+            index=request.index,
+            workspace_id=auth.workspace_id if auth else None,
+            owner_id=auth.user_id if auth else None,
+        )
 
-            # Save the Page using the repository
-            logger.info("saving_page", page_id=str(page.id))
-            self.page_repository.save(page)
-            logger.info("page_saved", page_id=str(page.id))
+        self.page_repository.save(page)
 
-            result = PageMapper.to_page_response(page)
+        result = PageMapper.to_page_response(page)
 
-            if self.external_event_publisher:
-                await self.external_event_publisher.notify_page_created(result)
+        if self.external_event_publisher:
+            await self.external_event_publisher.notify_page_created(result)
 
-            logger.info("create_page_use_case_success", page_id=str(page.id))
-            # Return a successful result with the PageResponse
-            return Success(result)
-        except AggregateNotFoundError as e:
-            logger.warning("artifact_not_found", artifact_id=str(request.artifact_id), error=str(e))
-            return Failure(AppError("not_found", f"Artifact not found: {e!s}"))
-        except ValidationError as e:
-            logger.warning("validation_error", error=str(e))
-            # Domain validation errors - client's fault (400 Bad Request)
-            return Failure(AppError("validation", f"Validation error: {e!s}"))
-        except ConcurrencyError as e:
-            logger.warning("concurrency_error", error=str(e))
-            # Concurrency conflicts (409 Conflict)
-            return Failure(
-                AppError("concurrency", f"Resource was modified by another request: {e!s}"),
-            )
-        except Exception as e:
-            logger.exception(
-                "unexpected_error_in_create_page_use_case",
-                error=str(e),
-                error_type=type(e).__name__,
-            )
-            return Failure(AppError("internal_error", f"Unexpected error: {e!s}"))
+        logger.info("create_page_use_case_success", page_id=str(page.id))
+        return Success(result)
 
 
 class AddCompoundMentionsUseCase:
@@ -107,43 +88,29 @@ class AddCompoundMentionsUseCase:
         self.page_repository = page_repository
         self.external_event_publisher = external_event_publisher
 
+    @handle_domain_errors
     async def execute(
-        self, request: AddCompoundMentionsRequest, auth: AuthContext | None = None
+        self,
+        request: AddCompoundMentionsRequest,
+        auth: AuthContext | None = None,
     ) -> Result[PageResponse, AppError]:
-        try:
-            if auth and not auth.has_role("editor"):
-                return Failure(AppError("forbidden", "Requires editor role"))
+        require_editor(auth)
 
-            # Retrieve the page by ID
-            page = self.page_repository.get_by_id(request.page_id)
+        page = self.page_repository.get_by_id(request.page_id)
+        require_page_workspace(auth, page)
 
-            if auth and page.workspace_id is not None and page.workspace_id != auth.workspace_id:
-                return Failure(AppError("not_found", "Page not found"))
+        page.update_compound_mentions(request.compound_mentions)
+        self.page_repository.save(page)
 
-            # Add compound_mentions to the page
-            page.update_compound_mentions(request.compound_mentions)
+        result = PageMapper.to_page_response(page)
 
-            # Save the updated page
-            self.page_repository.save(page)
-
-            # Return a successful result with the updated PageResponse
-            result = PageMapper.to_page_response(page)
-
-            if self.external_event_publisher:
-                await self.external_event_publisher.notify_page_updated(result)
-
-            return Success(result)
-        except AggregateNotFoundError as e:
-            # Page not found - client's fault (404 Not Found)
-            return Failure(AppError("not_found", f"Page not found: {e!s}"))
-        except ValidationError as e:
-            # Domain validation errors - client's fault (400 Bad Request)
-            return Failure(AppError("validation", f"Validation error: {e!s}"))
-        except ConcurrencyError as e:
-            # Concurrency conflicts (409 Conflict) - retry-able error
-            return Failure(
-                AppError("concurrency", f"Resource was modified by another request: {e!s}"),
+        if self.external_event_publisher:
+            await self.external_event_publisher.notify_page_updated(
+                result,
+                sub_type="CompoundMentionsUpdated",
             )
+
+        return Success(result)
 
 
 class UpdateTagMentionsUseCase:
@@ -157,45 +124,30 @@ class UpdateTagMentionsUseCase:
         self.page_repository = page_repository
         self.external_event_publisher = external_event_publisher
 
+    @handle_domain_errors
     async def execute(
         self,
         page_id: UUID,
         tag_mentions: list[TagMention],
         auth: AuthContext | None = None,
     ) -> Result[PageResponse, AppError]:
-        try:
-            if auth and not auth.has_role("editor"):
-                return Failure(AppError("forbidden", "Requires editor role"))
+        require_editor(auth)
 
-            # Retrieve the page by ID
-            page = self.page_repository.get_by_id(page_id)
+        page = self.page_repository.get_by_id(page_id)
+        require_page_workspace(auth, page)
 
-            if auth and page.workspace_id is not None and page.workspace_id != auth.workspace_id:
-                return Failure(AppError("not_found", "Page not found"))
+        page.update_tag_mentions(tag_mentions)
+        self.page_repository.save(page)
 
-            # Update tag mentions
-            page.update_tag_mentions(tag_mentions)
+        result = PageMapper.to_page_response(page)
 
-            # Save the updated page
-            self.page_repository.save(page)
-
-            # Return a successful result with the updated PageResponse
-            result = PageMapper.to_page_response(page)
-
-            if self.external_event_publisher:
-                await self.external_event_publisher.notify_page_updated(result)
-
-            return Success(result)
-        except AggregateNotFoundError as e:
-            return Failure(AppError("not_found", f"Page not found: {e!s}"))
-        except ValidationError as e:
-            return Failure(AppError("validation", f"Validation error: {e!s}"))
-        except ConcurrencyError as e:
-            return Failure(
-                AppError("concurrency", f"Resource was modified by another request: {e!s}"),
+        if self.external_event_publisher:
+            await self.external_event_publisher.notify_page_updated(
+                result,
+                sub_type="TagMentionsUpdated",
             )
-        except ValueError as e:
-            return Failure(AppError("invalid_operation", str(e)))
+
+        return Success(result)
 
 
 class UpdateTextMentionUseCase:
@@ -209,45 +161,30 @@ class UpdateTextMentionUseCase:
         self.page_repository = page_repository
         self.external_event_publisher = external_event_publisher
 
+    @handle_domain_errors
     async def execute(
         self,
         page_id: UUID,
         text_mention: TextMention,
         auth: AuthContext | None = None,
     ) -> Result[PageResponse, AppError]:
-        try:
-            if auth and not auth.has_role("editor"):
-                return Failure(AppError("forbidden", "Requires editor role"))
+        require_editor(auth)
 
-            # Retrieve the page by ID
-            page = self.page_repository.get_by_id(page_id)
+        page = self.page_repository.get_by_id(page_id)
+        require_page_workspace(auth, page)
 
-            if auth and page.workspace_id is not None and page.workspace_id != auth.workspace_id:
-                return Failure(AppError("not_found", "Page not found"))
+        page.update_text_mention(text_mention)
+        self.page_repository.save(page)
 
-            # Update text mention
-            page.update_text_mention(text_mention)
+        result = PageMapper.to_page_response(page)
 
-            # Save the updated page
-            self.page_repository.save(page)
-
-            # Return a successful result with the updated PageResponse
-            result = PageMapper.to_page_response(page)
-
-            if self.external_event_publisher:
-                await self.external_event_publisher.notify_page_updated(result)
-
-            return Success(result)
-        except AggregateNotFoundError as e:
-            return Failure(AppError("not_found", f"Page not found: {e!s}"))
-        except ValidationError as e:
-            return Failure(AppError("validation", f"Validation error: {e!s}"))
-        except ConcurrencyError as e:
-            return Failure(
-                AppError("concurrency", f"Resource was modified by another request: {e!s}"),
+        if self.external_event_publisher:
+            await self.external_event_publisher.notify_page_updated(
+                result,
+                sub_type="TextMentionUpdated",
             )
-        except ValueError as e:
-            return Failure(AppError("invalid_operation", str(e)))
+
+        return Success(result)
 
 
 class UpdateSummaryCandidateUseCase:
@@ -261,45 +198,30 @@ class UpdateSummaryCandidateUseCase:
         self.page_repository = page_repository
         self.external_event_publisher = external_event_publisher
 
+    @handle_domain_errors
     async def execute(
         self,
         page_id: UUID,
         summary_candidate: SummaryCandidate,
         auth: AuthContext | None = None,
     ) -> Result[PageResponse, AppError]:
-        try:
-            if auth and not auth.has_role("editor"):
-                return Failure(AppError("forbidden", "Requires editor role"))
+        require_editor(auth)
 
-            # Retrieve the page by ID
-            page = self.page_repository.get_by_id(page_id)
+        page = self.page_repository.get_by_id(page_id)
+        require_page_workspace(auth, page)
 
-            if auth and page.workspace_id is not None and page.workspace_id != auth.workspace_id:
-                return Failure(AppError("not_found", "Page not found"))
+        page.update_summary_candidate(summary_candidate)
+        self.page_repository.save(page)
 
-            # Update summary candidate
-            page.update_summary_candidate(summary_candidate)
+        result = PageMapper.to_page_response(page)
 
-            # Save the updated page
-            self.page_repository.save(page)
-
-            # Return a successful result with the updated PageResponse
-            result = PageMapper.to_page_response(page)
-
-            if self.external_event_publisher:
-                await self.external_event_publisher.notify_page_updated(result)
-
-            return Success(result)
-        except AggregateNotFoundError as e:
-            return Failure(AppError("not_found", f"Page not found: {e!s}"))
-        except ValidationError as e:
-            return Failure(AppError("validation", f"Validation error: {e!s}"))
-        except ConcurrencyError as e:
-            return Failure(
-                AppError("concurrency", f"Resource was modified by another request: {e!s}"),
+        if self.external_event_publisher:
+            await self.external_event_publisher.notify_page_updated(
+                result,
+                sub_type="SummaryCandidateUpdated",
             )
-        except ValueError as e:
-            return Failure(AppError("invalid_operation", str(e)))
+
+        return Success(result)
 
 
 class DeletePageUseCase:
@@ -315,65 +237,29 @@ class DeletePageUseCase:
         self.artifact_repository = artifact_repository
         self.external_event_publisher = external_event_publisher
 
+    @handle_domain_errors
     async def execute(
-        self, page_id: UUID, auth: AuthContext | None = None
+        self,
+        page_id: UUID,
+        auth: AuthContext | None = None,
     ) -> Result[None, AppError]:
-        try:
-            if auth and not auth.has_role("editor"):
-                return Failure(AppError("forbidden", "Requires editor role"))
+        require_editor(auth)
 
-            logger.info("delete_page_use_case_start", page_id=str(page_id))
-            # Retrieve the page by ID
-            page = self.page_repository.get_by_id(page_id)
+        logger.info("delete_page_use_case_start", page_id=str(page_id))
 
-            if auth and page.workspace_id is not None and page.workspace_id != auth.workspace_id:
-                return Failure(AppError("not_found", "Page not found"))
+        page = self.page_repository.get_by_id(page_id)
+        require_page_workspace(auth, page)
 
-            # Delete the page
-            logger.info("deleting_page", page_id=str(page_id))
-            page.delete()
+        page.delete()
+        self.page_repository.save(page)
 
-            # Save the updated page
-            logger.info("saving_deleted_page", page_id=str(page_id))
-            self.page_repository.save(page)
-            logger.info("deleted_page_saved", page_id=str(page_id))
+        # Remove page from artifact
+        artifact = self.artifact_repository.get_by_id(page.artifact_id)
+        artifact.remove_pages([page_id])
+        self.artifact_repository.save(artifact)
 
-            # Remove page from artifact
-            logger.info(
-                "removing_page_from_artifact",
-                page_id=str(page_id),
-                artifact_id=str(page.artifact_id),
-            )
-            artifact = self.artifact_repository.get_by_id(page.artifact_id)
-            artifact.remove_pages([page_id])
-            self.artifact_repository.save(artifact)
-            logger.info("artifact_updated_page_removed", artifact_id=str(page.artifact_id))
+        if self.external_event_publisher:
+            await self.external_event_publisher.notify_page_deleted(page_id)
 
-            if self.external_event_publisher:
-                await self.external_event_publisher.notify_page_deleted(page_id)
-
-            logger.info("delete_page_use_case_success", page_id=str(page_id))
-            # Return a successful result
-            return Success(None)
-        except AggregateNotFoundError as e:
-            logger.warning("aggregate_not_found", page_id=str(page_id), error=str(e))
-            return Failure(AppError("not_found", f"Page not found: {e!s}"))
-        except ValidationError as e:
-            logger.warning("validation_error", page_id=str(page_id), error=str(e))
-            return Failure(AppError("validation", f"Validation error: {e!s}"))
-        except ConcurrencyError as e:
-            logger.warning("concurrency_error", page_id=str(page_id), error=str(e))
-            return Failure(
-                AppError("concurrency", f"Resource was modified by another request: {e!s}"),
-            )
-        except ValueError as e:
-            logger.warning("value_error", page_id=str(page_id), error=str(e))
-            return Failure(AppError("invalid_operation", str(e)))
-        except Exception as e:
-            logger.exception(
-                "unexpected_error_in_delete_page_use_case",
-                page_id=str(page_id),
-                error=str(e),
-                error_type=type(e).__name__,
-            )
-            return Failure(AppError("internal_error", f"Unexpected error: {e!s}"))
+        logger.info("delete_page_use_case_success", page_id=str(page_id))
+        return Success(None)

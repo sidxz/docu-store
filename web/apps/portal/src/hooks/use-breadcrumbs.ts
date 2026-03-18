@@ -29,7 +29,6 @@ export function useBreadcrumbs(): Breadcrumb[] {
 
   // segments[0] is the workspace slug ([workspace] dynamic segment).
   // We intentionally skip it — the sidebar already shows the workspace name.
-  const workspace = segments[0];
   const crumbs: Breadcrumb[] = [];
 
   for (let i = 1; i < segments.length; i++) {

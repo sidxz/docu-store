@@ -1,6 +1,5 @@
 import { SearchResultCard } from "./SearchResultCard";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import { API_URL } from "@/lib/constants";
 
 interface SummaryResult {
   entity_type: "page" | "artifact";
@@ -44,7 +43,11 @@ export function SummarySearchResults({
         {data.results.map((r) => (
           <SearchResultCard
             key={`${r.entity_id}-${r.similarity_score}`}
-            title={r.artifact_title ?? r.entity_id}
+            title={
+              r.entity_type === "page" && r.artifact_title
+                ? `${r.artifact_title} | Page ${(r.page_index ?? 0) + 1}`
+                : r.artifact_title ?? r.entity_id.slice(0, 8)
+            }
             href={
               r.entity_type === "artifact"
                 ? `/${workspace}/documents/${r.artifact_id}`

@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
+import { Skeleton } from "primereact/skeleton";
 
 import { ScoreBadge } from "@/components/ui/ScoreBadge";
 import { EntityTypeBadge } from "@/components/ui/EntityTypeBadge";
+import { getAuthzClient } from "@/lib/authz-client";
 
 interface SearchResultCardProps {
   title: string;
@@ -11,9 +13,57 @@ interface SearchResultCardProps {
   preview?: string | null;
   entityType?: "artifact" | "page";
   secondaryLink?: { label: string; href: string };
-  /** URL to a page thumbnail image (lazy-loaded) */
+  /** URL to a page thumbnail image (lazy-loaded with auth) */
   thumbnailSrc?: string;
   children?: ReactNode;
+}
+
+function AuthThumbnail({ src, href }: { src: string; href: string }) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let revoke: string | null = null;
+    const headers = getAuthzClient().getHeaders();
+
+    fetch(src, { headers, signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error(res.statusText);
+        return res.blob();
+      })
+      .then((blob) => {
+        if (controller.signal.aborted) return;
+        revoke = URL.createObjectURL(blob);
+        setBlobUrl(revoke);
+      })
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setError(true);
+      });
+
+    return () => {
+      controller.abort();
+      if (revoke) URL.revokeObjectURL(revoke);
+    };
+  }, [src]);
+
+  if (error) return null;
+
+  return (
+    <Link href={href} className="relative hidden h-40 w-32 shrink-0 sm:block">
+      {!blobUrl && (
+        <Skeleton width="8rem" height="10rem" borderRadius="0.375rem" />
+      )}
+      {blobUrl && (
+        <img
+          src={blobUrl}
+          alt=""
+          className="h-40 w-32 rounded-md border border-border-subtle object-cover object-top"
+        />
+      )}
+    </Link>
+  );
 }
 
 export function SearchResultCard({
@@ -26,30 +76,12 @@ export function SearchResultCard({
   thumbnailSrc,
   children,
 }: SearchResultCardProps) {
-  const [thumbLoaded, setThumbLoaded] = useState(false);
-  const [thumbError, setThumbError] = useState(false);
-
   return (
     <div className="rounded-xl border border-border-default bg-surface-elevated p-4 transition-shadow hover:shadow-ds">
       <div className="flex items-start gap-4">
-        {/* Thumbnail */}
-        {thumbnailSrc && !thumbError && (
-          <Link
-            href={href}
-            className="relative hidden h-40 w-32 shrink-0 sm:block"
-          >
-            {!thumbLoaded && (
-              <div className="absolute inset-0 animate-pulse rounded-md bg-border-subtle" />
-            )}
-            <img
-              src={thumbnailSrc}
-              alt=""
-              loading="lazy"
-              className={`h-40 w-32 rounded-md border border-border-subtle object-cover object-top transition-opacity ${thumbLoaded ? "opacity-100" : "opacity-0"}`}
-              onLoad={() => setThumbLoaded(true)}
-              onError={() => setThumbError(true)}
-            />
-          </Link>
+        {/* Thumbnail with auth */}
+        {thumbnailSrc && (
+          <AuthThumbnail src={thumbnailSrc} href={href} />
         )}
 
         {/* Content */}

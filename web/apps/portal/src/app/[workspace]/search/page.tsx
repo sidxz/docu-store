@@ -1,8 +1,15 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useState } from "react";
-import { Search as SearchIcon, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Search as SearchIcon } from "lucide-react";
+import { Button } from "primereact/button";
+import { IconField } from "primereact/iconfield";
+import { InputIcon } from "primereact/inputicon";
+import { InputText } from "primereact/inputtext";
+import { Message } from "primereact/message";
+import { ProgressSpinner } from "primereact/progressspinner";
+import { SelectButton } from "primereact/selectbutton";
 
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -14,13 +21,14 @@ import {
   useSearchSummaries,
   useHierarchicalSearch,
 } from "@/hooks/use-search";
+import { useSearchStore } from "@/lib/stores/search-store";
 
 type SearchMode = "text" | "summary" | "hierarchical";
 
-const SEARCH_MODES: { label: string; value: SearchMode }[] = [
-  { label: "Text Chunks", value: "text" },
-  { label: "Summaries", value: "summary" },
-  { label: "Hierarchical", value: "hierarchical" },
+const SEARCH_MODES = [
+  { label: "Text Chunks", value: "text" as SearchMode },
+  { label: "Summaries", value: "summary" as SearchMode },
+  { label: "Hierarchical", value: "hierarchical" as SearchMode },
 ];
 
 export default function SearchPage() {
@@ -28,9 +36,32 @@ export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<SearchMode>("hierarchical");
 
+  // Track whether we need to auto-search after prefill
+  const [shouldAutoSearch, setShouldAutoSearch] = useState(false);
+
   const textSearch = useSearchPages();
   const summarySearch = useSearchSummaries();
   const hierarchicalSearch = useHierarchicalSearch();
+
+  // Step 1: Consume pending query from store on mount — only prefill state
+  useEffect(() => {
+    const pending = useSearchStore.getState().pendingQuery;
+    if (pending) {
+      useSearchStore.getState().setPendingQuery(null);
+      setQuery(pending);
+      setMode("hierarchical");
+      setShouldAutoSearch(true);
+    }
+  }, []);
+
+  // Step 2: Fire the search AFTER the query state has been committed
+  // This runs on the render AFTER setQuery/setShouldAutoSearch
+  useEffect(() => {
+    if (shouldAutoSearch && query) {
+      setShouldAutoSearch(false);
+      hierarchicalSearch.mutate({ query_text: query, include_chunks: true });
+    }
+  }, [shouldAutoSearch, query]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isPending =
     textSearch.isPending ||
@@ -69,48 +100,32 @@ export default function SearchPage() {
 
       {/* Search controls */}
       <div className="space-y-4">
-        {/* Search input */}
         <div className="flex gap-3">
-          <div className="relative flex-1">
-            <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
-            <input
+          <IconField iconPosition="left" className="flex-1">
+            <InputIcon className="pi pi-search" />
+            <InputText
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Enter search query..."
-              className="w-full rounded-lg border border-border-default bg-surface-elevated py-2.5 pl-10 pr-4 text-sm text-text-primary placeholder:text-text-muted transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+              className="w-full"
             />
-          </div>
-          <button
+          </IconField>
+          <Button
+            label="Search"
+            icon={isPending ? "pi pi-spin pi-spinner" : "pi pi-search"}
             onClick={handleSearch}
             disabled={!query.trim() || isPending}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
-          >
-            {isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <SearchIcon className="h-4 w-4" />
-            )}
-            Search
-          </button>
+          />
         </div>
 
-        {/* Mode selector — custom segmented control */}
-        <div className="inline-flex rounded-lg border border-border-default bg-surface-elevated p-0.5">
-          {SEARCH_MODES.map((m) => (
-            <button
-              key={m.value}
-              onClick={() => setMode(m.value)}
-              className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-                mode === m.value
-                  ? "bg-accent text-white shadow-sm"
-                  : "text-text-secondary hover:text-text-primary"
-              }`}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
+        <SelectButton
+          value={mode}
+          options={SEARCH_MODES}
+          onChange={(e) => {
+            if (e.value) setMode(e.value);
+          }}
+        />
       </div>
 
       {/* Results */}
@@ -131,14 +146,15 @@ export default function SearchPage() {
           />
         )}
 
-      {/* Loading */}
       {isPending && (
         <div className="mt-12 flex items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-accent" />
+          <ProgressSpinner
+            style={{ width: "1.5rem", height: "1.5rem" }}
+            strokeWidth="3"
+          />
         </div>
       )}
 
-      {/* Empty state — no search yet */}
       {!hasResults && !isPending && (
         <EmptyState
           icon={SearchIcon}
@@ -147,10 +163,12 @@ export default function SearchPage() {
         />
       )}
 
-      {/* Error states */}
       {(textSearch.error || summarySearch.error || hierarchicalSearch.error) && (
-        <div className="mt-6 rounded-lg border border-ds-error/20 bg-ds-error/5 p-4 text-sm text-ds-error">
-          Search failed. Please check that the backend is running and try again.
+        <div className="mt-6">
+          <Message
+            severity="error"
+            text="Search failed. Please check that the backend is running and try again."
+          />
         </div>
       )}
     </div>
