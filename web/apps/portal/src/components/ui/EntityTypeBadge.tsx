@@ -24,7 +24,6 @@ export function EntityTypeBadge({ type, className = "" }: EntityTypeBadgeProps) 
       value={config.label}
       severity={config.severity}
       icon={config.icon}
-      rounded
       className={className}
     />
   );

@@ -45,12 +45,12 @@ class AggregateArtifactTagsUseCase:
         try:
             artifact = self.artifact_repository.get_by_id(artifact_id)
 
-            pages_tags = []
+            pages_data = []
             pages_loaded = 0
             for page_id in artifact.pages:
                 try:
                     page = self.page_repository.get_by_id(page_id)
-                    pages_tags.append(list(page.tag_mentions))
+                    pages_data.append((page.id, page.index, list(page.tag_mentions)))
                     pages_loaded += 1
                 except Exception:  # noqa: BLE001
                     # Skip pages that can't be loaded — partial aggregation is fine
@@ -60,7 +60,7 @@ class AggregateArtifactTagsUseCase:
                         page_id=str(page_id),
                     )
 
-            merged = aggregate_tag_mentions(pages_tags)
+            merged = aggregate_tag_mentions(pages_data)
 
             artifact.update_tag_mentions(merged)
             self.artifact_repository.save(artifact)

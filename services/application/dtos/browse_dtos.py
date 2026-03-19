@@ -39,6 +39,13 @@ class BrowseFoldersResponse(BaseModel):
     total_folders: int
 
 
+class TagPageSource(BaseModel):
+    """Lightweight page-level provenance for a browsed tag."""
+
+    page_id: UUID
+    page_index: int
+
+
 class ArtifactBrowseItemDTO(BaseModel):
     """Lightweight artifact representation for folder listings."""
 
@@ -49,3 +56,7 @@ class ArtifactBrowseItemDTO(BaseModel):
     page_count: int
     presentation_date: str | None = Field(default=None, description="ISO formatted")
     author_names: list[str] = Field(default_factory=list)
+    tag_page_sources: list[TagPageSource] = Field(
+        default_factory=list,
+        description="Pages where the browsed tag was found in this artifact",
+    )

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from uuid import uuid4
 
 from domain.aggregates.artifact import Artifact
 from domain.aggregates.page import Page
@@ -24,6 +25,11 @@ def _tm(tag: str, entity_type: str, params: dict | None = None) -> TagMention:
         model_name="test",
         additional_model_params=params or {"entity_type": entity_type},
     )
+
+
+def _page_data(tags: list[TagMention], index: int = 0):
+    """Helper: wrap a tag list as (page_id, page_index, tags) for aggregate_tag_mentions."""
+    return (uuid4(), index, tags)
 
 
 class TestArtifactDeletionService:
@@ -264,31 +270,62 @@ class TestTagMentionAggregator:
 
     def test_dedup_same_tag_across_pages(self) -> None:
         """Same target on two pages → one entry, best confidence."""
-        page1 = [_tm("EGFR", "target", {"entity_type": "target"})]
-        page2 = [
+        page1_tags = [_tm("EGFR", "target", {"entity_type": "target"})]
+        page2_tags = [
             TagMention(
                 tag="EGFR", entity_type="target", confidence=0.99,
                 date_extracted=datetime.now(UTC), model_name="test",
                 additional_model_params={"entity_type": "target"},
             ),
         ]
-        result = aggregate_tag_mentions([page1, page2])
+        result = aggregate_tag_mentions([
+            _page_data(page1_tags, 0),
+            _page_data(page2_tags, 1),
+        ])
 
         assert len(result) == 1
         assert result[0].tag == "EGFR"
         assert result[0].confidence == 0.99
 
+    def test_provenance_populated(self) -> None:
+        """Aggregated tags carry provenance with source page info."""
+        pid1, pid2 = uuid4(), uuid4()
+        page1_tags = [_tm("EGFR", "target")]
+        page2_tags = [
+            TagMention(
+                tag="EGFR", entity_type="target", confidence=0.99,
+                date_extracted=datetime.now(UTC), model_name="test",
+            ),
+        ]
+        result = aggregate_tag_mentions([
+            (pid1, 0, page1_tags),
+            (pid2, 2, page2_tags),
+        ])
+
+        assert len(result) == 1
+        tag = result[0]
+        assert tag.tag_normalized == "egfr"
+        assert tag.page_count == 2
+        assert tag.max_confidence == 0.99
+        assert tag.sources is not None
+        assert len(tag.sources) == 2
+        source_page_ids = {s.page_id for s in tag.sources}
+        assert source_page_ids == {pid1, pid2}
+
     def test_compound_bioactivities_merged_across_pages(self) -> None:
         """Same compound on two pages with different bioactivities → merged."""
-        page1 = [_tm("Aspirin", "compound_name", {
+        page1_tags = [_tm("Aspirin", "compound_name", {
             "entity_type": "compound_name",
             "bioactivities": [{"assay_type": "IC50", "value": "5", "unit": "nM", "raw_text": "IC50 5nM"}],
         })]
-        page2 = [_tm("Aspirin", "compound_name", {
+        page2_tags = [_tm("Aspirin", "compound_name", {
             "entity_type": "compound_name",
             "bioactivities": [{"assay_type": "MIC", "value": "2", "unit": "µg/mL", "raw_text": "MIC 2µg/mL"}],
         })]
-        result = aggregate_tag_mentions([page1, page2])
+        result = aggregate_tag_mentions([
+            _page_data(page1_tags, 0),
+            _page_data(page2_tags, 1),
+        ])
 
         assert len(result) == 1
         activities = result[0].additional_model_params["bioactivities"]
@@ -299,48 +336,60 @@ class TestTagMentionAggregator:
     def test_duplicate_bioactivities_deduped(self) -> None:
         """Same bioactivity on two pages → kept once."""
         bio = {"assay_type": "IC50", "value": "5", "unit": "nM", "raw_text": "IC50 5nM"}
-        page1 = [_tm("Aspirin", "compound_name", {
+        page1_tags = [_tm("Aspirin", "compound_name", {
             "entity_type": "compound_name",
             "bioactivities": [bio],
         })]
-        page2 = [_tm("Aspirin", "compound_name", {
+        page2_tags = [_tm("Aspirin", "compound_name", {
             "entity_type": "compound_name",
             "bioactivities": [bio],
         })]
-        result = aggregate_tag_mentions([page1, page2])
+        result = aggregate_tag_mentions([
+            _page_data(page1_tags, 0),
+            _page_data(page2_tags, 1),
+        ])
 
         activities = result[0].additional_model_params["bioactivities"]
         assert len(activities) == 1
 
     def test_case_insensitive_dedup(self) -> None:
         """Same tag with different casing → one entry."""
-        page1 = [_tm("EGFR", "target")]
-        page2 = [_tm("egfr", "target")]
-        result = aggregate_tag_mentions([page1, page2])
+        page1_tags = [_tm("EGFR", "target")]
+        page2_tags = [_tm("egfr", "target")]
+        result = aggregate_tag_mentions([
+            _page_data(page1_tags, 0),
+            _page_data(page2_tags, 1),
+        ])
 
         assert len(result) == 1
 
     def test_different_entity_types_not_deduped(self) -> None:
         """Same tag text but different entity types → separate entries."""
-        page1 = [_tm("G2", "gene_name"), _tm("G2", "target")]
-        result = aggregate_tag_mentions([page1])
+        page_tags = [_tm("G2", "gene_name"), _tm("G2", "target")]
+        result = aggregate_tag_mentions([_page_data(page_tags, 0)])
 
         assert len(result) == 2
 
     def test_empty_pages(self) -> None:
         """Empty input returns empty."""
         assert aggregate_tag_mentions([]) == []
-        assert aggregate_tag_mentions([[], []]) == []
+        assert aggregate_tag_mentions([
+            _page_data([], 0),
+            _page_data([], 1),
+        ]) == []
 
     def test_synonyms_merged(self) -> None:
         """Synonyms from multiple pages are merged."""
-        page1 = [_tm("Aspirin", "compound_name", {
+        page1_tags = [_tm("Aspirin", "compound_name", {
             "entity_type": "compound_name", "synonyms": "ASA",
         })]
-        page2 = [_tm("Aspirin", "compound_name", {
+        page2_tags = [_tm("Aspirin", "compound_name", {
             "entity_type": "compound_name", "synonyms": "acetylsalicylic acid",
         })]
-        result = aggregate_tag_mentions([page1, page2])
+        result = aggregate_tag_mentions([
+            _page_data(page1_tags, 0),
+            _page_data(page2_tags, 1),
+        ])
 
         synonyms = result[0].additional_model_params["synonyms"]
         assert "ASA" in synonyms

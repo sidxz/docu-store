@@ -155,7 +155,6 @@ export default function DashboardPage() {
                           <Tag
                             value={typeLabel}
                             severity="secondary"
-                            rounded
                           />
                           {artifact.author_mentions?.length > 0 && (
                             <span className="truncate text-xs text-text-muted">

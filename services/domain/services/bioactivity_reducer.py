@@ -67,6 +67,7 @@ def associate_bioactivities(tag_mentions: list[TagMention]) -> list[TagMention]:
 
         assay_type = (params.get("assay_type") or "").strip()
         value = (params.get("value") or "").strip()
+        # Skip bioactivities with missing assay type or value, as they are unlikely to be useful in this form
         if not assay_type or not value:
             continue
 

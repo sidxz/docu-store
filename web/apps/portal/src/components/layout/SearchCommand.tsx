@@ -242,7 +242,6 @@ export function SearchCommand() {
                       <Tag
                         value={h.entity_type}
                         severity={h.entity_type === "artifact" ? "info" : "secondary"}
-                        rounded
                         className="shrink-0"
                       />
                     </Link>

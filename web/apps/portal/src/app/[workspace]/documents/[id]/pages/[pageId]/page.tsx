@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { ArrowLeft, BookOpen } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronDown } from "lucide-react";
 import { Button } from "primereact/button";
 import { Message } from "primereact/message";
 import { ProgressSpinner } from "primereact/progressspinner";
@@ -114,6 +114,7 @@ export default function PageViewerPage() {
   }>();
   const router = useRouter();
   const [viewMode, setViewMode] = useState<"image" | "pdf">("image");
+  const [textExpanded, setTextExpanded] = useState(false);
   const { data: page, isLoading, error } = usePage(pageId);
   const { data: artifact } = useArtifact(id);
   const { data: workflowData } = usePageWorkflows(pageId);
@@ -251,42 +252,22 @@ export default function PageViewerPage() {
         )}
       </Card>
 
-      {/* Two-panel: text + summary */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader title="Extracted Text" />
-          {page.text_mention?.text ? (
-            <div className="max-h-96 overflow-y-auto text-sm leading-relaxed text-text-primary whitespace-pre-wrap">
-              {page.text_mention.text}
-            </div>
-          ) : (
-            <p className="text-text-muted">No text extracted yet.</p>
-          )}
-          {page.text_mention?.model_name && (
-            <div className="mt-3 border-t border-border-subtle pt-2 text-xs text-text-muted">
-              Model: {page.text_mention.model_name}
-              {page.text_mention.confidence != null &&
-                ` · Confidence: ${(page.text_mention.confidence * 100).toFixed(0)}%`}
-            </div>
-          )}
-        </Card>
-
-        <Card>
-          <CardHeader title="Summary" />
-          {page.summary_candidate?.summary ? (
-            <div className="text-sm leading-relaxed text-text-primary">
-              {page.summary_candidate.summary}
-            </div>
-          ) : (
-            <p className="text-text-muted">No summary generated yet.</p>
-          )}
-          {page.summary_candidate?.model_name && (
-            <div className="mt-3 border-t border-border-subtle pt-2 text-xs text-text-muted">
-              Model: {page.summary_candidate.model_name}
-            </div>
-          )}
-        </Card>
-      </div>
+      {/* Summary */}
+      <Card className="mb-6">
+        <CardHeader title="Summary" />
+        {page.summary_candidate?.summary ? (
+          <div className="text-sm leading-relaxed text-text-primary">
+            {page.summary_candidate.summary}
+          </div>
+        ) : (
+          <p className="text-text-muted">No summary generated yet.</p>
+        )}
+        {page.summary_candidate?.model_name && (
+          <div className="mt-3 border-t border-border-subtle pt-2 text-xs text-text-muted">
+            Model: {page.summary_candidate.model_name}
+          </div>
+        )}
+      </Card>
 
       {/* Tag mentions — grouped by entity type */}
       {page.tag_mentions && page.tag_mentions.length > 0 && (() => {
@@ -333,7 +314,6 @@ export default function PageViewerPage() {
                             <Tag
                               value={tm.tag}
                               severity="success"
-                              rounded
                             />
                             {synonyms && (
                               <span className="text-xs text-text-muted">
@@ -388,7 +368,6 @@ export default function PageViewerPage() {
                           key={`${tm.tag}-${i}`}
                           value={tm.tag}
                           severity={config?.severity ?? "secondary"}
-                          rounded
                         />
                       ))}
                     </div>
@@ -453,6 +432,40 @@ export default function PageViewerPage() {
           </div>
         </div>
       )}
+
+      {/* Extracted Text — collapsed by default */}
+      <div className="mt-6">
+        <Card>
+          <button
+            type="button"
+            onClick={() => setTextExpanded((v) => !v)}
+            className="flex w-full items-center justify-between text-left"
+          >
+            <CardHeader title="Extracted Text" />
+            <ChevronDown
+              className={`h-4 w-4 text-text-muted transition-transform ${textExpanded ? "rotate-180" : ""}`}
+            />
+          </button>
+          {textExpanded && (
+            <div className="mt-3">
+              {page.text_mention?.text ? (
+                <div className="max-h-96 overflow-y-auto text-sm leading-relaxed text-text-primary whitespace-pre-wrap">
+                  {page.text_mention.text}
+                </div>
+              ) : (
+                <p className="text-text-muted">No text extracted yet.</p>
+              )}
+              {page.text_mention?.model_name && (
+                <div className="mt-3 border-t border-border-subtle pt-2 text-xs text-text-muted">
+                  Model: {page.text_mention.model_name}
+                  {page.text_mention.confidence != null &&
+                    ` · Confidence: ${(page.text_mention.confidence * 100).toFixed(0)}%`}
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+      </div>
 
       {/* Workflows */}
       {workflows && workflows.length > 0 && (

@@ -18,9 +18,23 @@ export interface TitleMention extends ExtractionMetadata {
   title: string;
 }
 
+export interface TagSource {
+  page_id: string;
+  page_index: number;
+  confidence: number | null;
+}
+
 export interface TagMention extends ExtractionMetadata {
   tag: string;
   entity_type: string | null;
+  /** Lowercase key for grouping — populated on artifact-level aggregated tags. */
+  tag_normalized: string | null;
+  /** Pages that contributed this tag to the artifact aggregate. */
+  sources: TagSource[] | null;
+  /** Highest confidence across all source pages. */
+  max_confidence: number | null;
+  /** Number of distinct pages where this tag was found. */
+  page_count: number | null;
 }
 
 export interface CompoundMention extends ExtractionMetadata {

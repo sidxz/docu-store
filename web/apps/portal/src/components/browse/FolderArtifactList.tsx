@@ -40,7 +40,7 @@ export function FolderArtifactList({
   const typeTemplate = (row: ArtifactBrowseItemDTO) => {
     const label =
       ARTIFACT_TYPE_LABELS[row.artifact_type] ?? row.artifact_type;
-    return <Tag value={label} severity="info" rounded />;
+    return <Tag value={label} severity="info" />;
   };
 
   const authorsTemplate = (row: ArtifactBrowseItemDTO) => {
@@ -70,6 +70,26 @@ export function FolderArtifactList({
   const pagesTemplate = (row: ArtifactBrowseItemDTO) => (
     <span className="text-text-secondary">{row.page_count}</span>
   );
+
+  const foundOnTemplate = (row: ArtifactBrowseItemDTO) => {
+    const sources = row.tag_page_sources;
+    if (!sources?.length) return <span className="text-text-muted">—</span>;
+
+    const sorted = [...sources].sort((a, b) => a.page_index - b.page_index);
+    return (
+      <div className="flex flex-wrap gap-1">
+        {sorted.map((src) => (
+          <Link
+            key={src.page_id}
+            href={`/${workspace}/documents/${row.artifact_id}/pages/${src.page_id}`}
+            className="inline-flex items-center rounded bg-surface-hover px-1.5 py-0.5 text-xs tabular-nums text-accent-text hover:underline"
+          >
+            p.{src.page_index + 1}
+          </Link>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <DataTable
@@ -102,6 +122,11 @@ export function FolderArtifactList({
         header="Pages"
         body={pagesTemplate}
         style={{ width: "80px" }}
+      />
+      <Column
+        header="Found on"
+        body={foundOnTemplate}
+        style={{ width: "140px" }}
       />
     </DataTable>
   );

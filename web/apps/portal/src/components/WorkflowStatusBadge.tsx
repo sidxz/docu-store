@@ -21,7 +21,6 @@ export function WorkflowStatusBadge({ status }: { status: string }) {
       value={status}
       severity={config.severity}
       icon={config.icon}
-      rounded
     />
   );
 }

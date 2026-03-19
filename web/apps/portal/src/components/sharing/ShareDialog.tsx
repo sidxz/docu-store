@@ -430,7 +430,6 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
                         <Tag
                           value={share.grantee_type}
                           severity={share.grantee_type === "group" ? "info" : "secondary"}
-                          rounded
                           className="text-xs"
                         />
                         <span className="rounded-md bg-border-subtle px-2 py-0.5 text-xs font-medium text-text-secondary">

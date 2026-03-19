@@ -24,6 +24,11 @@ export interface BrowseFoldersResponse {
   total_folders: number;
 }
 
+export interface TagPageSource {
+  page_id: string;
+  page_index: number;
+}
+
 export interface ArtifactBrowseItemDTO {
   artifact_id: string;
   title: string | null;
@@ -32,4 +37,6 @@ export interface ArtifactBrowseItemDTO {
   page_count: number;
   presentation_date: string | null;
   author_names: string[];
+  /** Pages where the browsed tag was found in this artifact. */
+  tag_page_sources: TagPageSource[];
 }

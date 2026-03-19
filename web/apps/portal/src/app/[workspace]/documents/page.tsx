@@ -165,7 +165,7 @@ export default function DocumentsPage() {
 
   const typeTemplate = (row: ArtifactResponse) => {
     const label = ARTIFACT_TYPE_LABELS[row.artifact_type] ?? row.artifact_type;
-    return <Tag value={label} severity="info" rounded />;
+    return <Tag value={label} severity="info" />;
   };
 
   const pagesTemplate = (row: ArtifactResponse) => (
@@ -201,8 +201,12 @@ export default function DocumentsPage() {
     if (!tms?.length) return <span className="text-text-muted">—</span>;
     return (
       <div className="flex flex-wrap gap-1">
-        {tms.slice(0, 3).map((tm: { tag: string }, i: number) => (
-          <Tag key={`${tm.tag}-${i}`} value={tm.tag} severity="secondary" rounded />
+        {tms.slice(0, 3).map((tm: { tag: string; page_count?: number | null }, i: number) => (
+          <Tag
+            key={`${tm.tag}-${i}`}
+            value={tm.page_count ? `${tm.tag} (${tm.page_count})` : tm.tag}
+            severity="secondary"
+          />
         ))}
         {tms.length > 3 && (
           <span className="text-xs text-text-muted">+{tms.length - 3}</span>

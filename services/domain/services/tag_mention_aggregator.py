@@ -3,11 +3,19 @@
 Deduplicates tags across pages by (entity_type, normalized tag name).
 For compound_name entities, bioactivities and synonyms are merged across pages.
 For all other entity types, the highest-confidence mention is kept.
+
+Provenance is tracked: each aggregated tag records which pages contributed it
+via ``TagSource`` entries in the ``sources`` field.
 """
 
 from __future__ import annotations
 
-from domain.value_objects.tag_mention import TagMention
+from typing import TYPE_CHECKING
+
+from domain.value_objects.tag_mention import TagMention, TagSource
+
+if TYPE_CHECKING:
+    from uuid import UUID
 
 
 def _normalize(name: str) -> str:
@@ -16,39 +24,74 @@ def _normalize(name: str) -> str:
 
 
 def aggregate_tag_mentions(
-    pages_tags: list[list[TagMention]],
+    pages_data: list[tuple[UUID, int, list[TagMention]]],
 ) -> list[TagMention]:
     """Merge tag mentions from multiple pages into a deduplicated artifact-level list.
 
+    Each page's tags are tracked with provenance so that the resulting artifact-level
+    tags know which pages they originated from.
+
     Parameters
     ----------
-    pages_tags:
-        One list of TagMentions per page.
+    pages_data:
+        One tuple per page: ``(page_id, page_index, tag_mentions)``.
 
     Returns
     -------
-    A single deduplicated list suitable for ``Artifact.update_tag_mentions()``.
+    A single deduplicated list suitable for ``Artifact.update_tag_mentions()``,
+    with ``sources``, ``tag_normalized``, ``max_confidence``, and ``page_count``
+    populated on each entry.
     """
-    # Flatten
-    all_tags: list[TagMention] = []
-    for page_tags in pages_tags:
-        all_tags.extend(page_tags)
+    # Group by (entity_type, normalized tag) → list of (TagMention, page_id, page_index)
+    groups: dict[tuple[str, str], list[tuple[TagMention, UUID, int]]] = {}
+    for page_id, page_index, page_tags in pages_data:
+        for tm in page_tags:
+            key = (tm.entity_type or "other", _normalize(tm.tag))
+            groups.setdefault(key, []).append((tm, page_id, page_index))
 
-    if not all_tags:
+    if not groups:
         return []
 
-    # Group by (entity_type, normalized tag)
-    groups: dict[tuple[str, str], list[TagMention]] = {}
-    for tm in all_tags:
-        key = (tm.entity_type or "other", _normalize(tm.tag))
-        groups.setdefault(key, []).append(tm)
-
     result: list[TagMention] = []
-    for (_etype, _norm_tag), mentions in groups.items():
-        if mentions[0].entity_type == "compound_name":
-            result.append(_merge_compound_group(mentions))
+    for (etype, norm_tag), entries in groups.items():
+        mentions = [e[0] for e in entries]
+
+        if etype == "compound_name":
+            base = _merge_compound_group(mentions)
         else:
-            result.append(_pick_best(mentions))
+            base = _pick_best(mentions)
+
+        # Build provenance sources
+        sources = [
+            TagSource(
+                page_id=page_id,
+                page_index=page_index,
+                confidence=tm.confidence,
+            )
+            for tm, page_id, page_index in entries
+        ]
+
+        # Deduplicate sources by page_id (a page may have the same tag twice)
+        seen_pages: set[UUID] = set()
+        deduped_sources: list[TagSource] = []
+        for src in sources:
+            if src.page_id not in seen_pages:
+                seen_pages.add(src.page_id)
+                deduped_sources.append(src)
+
+        confidences = [s.confidence for s in deduped_sources if s.confidence is not None]
+        max_conf = max(confidences) if confidences else None
+
+        result.append(
+            base.model_copy(
+                update={
+                    "tag_normalized": norm_tag,
+                    "sources": deduped_sources,
+                    "max_confidence": max_conf,
+                    "page_count": len(deduped_sources),
+                },
+            ),
+        )
 
     return result
 

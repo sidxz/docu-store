@@ -11,6 +11,7 @@ from application.dtos.browse_dtos import (
     BrowseFoldersResponse,
     TagCategoryDTO,
     TagFolderDTO,
+    TagPageSource,
 )
 from application.dtos.dashboard_dtos import DashboardStatsResponse
 from application.dtos.page_dtos import PageResponse
@@ -546,6 +547,50 @@ class MongoReadRepository(PageReadModel, ArtifactReadModel, DashboardReadModel, 
         allowed_artifact_ids: list[UUID] | None = None,
     ) -> list[ArtifactBrowseItemDTO]:
         base_match = self._browse_base_match(workspace_id, allowed_artifact_ids)
+
+        if entity_type == "author":
+            return await self._get_folder_artifacts_simple(
+                query={
+                    **base_match,
+                    "author_mentions": {
+                        "$elemMatch": {"name": {"$regex": f"^{tag_value}$", "$options": "i"}},
+                    },
+                },
+                skip=skip,
+                limit=limit,
+            )
+
+        if entity_type == "date":
+            query = {**base_match}
+            if "-" in tag_value:
+                year, month = tag_value.split("-", 1)
+                month_int = int(month)
+                start = datetime(int(year), month_int, 1, tzinfo=timezone.utc).isoformat()
+                if month_int == 12:
+                    end = datetime(int(year) + 1, 1, 1, tzinfo=timezone.utc).isoformat()
+                else:
+                    end = datetime(int(year), month_int + 1, 1, tzinfo=timezone.utc).isoformat()
+                query["presentation_date.date"] = {"$gte": start, "$lt": end}
+            else:
+                year_int = int(tag_value)
+                start = datetime(year_int, 1, 1, tzinfo=timezone.utc).isoformat()
+                end = datetime(year_int + 1, 1, 1, tzinfo=timezone.utc).isoformat()
+                query["presentation_date.date"] = {"$gte": start, "$lt": end}
+            return await self._get_folder_artifacts_simple(query=query, skip=skip, limit=limit)
+
+        # NER tag browse — use aggregation to extract page-level provenance
+        return await self._get_folder_artifacts_with_provenance(
+            base_match=base_match,
+            entity_type=entity_type,
+            tag_value=tag_value,
+            skip=skip,
+            limit=limit,
+        )
+
+    async def _get_folder_artifacts_simple(
+        self, query: dict, skip: int, limit: int
+    ) -> list[ArtifactBrowseItemDTO]:
+        """Fetch folder artifacts without tag provenance (authors, dates)."""
         projection = {
             "artifact_id": 1,
             "title_mention.title": 1,
@@ -556,66 +601,109 @@ class MongoReadRepository(PageReadModel, ArtifactReadModel, DashboardReadModel, 
             "author_mentions.name": 1,
             "_id": 0,
         }
+        cursor = self.artifacts.find(query, projection).skip(skip).limit(limit)
+        return [self._doc_to_browse_item(doc) async for doc in cursor]
 
-        if entity_type == "author":
-            query = {
-                **base_match,
-                "author_mentions": {
-                    "$elemMatch": {"name": {"$regex": f"^{tag_value}$", "$options": "i"}},
+    async def _get_folder_artifacts_with_provenance(
+        self,
+        base_match: dict,
+        entity_type: str,
+        tag_value: str,
+        skip: int,
+        limit: int,
+    ) -> list[ArtifactBrowseItemDTO]:
+        """Fetch folder artifacts with page-level provenance for the browsed tag."""
+        match_stage = {
+            **base_match,
+            "tag_mentions": {
+                "$elemMatch": {
+                    "entity_type": entity_type,
+                    "tag": {"$regex": f"^{tag_value}$", "$options": "i"},
                 },
-            }
-        elif entity_type == "date":
-            query = {**base_match}
-            if "-" in tag_value:
-                # year-month
-                year, month = tag_value.split("-", 1)
-                month_int = int(month)
-                start = datetime(int(year), month_int, 1, tzinfo=timezone.utc).isoformat()
-                if month_int == 12:
-                    end = datetime(int(year) + 1, 1, 1, tzinfo=timezone.utc).isoformat()
-                else:
-                    end = datetime(int(year), month_int + 1, 1, tzinfo=timezone.utc).isoformat()
-                query["presentation_date.date"] = {"$gte": start, "$lt": end}
-            else:
-                # year only
-                year_int = int(tag_value)
-                start = datetime(year_int, 1, 1, tzinfo=timezone.utc).isoformat()
-                end = datetime(year_int + 1, 1, 1, tzinfo=timezone.utc).isoformat()
-                query["presentation_date.date"] = {"$gte": start, "$lt": end}
-        else:
-            query = {
-                **base_match,
-                "tag_mentions": {
-                    "$elemMatch": {
-                        "entity_type": entity_type,
-                        "tag": {"$regex": f"^{tag_value}$", "$options": "i"},
+            },
+        }
+
+        pipeline: list[dict] = [
+            {"$match": match_stage},
+            # Extract the matched tag's sources array
+            {
+                "$addFields": {
+                    "_matched_tag": {
+                        "$arrayElemAt": [
+                            {
+                                "$filter": {
+                                    "input": {"$ifNull": ["$tag_mentions", []]},
+                                    "cond": {
+                                        "$and": [
+                                            {"$eq": ["$$this.entity_type", entity_type]},
+                                            {"$eq": [{"$toLower": "$$this.tag"}, tag_value]},
+                                        ],
+                                    },
+                                },
+                            },
+                            0,
+                        ],
                     },
                 },
-            }
+            },
+            {
+                "$project": {
+                    "artifact_id": 1,
+                    "title_mention.title": 1,
+                    "source_filename": 1,
+                    "artifact_type": 1,
+                    "pages": 1,
+                    "presentation_date.date": 1,
+                    "author_mentions.name": 1,
+                    "tag_page_sources": {"$ifNull": ["$_matched_tag.sources", []]},
+                    "_id": 0,
+                },
+            },
+            {"$skip": skip},
+            {"$limit": limit},
+        ]
 
-        cursor = self.artifacts.find(query, projection).skip(skip).limit(limit)
         items: list[ArtifactBrowseItemDTO] = []
-        async for doc in cursor:
-            pd = doc.get("presentation_date", {})
-            pd_date = pd.get("date") if pd else None
-            items.append(
-                ArtifactBrowseItemDTO(
-                    artifact_id=doc["artifact_id"],
-                    title=doc.get("title_mention", {}).get("title") if doc.get("title_mention") else None,
-                    source_filename=doc.get("source_filename"),
-                    artifact_type=doc.get("artifact_type", "UNCLASSIFIED"),
-                    page_count=len(doc.get("pages", [])),
-                    presentation_date=pd_date,
-                    author_names=[a["name"] for a in doc.get("author_mentions", [])],
-                ),
-            )
+        async for doc in self.artifacts.aggregate(pipeline):
+            item = self._doc_to_browse_item(doc)
+            # Attach provenance from the aggregation pipeline
+            raw_sources = doc.get("tag_page_sources", [])
+            if raw_sources:
+                item.tag_page_sources = [
+                    TagPageSource(
+                        page_id=s["page_id"],
+                        page_index=s["page_index"],
+                    )
+                    for s in raw_sources
+                    if "page_id" in s and "page_index" in s
+                ]
+            items.append(item)
         return items
+
+    @staticmethod
+    def _doc_to_browse_item(doc: dict) -> ArtifactBrowseItemDTO:
+        """Convert a MongoDB document to an ArtifactBrowseItemDTO."""
+        pd = doc.get("presentation_date", {})
+        pd_date = pd.get("date") if pd else None
+        return ArtifactBrowseItemDTO(
+            artifact_id=doc["artifact_id"],
+            title=doc.get("title_mention", {}).get("title") if doc.get("title_mention") else None,
+            source_filename=doc.get("source_filename"),
+            artifact_type=doc.get("artifact_type", "UNCLASSIFIED"),
+            page_count=len(doc.get("pages", [])),
+            presentation_date=pd_date,
+            author_names=[a["name"] for a in doc.get("author_mentions", [])],
+        )
 
     async def ensure_browse_indexes(self) -> None:
         """Create indexes to support browse aggregation pipelines. Idempotent."""
         await self.artifacts.create_index(
             [("workspace_id", 1), ("tag_mentions.entity_type", 1), ("tag_mentions.tag", 1)],
             name="idx_browse_tags",
+        )
+        await self.artifacts.create_index(
+            [("workspace_id", 1), ("tag_mentions.entity_type", 1), ("tag_mentions.tag_normalized", 1)],
+            name="idx_browse_tags_normalized",
         )
         await self.artifacts.create_index(
             [("workspace_id", 1), ("author_mentions.name", 1)],
