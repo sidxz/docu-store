@@ -131,6 +131,26 @@ class VectorStore(Protocol):
         """
         ...
 
+    async def search_pages_grouped(  # noqa: PLR0913
+        self,
+        query_embedding: TextEmbedding,
+        limit: int = 10,
+        artifact_id_filter: UUID | None = None,
+        score_threshold: float | None = None,
+        allowed_artifact_ids: list[UUID] | None = None,
+        workspace_id: UUID | None = None,
+        tags: list[str] | None = None,
+        entity_types: list[str] | None = None,
+        tag_match_mode: Literal["any", "all"] = "any",
+        group_size: int = 1,
+    ) -> list[PageSearchResult]:
+        """Find pages with server-side dedup by page_id.
+
+        Returns the best-scoring chunk per page using Qdrant group_by.
+        Same args as search_similar_pages plus group_size.
+        """
+        ...
+
     async def set_page_payload(
         self,
         page_id: UUID,

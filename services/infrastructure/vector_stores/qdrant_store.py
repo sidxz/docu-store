@@ -362,38 +362,16 @@ class QdrantStore(VectorStore):
             )
         return conditions
 
-    async def search_similar_pages(  # noqa: PLR0913
+    def _build_filter(  # noqa: PLR0913
         self,
-        query_embedding: TextEmbedding,
-        limit: int = 10,
         artifact_id_filter: UUID | None = None,
-        score_threshold: float | None = None,
         allowed_artifact_ids: list[UUID] | None = None,
         workspace_id: UUID | None = None,
         tags: list[str] | None = None,
         entity_types: list[str] | None = None,
         tag_match_mode: Literal["any", "all"] = "any",
-    ) -> list[PageSearchResult]:
-        """Find pages similar to the query embedding using cosine similarity.
-
-        Args:
-            query_embedding: The embedding to search for
-            limit: Maximum number of results to return
-            artifact_id_filter: Optional filter to search within a specific artifact
-            score_threshold: Optional minimum similarity score (0.0 to 1.0)
-            allowed_artifact_ids: Optional whitelist of accessible artifact IDs
-            workspace_id: Optional workspace filter for tenant isolation
-            tags: Optional tag filter (case-insensitive)
-            entity_types: Optional NER entity type filter
-            tag_match_mode: 'any' = match ANY tag, 'all' = must have ALL tags
-
-        Returns:
-            List of PageSearchResult, ordered by similarity (highest first)
-
-        """
-        client = await self._get_client()
-
-        # Build filter conditions
+    ) -> models.Filter | None:
+        """Build a combined Qdrant filter from all filter parameters."""
         must_conditions: list[models.Condition] = []
         if artifact_id_filter:
             must_conditions.append(
@@ -417,12 +395,32 @@ class QdrantStore(VectorStore):
                 ),
             )
         must_conditions.extend(self._build_tag_conditions(tags, entity_types, tag_match_mode))
-        query_filter = models.Filter(must=must_conditions) if must_conditions else None
+        return models.Filter(must=must_conditions) if must_conditions else None
 
-        # Note: sentence-transformers embeddings are already L2-normalized
-        # Using them as-is ensures optimal similarity calculations in Qdrant
+    async def search_similar_pages(  # noqa: PLR0913
+        self,
+        query_embedding: TextEmbedding,
+        limit: int = 10,
+        artifact_id_filter: UUID | None = None,
+        score_threshold: float | None = None,
+        allowed_artifact_ids: list[UUID] | None = None,
+        workspace_id: UUID | None = None,
+        tags: list[str] | None = None,
+        entity_types: list[str] | None = None,
+        tag_match_mode: Literal["any", "all"] = "any",
+    ) -> list[PageSearchResult]:
+        """Find pages similar to the query embedding using cosine similarity.
+
+        Returns raw chunk-level results (may contain multiple chunks per page).
+        For deduplicated page-level results, use search_pages_grouped() instead.
+        """
+        client = await self._get_client()
+        query_filter = self._build_filter(
+            artifact_id_filter, allowed_artifact_ids, workspace_id,
+            tags, entity_types, tag_match_mode,
+        )
+
         try:
-            # Use the modern Query API via query_points
             search_result = await client.query_points(
                 collection_name=self.collection_name,
                 query=query_embedding.vector,
@@ -432,10 +430,7 @@ class QdrantStore(VectorStore):
                 with_payload=True,
             )
         except Exception as e:
-            logger.exception(
-                "search_failed",
-                error=str(e),
-            )
+            logger.exception("search_failed", error=str(e))
             raise
         else:
             results = [
@@ -454,10 +449,72 @@ class QdrantStore(VectorStore):
                 results_count=len(results),
                 limit=limit,
                 has_filter=artifact_id_filter is not None,
-                min_score=min((r.score for r in results), default=0.0),
-                max_score=max((r.score for r in results), default=0.0),
             )
+            return results
 
+    async def search_pages_grouped(  # noqa: PLR0913
+        self,
+        query_embedding: TextEmbedding,
+        limit: int = 10,
+        artifact_id_filter: UUID | None = None,
+        score_threshold: float | None = None,
+        allowed_artifact_ids: list[UUID] | None = None,
+        workspace_id: UUID | None = None,
+        tags: list[str] | None = None,
+        entity_types: list[str] | None = None,
+        tag_match_mode: Literal["any", "all"] = "any",
+        group_size: int = 1,
+    ) -> list[PageSearchResult]:
+        """Search with server-side deduplication by page_id.
+
+        Uses Qdrant's query_groups() to return the best-scoring chunk per page,
+        eliminating application-level 3x over-fetch and dedup.
+
+        Args:
+            group_size: Number of hits to keep per page (default 1 = best chunk only).
+            (other args same as search_similar_pages)
+
+        """
+        client = await self._get_client()
+        query_filter = self._build_filter(
+            artifact_id_filter, allowed_artifact_ids, workspace_id,
+            tags, entity_types, tag_match_mode,
+        )
+
+        try:
+            grouped = await client.query_points_groups(
+                collection_name=self.collection_name,
+                query=query_embedding.vector,
+                group_by="page_id",
+                group_size=group_size,
+                limit=limit,
+                query_filter=query_filter,
+                score_threshold=score_threshold,
+                with_payload=True,
+            )
+        except Exception as e:
+            logger.exception("grouped_search_failed", error=str(e))
+            raise
+        else:
+            results = []
+            for group in grouped.groups:
+                best_point = group.hits[0]
+                results.append(
+                    PageSearchResult(
+                        page_id=UUID(best_point.payload["page_id"]),
+                        artifact_id=UUID(best_point.payload["artifact_id"]),
+                        score=best_point.score,
+                        page_index=best_point.payload["page_index"],
+                        metadata=best_point.payload,
+                    ),
+                )
+
+            logger.info(
+                "grouped_search_completed",
+                results_count=len(results),
+                limit=limit,
+                has_filter=artifact_id_filter is not None,
+            )
             return results
 
     async def get_collection_info(self) -> dict:

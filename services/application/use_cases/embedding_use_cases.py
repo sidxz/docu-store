@@ -16,7 +16,7 @@ from application.ports.repositories.artifact_read_models import ArtifactReadMode
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
 from application.ports.text_chunker import TextChunker
-from application.ports.vector_store import PageSearchResult, VectorStore
+from application.ports.vector_store import VectorStore
 from domain.exceptions import AggregateNotFoundError
 from domain.value_objects.embedding_metadata import EmbeddingMetadata
 
@@ -238,10 +238,10 @@ class SearchSimilarPagesUseCase:
                 text=request.query_text,
             )
 
-            # 2. Search vector store (request extra results to account for chunk dedup)
-            search_results = await self.vector_store.search_similar_pages(
+            # 2. Search with server-side dedup (group_by page_id)
+            search_results = await self.vector_store.search_pages_grouped(
                 query_embedding=query_embedding,
-                limit=request.limit * 3,  # Over-fetch to handle chunk dedup
+                limit=request.limit,
                 artifact_id_filter=request.artifact_id,
                 score_threshold=request.score_threshold,
                 allowed_artifact_ids=allowed_artifact_ids,
@@ -251,22 +251,9 @@ class SearchSimilarPagesUseCase:
                 tag_match_mode=request.tag_match_mode,
             )
 
-            # 3. Deduplicate by page_id (keep highest-scoring chunk per page)
-            best_by_page: dict[UUID, PageSearchResult] = {}
-            for result in search_results:
-                existing = best_by_page.get(result.page_id)
-                if existing is None or result.score > existing.score:
-                    best_by_page[result.page_id] = result
-
-            deduplicated_results = sorted(
-                best_by_page.values(),
-                key=lambda r: r.score,
-                reverse=True,
-            )[: request.limit]
-
-            # 4. Enrich results with read model data
+            # 3. Enrich results with read model data
             result_dtos = []
-            for result in deduplicated_results:
+            for result in search_results:
                 # Fetch page details for text preview
                 page = await self.page_read_model.get_page_by_id(result.page_id)
                 text_preview = None

@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from application.ports.repositories.artifact_read_models import ArtifactReadModel
     from application.ports.repositories.page_read_models import PageReadModel
     from application.ports.summary_vector_store import SummarySearchResult, SummaryVectorStore
-    from application.ports.vector_store import PageSearchResult, VectorStore
+    from application.ports.vector_store import VectorStore
 
 logger = structlog.get_logger()
 
@@ -286,10 +286,10 @@ class HierarchicalSearchUseCase:
         allowed_artifact_ids: list[UUID] | None,
         workspace_id: UUID | None,
     ) -> list[ChunkHit]:
-        """Query the raw chunk collection, deduplicate by page, enrich."""
-        raw_results: list[PageSearchResult] = await self.vector_store.search_similar_pages(
+        """Query the raw chunk collection with server-side dedup, then enrich."""
+        grouped_results = await self.vector_store.search_pages_grouped(
             query_embedding=query_embedding,
-            limit=request.limit * 3,
+            limit=request.limit,
             score_threshold=request.score_threshold,
             allowed_artifact_ids=allowed_artifact_ids,
             workspace_id=workspace_id,
@@ -298,21 +298,11 @@ class HierarchicalSearchUseCase:
             tag_match_mode=request.tag_match_mode,
         )
 
-        # Deduplicate: keep best chunk per page
-        best_by_page: dict[UUID, tuple[float, int]] = {}
-        for r in raw_results:
-            existing_score, _ = best_by_page.get(r.page_id, (-1.0, 0))
-            if r.score > existing_score:
-                best_by_page[r.page_id] = (r.score, r.page_index)
-
-        top_pages = sorted(best_by_page.items(), key=lambda x: x[1][0], reverse=True)[
-            : request.limit
-        ]
-
         chunk_hits: list[ChunkHit] = []
-        for page_id, (score, page_index) in top_pages:
-            artifact_id = next(r.artifact_id for r in raw_results if r.page_id == page_id)
-            chunk_hits.append(await self._enrich_chunk_hit(page_id, artifact_id, page_index, score))
+        for r in grouped_results:
+            chunk_hits.append(
+                await self._enrich_chunk_hit(r.page_id, r.artifact_id, r.page_index, r.score),
+            )
         return chunk_hits
 
     async def _enrich_chunk_hit(
