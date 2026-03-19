@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "primereact/button";
 import { Column } from "primereact/column";
 import { DataTable } from "primereact/datatable";
+import { IconField } from "primereact/iconfield";
+import { InputIcon } from "primereact/inputicon";
+import { InputText } from "primereact/inputtext";
 import { Message } from "primereact/message";
 import { SelectButton } from "primereact/selectbutton";
 import { Tag } from "primereact/tag";
@@ -56,6 +59,7 @@ export default function DocumentsPage() {
   const [selectedCategoryMeta, setSelectedCategoryMeta] = useState<TagCategoryDTO | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<TagFolderDTO | null>(null);
   const [dateParent, setDateParent] = useState<string | undefined>();
+  const [folderFilter, setFolderFilter] = useState("");
 
   // Queries
   const { data: artifacts, isLoading: tableLoading, error: tableError } = useArtifacts();
@@ -68,6 +72,14 @@ export default function DocumentsPage() {
     selectedCategory,
     selectedFolder?.tag_value ?? null,
   );
+
+  // Client-side folder filter
+  const filteredFolders = useMemo(() => {
+    const folders = foldersData?.folders;
+    if (!folders || !folderFilter.trim()) return folders;
+    const q = folderFilter.trim().toLowerCase();
+    return folders.filter((f) => f.display_name.toLowerCase().includes(q));
+  }, [foldersData?.folders, folderFilter]);
 
   // Auto-select first category when categories load
   useEffect(() => {
@@ -101,11 +113,12 @@ export default function DocumentsPage() {
     setSelectedCategoryMeta(meta);
     setSelectedFolder(null);
     setDateParent(undefined);
+    setFolderFilter("");
   };
 
   const handleSelectFolder = (folder: TagFolderDTO) => {
+    setFolderFilter("");
     if (folder.has_children) {
-      // Date year → drill into months
       setDateParent(folder.tag_value);
       setSelectedFolder(null);
     } else {
@@ -114,6 +127,7 @@ export default function DocumentsPage() {
   };
 
   const handleBreadcrumbNavigate = (level: "root" | "category" | "dateParent") => {
+    setFolderFilter("");
     if (level === "root") {
       setSelectedCategory(null);
       setSelectedCategoryMeta(null);
@@ -246,6 +260,19 @@ export default function DocumentsPage() {
             isLoading={categoriesLoading}
           />
 
+          {/* Folder filter */}
+          {showFolders && !foldersLoading && (foldersData?.folders?.length ?? 0) > 5 && (
+            <IconField iconPosition="left" className="max-w-xs">
+              <InputIcon className="pi pi-filter" />
+              <InputText
+                value={folderFilter}
+                onChange={(e) => setFolderFilter(e.target.value)}
+                placeholder="Filter folders..."
+                className="w-full"
+              />
+            </IconField>
+          )}
+
           {/* Folder grid or artifact list */}
           {showFolderArtifacts ? (
             <FolderArtifactList
@@ -255,7 +282,7 @@ export default function DocumentsPage() {
             />
           ) : showFolders ? (
             <FolderGrid
-              folders={foldersData?.folders}
+              folders={filteredFolders}
               onSelect={handleSelectFolder}
               isLoading={foldersLoading}
             />
