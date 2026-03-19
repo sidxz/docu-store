@@ -142,6 +142,13 @@ class Settings(BaseSettings):
         description="Overlapping characters between chunks. Typically 10-20% of chunk_size.",
     )
 
+    # GLiNER2 (structured extraction for document metadata)
+    gliner2_model_name: str = Field(
+        default="fastino/gliner2-large-v1",
+        validation_alias="GLINER2_MODEL_NAME",
+        description="GLiNER2 model for structured document metadata extraction.",
+    )
+
     # Artifact Summarization
     artifact_summarization_batch_size: int = Field(
         default=10,

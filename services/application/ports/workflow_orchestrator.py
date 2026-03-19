@@ -180,6 +180,24 @@ class WorkflowOrchestrator(Protocol):
         ...
 
     @abstractmethod
+    async def start_doc_metadata_extraction_workflow(
+        self,
+        artifact_id: UUID,
+        page_id: UUID,
+    ) -> None:
+        """Start the document metadata extraction workflow.
+
+        Extracts title, authors, and date from the first page of an artifact.
+        Uses ALLOW_DUPLICATE so re-triggering replaces prior results.
+
+        Args:
+            artifact_id: Unique identifier of the artifact.
+            page_id: Unique identifier of the first page (index 0).
+
+        """
+        ...
+
+    @abstractmethod
     async def get_page_workflow_statuses(
         self,
         page_id: UUID,

@@ -22,8 +22,10 @@ from application.ports.repositories.artifact_repository import ArtifactRepositor
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
 from application.ports.smiles_validator import SmilesValidator
+from application.ports.structured_extractor import StructuredExtractorPort
 from application.ports.summary_vector_store import SummaryVectorStore
 from application.ports.text_chunker import TextChunker
+from application.ports.title_extractor import TitleExtractorPort
 from application.ports.vector_store import VectorStore
 from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
@@ -33,11 +35,13 @@ from application.use_cases.artifact_use_cases import (
     CreateArtifactUseCase,
     DeleteArtifactUseCase,
     RemovePagesUseCase,
-    UpdateTagMentionsUseCase as UpdateArtifactTagMentionsUseCase,
     UpdateTitleMentionUseCase,
 )
 from application.use_cases.artifact_use_cases import (
     UpdateSummaryCandidateUseCase as UpdateArtifactSummaryCandidateUseCase,
+)
+from application.use_cases.artifact_use_cases import (
+    UpdateTagMentionsUseCase as UpdateArtifactTagMentionsUseCase,
 )
 from application.use_cases.blob_use_cases import UploadBlobUseCase
 from application.use_cases.compound_use_cases import ExtractCompoundMentionsUseCase
@@ -45,6 +49,7 @@ from application.use_cases.embedding_use_cases import (
     GeneratePageEmbeddingUseCase,
     SearchSimilarPagesUseCase,
 )
+from application.use_cases.extract_document_metadata_use_case import ExtractDocumentMetadataUseCase
 from application.use_cases.extract_page_entities_use_case import ExtractPageEntitiesUseCase
 from application.use_cases.page_use_cases import (
     AddCompoundMentionsUseCase,
@@ -80,6 +85,9 @@ from application.workflow_use_cases.trigger_artifact_tag_aggregation_use_case im
 from application.workflow_use_cases.trigger_compound_extraction_use_case import (
     TriggerCompoundExtractionUseCase,
 )
+from application.workflow_use_cases.trigger_doc_metadata_extraction_use_case import (
+    TriggerDocMetadataExtractionUseCase,
+)
 from application.workflow_use_cases.trigger_embedding_use_case import TriggerEmbeddingUseCase
 from application.workflow_use_cases.trigger_ner_extraction_use_case import (
     TriggerNERExtractionUseCase,
@@ -96,10 +104,12 @@ from application.workflow_use_cases.trigger_resource_registration_use_case impor
 from application.workflow_use_cases.trigger_smiles_embedding_use_case import (
     TriggerSmilesEmbeddingUseCase,
 )
+from domain.value_objects.author_mention import AuthorMention
 from domain.value_objects.blob_ref import BlobRef
 from domain.value_objects.compound_mention import CompoundMention
 from domain.value_objects.embedding_metadata import EmbeddingMetadata
 from domain.value_objects.extraction_metadata import ExtractionMetadata
+from domain.value_objects.presentation_date import PresentationDate
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.text_mention import TextMention
@@ -116,10 +126,12 @@ from infrastructure.event_sourced_repositories.artifact_repository import (
     EventSourcedArtifactRepository,
 )
 from infrastructure.event_sourced_repositories.page_repository import EventSourcedPageRepository
+from infrastructure.file_services.font_title_extractor import FontTitleExtractor
 from infrastructure.file_services.py_mu_pfd_service import PyMuPDFService
 from infrastructure.kafka.kafka_external_event_streamer import KafkaExternalEventPublisher
 from infrastructure.kafka.kafka_publisher import KafkaPublisher
 from infrastructure.llm.factory import create_llm_client, create_prompt_repository
+from infrastructure.ner.gliner2_extractor import GLiNER2Extractor
 from infrastructure.ner.structflo_ner_extractor import StructfloNERExtractor
 from infrastructure.permissions.sentinel_permission_registrar import SentinelPermissionRegistrar
 from infrastructure.read_repositories.mongo_read_model_materializer import (
@@ -146,7 +158,9 @@ class DocuStoreApplication(Application):
 
     def register_transcodings(self, transcoder: JSONTranscoder) -> None:  # type: ignore[name-defined]
         super().register_transcodings(transcoder)
+        transcoder.register(PydanticTranscoding(AuthorMention))
         transcoder.register(PydanticTranscoding(CompoundMention))
+        transcoder.register(PydanticTranscoding(PresentationDate))
         transcoder.register(PydanticTranscoding(TitleMention))
         transcoder.register(PydanticTranscoding(SummaryCandidate))
         transcoder.register(PydanticTranscoding(TagMention))
@@ -239,6 +253,14 @@ def create_container() -> Container:  # noqa: PLR0915
 
     # Register CSER Service
     container[CserService] = lambda c: CserPipelineService(blob_store=c[BlobStore])
+
+    # Register Title Extractor (font-based, PyMuPDF)
+    container[TitleExtractorPort] = lambda _: FontTitleExtractor()
+
+    # Register Structured Extractor (GLiNER2 — document metadata)
+    container[StructuredExtractorPort] = lambda _: GLiNER2Extractor(
+        model_name=settings.gliner2_model_name,
+    )
 
     # Register NER Extractor (dual-mode: fast + LLM, reuses configured LLM settings)
     container[NERExtractorPort] = lambda _: StructfloNERExtractor(
@@ -405,6 +427,22 @@ def create_container() -> Container:  # noqa: PLR0915
         external_event_publisher=c[ExternalEventPublisher],
     )
     container[TriggerNERExtractionUseCase] = lambda c: TriggerNERExtractionUseCase(
+        workflow_orchestrator=c[WorkflowOrchestrator],
+    )
+
+    # Document Metadata Extraction Use Cases
+    container[ExtractDocumentMetadataUseCase] = lambda c: ExtractDocumentMetadataUseCase(
+        page_repository=c[PageRepository],
+        artifact_repository=c[ArtifactRepository],
+        structured_extractor=c[StructuredExtractorPort],
+        llm_client=c[LLMClientPort],
+        prompt_repository=c[PromptRepositoryPort],
+        title_extractor=c[TitleExtractorPort],
+        blob_store=c[BlobStore],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[TriggerDocMetadataExtractionUseCase] = lambda c: TriggerDocMetadataExtractionUseCase(
+        page_repository=c[PageRepository],
         workflow_orchestrator=c[WorkflowOrchestrator],
     )
     container[TriggerArtifactTagAggregationUseCase] = (

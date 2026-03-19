@@ -4,7 +4,9 @@ from pydantic import BaseModel, Field
 
 from application.dtos.page_dtos import PageResponse
 from domain.value_objects.artifact_type import ArtifactType
+from domain.value_objects.author_mention import AuthorMention
 from domain.value_objects.mime_type import MimeType
+from domain.value_objects.presentation_date import PresentationDate
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.title_mention import TitleMention
@@ -46,6 +48,14 @@ class ArtifactResponse(BaseModel):
     tag_mentions: list[TagMention] = Field(
         default_factory=list,
         description="Structured tag mentions aggregated from all pages",
+    )
+    author_mentions: list[AuthorMention] = Field(
+        default_factory=list,
+        description="Author mentions extracted from the document",
+    )
+    presentation_date: PresentationDate | None = Field(
+        None,
+        description="Presentation or publication date extracted from the document",
     )
     summary_candidate: SummaryCandidate | None = Field(
         None,

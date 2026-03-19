@@ -12,7 +12,7 @@ import { ProgressSpinner } from "primereact/progressspinner";
 import { TabPanel, TabView } from "primereact/tabview";
 import { Tag } from "primereact/tag";
 import { Toast } from "primereact/toast";
-import { FileText, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { FileText, ArrowLeft, CheckCircle2, Users, Calendar } from "lucide-react";
 
 import type { components } from "@docu-store/api-client";
 import type { WorkflowMap } from "@docu-store/types";
@@ -220,6 +220,47 @@ export default function ArtifactDetailPage() {
                 </div>
               </div>
             </Card>
+
+            {/* Authors & Date */}
+            {(artifact.author_mentions?.length > 0 || artifact.presentation_date) && (
+              <Card>
+                <div className="space-y-3">
+                  {artifact.author_mentions?.length > 0 && (
+                    <div className="flex items-start gap-3">
+                      <Users className="mt-0.5 h-4 w-4 shrink-0 text-text-muted" />
+                      <div>
+                        <span className="text-xs font-medium text-text-muted">Authors</span>
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          {artifact.author_mentions.map((am, i) => (
+                            <span
+                              key={`${am.name}-${i}`}
+                              className="rounded-md border border-border-default bg-surface-elevated px-2 py-1 text-sm font-medium text-text-primary"
+                            >
+                              {am.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {artifact.presentation_date && (
+                    <div className="flex items-center gap-3">
+                      <Calendar className="h-4 w-4 shrink-0 text-text-muted" />
+                      <div>
+                        <span className="text-xs font-medium text-text-muted">Date</span>
+                        <p className="mt-1 text-sm font-medium text-text-primary">
+                          {new Date(artifact.presentation_date.date).toLocaleDateString(undefined, {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            )}
 
             {/* Tag Mentions — grouped by entity type */}
             {artifact.tag_mentions && artifact.tag_mentions.length > 0 && (() => {

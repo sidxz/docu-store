@@ -33,6 +33,9 @@ from application.workflow_use_cases.trigger_artifact_tag_aggregation_use_case im
 from application.workflow_use_cases.trigger_compound_extraction_use_case import (
     TriggerCompoundExtractionUseCase,
 )
+from application.workflow_use_cases.trigger_doc_metadata_extraction_use_case import (
+    TriggerDocMetadataExtractionUseCase,
+)
 from application.workflow_use_cases.trigger_embedding_use_case import TriggerEmbeddingUseCase
 from application.workflow_use_cases.trigger_ner_extraction_use_case import (
     TriggerNERExtractionUseCase,
@@ -85,6 +88,7 @@ async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0
     trigger_artifact_summary_embedding_use_case = container[TriggerArtifactSummaryEmbeddingUseCase]
     trigger_ner_extraction_use_case = container[TriggerNERExtractionUseCase]
     trigger_artifact_tag_aggregation_use_case = container[TriggerArtifactTagAggregationUseCase]
+    trigger_doc_metadata_extraction_use_case = container[TriggerDocMetadataExtractionUseCase]
 
     # Setup signal handlers
     def handle_signal(signum: int, _frame: object) -> None:
@@ -190,8 +194,13 @@ async def run(worker_name: str = "pipeline_worker") -> None:  # noqa: C901, PLR0
                                     page_id=domain_event.originator_id,
                                 )
 
+                                # Doc metadata extraction (title, authors, date) — only runs for page 0
+                                await trigger_doc_metadata_extraction_use_case.execute(
+                                    page_id=domain_event.originator_id,
+                                )
+
                                 logger.info(
-                                    "pipeline_embedding_and_ner_workflows_triggered",
+                                    "pipeline_embedding_ner_metadata_workflows_triggered",
                                     page_id=str(domain_event.originator_id),
                                     tracking_id=tracking.notification_id,
                                 )

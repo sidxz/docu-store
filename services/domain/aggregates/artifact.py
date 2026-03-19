@@ -4,7 +4,9 @@ from uuid import UUID
 from eventsourcing.domain import Aggregate, event
 
 from domain.value_objects.artifact_type import ArtifactType
+from domain.value_objects.author_mention import AuthorMention
 from domain.value_objects.mime_type import MimeType
+from domain.value_objects.presentation_date import PresentationDate
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.title_mention import TitleMention
@@ -91,6 +93,8 @@ class Artifact(Aggregate):
         self.title_mention: TitleMention | None = None
         self.summary_candidate: SummaryCandidate | None = None
         self.tag_mentions: list[TagMention] = []
+        self.author_mentions: list[AuthorMention] = []
+        self.presentation_date: PresentationDate | None = None
         self.is_deleted: bool = False
 
     def __hash__(self) -> int:
@@ -212,6 +216,38 @@ class Artifact(Aggregate):
     @event(TagMentionsUpdated)
     def _apply_tag_mentions_updated(self, tag_mentions: list[TagMention]) -> None:
         self.tag_mentions = tag_mentions
+
+    # ============================================================================
+    # COMMAND METHOD - Author Mentions Updated
+    # ============================================================================
+    class AuthorMentionsUpdated(Aggregate.Event):
+        author_mentions: list[AuthorMention]
+
+    def update_author_mentions(self, author_mentions: list[AuthorMention]) -> None:
+        if self.is_deleted:
+            msg = "Cannot update author mentions on a deleted artifact"
+            raise ValueError(msg)
+        self.trigger_event(self.AuthorMentionsUpdated, author_mentions=author_mentions)
+
+    @event(AuthorMentionsUpdated)
+    def _apply_author_mentions_updated(self, author_mentions: list[AuthorMention]) -> None:
+        self.author_mentions = author_mentions
+
+    # ============================================================================
+    # COMMAND METHOD - Presentation Date Updated
+    # ============================================================================
+    class PresentationDateUpdated(Aggregate.Event):
+        presentation_date: PresentationDate | None
+
+    def update_presentation_date(self, presentation_date: PresentationDate | None) -> None:
+        if self.is_deleted:
+            msg = "Cannot update presentation date on a deleted artifact"
+            raise ValueError(msg)
+        self.trigger_event(self.PresentationDateUpdated, presentation_date=presentation_date)
+
+    @event(PresentationDateUpdated)
+    def _apply_presentation_date_updated(self, presentation_date: PresentationDate | None) -> None:
+        self.presentation_date = presentation_date
 
     # ============================================================================
     # COMMAND METHOD - Delete Artifact

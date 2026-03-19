@@ -295,6 +295,39 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
                 error=str(e),
             )
 
+    async def start_doc_metadata_extraction_workflow(
+        self,
+        artifact_id: UUID,
+        page_id: UUID,
+    ) -> None:
+        """Start the document metadata extraction workflow."""
+        await self._ensure_client()
+
+        from temporalio.common import WorkflowIDReusePolicy  # noqa: PLC0415
+
+        workflow_id = f"doc-metadata-{artifact_id}"
+
+        try:
+            await self._client.start_workflow(
+                "DocumentMetadataExtractionWorkflow",
+                args=[str(artifact_id), str(page_id)],
+                id=workflow_id,
+                task_queue="artifact_processing",
+                id_reuse_policy=WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+            )
+            logger.info(
+                "doc_metadata_extraction_workflow_started",
+                artifact_id=str(artifact_id),
+                page_id=str(page_id),
+            )
+        except Exception as e:
+            logger.exception(
+                "failed_to_start_doc_metadata_extraction_workflow",
+                artifact_id=str(artifact_id),
+                page_id=str(page_id),
+                error=str(e),
+            )
+
     async def start_ner_extraction_workflow(self, page_id: UUID) -> None:
         """Start the NER entity extraction workflow for a page."""
         await self._ensure_client()
@@ -369,6 +402,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
             "artifact_processing": str(artifact_id),
             "artifact_summarization": f"artifact-summarization-{artifact_id}",
             "artifact_summary_embedding": f"artifact-summary-embedding-{artifact_id}",
+            "doc_metadata_extraction": f"doc-metadata-{artifact_id}",
         }
         return await self._query_workflow_statuses(workflow_ids)
 

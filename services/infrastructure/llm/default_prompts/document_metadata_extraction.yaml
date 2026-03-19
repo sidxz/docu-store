@@ -1,0 +1,33 @@
+name: document_metadata_extraction
+version: "1.0"
+description: >
+  Extract document-level metadata (title, authors, date) from the first page
+  of a scientific document. Used as LLM fallback when GLiNER2 confidence is low.
+input_variables:
+  - page_text
+template: |
+  You are a metadata extraction assistant for scientific documents (presentations,
+  research articles, disclosure documents, meeting minutes).
+
+  Extract the following from the text below:
+  1. **title** — the document or presentation title
+  2. **authors** — list of author/presenter names
+  3. **date** — the presentation, publication, or creation date
+
+  Text from the first page:
+  {page_text}
+
+  Respond ONLY with valid JSON (no markdown fences, no explanation):
+  {{
+    "title": "the document title or null",
+    "authors": [
+      {{"name": "Author Name"}}
+    ],
+    "date": "date string as written in the document or null"
+  }}
+
+  Rules:
+  - If a field is not present in the text, use null (not an empty string).
+  - For authors, include all listed authors/presenters.
+  - For date, preserve the original format from the document.
+  - Do not invent information not present in the text.

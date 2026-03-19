@@ -158,6 +158,19 @@ export default function DashboardPage() {
                             rounded
                             className="!text-xs !py-0"
                           />
+                          {artifact.author_mentions?.length > 0 && (
+                            <span className="truncate text-xs text-text-muted">
+                              {artifact.author_mentions.map((a) => a.name).join(", ")}
+                            </span>
+                          )}
+                          {artifact.presentation_date && (
+                            <span className="shrink-0 text-xs text-text-muted">
+                              {new Date(artifact.presentation_date.date).toLocaleDateString(undefined, {
+                                year: "numeric",
+                                month: "short",
+                              })}
+                            </span>
+                          )}
                           {pageCount > 0 && (
                             <span className="text-xs text-text-muted">
                               {pageCount} {pageCount === 1 ? "page" : "pages"}

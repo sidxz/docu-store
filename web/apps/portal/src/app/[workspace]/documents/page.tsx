@@ -53,6 +53,30 @@ export default function DocumentsPage() {
     <span className="text-text-secondary">{row.pages?.length ?? 0}</span>
   );
 
+  const authorsTemplate = (row: ArtifactResponse) => {
+    const authors = row.author_mentions;
+    if (!authors?.length) return <span className="text-text-muted">—</span>;
+    return (
+      <span className="text-sm text-text-secondary">
+        {authors.map((a) => a.name).join(", ")}
+      </span>
+    );
+  };
+
+  const dateTemplate = (row: ArtifactResponse) => {
+    const pd = row.presentation_date;
+    if (!pd) return <span className="text-text-muted">—</span>;
+    return (
+      <span className="text-sm text-text-secondary">
+        {new Date(pd.date).toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })}
+      </span>
+    );
+  };
+
   const tagsTemplate = (row: ArtifactResponse) => {
     const tms = row.tag_mentions;
     if (!tms?.length) return <span className="text-text-muted">—</span>;
@@ -128,6 +152,18 @@ export default function DocumentsPage() {
             sortable
             sortField="artifact_type"
             style={{ width: "180px" }}
+          />
+          <Column
+            header="Authors"
+            body={authorsTemplate}
+            style={{ width: "200px" }}
+          />
+          <Column
+            header="Date"
+            body={dateTemplate}
+            sortable
+            sortField="presentation_date.date"
+            style={{ width: "120px" }}
           />
           <Column
             header="Pages"

@@ -36,6 +36,15 @@ export interface CompoundMention extends ExtractionMetadata {
   extracted_id: string | null;  // Raw ID string as found in the source document
 }
 
+export interface AuthorMention extends ExtractionMetadata {
+  name: string;
+}
+
+export interface PresentationDate extends ExtractionMetadata {
+  date: string;
+  source: string | null;
+}
+
 export interface SummaryCandidate extends ExtractionMetadata {
   summary: string | null;
   is_locked: boolean;

@@ -24,6 +24,8 @@ class ArtifactMapper:
             pages=tuple(artifact.pages),
             title_mention=artifact.title_mention,
             tag_mentions=list(artifact.tag_mentions),
+            author_mentions=list(artifact.author_mentions),
+            presentation_date=artifact.presentation_date,
             summary_candidate=artifact.summary_candidate,
             workspace_id=artifact.workspace_id,
             owner_id=artifact.owner_id,

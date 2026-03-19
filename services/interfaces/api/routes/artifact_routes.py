@@ -23,8 +23,10 @@ from application.use_cases.artifact_use_cases import (
     DeleteArtifactUseCase,
     RemovePagesUseCase,
     UpdateSummaryCandidateUseCase,
-    UpdateTagMentionsUseCase as UpdateArtifactTagMentionsUseCase,
     UpdateTitleMentionUseCase,
+)
+from application.use_cases.artifact_use_cases import (
+    UpdateTagMentionsUseCase as UpdateArtifactTagMentionsUseCase,
 )
 from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.summary_candidate import SummaryCandidate
@@ -251,6 +253,39 @@ async def trigger_artifact_summarization(
     orchestrator = container[WorkflowOrchestrator]
     await orchestrator.start_artifact_summarization_workflow(artifact_id=artifact_id)
     return WorkflowStartedResponse(workflow_id=f"artifact-summarization-{artifact_id}")
+
+
+@router.post("/{artifact_id}/extract-metadata", status_code=status.HTTP_202_ACCEPTED)
+async def trigger_doc_metadata_extraction(
+    artifact_id: UUID,
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> WorkflowStartedResponse:
+    """Trigger document metadata extraction for an artifact (non-blocking).
+
+    Starts the GLiNER2 + LLM extraction workflow for title, authors, and date.
+    Uses the first page (index 0) of the artifact. Useful for re-running after
+    manual corrections or when automated extraction missed fields.
+    """
+    artifact = await require_workspace_artifact(artifact_id, auth, container)
+    await require_artifact_permission(artifact_id, auth, "edit")
+
+    if not artifact.pages:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Artifact has no pages",
+        )
+
+    # Pages are resolved to PageResponse objects by the read model
+    first_page = artifact.pages[0]
+    page_id = first_page.page_id if hasattr(first_page, "page_id") else UUID(str(first_page))
+
+    orchestrator = container[WorkflowOrchestrator]
+    await orchestrator.start_doc_metadata_extraction_workflow(
+        artifact_id=artifact_id,
+        page_id=page_id,
+    )
+    return WorkflowStartedResponse(workflow_id=f"doc-metadata-{artifact_id}")
 
 
 @router.get("/{artifact_id}/summary", status_code=status.HTTP_200_OK)

@@ -38,6 +38,7 @@ export function useArtifact(id: string) {
 /** Artifact workflow keys (from backend) that have rerun API endpoints. */
 export const RERUNNABLE_ARTIFACT_WORKFLOWS = new Set([
   "artifact_summarization",
+  "doc_metadata_extraction",
 ]);
 
 export function useArtifactWorkflows(id: string) {
@@ -171,6 +172,21 @@ export function useRerunArtifactWorkflow(artifactId: string) {
         case "artifact_summarization": {
           const { data, error } = await apiClient.POST(
             "/artifacts/{artifact_id}/summarize",
+            { params: { path: { artifact_id: artifactId } } },
+          );
+          if (error) throw new Error(`Failed to rerun ${workflowName}`);
+
+          if (process.env.NODE_ENV === "development") {
+            console.log(
+              `[docu-store] ✓ ${workflowName} rerun accepted:`,
+              data,
+            );
+          }
+          return data;
+        }
+        case "doc_metadata_extraction": {
+          const { data, error } = await apiClient.POST(
+            "/artifacts/{artifact_id}/extract-metadata",
             { params: { path: { artifact_id: artifactId } } },
           );
           if (error) throw new Error(`Failed to rerun ${workflowName}`);
