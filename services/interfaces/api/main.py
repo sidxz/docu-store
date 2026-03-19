@@ -80,7 +80,13 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS middleware
+    # Sentinel auth middleware — protects all routes except excluded paths
+    # NOTE: Starlette middleware is LIFO — last added runs first.
+    # Sentinel must be added BEFORE CORS so that CORS runs first and adds
+    # Access-Control-Allow-* headers to ALL responses, including 401s.
+    sentinel.protect(app, exclude_paths=["/health", "/docs", "/openapi.json", "/search/health"])
+
+    # CORS middleware — added last so it runs first (wraps everything, including auth errors)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],  # Configure properly for production
@@ -88,9 +94,6 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
-    # Sentinel auth middleware — protects all routes except excluded paths
-    sentinel.protect(app, exclude_paths=["/health", "/docs", "/openapi.json", "/search/health"])
 
     # Include routers
     app.include_router(artifact_router)

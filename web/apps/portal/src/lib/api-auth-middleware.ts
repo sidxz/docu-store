@@ -10,4 +10,24 @@ export const authMiddleware: Middleware = {
     }
     return request;
   },
+  async onResponse({ response, request }) {
+    if (response.status === 401) {
+      const client = getAuthzClient();
+      const refreshed = await client.refresh();
+      if (refreshed) {
+        // Retry the original request with fresh tokens
+        const headers = client.getHeaders();
+        const retryInit: RequestInit = {
+          method: request.method,
+          headers: new Headers(request.headers),
+          body: request.bodyUsed ? undefined : await request.clone().text() || undefined,
+        };
+        for (const [key, value] of Object.entries(headers)) {
+          (retryInit.headers as Headers).set(key, value);
+        }
+        return fetch(request.url, retryInit);
+      }
+    }
+    return response;
+  },
 };
