@@ -1,4 +1,4 @@
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, LayoutGrid } from "lucide-react";
 
 interface BrowseBreadcrumbProps {
   category?: { entity_type: string; display_name: string } | null;
@@ -13,59 +13,52 @@ export function BrowseBreadcrumb({
   dateParent,
   onNavigate,
 }: BrowseBreadcrumbProps) {
+  if (!category) return null;
+
   return (
-    <nav className="flex items-center gap-1 text-sm">
+    <nav className="flex items-center gap-1 text-xs">
       <button
         onClick={() => onNavigate("root")}
-        className={`cursor-pointer rounded px-1.5 py-0.5 transition-colors ${
-          !category
-            ? "font-semibold text-text-primary"
-            : "text-text-secondary hover:text-accent-text"
-        }`}
+        className="inline-flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-text-muted transition-colors hover:text-accent-text"
       >
-        All Categories
+        <LayoutGrid className="h-3 w-3" />
+        All
       </button>
 
-      {category && (
-        <>
-          <ChevronRight className="h-3.5 w-3.5 text-text-muted" />
-          <button
-            onClick={() => onNavigate("category")}
-            className={`cursor-pointer rounded px-1.5 py-0.5 transition-colors ${
-              !folder && !dateParent
-                ? "font-semibold text-text-primary"
-                : "text-text-secondary hover:text-accent-text"
-            }`}
-          >
-            {category.display_name}
-          </button>
-        </>
-      )}
+      <ChevronRight className="h-3 w-3 text-text-muted/50" />
+      <button
+        onClick={() => onNavigate("category")}
+        className={`cursor-pointer rounded px-1.5 py-0.5 transition-colors ${
+          !folder && !dateParent
+            ? "font-medium text-text-primary"
+            : "text-text-muted hover:text-accent-text"
+        }`}
+      >
+        {category.display_name}
+      </button>
 
-      {dateParent && !folder && (
+      {dateParent && (
         <>
-          <ChevronRight className="h-3.5 w-3.5 text-text-muted" />
-          <span className="px-1.5 py-0.5 font-semibold text-text-primary">
-            {dateParent}
-          </span>
+          <ChevronRight className="h-3 w-3 text-text-muted/50" />
+          {folder ? (
+            <button
+              onClick={() => onNavigate("dateParent")}
+              className="cursor-pointer rounded px-1.5 py-0.5 text-text-muted transition-colors hover:text-accent-text"
+            >
+              {dateParent}
+            </button>
+          ) : (
+            <span className="px-1.5 py-0.5 font-medium text-text-primary">
+              {dateParent}
+            </span>
+          )}
         </>
       )}
 
       {folder && (
         <>
-          {dateParent && (
-            <>
-              <ChevronRight className="h-3.5 w-3.5 text-text-muted" />
-              <button
-                onClick={() => onNavigate("dateParent")}
-                className="cursor-pointer rounded px-1.5 py-0.5 text-text-secondary transition-colors hover:text-accent-text"
-              >
-                {dateParent}
-              </button>
-            </>
-          )}
-          <ChevronRight className="h-3.5 w-3.5 text-text-muted" />
-          <span className="px-1.5 py-0.5 font-semibold text-text-primary">
+          <ChevronRight className="h-3 w-3 text-text-muted/50" />
+          <span className="px-1.5 py-0.5 font-medium text-text-primary">
             {folder.display_name}
           </span>
         </>

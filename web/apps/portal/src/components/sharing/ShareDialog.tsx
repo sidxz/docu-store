@@ -222,7 +222,6 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
         onClick={() => setVisible(true)}
         outlined
         severity="secondary"
-        size="small"
       />
 
       <Dialog
@@ -351,7 +350,6 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
                     onClick={handleShare}
                     disabled={!hasSelection || shareMutation.isPending}
                     loading={shareMutation.isPending}
-                    size="small"
                   />
                 </div>
               </div>
@@ -446,7 +444,6 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
                             severity="danger"
                             text
                             rounded
-                            size="small"
                             aria-label="Revoke access"
                             tooltip="Revoke access"
                             tooltipOptions={{ position: "top" }}

@@ -169,7 +169,6 @@ export default function PageViewerPage() {
           onClick={() => router.push(`/${workspace}/documents/${id}`)}
           text
           severity="secondary"
-          size="small"
           className="mt-4"
         />
       </div>
@@ -192,7 +191,6 @@ export default function PageViewerPage() {
         onClick={() => router.push(`/${workspace}/documents/${id}`)}
         text
         severity="secondary"
-        size="small"
         className="mb-4"
       />
 
@@ -214,7 +212,6 @@ export default function PageViewerPage() {
               }
               outlined
               severity="secondary"
-              size="small"
             />
             <Button
               label="Next"
@@ -229,7 +226,6 @@ export default function PageViewerPage() {
               }
               outlined
               severity="secondary"
-              size="small"
             />
           </div>
         }
@@ -497,11 +493,9 @@ export default function PageViewerPage() {
                       disabled={rerunMutation.isPending}
                       text
                       severity="secondary"
-                      size="small"
                       rounded
                       tooltip="Rerun"
                       tooltipOptions={{ position: "top" }}
-                      className="!p-1"
                     />
                   )}
               </div>

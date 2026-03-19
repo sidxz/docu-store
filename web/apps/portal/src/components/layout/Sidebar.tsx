@@ -106,12 +106,12 @@ export function Sidebar({ workspaceSlug }: { workspaceSlug: string }) {
           onClick={toggleTheme}
           title={collapsed ? (theme === "light" ? "Dark mode" : "Light mode") : undefined}
           aria-label={theme === "light" ? "Dark mode" : "Light mode"}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-text transition-all duration-200 hover:bg-white/[0.04] hover:text-white"
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-text transition-all duration-200 hover:bg-sidebar-hover hover:text-white"
         >
           {theme === "light" ? (
-            <Moon className="h-[18px] w-[18px] shrink-0" />
+            <Moon className="size-[1.125rem] shrink-0" />
           ) : (
-            <Sun className="h-[18px] w-[18px] shrink-0" />
+            <Sun className="size-[1.125rem] shrink-0" />
           )}
           {!collapsed && (
             <span>{theme === "light" ? "Dark mode" : "Light mode"}</span>
@@ -124,12 +124,12 @@ export function Sidebar({ workspaceSlug }: { workspaceSlug: string }) {
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-expanded={!collapsed}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-text transition-all duration-200 hover:bg-white/[0.04] hover:text-white"
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-text transition-all duration-200 hover:bg-sidebar-hover hover:text-white"
         >
           {collapsed ? (
-            <PanelLeftOpen className="h-[18px] w-[18px] shrink-0" />
+            <PanelLeftOpen className="size-[1.125rem] shrink-0" />
           ) : (
-            <PanelLeftClose className="h-[18px] w-[18px] shrink-0" />
+            <PanelLeftClose className="size-[1.125rem] shrink-0" />
           )}
           {!collapsed && <span>Collapse</span>}
         </button>

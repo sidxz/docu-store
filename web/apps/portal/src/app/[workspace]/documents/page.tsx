@@ -10,9 +10,8 @@ import { IconField } from "primereact/iconfield";
 import { InputIcon } from "primereact/inputicon";
 import { InputText } from "primereact/inputtext";
 import { Message } from "primereact/message";
-import { SelectButton } from "primereact/selectbutton";
 import { Tag } from "primereact/tag";
-import { FileText } from "lucide-react";
+import { FileText, Grid3X3, List } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import type { components } from "@docu-store/api-client";
@@ -21,6 +20,8 @@ import { useArtifacts } from "@/hooks/use-artifacts";
 import { useTagCategories, useTagFolders, useFolderArtifacts } from "@/hooks/use-browse";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ViewToggle } from "@/components/ui/ViewToggle";
+import { LinkButton } from "@/components/ui/LinkButton";
 import { CategoryBar } from "@/components/browse/CategoryBar";
 import { FolderGrid } from "@/components/browse/FolderGrid";
 import { FolderArtifactList } from "@/components/browse/FolderArtifactList";
@@ -33,8 +34,8 @@ type ArtifactResponse = components["schemas"]["ArtifactResponse"];
 type ViewMode = "browse" | "table";
 
 const VIEW_MODES = [
-  { label: "Browse", value: "browse" as ViewMode },
-  { label: "Table", value: "table" as ViewMode },
+  { value: "browse" as ViewMode, icon: Grid3X3, label: "Browse by category" },
+  { value: "table" as ViewMode, icon: List, label: "Table view" },
 ];
 
 const ARTIFACT_TYPE_LABELS: Record<string, string> = {
@@ -51,19 +52,30 @@ export default function DocumentsPage() {
   const { workspace } = useParams<{ workspace: string }>();
   const queryClient = useQueryClient();
 
-  // View mode
   const [viewMode, setViewMode] = useState<ViewMode>("browse");
-
-  // Browse state
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedCategoryMeta, setSelectedCategoryMeta] = useState<TagCategoryDTO | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<TagFolderDTO | null>(null);
   const [dateParent, setDateParent] = useState<string | undefined>();
   const [folderFilter, setFolderFilter] = useState("");
 
-  // Queries
   const { data: artifacts, isLoading: tableLoading, error: tableError } = useArtifacts();
-  const { data: categoriesData, isLoading: categoriesLoading } = useTagCategories();
+  const { data: rawCategoriesData, isLoading: categoriesLoading } = useTagCategories();
+
+  // Ensure "target" category is always visible even if the API doesn't return it
+  const categoriesData = useMemo(() => {
+    if (!rawCategoriesData) return rawCategoriesData;
+    const cats = rawCategoriesData.categories;
+    const hasTarget = cats.some((c) => c.entity_type === "target");
+    if (hasTarget) return rawCategoriesData;
+    return {
+      ...rawCategoriesData,
+      categories: [
+        ...cats,
+        { entity_type: "target", display_name: "Target", artifact_count: 0, distinct_count: 0 },
+      ],
+    };
+  }, [rawCategoriesData]);
   const { data: foldersData, isLoading: foldersLoading } = useTagFolders(
     selectedCategory,
     dateParent,
@@ -73,7 +85,6 @@ export default function DocumentsPage() {
     selectedFolder?.tag_value ?? null,
   );
 
-  // Client-side folder filter
   const filteredFolders = useMemo(() => {
     const folders = foldersData?.folders;
     if (!folders || !folderFilter.trim()) return folders;
@@ -81,7 +92,6 @@ export default function DocumentsPage() {
     return folders.filter((f) => f.display_name.toLowerCase().includes(q));
   }, [foldersData?.folders, folderFilter]);
 
-  // Auto-select first category when categories load
   useEffect(() => {
     if (categoriesData?.categories?.length && !selectedCategory) {
       const first = categoriesData.categories[0];
@@ -90,7 +100,6 @@ export default function DocumentsPage() {
     }
   }, [categoriesData, selectedCategory]);
 
-  // Prefetch folders on category hover
   const handleCategoryHover = (entityType: string) => {
     queryClient.prefetchQuery({
       queryKey: queryKeys.browse.folders(entityType),
@@ -141,7 +150,7 @@ export default function DocumentsPage() {
     }
   };
 
-  // ── Table templates (reused from original) ──
+  // ── Table templates ──
   const titleTemplate = (row: ArtifactResponse) => {
     const title = row.title_mention?.title ?? row.source_filename ?? "Untitled";
     return (
@@ -160,15 +169,15 @@ export default function DocumentsPage() {
   };
 
   const pagesTemplate = (row: ArtifactResponse) => (
-    <span className="text-text-secondary">{row.pages?.length ?? 0}</span>
+    <span className="tabular-nums text-text-secondary">{row.pages?.length ?? 0}</span>
   );
 
   const authorsTemplate = (row: ArtifactResponse) => {
     const authors = row.author_mentions;
     if (!authors?.length) return <span className="text-text-muted">—</span>;
     return (
-      <span className="text-sm text-text-secondary">
-        {authors.map((a) => a.name).join(", ")}
+      <span className="text-text-secondary">
+        {authors.map((a: { name: string }) => a.name).join(", ")}
       </span>
     );
   };
@@ -177,7 +186,7 @@ export default function DocumentsPage() {
     const pd = row.presentation_date;
     if (!pd) return <span className="text-text-muted">—</span>;
     return (
-      <span className="text-sm text-text-secondary">
+      <span className="tabular-nums text-text-secondary">
         {new Date(pd.date).toLocaleDateString(undefined, {
           year: "numeric",
           month: "short",
@@ -192,7 +201,7 @@ export default function DocumentsPage() {
     if (!tms?.length) return <span className="text-text-muted">—</span>;
     return (
       <div className="flex flex-wrap gap-1">
-        {tms.slice(0, 3).map((tm, i) => (
+        {tms.slice(0, 3).map((tm: { tag: string }, i: number) => (
           <Tag key={`${tm.tag}-${i}`} value={tm.tag} severity="secondary" rounded />
         ))}
         {tms.length > 3 && (
@@ -203,8 +212,6 @@ export default function DocumentsPage() {
   };
 
   const isEmpty = !tableLoading && (!artifacts || artifacts.length === 0) && !tableError;
-
-  // Determine current browse depth
   const showFolderArtifacts = !!selectedFolder;
   const showFolders = !!selectedCategory && !showFolderArtifacts;
 
@@ -215,17 +222,9 @@ export default function DocumentsPage() {
         title="Documents"
         subtitle="Manage your uploaded documents"
         actions={
-          <div className="flex items-center gap-3">
-            <SelectButton
-              value={viewMode}
-              options={VIEW_MODES}
-              onChange={(e) => {
-                if (e.value) setViewMode(e.value);
-              }}
-            />
-            <Link href={`/${workspace}/documents/upload`}>
-              <Button label="Upload" icon="pi pi-upload" />
-            </Link>
+          <div className="flex items-center gap-2">
+            <ViewToggle value={viewMode} options={VIEW_MODES} onChange={setViewMode} />
+            <LinkButton href={`/${workspace}/documents/upload`} label="Upload" icon="pi pi-upload" />
           </div>
         }
       />
@@ -240,40 +239,47 @@ export default function DocumentsPage() {
       )}
 
       {viewMode === "browse" ? (
-        <div className="space-y-5">
-          {/* Breadcrumb */}
-          {selectedCategory && (
-            <BrowseBreadcrumb
-              category={selectedCategoryMeta}
-              folder={selectedFolder}
-              dateParent={dateParent}
-              onNavigate={handleBreadcrumbNavigate}
+        <div className="space-y-4">
+          <div className="space-y-3">
+            <CategoryBar
+              categories={categoriesData?.categories}
+              selected={selectedCategory}
+              onSelect={handleSelectCategory}
+              onHover={handleCategoryHover}
+              isLoading={categoriesLoading}
             />
-          )}
 
-          {/* Category bar */}
-          <CategoryBar
-            categories={categoriesData?.categories}
-            selected={selectedCategory}
-            onSelect={handleSelectCategory}
-            onHover={handleCategoryHover}
-            isLoading={categoriesLoading}
-          />
+            {showFolders && (
+              <div className="flex items-center justify-between gap-4">
+                <BrowseBreadcrumb
+                  category={selectedCategoryMeta}
+                  folder={selectedFolder}
+                  dateParent={dateParent}
+                  onNavigate={handleBreadcrumbNavigate}
+                />
+                {!foldersLoading && (foldersData?.folders?.length ?? 0) > 5 && (
+                  <IconField iconPosition="left" className="w-48 shrink-0">
+                    <InputIcon className="pi pi-search" />
+                    <InputText
+                      value={folderFilter}
+                      onChange={(e) => setFolderFilter(e.target.value)}
+                      placeholder="Filter..."
+                    />
+                  </IconField>
+                )}
+              </div>
+            )}
 
-          {/* Folder filter */}
-          {showFolders && !foldersLoading && (foldersData?.folders?.length ?? 0) > 5 && (
-            <IconField iconPosition="left" className="max-w-xs">
-              <InputIcon className="pi pi-filter" />
-              <InputText
-                value={folderFilter}
-                onChange={(e) => setFolderFilter(e.target.value)}
-                placeholder="Filter folders..."
-                className="w-full"
+            {showFolderArtifacts && (
+              <BrowseBreadcrumb
+                category={selectedCategoryMeta}
+                folder={selectedFolder}
+                dateParent={dateParent}
+                onNavigate={handleBreadcrumbNavigate}
               />
-            </IconField>
-          )}
+            )}
+          </div>
 
-          {/* Folder grid or artifact list */}
           {showFolderArtifacts ? (
             <FolderArtifactList
               artifacts={folderArtifacts}
@@ -285,6 +291,7 @@ export default function DocumentsPage() {
               folders={filteredFolders}
               onSelect={handleSelectFolder}
               isLoading={foldersLoading}
+              entityType={selectedCategory ?? undefined}
             />
           ) : (
             !categoriesLoading && (
@@ -302,9 +309,11 @@ export default function DocumentsPage() {
           title="No documents yet"
           description="Upload your first document to start extracting insights."
           action={
-            <Link href={`/${workspace}/documents/upload`}>
-              <Button label="Upload Document" icon="pi pi-upload" />
-            </Link>
+            <LinkButton
+              href={`/${workspace}/documents/upload`}
+              label="Upload Document"
+              icon="pi pi-upload"
+            />
           }
         />
       ) : (
@@ -320,36 +329,11 @@ export default function DocumentsPage() {
           className="rounded-xl border border-border-default"
           rowHover
         >
-          <Column
-            header="Title"
-            body={titleTemplate}
-            sortable
-            sortField="source_filename"
-          />
-          <Column
-            header="Type"
-            body={typeTemplate}
-            sortable
-            sortField="artifact_type"
-            style={{ width: "180px" }}
-          />
-          <Column
-            header="Authors"
-            body={authorsTemplate}
-            style={{ width: "200px" }}
-          />
-          <Column
-            header="Date"
-            body={dateTemplate}
-            sortable
-            sortField="presentation_date.date"
-            style={{ width: "120px" }}
-          />
-          <Column
-            header="Pages"
-            body={pagesTemplate}
-            style={{ width: "80px" }}
-          />
+          <Column header="Title" body={titleTemplate} sortable sortField="source_filename" />
+          <Column header="Type" body={typeTemplate} sortable sortField="artifact_type" style={{ width: "180px" }} />
+          <Column header="Authors" body={authorsTemplate} style={{ width: "200px" }} />
+          <Column header="Date" body={dateTemplate} sortable sortField="presentation_date.date" style={{ width: "120px" }} />
+          <Column header="Pages" body={pagesTemplate} style={{ width: "80px" }} />
           <Column header="Tags" body={tagsTemplate} style={{ width: "200px" }} />
         </DataTable>
       )}

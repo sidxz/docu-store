@@ -59,7 +59,6 @@ export default function UploadPage() {
         onClick={() => router.push(`/${workspace}/documents`)}
         text
         severity="secondary"
-        size="small"
         className="mb-4"
       />
 

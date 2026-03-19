@@ -5,6 +5,7 @@ interface PageHeaderProps {
   icon?: LucideIcon;
   title: string;
   subtitle?: string;
+  badge?: ReactNode;
   actions?: ReactNode;
 }
 
@@ -12,6 +13,7 @@ export function PageHeader({
   icon: Icon,
   title,
   subtitle,
+  badge,
   actions,
 }: PageHeaderProps) {
   return (
@@ -23,7 +25,10 @@ export function PageHeader({
           </div>
         )}
         <div>
-          <h1 className="text-2xl font-semibold text-text-primary">{title}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold text-text-primary">{title}</h1>
+            {badge}
+          </div>
           {subtitle && (
             <p className="mt-0.5 text-sm text-text-secondary">{subtitle}</p>
           )}

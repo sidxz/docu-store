@@ -1,4 +1,3 @@
-import { Tag } from "primereact/tag";
 import { Skeleton } from "primereact/skeleton";
 import type { TagCategoryDTO } from "@docu-store/types";
 
@@ -21,7 +20,7 @@ export function CategoryBar({
     return (
       <div className="flex gap-2">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} width="6rem" height="2.25rem" borderRadius="9999px" />
+          <Skeleton key={i} width="7rem" height="2rem" borderRadius="0.5rem" />
         ))}
       </div>
     );
@@ -30,7 +29,7 @@ export function CategoryBar({
   if (!categories?.length) return null;
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-1.5">
       {categories.map((cat) => {
         const isActive = selected === cat.entity_type;
         return (
@@ -38,19 +37,22 @@ export function CategoryBar({
             key={cat.entity_type}
             onClick={() => onSelect(cat.entity_type)}
             onMouseEnter={() => onHover?.(cat.entity_type)}
-            className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
+            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all duration-150 ${
               isActive
-                ? "border-accent-text bg-accent-light text-accent-text"
-                : "border-border-default bg-surface-elevated text-text-secondary hover:border-accent-text/40 hover:text-text-primary"
+                ? "border-accent bg-accent text-white shadow-ds-sm"
+                : "border-border-default bg-surface-elevated text-text-secondary hover:border-border-default/80 hover:bg-surface-sunken hover:text-text-primary"
             }`}
           >
             {cat.display_name}
-            <Tag
-              value={String(cat.artifact_count)}
-              severity={isActive ? "info" : "secondary"}
-              rounded
-              className="!px-1.5 !py-0 !text-xs"
-            />
+            <span
+              className={`tabular-nums ${
+                isActive
+                  ? "text-white/70"
+                  : "text-text-muted"
+              }`}
+            >
+              {cat.artifact_count}
+            </span>
           </button>
         );
       })}

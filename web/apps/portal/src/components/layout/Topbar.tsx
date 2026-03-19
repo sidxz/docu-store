@@ -78,7 +78,6 @@ export function Topbar() {
           onClick={() => setDefaultScope(defaultScope === "workspace" ? "private" : "workspace")}
           severity="secondary"
           text
-          size="small"
           aria-label={`Default visibility: ${defaultScope}. Click to switch.`}
           tooltip="Default visibility for new documents"
           tooltipOptions={{ position: "bottom" }}
@@ -91,7 +90,6 @@ export function Topbar() {
           severity="secondary"
           text
           rounded
-          size="small"
           aria-label={theme === "light" ? "Dark mode" : "Light mode"}
           tooltip={theme === "light" ? "Dark mode" : "Light mode"}
           tooltipOptions={{ position: "bottom" }}
@@ -121,7 +119,6 @@ export function Topbar() {
             severity="secondary"
             text
             rounded
-            size="small"
             aria-label="Sign out"
             tooltip="Sign out"
             tooltipOptions={{ position: "bottom" }}

@@ -3,6 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
+import {
+  Search,
+  Loader2,
+  AlignLeft,
+  ArrowRight,
+  FileText,
+  BookOpen,
+} from "lucide-react";
 import { ProgressSpinner } from "primereact/progressspinner";
 import { Tag } from "primereact/tag";
 import { useHierarchicalSearch } from "@/hooks/use-search";
@@ -123,7 +131,7 @@ export function SearchCommand() {
           onClick={() => setOpen(true)}
           className="flex items-center gap-2 rounded-full border border-border-default bg-surface-sunken px-4 py-1.5 text-sm text-text-muted transition-all hover:border-accent/40 hover:text-text-secondary hover:shadow-ds-sm"
         >
-          <i className="pi pi-search text-xs" />
+          <Search className="size-3.5" />
           <span>Search...</span>
           <kbd className="ml-1 rounded border border-border-default bg-surface px-1.5 py-0.5 text-xs font-medium text-text-muted">
             {"\u2318"}K
@@ -140,9 +148,9 @@ export function SearchCommand() {
             aria-label="Search"
           >
             {search.isPending ? (
-              <i className="pi pi-spin pi-spinner text-sm" />
+              <Loader2 className="size-4 animate-spin" />
             ) : (
-              <i className="pi pi-search text-sm" />
+              <Search className="size-4" />
             )}
           </button>
           <input
@@ -208,7 +216,11 @@ export function SearchCommand() {
                       className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-surface-sunken"
                     >
                       <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-light">
-                        <i className={`pi ${h.entity_type === "artifact" ? "pi-file" : "pi-book"} text-xs text-accent-text`} />
+                        {h.entity_type === "artifact" ? (
+                          <FileText className="size-3.5 text-accent-text" />
+                        ) : (
+                          <BookOpen className="size-3.5 text-accent-text" />
+                        )}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
@@ -231,7 +243,7 @@ export function SearchCommand() {
                         value={h.entity_type}
                         severity={h.entity_type === "artifact" ? "info" : "secondary"}
                         rounded
-                        className="!text-xs !py-0 shrink-0"
+                        className="shrink-0"
                       />
                     </Link>
                   ))}
@@ -254,7 +266,7 @@ export function SearchCommand() {
                       className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-surface-sunken"
                     >
                       <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-border-subtle">
-                        <i className="pi pi-align-left text-xs text-text-muted" />
+                        <AlignLeft className="size-3.5 text-text-muted" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
@@ -283,7 +295,7 @@ export function SearchCommand() {
                   className="flex w-full items-center justify-center gap-1.5 text-xs font-medium text-accent-text transition-colors hover:text-accent-hover"
                 >
                   View all results
-                  <i className="pi pi-arrow-right text-xs" />
+                  <ArrowRight className="size-3" />
                 </button>
               </div>
             </div>
@@ -295,7 +307,7 @@ export function SearchCommand() {
             (search.data.summary_hits?.length ?? 0) === 0 &&
             (search.data.chunk_hits?.length ?? 0) === 0 && (
               <div className="px-4 py-8 text-center">
-                <i className="pi pi-search text-2xl text-text-muted" />
+                <Search className="size-8 text-text-muted" />
                 <p className="mt-2 text-sm text-text-muted">
                   No results found for &ldquo;{query}&rdquo;
                 </p>

@@ -5,17 +5,17 @@ interface ScoreBadgeProps {
 }
 
 function getScoreColor(score: number): string {
-  if (score >= 0.8) return "bg-emerald-500";
-  if (score >= 0.6) return "bg-teal-500";
-  if (score >= 0.4) return "bg-amber-500";
-  return "bg-red-400";
+  if (score >= 0.8) return "bg-score-excellent";
+  if (score >= 0.6) return "bg-score-good";
+  if (score >= 0.4) return "bg-score-fair";
+  return "bg-score-poor";
 }
 
 function getScoreTextColor(score: number): string {
-  if (score >= 0.8) return "text-emerald-700 dark:text-emerald-400";
-  if (score >= 0.6) return "text-teal-700 dark:text-teal-400";
-  if (score >= 0.4) return "text-amber-700 dark:text-amber-400";
-  return "text-red-700 dark:text-red-400";
+  if (score >= 0.8) return "text-score-excellent";
+  if (score >= 0.6) return "text-score-good";
+  if (score >= 0.4) return "text-score-fair";
+  return "text-score-poor";
 }
 
 export function ScoreBadge({

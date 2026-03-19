@@ -1,4 +1,8 @@
 /*
+ * DESIGN SYSTEM: Tailwind v4 is the sole utility CSS framework.
+ * PrimeFlex is NOT used. All layout/spacing/color utilities come from
+ * Tailwind + the --ds-* token system below.
+ *
  * CSS Layer ordering — critical for PrimeReact + Tailwind coexistence.
  *
  * Order (lowest → highest specificity):
@@ -63,6 +67,16 @@
   --ds-error: #dc2626;
   --ds-info: #3b82f6;
 
+  /* Score severity — for ScoreBadge and similar */
+  --ds-score-excellent: #16a34a;
+  --ds-score-good: #0d9488;
+  --ds-score-fair: #d97706;
+  --ds-score-poor: #ef4444;
+
+  /* Feature accent colors */
+  --ds-feature-search: #8b5cf6;
+  --ds-feature-compounds: #16a34a;
+
   /* Shadows */
   --ds-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --ds-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
@@ -98,6 +112,16 @@
   --ds-warning: #f59e0b;
   --ds-error: #ef4444;
   --ds-info: #60a5fa;
+
+  /* Score severity */
+  --ds-score-excellent: #22c55e;
+  --ds-score-good: #2dd4bf;
+  --ds-score-fair: #f59e0b;
+  --ds-score-poor: #f87171;
+
+  /* Feature accent colors */
+  --ds-feature-search: #a78bfa;
+  --ds-feature-compounds: #22c55e;
 
   /* Shadows */
   --ds-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
@@ -141,6 +165,14 @@
   --color-ds-warning: var(--ds-warning);
   --color-ds-error: var(--ds-error);
   --color-ds-info: var(--ds-info);
+
+  --color-score-excellent: var(--ds-score-excellent);
+  --color-score-good: var(--ds-score-good);
+  --color-score-fair: var(--ds-score-fair);
+  --color-score-poor: var(--ds-score-poor);
+
+  --color-feature-search: var(--ds-feature-search);
+  --color-feature-compounds: var(--ds-feature-compounds);
 
   --shadow-ds-sm: var(--ds-shadow-sm);
   --shadow-ds: var(--ds-shadow);
@@ -268,8 +300,102 @@
 
   [data-theme="dark"] .p-selectbutton .p-button {
     background: var(--ds-surface-elevated);
-    color: var(--ds-text-primary);
+    color: var(--ds-text-secondary);
     border-color: var(--ds-border);
+  }
+
+  [data-theme="dark"] .p-dialog .p-dialog-header,
+  [data-theme="dark"] .p-dialog .p-dialog-content,
+  [data-theme="dark"] .p-dialog .p-dialog-footer {
+    background: var(--ds-surface-elevated);
+    color: var(--ds-text-primary);
+  }
+
+  [data-theme="dark"] .p-dialog .p-dialog-header {
+    border-bottom: 1px solid var(--ds-border);
+  }
+
+  [data-theme="dark"] .p-autocomplete-panel {
+    background: var(--ds-surface-elevated);
+    border-color: var(--ds-border);
+  }
+
+  [data-theme="dark"] .p-autocomplete-item:hover {
+    background: var(--ds-sidebar-hover);
+  }
+
+  [data-theme="dark"] .p-confirmdialog {
+    background: var(--ds-surface-elevated);
+  }
+
+  [data-theme="dark"] .p-tooltip .p-tooltip-text {
+    background: var(--ds-surface-elevated);
+    color: var(--ds-text-primary);
+    border: 1px solid var(--ds-border);
+  }
+
+  [data-theme="dark"] .p-message {
+    border-color: var(--ds-border);
+  }
+
+  [data-theme="dark"] .p-breadcrumb {
+    background: transparent;
+    border-color: transparent;
+  }
+
+  /* ── App-wide PrimeReact sizing baseline ──
+   * Data-heavy apps need compact controls. Instead of scattering size="small"
+   * and !important overrides across every page, set the baseline once here.
+   * Individual components can still opt into larger sizes when needed.
+   */
+  .p-button {
+    font-size: 0.8125rem;
+    padding: 0.4375rem 0.875rem;
+    gap: 0.375rem;
+  }
+
+  .p-button .p-button-icon {
+    font-size: 0.8125rem;
+  }
+
+  .p-button.p-button-icon-only {
+    padding: 0.4375rem;
+    width: auto;
+    height: auto;
+  }
+
+  .p-selectbutton .p-button {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  .p-inputtext {
+    font-size: 0.8125rem;
+    padding-block: 0.4375rem;
+    padding-inline: 0.75rem;
+  }
+
+  .p-icon-field-left > .p-inputtext {
+    padding-left: 2.5rem;
+  }
+
+  .p-icon-field-right > .p-inputtext {
+    padding-right: 2.5rem;
+  }
+
+  .p-tooltip .p-tooltip-text {
+    font-size: 0.6875rem;
+    padding: 0.25rem 0.5rem;
+    white-space: nowrap;
+  }
+
+  .p-tabview .p-tabview-nav {
+    gap: 0.25rem;
+  }
+
+  .p-tag {
+    font-size: 0.75rem;
+    padding: 0.125rem 0.5rem;
   }
 
   /* Page transitions */
@@ -294,3 +420,19 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+ * Unlayered overrides — must sit outside @layer to beat the PrimeReact
+ * theme CSS which is loaded as an unlayered dynamic <link> tag.
+ * ------------------------------------------------------------------------- */
+
+[data-theme="dark"] .p-selectbutton .p-button.p-highlight {
+  background: var(--ds-accent);
+  color: #ffffff;
+  border-color: var(--ds-accent);
+}
+
+[data-theme="dark"] .p-selectbutton .p-button.p-highlight:hover {
+  background: var(--ds-accent-hover);
+  color: #ffffff;
+  border-color: var(--ds-accent-hover);
+}

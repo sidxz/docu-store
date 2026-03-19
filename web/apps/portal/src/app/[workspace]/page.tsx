@@ -16,6 +16,7 @@ import { Skeleton } from "primereact/skeleton";
 import { Tag } from "primereact/tag";
 
 import { StatCard } from "@/components/ui/StatCard";
+import { LinkButton } from "@/components/ui/LinkButton";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { useSession } from "@/lib/auth";
 
@@ -39,8 +40,8 @@ export default function DashboardPage() {
   return (
     <div>
       {/* Greeting */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight text-text-primary">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold text-text-primary">
           Welcome back, {firstName}
         </h1>
         <p className="mt-1 text-sm text-text-muted">
@@ -116,13 +117,12 @@ export default function DashboardPage() {
                 <p className="mt-1 text-xs text-text-muted">
                   Upload your first document to get started.
                 </p>
-                <Link
+                <LinkButton
                   href={`/${workspace}/documents/upload`}
-                  className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
-                >
-                  <Upload className="h-3.5 w-3.5" />
-                  Upload
-                </Link>
+                  label="Upload"
+                  icon="pi pi-upload"
+                  className="mt-4"
+                />
               </div>
             ) : (
               <div className="divide-y divide-border-subtle">
@@ -156,7 +156,6 @@ export default function DashboardPage() {
                             value={typeLabel}
                             severity="secondary"
                             rounded
-                            className="!text-xs !py-0"
                           />
                           {artifact.author_mentions?.length > 0 && (
                             <span className="truncate text-xs text-text-muted">
@@ -197,8 +196,8 @@ export default function DashboardPage() {
               href={`/${workspace}/documents/upload`}
               className="group flex items-center gap-4 rounded-xl border border-border-default bg-surface-elevated p-4 transition-all hover:shadow-ds hover:border-accent/30"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10">
-                <Upload className="h-5 w-5 text-blue-500" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-light">
+                <Upload className="h-5 w-5 text-accent-text" />
               </div>
               <div>
                 <p className="text-sm font-medium text-text-primary">
@@ -214,8 +213,8 @@ export default function DashboardPage() {
               href={`/${workspace}/search`}
               className="group flex items-center gap-4 rounded-xl border border-border-default bg-surface-elevated p-4 transition-all hover:shadow-ds hover:border-accent/30"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/10">
-                <Search className="h-5 w-5 text-violet-500" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-feature-search/10">
+                <Search className="h-5 w-5 text-feature-search" />
               </div>
               <div>
                 <p className="text-sm font-medium text-text-primary">
@@ -231,8 +230,8 @@ export default function DashboardPage() {
               href={`/${workspace}/compounds`}
               className="group flex items-center gap-4 rounded-xl border border-border-default bg-surface-elevated p-4 transition-all hover:shadow-ds hover:border-accent/30"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10">
-                <Atom className="h-5 w-5 text-emerald-500" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-feature-compounds/10">
+                <Atom className="h-5 w-5 text-feature-compounds" />
               </div>
               <div>
                 <p className="text-sm font-medium text-text-primary">

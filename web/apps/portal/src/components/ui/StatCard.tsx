@@ -37,7 +37,7 @@ export function StatCard({
       <div className="flex items-center justify-between">
         <span className="text-sm text-text-muted">{label}</span>
         <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${accentColor ?? "bg-accent-light"}`}>
-          <Icon className="h-[18px] w-[18px] text-accent-text" />
+          <Icon className="size-[1.125rem] text-accent-text" />
         </div>
       </div>
       <div className="mt-3 flex items-baseline gap-2">
