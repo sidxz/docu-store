@@ -62,6 +62,14 @@ class SearchResultDTO(BaseModel):
     artifact_id: UUID
     page_index: int
     similarity_score: float
+    rerank_score: float | None = Field(
+        default=None,
+        description="Cross-encoder rerank score (if reranking was applied)",
+    )
+    original_rank: int | None = Field(
+        default=None,
+        description="Position before reranking (0-based). Shows how much the result moved.",
+    )
     text_preview: str | None = Field(
         default=None,
         description="Preview of the page text (if available from read model)",
@@ -103,6 +111,18 @@ class ArtifactDetailsDTO(BaseModel):
     )
 
 
+class RerankInfoDTO(BaseModel):
+    """Diagnostics about the reranking step."""
+
+    reranker_model: str
+    candidates_before: int
+    results_after: int
+    top_promotion: int | None = Field(
+        default=None,
+        description="Largest rank jump (e.g. result moved from #15 to #1 = promotion of 14)",
+    )
+
+
 class SearchResponse(BaseModel):
     """Response containing search results."""
 
@@ -110,6 +130,10 @@ class SearchResponse(BaseModel):
     results: list[SearchResultDTO]
     total_results: int
     model_used: str
+    rerank_info: RerankInfoDTO | None = Field(
+        default=None,
+        description="Reranking diagnostics (present when reranking was applied)",
+    )
 
 
 # Forward reference resolution

@@ -130,6 +130,20 @@ class Settings(BaseSettings):
         validation_alias="SMILES_EMBEDDING_DEVICE",
     )
 
+    # Cross-encoder reranker
+    reranker_model_name: str = Field(
+        default="cross-encoder/ms-marco-MiniLM-L-12-v2",
+        validation_alias="RERANKER_MODEL_NAME",
+    )
+    reranker_device: Literal["cpu", "cuda", "mps"] = Field(
+        default="cpu",
+        validation_alias="RERANKER_DEVICE",
+    )
+    reranker_enabled: bool = Field(
+        default=True,
+        validation_alias="RERANKER_ENABLED",
+    )
+
     # Text Chunking
     chunk_size: int = Field(
         default=1000,

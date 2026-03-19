@@ -6,12 +6,14 @@ from returns.result import Failure, Result, Success
 from application.dtos.embedding_dtos import (
     ArtifactDetailsDTO,
     EmbeddingDTO,
+    RerankInfoDTO,
     SearchRequest,
     SearchResponse,
     SearchResultDTO,
 )
 from application.dtos.errors import AppError
 from application.ports.embedding_generator import EmbeddingGenerator
+from application.ports.reranker import Reranker, RerankDocument
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
@@ -215,12 +217,14 @@ class SearchSimilarPagesUseCase:
         page_read_model: PageReadModel,
         artifact_read_model: ArtifactReadModel,
         sparse_embedding_generator: SparseEmbeddingGenerator | None = None,
+        reranker: Reranker | None = None,
     ) -> None:
         self.embedding_generator = embedding_generator
         self.vector_store = vector_store
         self.page_read_model = page_read_model
         self.artifact_read_model = artifact_read_model
         self.sparse_embedding_generator = sparse_embedding_generator
+        self.reranker = reranker
 
     async def execute(
         self,
@@ -262,6 +266,9 @@ class SearchSimilarPagesUseCase:
                 tag_match_mode=request.tag_match_mode,
             )
 
+            # Over-fetch if reranker is available (reranker needs more candidates)
+            retrieval_limit = request.limit * 3 if self.reranker else request.limit
+
             if self.sparse_embedding_generator:
                 sparse_query = self.sparse_embedding_generator.generate_sparse_embedding(
                     request.query_text,
@@ -269,14 +276,63 @@ class SearchSimilarPagesUseCase:
                 search_results = await self.vector_store.search_hybrid_grouped(
                     dense_query=query_embedding,
                     sparse_query=sparse_query,
-                    limit=request.limit,
+                    limit=retrieval_limit,
                     **filter_kwargs,
                 )
             else:
                 search_results = await self.vector_store.search_pages_grouped(
                     query_embedding=query_embedding,
-                    limit=request.limit,
+                    limit=retrieval_limit,
                     **filter_kwargs,
+                )
+
+            # 2b. Rerank with cross-encoder if available
+            rerank_info = None
+            rerank_scores: dict[str, tuple[float, int]] = {}  # page_id → (score, original_rank)
+
+            if self.reranker and search_results:
+                rerank_docs = []
+                for r in search_results:
+                    page = await self.page_read_model.get_page_by_id(r.page_id)
+                    text = ""
+                    if page and page.text_mention and page.text_mention.text:
+                        text = page.text_mention.text[:2000]
+                    if not text.strip():
+                        continue  # skip empty pages — cross-encoder returns nan for empty text
+                    rerank_docs.append(RerankDocument(id=str(r.page_id), text=text))
+
+                reranked = self.reranker.rerank(
+                    query=request.query_text,
+                    documents=rerank_docs,
+                    top_k=request.limit,
+                )
+
+                # Build score/rank lookup and reorder
+                rerank_scores = {r.id: (r.score, r.original_rank) for r in reranked}
+                rerank_order = {r.id: i for i, r in enumerate(reranked)}
+                search_results = sorted(
+                    [r for r in search_results if str(r.page_id) in rerank_order],
+                    key=lambda r: rerank_order[str(r.page_id)],
+                )
+
+                # Build diagnostics
+                promotions = [r.original_rank - i for i, r in enumerate(reranked)]
+                rerank_info = RerankInfoDTO(
+                    reranker_model=self.reranker.model_name if hasattr(self.reranker, "model_name") else "unknown",
+                    candidates_before=len(rerank_docs),
+                    results_after=len(reranked),
+                    top_promotion=max(promotions) if promotions else None,
+                )
+
+                logger.info(
+                    "rerank_diagnostics",
+                    candidates=len(rerank_docs),
+                    returned=len(reranked),
+                    top_promotion=rerank_info.top_promotion,
+                    rank_changes=[
+                        {"page_id": r.id[:8], "original": r.original_rank, "new": i, "score": round(r.score, 4)}
+                        for i, r in enumerate(reranked[:5])
+                    ],
                 )
 
             # 3. Enrich results with read model data
@@ -321,11 +377,16 @@ class SearchSimilarPagesUseCase:
                         title=artifact.title_mention.title if artifact.title_mention else None,
                     )
 
+                # Attach rerank scores if available
+                rr_score, rr_original = rerank_scores.get(str(result.page_id), (None, None))
+
                 result_dto = SearchResultDTO(
                     page_id=result.page_id,
                     artifact_id=result.artifact_id,
                     page_index=result.page_index,
                     similarity_score=result.score,
+                    rerank_score=rr_score,
+                    original_rank=rr_original,
                     text_preview=text_preview,
                     artifact_name=artifact_name,
                     artifact_details=artifact_details,
@@ -346,6 +407,7 @@ class SearchSimilarPagesUseCase:
                     results=result_dtos,
                     total_results=len(result_dtos),
                     model_used=str(model_info.get("model_name", "unknown")),
+                    rerank_info=rerank_info,
                 ),
             )
 

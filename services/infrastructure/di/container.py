@@ -65,7 +65,9 @@ from application.use_cases.page_use_cases import (
 from application.use_cases.search_use_cases import HierarchicalSearchUseCase, SearchSummariesUseCase
 from application.use_cases.smiles_embedding_use_cases import EmbedCompoundSmilesUseCase
 from application.use_cases.smiles_search_use_cases import SearchSimilarCompoundsUseCase
+from application.ports.reranker import Reranker
 from application.ports.sparse_embedding_generator import SparseEmbeddingGenerator
+from infrastructure.rerankers.cross_encoder_reranker import CrossEncoderReranker
 from application.use_cases.vector_metadata_use_cases import SyncPageTagsToVectorStoreUseCase
 from infrastructure.embeddings.tfidf_sparse_generator import TfidfSparseGenerator
 from application.use_cases.summarization_use_cases import (
@@ -328,6 +330,15 @@ def create_container() -> Container:  # noqa: PLR0915
     sparse_generator_instance = TfidfSparseGenerator()
     container[SparseEmbeddingGenerator] = sparse_generator_instance
 
+    # Cross-encoder reranker (Stage 2 — reranks retrieval candidates)
+    if settings.reranker_enabled:
+        container[Reranker] = lambda _: CrossEncoderReranker(
+            model_name=settings.reranker_model_name,
+            device=settings.reranker_device,
+        )
+    else:
+        container[Reranker] = None  # type: ignore[assignment]
+
     # Register Use Cases
     # Page Use Cases
     container[CreatePageUseCase] = lambda c: CreatePageUseCase(
@@ -372,6 +383,7 @@ def create_container() -> Container:  # noqa: PLR0915
         page_read_model=c[PageReadModel],
         artifact_read_model=c[ArtifactReadModel],
         sparse_embedding_generator=c[SparseEmbeddingGenerator],
+        reranker=c[Reranker],
     )
 
     # Artifact Use Cases
