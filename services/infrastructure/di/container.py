@@ -239,6 +239,10 @@ def create_container() -> Container:  # noqa: PLR0915
     container[PageReadModel] = mongo_repository_factory
     container[ArtifactReadModel] = mongo_repository_factory
 
+    from application.ports.repositories.tag_browse_read_model import TagBrowseReadModel  # noqa: PLC0415
+
+    container[TagBrowseReadModel] = mongo_repository_factory
+
     # Register Pipeline Orchestrator (Temporal)
     container[WorkflowOrchestrator] = lambda _: TemporalWorkflowOrchestrator()
 

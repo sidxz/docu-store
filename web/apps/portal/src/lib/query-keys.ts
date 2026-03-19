@@ -39,4 +39,12 @@ export const queryKeys = {
       ["search", "hierarchical", query] as const,
     compound: (smiles: string) => ["search", "compound", smiles] as const,
   },
+  browse: {
+    all: ["browse"] as const,
+    categories: () => [...queryKeys.browse.all, "categories"] as const,
+    folders: (entityType: string, parent?: string) =>
+      [...queryKeys.browse.all, "folders", entityType, parent ?? "root"] as const,
+    artifacts: (entityType: string, tagValue: string) =>
+      [...queryKeys.browse.all, "artifacts", entityType, tagValue] as const,
+  },
 };

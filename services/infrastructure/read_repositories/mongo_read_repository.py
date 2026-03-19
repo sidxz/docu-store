@@ -1,15 +1,35 @@
+from datetime import datetime, timezone
 from uuid import UUID
 
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from application.dtos.artifact_dtos import ArtifactResponse
+from application.dtos.browse_dtos import (
+    ArtifactBrowseItemDTO,
+    BrowseCategoriesResponse,
+    BrowseFoldersResponse,
+    TagCategoryDTO,
+    TagFolderDTO,
+)
 from application.dtos.page_dtos import PageResponse
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.ports.repositories.page_read_models import PageReadModel
+from application.ports.repositories.tag_browse_read_model import TagBrowseReadModel
 from infrastructure.config import Settings
 
+ENTITY_TYPE_DISPLAY_NAMES: dict[str, str] = {
+    "target": "Target",
+    "compound_name": "Compound",
+    "gene_name": "Gene",
+    "screening_method": "Method",
+    "author": "Author",
+    "date": "Date",
+    "accession_number": "Accession",
+    "disease": "Disease",
+}
 
-class MongoReadRepository(PageReadModel, ArtifactReadModel):
+
+class MongoReadRepository(PageReadModel, ArtifactReadModel, TagBrowseReadModel):
     def __init__(self, client: AsyncIOMotorClient, settings: Settings) -> None:
         self.client = client
         self.db = self.client[settings.mongo_db]
@@ -98,3 +118,416 @@ class MongoReadRepository(PageReadModel, ArtifactReadModel):
                 doc["pages"] = ()
             artifacts.append(ArtifactResponse(**doc))
         return artifacts
+
+    # ── TagBrowseReadModel implementation ────────────────────────────
+
+    def _browse_base_match(
+        self,
+        workspace_id: UUID | None,
+        allowed_artifact_ids: list[UUID] | None,
+    ) -> dict:
+        """Build the common $match stage for workspace + permission filtering."""
+        match: dict = {}
+        if workspace_id is not None:
+            match["workspace_id"] = str(workspace_id)
+        if allowed_artifact_ids is not None:
+            match["artifact_id"] = {"$in": [str(aid) for aid in allowed_artifact_ids]}
+        return match
+
+    async def get_tag_categories(
+        self,
+        workspace_id: UUID | None = None,
+        limit: int = 5,
+        sticky_categories: list[str] | None = None,
+        allowed_artifact_ids: list[UUID] | None = None,
+    ) -> BrowseCategoriesResponse:
+        base_match = self._browse_base_match(workspace_id, allowed_artifact_ids)
+
+        pipeline: list[dict] = []
+        if base_match:
+            pipeline.append({"$match": base_match})
+
+        pipeline.append(
+            {
+                "$facet": {
+                    # Branch 1: tag_mentions grouped by entity_type
+                    "tag_mentions": [
+                        {"$unwind": "$tag_mentions"},
+                        {"$match": {"tag_mentions.entity_type": {"$ne": None}}},
+                        {
+                            "$group": {
+                                "_id": "$tag_mentions.entity_type",
+                                "artifact_ids": {"$addToSet": "$artifact_id"},
+                                "distinct_tags": {
+                                    "$addToSet": {"$toLower": "$tag_mentions.tag"},
+                                },
+                            },
+                        },
+                        {
+                            "$project": {
+                                "entity_type": "$_id",
+                                "artifact_count": {"$size": "$artifact_ids"},
+                                "distinct_count": {"$size": "$distinct_tags"},
+                            },
+                        },
+                    ],
+                    # Branch 2: authors
+                    "authors": [
+                        {"$match": {"author_mentions.0": {"$exists": True}}},
+                        {"$unwind": "$author_mentions"},
+                        {
+                            "$group": {
+                                "_id": None,
+                                "artifact_ids": {"$addToSet": "$artifact_id"},
+                                "distinct_names": {
+                                    "$addToSet": {"$toLower": "$author_mentions.name"},
+                                },
+                            },
+                        },
+                        {
+                            "$project": {
+                                "artifact_count": {"$size": "$artifact_ids"},
+                                "distinct_count": {"$size": "$distinct_names"},
+                            },
+                        },
+                    ],
+                    # Branch 3: dates
+                    "dates": [
+                        {"$match": {"presentation_date.date": {"$ne": None}}},
+                        {
+                            "$group": {
+                                "_id": None,
+                                "artifact_ids": {"$addToSet": "$artifact_id"},
+                                "distinct_years": {
+                                    "$addToSet": {"$year": {"$toDate": "$presentation_date.date"}},
+                                },
+                            },
+                        },
+                        {
+                            "$project": {
+                                "artifact_count": {"$size": "$artifact_ids"},
+                                "distinct_count": {"$size": "$distinct_years"},
+                            },
+                        },
+                    ],
+                    # Total artifact count
+                    "total": [{"$count": "count"}],
+                },
+            },
+        )
+
+        results = await self.artifacts.aggregate(pipeline).to_list(1)
+        facets = results[0] if results else {}
+
+        categories: dict[str, TagCategoryDTO] = {}
+
+        # Merge tag_mentions facet
+        for item in facets.get("tag_mentions", []):
+            et = item["entity_type"]
+            categories[et] = TagCategoryDTO(
+                entity_type=et,
+                display_name=ENTITY_TYPE_DISPLAY_NAMES.get(et, et.replace("_", " ").title()),
+                artifact_count=item["artifact_count"],
+                distinct_count=item["distinct_count"],
+            )
+
+        # Merge author facet
+        for item in facets.get("authors", []):
+            categories["author"] = TagCategoryDTO(
+                entity_type="author",
+                display_name="Author",
+                artifact_count=item["artifact_count"],
+                distinct_count=item["distinct_count"],
+            )
+
+        # Merge date facet
+        for item in facets.get("dates", []):
+            categories["date"] = TagCategoryDTO(
+                entity_type="date",
+                display_name="Date",
+                artifact_count=item["artifact_count"],
+                distinct_count=item["distinct_count"],
+            )
+
+        # Inject sticky categories (always present even if count 0)
+        for sticky in sticky_categories or []:
+            if sticky not in categories:
+                categories[sticky] = TagCategoryDTO(
+                    entity_type=sticky,
+                    display_name=ENTITY_TYPE_DISPLAY_NAMES.get(
+                        sticky, sticky.replace("_", " ").title()
+                    ),
+                    artifact_count=0,
+                    distinct_count=0,
+                )
+
+        # Sort by artifact_count desc, apply limit
+        sorted_cats = sorted(categories.values(), key=lambda c: c.artifact_count, reverse=True)
+        total = facets.get("total", [{}])[0].get("count", 0) if facets.get("total") else 0
+
+        return BrowseCategoriesResponse(
+            categories=sorted_cats[:limit],
+            total_artifacts=total,
+        )
+
+    async def get_tag_folders(
+        self,
+        entity_type: str,
+        workspace_id: UUID | None = None,
+        parent: str | None = None,
+        skip: int = 0,
+        limit: int = 50,
+        allowed_artifact_ids: list[UUID] | None = None,
+    ) -> BrowseFoldersResponse:
+        base_match = self._browse_base_match(workspace_id, allowed_artifact_ids)
+
+        if entity_type == "author":
+            folders = await self._get_author_folders(base_match, skip, limit)
+        elif entity_type == "date":
+            folders = await self._get_date_folders(base_match, parent, skip, limit)
+        else:
+            folders = await self._get_tag_folders(base_match, entity_type, skip, limit)
+
+        return BrowseFoldersResponse(
+            entity_type=entity_type,
+            parent=parent,
+            folders=folders,
+            total_folders=len(folders),
+        )
+
+    async def _get_tag_folders(
+        self, base_match: dict, entity_type: str, skip: int, limit: int
+    ) -> list[TagFolderDTO]:
+        match_stage: dict = {**base_match, "tag_mentions.entity_type": entity_type}
+        pipeline: list[dict] = [
+            {"$match": match_stage},
+            {"$unwind": "$tag_mentions"},
+            {"$match": {"tag_mentions.entity_type": entity_type}},
+            {
+                "$group": {
+                    "_id": {"$toLower": "$tag_mentions.tag"},
+                    "display_name": {"$first": "$tag_mentions.tag"},
+                    "artifact_ids": {"$addToSet": "$artifact_id"},
+                },
+            },
+            {
+                "$project": {
+                    "tag_value": "$_id",
+                    "display_name": 1,
+                    "artifact_count": {"$size": "$artifact_ids"},
+                },
+            },
+            {"$sort": {"artifact_count": -1}},
+            {"$skip": skip},
+            {"$limit": limit},
+        ]
+        docs = await self.artifacts.aggregate(pipeline).to_list(limit)
+        return [
+            TagFolderDTO(
+                tag_value=d["tag_value"],
+                display_name=d["display_name"],
+                artifact_count=d["artifact_count"],
+            )
+            for d in docs
+        ]
+
+    async def _get_author_folders(
+        self, base_match: dict, skip: int, limit: int
+    ) -> list[TagFolderDTO]:
+        match_stage: dict = {**base_match, "author_mentions.0": {"$exists": True}}
+        pipeline: list[dict] = [
+            {"$match": match_stage},
+            {"$unwind": "$author_mentions"},
+            {
+                "$group": {
+                    "_id": {"$toLower": "$author_mentions.name"},
+                    "display_name": {"$first": "$author_mentions.name"},
+                    "artifact_ids": {"$addToSet": "$artifact_id"},
+                },
+            },
+            {
+                "$project": {
+                    "tag_value": "$_id",
+                    "display_name": 1,
+                    "artifact_count": {"$size": "$artifact_ids"},
+                },
+            },
+            {"$sort": {"artifact_count": -1}},
+            {"$skip": skip},
+            {"$limit": limit},
+        ]
+        docs = await self.artifacts.aggregate(pipeline).to_list(limit)
+        return [
+            TagFolderDTO(
+                tag_value=d["tag_value"],
+                display_name=d["display_name"],
+                artifact_count=d["artifact_count"],
+            )
+            for d in docs
+        ]
+
+    async def _get_date_folders(
+        self, base_match: dict, parent: str | None, skip: int, limit: int
+    ) -> list[TagFolderDTO]:
+        match_stage: dict = {**base_match, "presentation_date.date": {"$ne": None}}
+
+        if parent is None:
+            # Group by year
+            pipeline: list[dict] = [
+                {"$match": match_stage},
+                {
+                    "$group": {
+                        "_id": {"$year": {"$toDate": "$presentation_date.date"}},
+                        "artifact_ids": {"$addToSet": "$artifact_id"},
+                    },
+                },
+                {
+                    "$project": {
+                        "tag_value": {"$toString": "$_id"},
+                        "display_name": {"$toString": "$_id"},
+                        "artifact_count": {"$size": "$artifact_ids"},
+                    },
+                },
+                {"$sort": {"tag_value": -1}},
+                {"$skip": skip},
+                {"$limit": limit},
+            ]
+            docs = await self.artifacts.aggregate(pipeline).to_list(limit)
+            return [
+                TagFolderDTO(
+                    tag_value=d["tag_value"],
+                    display_name=d["display_name"],
+                    artifact_count=d["artifact_count"],
+                    has_children=True,
+                )
+                for d in docs
+            ]
+        else:
+            # Group by month within a year
+            year = int(parent)
+            start = datetime(year, 1, 1, tzinfo=timezone.utc).isoformat()
+            end = datetime(year + 1, 1, 1, tzinfo=timezone.utc).isoformat()
+            match_stage["presentation_date.date"] = {"$gte": start, "$lt": end}
+
+            month_names = [
+                "", "January", "February", "March", "April", "May", "June",
+                "July", "August", "September", "October", "November", "December",
+            ]
+
+            pipeline = [
+                {"$match": match_stage},
+                {
+                    "$group": {
+                        "_id": {"$month": {"$toDate": "$presentation_date.date"}},
+                        "artifact_ids": {"$addToSet": "$artifact_id"},
+                    },
+                },
+                {
+                    "$project": {
+                        "month_num": "$_id",
+                        "artifact_count": {"$size": "$artifact_ids"},
+                    },
+                },
+                {"$sort": {"month_num": 1}},
+                {"$skip": skip},
+                {"$limit": limit},
+            ]
+            docs = await self.artifacts.aggregate(pipeline).to_list(limit)
+            return [
+                TagFolderDTO(
+                    tag_value=f"{parent}-{d['month_num']:02d}",
+                    display_name=month_names[d["month_num"]],
+                    artifact_count=d["artifact_count"],
+                )
+                for d in docs
+            ]
+
+    async def get_folder_artifacts(
+        self,
+        entity_type: str,
+        tag_value: str,
+        workspace_id: UUID | None = None,
+        skip: int = 0,
+        limit: int = 50,
+        allowed_artifact_ids: list[UUID] | None = None,
+    ) -> list[ArtifactBrowseItemDTO]:
+        base_match = self._browse_base_match(workspace_id, allowed_artifact_ids)
+        projection = {
+            "artifact_id": 1,
+            "title_mention.title": 1,
+            "source_filename": 1,
+            "artifact_type": 1,
+            "pages": 1,
+            "presentation_date.date": 1,
+            "author_mentions.name": 1,
+            "_id": 0,
+        }
+
+        if entity_type == "author":
+            query = {
+                **base_match,
+                "author_mentions": {
+                    "$elemMatch": {"name": {"$regex": f"^{tag_value}$", "$options": "i"}},
+                },
+            }
+        elif entity_type == "date":
+            query = {**base_match}
+            if "-" in tag_value:
+                # year-month
+                year, month = tag_value.split("-", 1)
+                month_int = int(month)
+                start = datetime(int(year), month_int, 1, tzinfo=timezone.utc).isoformat()
+                if month_int == 12:
+                    end = datetime(int(year) + 1, 1, 1, tzinfo=timezone.utc).isoformat()
+                else:
+                    end = datetime(int(year), month_int + 1, 1, tzinfo=timezone.utc).isoformat()
+                query["presentation_date.date"] = {"$gte": start, "$lt": end}
+            else:
+                # year only
+                year_int = int(tag_value)
+                start = datetime(year_int, 1, 1, tzinfo=timezone.utc).isoformat()
+                end = datetime(year_int + 1, 1, 1, tzinfo=timezone.utc).isoformat()
+                query["presentation_date.date"] = {"$gte": start, "$lt": end}
+        else:
+            query = {
+                **base_match,
+                "tag_mentions": {
+                    "$elemMatch": {
+                        "entity_type": entity_type,
+                        "tag": {"$regex": f"^{tag_value}$", "$options": "i"},
+                    },
+                },
+            }
+
+        cursor = self.artifacts.find(query, projection).skip(skip).limit(limit)
+        items: list[ArtifactBrowseItemDTO] = []
+        async for doc in cursor:
+            pd = doc.get("presentation_date", {})
+            pd_date = pd.get("date") if pd else None
+            items.append(
+                ArtifactBrowseItemDTO(
+                    artifact_id=doc["artifact_id"],
+                    title=doc.get("title_mention", {}).get("title") if doc.get("title_mention") else None,
+                    source_filename=doc.get("source_filename"),
+                    artifact_type=doc.get("artifact_type", "UNCLASSIFIED"),
+                    page_count=len(doc.get("pages", [])),
+                    presentation_date=pd_date,
+                    author_names=[a["name"] for a in doc.get("author_mentions", [])],
+                ),
+            )
+        return items
+
+    async def ensure_browse_indexes(self) -> None:
+        """Create indexes to support browse aggregation pipelines. Idempotent."""
+        await self.artifacts.create_index(
+            [("workspace_id", 1), ("tag_mentions.entity_type", 1), ("tag_mentions.tag", 1)],
+            name="idx_browse_tags",
+        )
+        await self.artifacts.create_index(
+            [("workspace_id", 1), ("author_mentions.name", 1)],
+            name="idx_browse_authors",
+        )
+        await self.artifacts.create_index(
+            [("workspace_id", 1), ("presentation_date.date", 1)],
+            name="idx_browse_dates",
+        )

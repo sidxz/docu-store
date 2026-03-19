@@ -199,6 +199,20 @@ class Settings(BaseSettings):
         validation_alias="SENTINEL_IDP_JWKS_URL",
     )
 
+    # Browse (tag-based document browser)
+    browse_default_category_limit: int = Field(
+        default=5, validation_alias="BROWSE_DEFAULT_CATEGORY_LIMIT"
+    )
+    browse_sticky_categories: str = Field(
+        default="target", validation_alias="BROWSE_STICKY_CATEGORIES"
+    )
+
+    @property
+    def browse_sticky_categories_list(self) -> list[str]:
+        if not self.browse_sticky_categories:
+            return []
+        return [c.strip() for c in self.browse_sticky_categories.split(",") if c.strip()]
+
     # Plugin system
     enabled_plugins: str = Field(
         default="",
