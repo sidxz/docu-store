@@ -102,6 +102,38 @@ export function EntityTagPanel({ tagMentions, workspace, artifactId }: EntityTag
     <Card>
       <h3 className="mb-4 text-sm font-medium text-text-secondary">Entities</h3>
       <div className="space-y-5">
+        {[...grouped.entries()].map(([entityType, tags]) => {
+          const style = ENTITY_STYLE[entityType] ?? FALLBACK_STYLE;
+          return (
+            <div key={entityType}>
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
+                <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
+                {style.label || entityType.replace(/_/g, " ")}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {tags.map((tm, i) => {
+                  const sources = (tm as Record<string, unknown>).sources as
+                    | { page_id: string; page_index: number }[]
+                    | undefined;
+                  const hasSources = sources && sources.length > 0;
+                  return (
+                    <span
+                      key={`${tm.tag}-${i}`}
+                      className={`inline-flex items-center rounded-md border ${style.pill} bg-surface-elevated text-sm`}
+                    >
+                      <span className={`py-1 pl-3 font-medium text-text-primary ${hasSources ? "pr-2" : "pr-3"}`}>
+                        {tm.tag}
+                      </span>
+                      {hasSources && (
+                        <SourcePillSuffix sources={sources} workspace={workspace} artifactId={artifactId} />
+                      )}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
         {compounds.length > 0 && (
           <div>
             <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
@@ -158,38 +190,6 @@ export function EntityTagPanel({ tagMentions, workspace, artifactId }: EntityTag
             </div>
           </div>
         )}
-        {[...grouped.entries()].map(([entityType, tags]) => {
-          const style = ENTITY_STYLE[entityType] ?? FALLBACK_STYLE;
-          return (
-            <div key={entityType}>
-              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
-                <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
-                {style.label || entityType.replace(/_/g, " ")}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {tags.map((tm, i) => {
-                  const sources = (tm as Record<string, unknown>).sources as
-                    | { page_id: string; page_index: number }[]
-                    | undefined;
-                  const hasSources = sources && sources.length > 0;
-                  return (
-                    <span
-                      key={`${tm.tag}-${i}`}
-                      className={`inline-flex items-center rounded-md border ${style.pill} bg-surface-elevated text-sm`}
-                    >
-                      <span className={`py-1 pl-3 font-medium text-text-primary ${hasSources ? "pr-2" : "pr-3"}`}>
-                        {tm.tag}
-                      </span>
-                      {hasSources && (
-                        <SourcePillSuffix sources={sources} workspace={workspace} artifactId={artifactId} />
-                      )}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
       </div>
     </Card>
   );

@@ -23,7 +23,12 @@ export function Topbar() {
     window.location.href = "/login";
   };
 
-  const bcModel = breadcrumbs.slice(0, -1).map((crumb) => ({
+  // PrimeReact BreadCrumb: home renders FIRST (leftmost), model items follow.
+  const firstCrumb = breadcrumbs[0];
+  const lastCrumb = breadcrumbs[breadcrumbs.length - 1];
+
+  // Middle crumbs: everything between first and last — navigable links
+  const middleCrumbs = breadcrumbs.slice(1, -1).map((crumb) => ({
     label: crumb.label,
     template: () => (
       <Link
@@ -35,7 +40,21 @@ export function Topbar() {
     ),
   }));
 
-  const lastCrumb = breadcrumbs[breadcrumbs.length - 1];
+  // model = middle crumbs (links) + last crumb (current page, non-clickable)
+  const bcModel =
+    breadcrumbs.length > 1
+      ? [
+          ...middleCrumbs,
+          {
+            label: lastCrumb?.label,
+            template: () => (
+              <span className="text-sm font-medium text-text-primary">
+                {lastCrumb?.label}
+              </span>
+            ),
+          },
+        ]
+      : [];
 
   const initials = user.name
     ?.split(" ")
@@ -51,18 +70,21 @@ export function Topbar() {
         <BreadCrumb
           model={bcModel}
           home={{
-            label: lastCrumb?.label,
+            label: firstCrumb?.label,
             template: () => (
-              <span className="text-sm font-medium text-text-primary">
-                {lastCrumb?.label}
-              </span>
+              <Link
+                href={firstCrumb.href}
+                className="text-sm text-text-secondary hover:text-text-primary transition-colors"
+              >
+                {firstCrumb.label}
+              </Link>
             ),
           }}
           className="border-none bg-transparent p-0"
         />
       ) : (
         <span className="text-sm font-medium text-text-primary">
-          {lastCrumb?.label}
+          {firstCrumb?.label}
         </span>
       )}
 
