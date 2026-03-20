@@ -95,19 +95,21 @@ This geometric property is what makes semantic search possible. When a researche
 
 ### 3.2 Sparse Embeddings: Guaranteeing Exact-Term Recall
 
-Dense embeddings excel at semantic similarity but fail on opaque identifiers. To solve this, the system generates a second representation for each text chunk: a sparse TF-IDF vector. Unlike dense vectors, which are compact and capture meaning holistically, sparse vectors are high-dimensional and capture individual terms.
+Dense embeddings excel at semantic similarity but fail on opaque identifiers. To solve this, the system generates a second representation for each text chunk: a sparse hashing-based vector. Unlike dense vectors, which are compact and capture meaning holistically, sparse vectors are high-dimensional and capture individual terms.
 
-**TF-IDF (Term Frequency-Inverse Document Frequency)** is a classical information retrieval technique. For each term in a passage, it computes a weight that balances two factors:
+The system uses scikit-learn's **HashingVectorizer** to produce sparse vectors. For each term in a passage, the vectorizer computes a term-frequency weight and maps the term to a fixed index using a deterministic hash function. The resulting sparse vector has 2^18 (~262,000) dimensions. Most dimensions are zero -- only the terms present in the passage have non-zero weights. L2 normalization is applied so that longer passages do not dominate shorter ones.
 
-- **Term Frequency (TF)**: How often the term appears in this passage. Terms that appear frequently in a passage are likely important to it. The system applies sublinear dampening (logarithmic scaling) so that a term appearing 10 times is not scored 10x higher than one appearing once -- diminishing returns apply.
+This approach guarantees that a query containing "SACC-111" will match passages containing that exact string, regardless of whether the dense embedding model understands the term.
 
-- **Inverse Document Frequency (IDF)**: How rare the term is across all documents. Terms that appear in every document (like "the" or "and") receive low weight. Terms that appear in only a few documents (like "SACC-111" or "NadD") receive high weight because they are more discriminative.
+**Why hashing over TF-IDF with vocabulary fitting?** The system initially used scikit-learn's TfidfVectorizer, which produces higher-quality weights through IDF (Inverse Document Frequency) -- downweighting common terms and boosting rare ones. However, TfidfVectorizer requires fitting a vocabulary on the corpus, which creates an operational problem: the vocabulary becomes stale as new documents are ingested. Re-fitting changes vocabulary indices, invalidating all existing sparse vectors in the vector database and requiring a full re-embedding. For a long-running service processing documents continuously, this maintenance burden was unacceptable.
 
-The resulting sparse vector has one dimension per term in the vocabulary (approximately 30,000 terms). Most dimensions are zero -- only the terms present in the passage have non-zero weights. This sparsity is computationally efficient and guarantees that a query containing "SACC-111" will match passages containing that exact string, regardless of whether the dense embedding model understands the term.
+HashingVectorizer eliminates this entirely. Terms are mapped to indices via a deterministic hash function -- the same term always maps to the same index, regardless of when the document was ingested. No fitting, no persistence, no stale vocabulary, no re-embedding. The tradeoff is the loss of IDF weighting (common terms like "enzyme" are not downweighted), but this is mitigated by two factors:
 
-**Why TF-IDF over BM25?** The design considered both options. TF-IDF was chosen for practical reasons: it uses a well-tested implementation, supports custom tokenization patterns that preserve scientific notation (hyphens in compound codes, dots in version numbers), enables bigram capture for multi-word terms, and requires no additional binary dependencies. The tokenizer is specifically configured to recognize patterns like "SACC-111" and "IC50" as single tokens rather than splitting them at punctuation boundaries.
+1. **RRF fusion is rank-based, not score-based.** Even without IDF, the passage containing "SACC-111" still ranks first in sparse results for a "SACC-111" query. The RRF score is determined by rank position, not by the absolute sparse score.
 
-**Vocabulary fitting**: Unlike BM25 (which uses a static scoring formula), TF-IDF requires learning IDF weights from the document corpus. The system fits its vocabulary on the indexed documents and persists the learned model. This means the sparse vectors are tuned to the specific document collection -- rare terms within this collection receive appropriately high weights. The tradeoff is that the vocabulary must be periodically refitted as the collection grows, but this is acceptable for a research document platform where the corpus evolves gradually.
+2. **Cross-encoder reranking compensates.** The reranker reads query and passage text jointly, so it naturally distinguishes between a passage that centrally discusses a query term and one that merely mentions it in passing. The ranking quality that IDF would have provided at the sparse retrieval stage is recovered at the reranking stage.
+
+**Custom tokenization**: The tokenizer is configured with a custom pattern (`\b\w[\w\-\.]+\b`) that preserves hyphens and dots in tokens. This ensures scientific identifiers like "SACC-111", "IC50", "NZ-967", and "NadD/E" are treated as single tokens rather than being split at punctuation boundaries. Bigram capture (ngram_range 1-2) is enabled so that multi-word terms like "drug resistance" are indexed as a single unit alongside their individual words.
 
 ### 3.3 Reciprocal Rank Fusion: Combining Two Worlds
 
@@ -297,14 +299,22 @@ Keeping text chunks, summaries, and compounds in separate vector collections (ra
 - **Independent scaling**: Text chunks are the largest collection by far (many chunks per page per document). Scaling it independently avoids over-provisioning for the smaller collections.
 - **Schema clarity**: Each collection has a clean, focused schema without conditional fields.
 
-### 6.3 TF-IDF vs Learned Sparse Models
+### 6.3 Hashing-Based Sparse Vectors vs Alternatives
 
-The system uses classical TF-IDF for sparse vectors rather than learned sparse models like SPLADE. While SPLADE produces higher-quality sparse representations (it can expand queries with semantically related terms and compress irrelevant dimensions), TF-IDF was chosen for pragmatic reasons:
+The system uses HashingVectorizer for sparse vectors rather than TfidfVectorizer or learned sparse models like SPLADE. This decision was driven by operational robustness:
 
-- **Interpretability**: TF-IDF weights are directly tied to observable term frequencies. When debugging why a result was or wasn't returned, the sparse signal is transparent.
-- **Customizability**: The tokenizer is configured with a custom pattern that preserves scientific notation (hyphens, dots) and captures bigrams. This level of control is harder to achieve with pre-trained sparse models.
-- **Corpus specificity**: TF-IDF IDF weights are fitted on the actual document collection, automatically adapting to the corpus's vocabulary distribution. Terms rare in this specific collection receive appropriately high discriminative weight.
-- **Simplicity**: No additional binary dependencies, no GPU requirements, straightforward model persistence.
+- **No vocabulary fitting**: TfidfVectorizer requires fitting IDF weights on the corpus, which creates stale vocabulary problems in long-running containers. Re-fitting invalidates all existing sparse vectors. HashingVectorizer eliminates this class of problems entirely.
+- **Deterministic indexing**: The same term always hashes to the same vector index, regardless of corpus state. Documents ingested months apart produce compatible sparse vectors with no coordination.
+- **Custom tokenization**: The tokenizer preserves scientific notation (hyphens in compound codes, dots in version numbers) and captures bigrams. This level of control is harder to achieve with pre-trained sparse models like SPLADE, which use BERT's WordPiece tokenizer and would split "SACC-111" into subword pieces.
+- **Zero maintenance**: No model files to persist, no scheduled re-fitting jobs, no pkl corruption risk, no concurrency issues with multiple workers.
+
+The tradeoff is the loss of IDF weighting -- common terms are not downweighted at the sparse retrieval stage. This was evaluated against the alternatives:
+
+- **TfidfVectorizer**: Better ranking quality via IDF, but vocabulary staleness in production makes it impractical without periodic re-fitting and re-embedding of all vectors.
+- **SPLADE**: Higher-quality sparse representations with term expansion, but uses BERT's WordPiece tokenizer which splits scientific identifiers into subwords, degrading exact-term recall for the system's primary sparse search use case.
+- **BM25**: Requires corpus statistics similar to TF-IDF, with the same fitting/staleness problems.
+
+The cross-encoder reranker effectively compensates for the IDF quality gap, making hashing-based sparse vectors the pragmatic choice for this system.
 
 ### 6.4 Event-Driven Re-Embedding vs Scheduled Batch Jobs
 
@@ -347,7 +357,7 @@ The architecture anticipates several extensions that can be added without restru
 
 **Hybrid Summary Search** -- Extending sparse vectors to the summary collection, enabling exact-term recall at the summary level. This follows the same pattern already implemented for text chunks.
 
-**Learned Sparse Models** -- Upgrading from TF-IDF to SPLADE or similar learned sparse representations for higher-quality term expansion and compression. The existing sparse embedding port abstracts this cleanly.
+**Learned Sparse Models** -- If IDF-quality term weighting becomes a measurable gap, SPLADE or similar learned sparse representations could be evaluated. The existing sparse embedding port abstracts this cleanly. However, any learned model must be evaluated against the custom tokenization requirements for scientific identifiers -- BERT-based tokenizers split compound codes into subwords, which may degrade exact-term recall.
 
 ---
 
@@ -357,7 +367,7 @@ The architecture anticipates several extensions that can be added without restru
 |-----------|-----------|------|
 | Vector database | Qdrant v1.16+ | Vector storage, hybrid search, RRF fusion, server-side grouping |
 | Dense embedding model | nomic-ai/nomic-embed-text-v1.5 | 768-dimensional semantic embeddings |
-| Sparse embedding | scikit-learn TfidfVectorizer | TF-IDF sparse vectors for exact-term recall |
+| Sparse embedding | scikit-learn HashingVectorizer | Hashing-based sparse vectors for exact-term recall (no fitting required) |
 | Cross-encoder reranker | cross-encoder/ms-marco-MiniLM-L-12-v2 | Two-stage relevance rescoring |
 | Chemistry embedding | DeepChem/ChemBERTa-77M-MTR | 384-dimensional SMILES structural embeddings |
 | Workflow orchestration | Temporal | Durable execution for indexing pipeline |
@@ -375,7 +385,8 @@ The architecture anticipates several extensions that can be added without restru
 | **Dense vector** | A compact, fixed-size numerical representation (e.g., 768 numbers) that captures holistic semantic meaning. Every dimension carries a value. |
 | **Sparse vector** | A high-dimensional representation where most values are zero. Each non-zero dimension corresponds to a specific term in the vocabulary. |
 | **RRF (Reciprocal Rank Fusion)** | A rank-based fusion technique that combines ranked lists by summing reciprocal rank scores. Score-scale agnostic. |
-| **TF-IDF** | Term Frequency-Inverse Document Frequency. A weighting scheme that scores terms based on local frequency (how often in this passage) and global rarity (how rare across all passages). |
+| **TF-IDF** | Term Frequency-Inverse Document Frequency. A weighting scheme that scores terms based on local frequency (how often in this passage) and global rarity (how rare across all passages). Requires corpus fitting for IDF weights. |
+| **HashingVectorizer** | A stateless sparse encoder that maps terms to vector indices via deterministic hashing. No vocabulary fitting required -- the same term always maps to the same index. Trades IDF weighting for operational simplicity. |
 | **SMILES** | Simplified Molecular-Input Line-Entry System. A text notation for describing chemical structures (e.g., "C1=CC=CC=C1" represents benzene). |
 | **Quantization** | Reducing numerical precision of stored vectors (e.g., 32-bit float to 8-bit integer) to save memory with minimal quality loss. |
 | **Oversampling** | Retrieving more candidates than needed using quantized vectors, then rescoring with full-precision vectors for accuracy. |

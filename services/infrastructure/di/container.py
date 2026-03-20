@@ -330,7 +330,7 @@ def create_container() -> Container:  # noqa: PLR0915
         chunk_overlap=settings.chunk_overlap,
     )
 
-    # Sparse Embedding Generator (TF-IDF for hybrid search)
+    # Sparse Embedding Generator (hashing-based for hybrid search)
     sparse_generator_instance = TfidfSparseGenerator()
     container[SparseEmbeddingGenerator] = sparse_generator_instance
 
