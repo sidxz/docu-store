@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from application.dtos.embedding_dtos import RerankInfoDTO
+
 
 class SummarySearchRequest(BaseModel):
     """Request to search page/artifact summaries by semantic similarity."""
@@ -101,6 +103,8 @@ class ChunkHit(BaseModel):
     text_preview: str | None = None
     artifact_name: str | None = None
     page_name: str | None = None
+    rerank_score: float | None = None
+    original_rank: int | None = None
 
 
 class SummaryHit(BaseModel):
@@ -124,3 +128,4 @@ class HierarchicalSearchResponse(BaseModel):
     total_summary_hits: int
     total_chunk_hits: int
     model_used: str
+    chunk_rerank_info: RerankInfoDTO | None = None

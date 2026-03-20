@@ -90,11 +90,7 @@ class AggregateArtifactTagsUseCase:
             )
 
         except Exception as e:
-            from eventsourcing.application import AggregateNotFoundError  # noqa: PLC0415
-
-            from infrastructure.event_sourced_repositories.artifact_repository import (  # noqa: PLC0415
-                ConcurrencyError,
-            )
+            from domain.exceptions import AggregateNotFoundError, ConcurrencyError  # noqa: PLC0415
 
             if isinstance(e, AggregateNotFoundError):
                 return Failure(AppError("not_found", str(e)))

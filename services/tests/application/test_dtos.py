@@ -59,7 +59,7 @@ class TestArtifactResponse:
         )
         assert response.artifact_id == artifact_id
         assert response.pages == []
-        assert response.tags == []
+        assert response.tag_mentions == []
         assert response.title_mention is None
         assert response.summary_candidate is None
 

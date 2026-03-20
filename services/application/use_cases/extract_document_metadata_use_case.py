@@ -211,21 +211,19 @@ class ExtractDocumentMetadataUseCase:
                 author_count=len(author_mentions),
                 has_date=presentation_date is not None,
             )
-            return Success({
-                "status": "success",
-                "artifact_id": str(artifact_id),
-                "title": raw.title,
-                "author_count": len(author_mentions),
-                "has_date": presentation_date is not None,
-                "pages_tried": pages_tried,
-            })
+            return Success(
+                {
+                    "status": "success",
+                    "artifact_id": str(artifact_id),
+                    "title": raw.title,
+                    "author_count": len(author_mentions),
+                    "has_date": presentation_date is not None,
+                    "pages_tried": pages_tried,
+                },
+            )
 
         except Exception as e:
-            from eventsourcing.application import AggregateNotFoundError  # noqa: PLC0415
-
-            from infrastructure.event_sourced_repositories.page_repository import (  # noqa: PLC0415
-                ConcurrencyError,
-            )
+            from domain.exceptions import AggregateNotFoundError, ConcurrencyError  # noqa: PLC0415
 
             if isinstance(e, AggregateNotFoundError):
                 return Failure(AppError("not_found", str(e)))
@@ -383,7 +381,12 @@ class ExtractDocumentMetadataUseCase:
         parsed = ExtractDocumentMetadataUseCase._parse_date(raw.date_str)
         if not parsed:
             return None
-        model_map = {"gliner2": "gliner2", "regex": "regex", "llm": "llm-fallback", "filename": "filename"}
+        model_map = {
+            "gliner2": "gliner2",
+            "regex": "regex",
+            "llm": "llm-fallback",
+            "filename": "filename",
+        }
         return PresentationDate(
             date=parsed,
             source=raw.date_source,

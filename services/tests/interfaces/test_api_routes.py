@@ -42,7 +42,7 @@ class FakeArtifactReadModel(ArtifactReadModel):
     async def get_artifact_by_id(self, artifact_id: UUID, workspace_id: UUID | None = None) -> ArtifactResponse | None:
         return self._artifacts.get(artifact_id)
 
-    async def list_artifacts(self, workspace_id: UUID | None = None, skip: int = 0, limit: int = 100, allowed_artifact_ids: list[UUID] | None = None) -> list[ArtifactResponse]:
+    async def list_artifacts(self, workspace_id: UUID | None = None, skip: int = 0, limit: int = 100, allowed_artifact_ids: list[UUID] | None = None, sort_by: str = "updated_at", sort_order: int = -1) -> list[ArtifactResponse]:
         artifacts = list(self._artifacts.values())
         return artifacts[skip : skip + limit]
 

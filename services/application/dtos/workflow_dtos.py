@@ -25,6 +25,24 @@ class WorkflowTriggerReason(StrEnum):
     FAILED_RETRY = "failed_retry"
 
 
+class WorkflowStatusMapResponse(BaseModel):
+    """Typed response for workflow status endpoints (replaces bare dict)."""
+
+    entity_id: str
+    workflows: dict[str, TemporalWorkflowInfo]
+
+
+class SummaryDetailResponse(BaseModel):
+    """Typed response for /summary endpoints (replaces bare dict)."""
+
+    entity_id: str
+    summary: str | None = None
+    model_name: str | None = None
+    date_extracted: str | None = None
+    is_locked: bool = False
+    hil_correction: str | None = None
+
+
 class WorkflowNames(StrEnum):
     ARTIFACT_SAMPLE_WORKFLOW = "artifact_sample_workflow"
     COMPOUND_EXTRACTION_WORKFLOW = "compound_extraction_workflow"

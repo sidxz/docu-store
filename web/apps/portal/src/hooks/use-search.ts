@@ -2,6 +2,7 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { apiClient } from "@docu-store/api-client";
+import { throwApiError } from "@/lib/api-error";
 
 // All search operations use useMutation instead of useQuery because:
 // - Search is triggered by explicit user action (button click), not on mount
@@ -22,7 +23,7 @@ export function useSearchPages() {
       artifact_id?: string;
       score_threshold?: number;
     } & TagFilterParams) => {
-      const { data, error } = await apiClient.POST("/search/pages", {
+      const { data, error, response } = await apiClient.POST("/search/pages", {
         body: {
           query_text: params.query_text,
           limit: params.limit ?? 10,
@@ -33,7 +34,7 @@ export function useSearchPages() {
           tag_match_mode: params.tag_match_mode,
         },
       });
-      if (error) throw new Error("Failed to search pages");
+      if (error) throwApiError("Failed to search pages", error, response.status);
       return data;
     },
   });
@@ -48,7 +49,7 @@ export function useSearchSummaries() {
       artifact_id?: string;
       score_threshold?: number;
     } & TagFilterParams) => {
-      const { data, error } = await apiClient.POST("/search/summaries", {
+      const { data, error, response } = await apiClient.POST("/search/summaries", {
         body: {
           query_text: params.query_text,
           limit: params.limit ?? 10,
@@ -60,7 +61,7 @@ export function useSearchSummaries() {
           tag_match_mode: params.tag_match_mode,
         },
       });
-      if (error) throw new Error("Failed to search summaries");
+      if (error) throwApiError("Failed to search summaries", error, response.status);
       return data;
     },
   });
@@ -74,7 +75,7 @@ export function useHierarchicalSearch() {
       score_threshold?: number;
       include_chunks?: boolean;
     } & TagFilterParams) => {
-      const { data, error } = await apiClient.POST("/search/hierarchical", {
+      const { data, error, response } = await apiClient.POST("/search/hierarchical", {
         body: {
           query_text: params.query_text,
           limit: params.limit ?? 10,
@@ -85,7 +86,7 @@ export function useHierarchicalSearch() {
           tag_match_mode: params.tag_match_mode,
         },
       });
-      if (error) throw new Error("Failed to perform hierarchical search");
+      if (error) throwApiError("Failed to perform hierarchical search", error, response.status);
       return data;
     },
   });
@@ -99,7 +100,7 @@ export function useSearchCompounds() {
       artifact_id?: string;
       score_threshold?: number;
     }) => {
-      const { data, error } = await apiClient.POST("/search/compounds", {
+      const { data, error, response } = await apiClient.POST("/search/compounds", {
         body: {
           query_smiles: params.query_smiles,
           limit: params.limit ?? 10,
@@ -107,7 +108,7 @@ export function useSearchCompounds() {
           score_threshold: params.score_threshold,
         },
       });
-      if (error) throw new Error("Failed to search compounds");
+      if (error) throwApiError("Failed to search compounds", error, response.status);
       return data;
     },
   });

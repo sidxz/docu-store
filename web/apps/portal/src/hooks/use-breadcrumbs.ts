@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@docu-store/api-client";
 import { queryKeys } from "@/lib/query-keys";
+import { throwApiError } from "@/lib/api-error";
 
 interface Breadcrumb {
   label: string;
@@ -54,10 +55,10 @@ export function useBreadcrumbs(): Breadcrumb[] {
   const { data: artifact } = useQuery({
     queryKey: queryKeys.artifacts.detail(artifactId ?? ""),
     queryFn: async () => {
-      const { data, error } = await apiClient.GET("/artifacts/{artifact_id}", {
+      const { data, error, response } = await apiClient.GET("/artifacts/{artifact_id}", {
         params: { path: { artifact_id: artifactId! } },
       });
-      if (error) throw new Error("Failed to fetch artifact");
+      if (error) throwApiError("Failed to fetch artifact", error, response.status);
       return data;
     },
     enabled: !!artifactId,
@@ -67,10 +68,10 @@ export function useBreadcrumbs(): Breadcrumb[] {
   const { data: page } = useQuery({
     queryKey: queryKeys.pages.detail(pageId ?? ""),
     queryFn: async () => {
-      const { data, error } = await apiClient.GET("/pages/{page_id}", {
+      const { data, error, response } = await apiClient.GET("/pages/{page_id}", {
         params: { path: { page_id: pageId! } },
       });
-      if (error) throw new Error("Failed to fetch page");
+      if (error) throwApiError("Failed to fetch page", error, response.status);
       return data;
     },
     enabled: !!pageId,

@@ -13,11 +13,11 @@ from application.dtos.embedding_dtos import (
 )
 from application.dtos.errors import AppError
 from application.ports.embedding_generator import EmbeddingGenerator
-from application.ports.reranker import Reranker, RerankDocument
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
+from application.ports.reranker import RerankDocument, Reranker
 from application.ports.sparse_embedding_generator import SparseEmbeddingGenerator
 from application.ports.text_chunker import TextChunker
 from application.ports.vector_store import VectorStore
@@ -170,8 +170,10 @@ class GeneratePageEmbeddingUseCase:
             # 5b. Generate sparse embeddings on raw texts (exact-term matching)
             sparse_embeddings = None
             if self.sparse_embedding_generator:
-                sparse_embeddings = self.sparse_embedding_generator.generate_batch_sparse_embeddings(
-                    raw_chunk_texts,
+                sparse_embeddings = (
+                    self.sparse_embedding_generator.generate_batch_sparse_embeddings(
+                        raw_chunk_texts,
+                    )
                 )
 
             # 6. Store all chunk embeddings in vector store
@@ -373,7 +375,9 @@ class SearchSimilarPagesUseCase:
                 # Build diagnostics
                 promotions = [r.original_rank - i for i, r in enumerate(reranked)]
                 rerank_info = RerankInfoDTO(
-                    reranker_model=self.reranker.model_name if hasattr(self.reranker, "model_name") else "unknown",
+                    reranker_model=self.reranker.model_name
+                    if hasattr(self.reranker, "model_name")
+                    else "unknown",
                     candidates_before=len(rerank_docs),
                     results_after=len(reranked),
                     top_promotion=max(promotions) if promotions else None,
@@ -385,7 +389,12 @@ class SearchSimilarPagesUseCase:
                     returned=len(reranked),
                     top_promotion=rerank_info.top_promotion,
                     rank_changes=[
-                        {"page_id": r.id[:8], "original": r.original_rank, "new": i, "score": round(r.score, 4)}
+                        {
+                            "page_id": r.id[:8],
+                            "original": r.original_rank,
+                            "new": i,
+                            "score": round(r.score, 4),
+                        }
                         for i, r in enumerate(reranked[:5])
                     ],
                 )
@@ -425,7 +434,9 @@ class SearchSimilarPagesUseCase:
                         mime_type=str(artifact.mime_type),
                         storage_location=artifact.storage_location,
                         page_count=page_count,
-                        tags=[tm.tag for tm in artifact.tag_mentions] if artifact.tag_mentions else [],
+                        tags=[tm.tag for tm in artifact.tag_mentions]
+                        if artifact.tag_mentions
+                        else [],
                         summary=artifact.summary_candidate.summary
                         if artifact.summary_candidate
                         else None,

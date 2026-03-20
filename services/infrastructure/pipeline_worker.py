@@ -20,6 +20,7 @@ import structlog
 from eventsourcing.application import Application
 from eventsourcing.projection import ApplicationSubscription
 
+from application.use_cases.vector_metadata_use_cases import SyncPageTagsToVectorStoreUseCase
 from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
 from application.workflow_use_cases.trigger_artifact_summarization_use_case import (
     TriggerArtifactSummarizationUseCase,
@@ -49,7 +50,6 @@ from application.workflow_use_cases.trigger_page_summary_embedding_use_case impo
 from application.workflow_use_cases.trigger_smiles_embedding_use_case import (
     TriggerSmilesEmbeddingUseCase,
 )
-from application.use_cases.vector_metadata_use_cases import SyncPageTagsToVectorStoreUseCase
 from domain.aggregates.artifact import Artifact
 from domain.aggregates.page import Page
 from infrastructure.di.container import create_container

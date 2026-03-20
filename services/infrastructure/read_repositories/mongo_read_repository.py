@@ -1,5 +1,5 @@
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -169,7 +169,12 @@ class MongoReadRepository(PageReadModel, ArtifactReadModel, DashboardReadModel, 
                             "$cond": [
                                 {
                                     "$and": [
-                                        {"$ne": [{"$ifNull": ["$summary_candidate.summary", None]}, None]},
+                                        {
+                                            "$ne": [
+                                                {"$ifNull": ["$summary_candidate.summary", None]},
+                                                None,
+                                            ],
+                                        },
                                         {"$ne": ["$summary_candidate.summary", ""]},
                                     ],
                                 },
@@ -350,7 +355,7 @@ class MongoReadRepository(PageReadModel, ArtifactReadModel, DashboardReadModel, 
                 categories[sticky] = TagCategoryDTO(
                     entity_type=sticky,
                     display_name=ENTITY_TYPE_DISPLAY_NAMES.get(
-                        sticky, sticky.replace("_", " ").title()
+                        sticky, sticky.replace("_", " ").title(),
                     ),
                     artifact_count=0,
                     distinct_count=0,
@@ -391,7 +396,7 @@ class MongoReadRepository(PageReadModel, ArtifactReadModel, DashboardReadModel, 
         )
 
     async def _get_tag_folders(
-        self, base_match: dict, entity_type: str, skip: int, limit: int
+        self, base_match: dict, entity_type: str, skip: int, limit: int,
     ) -> list[TagFolderDTO]:
         match_stage: dict = {**base_match, "tag_mentions.entity_type": entity_type}
         pipeline: list[dict] = [
@@ -427,7 +432,7 @@ class MongoReadRepository(PageReadModel, ArtifactReadModel, DashboardReadModel, 
         ]
 
     async def _get_author_folders(
-        self, base_match: dict, skip: int, limit: int
+        self, base_match: dict, skip: int, limit: int,
     ) -> list[TagFolderDTO]:
         match_stage: dict = {**base_match, "author_mentions.0": {"$exists": True}}
         pipeline: list[dict] = [
@@ -462,7 +467,7 @@ class MongoReadRepository(PageReadModel, ArtifactReadModel, DashboardReadModel, 
         ]
 
     async def _get_date_folders(
-        self, base_match: dict, parent: str | None, skip: int, limit: int
+        self, base_match: dict, parent: str | None, skip: int, limit: int,
     ) -> list[TagFolderDTO]:
         match_stage: dict = {**base_match, "presentation_date.date": {"$ne": None}}
 
@@ -497,45 +502,55 @@ class MongoReadRepository(PageReadModel, ArtifactReadModel, DashboardReadModel, 
                 )
                 for d in docs
             ]
-        else:
-            # Group by month within a year
-            year = int(parent)
-            start = datetime(year, 1, 1, tzinfo=timezone.utc).isoformat()
-            end = datetime(year + 1, 1, 1, tzinfo=timezone.utc).isoformat()
-            match_stage["presentation_date.date"] = {"$gte": start, "$lt": end}
+        # Group by month within a year
+        year = int(parent)
+        start = datetime(year, 1, 1, tzinfo=UTC).isoformat()
+        end = datetime(year + 1, 1, 1, tzinfo=UTC).isoformat()
+        match_stage["presentation_date.date"] = {"$gte": start, "$lt": end}
 
-            month_names = [
-                "", "January", "February", "March", "April", "May", "June",
-                "July", "August", "September", "October", "November", "December",
-            ]
+        month_names = [
+            "",
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December",
+        ]
 
-            pipeline = [
-                {"$match": match_stage},
-                {
-                    "$group": {
-                        "_id": {"$month": {"$toDate": "$presentation_date.date"}},
-                        "artifact_ids": {"$addToSet": "$artifact_id"},
-                    },
+        pipeline = [
+            {"$match": match_stage},
+            {
+                "$group": {
+                    "_id": {"$month": {"$toDate": "$presentation_date.date"}},
+                    "artifact_ids": {"$addToSet": "$artifact_id"},
                 },
-                {
-                    "$project": {
-                        "month_num": "$_id",
-                        "artifact_count": {"$size": "$artifact_ids"},
-                    },
+            },
+            {
+                "$project": {
+                    "month_num": "$_id",
+                    "artifact_count": {"$size": "$artifact_ids"},
                 },
-                {"$sort": {"month_num": 1}},
-                {"$skip": skip},
-                {"$limit": limit},
-            ]
-            docs = await self.artifacts.aggregate(pipeline).to_list(limit)
-            return [
-                TagFolderDTO(
-                    tag_value=f"{parent}-{d['month_num']:02d}",
-                    display_name=month_names[d["month_num"]],
-                    artifact_count=d["artifact_count"],
-                )
-                for d in docs
-            ]
+            },
+            {"$sort": {"month_num": 1}},
+            {"$skip": skip},
+            {"$limit": limit},
+        ]
+        docs = await self.artifacts.aggregate(pipeline).to_list(limit)
+        return [
+            TagFolderDTO(
+                tag_value=f"{parent}-{d['month_num']:02d}",
+                display_name=month_names[d["month_num"]],
+                artifact_count=d["artifact_count"],
+            )
+            for d in docs
+        ]
 
     async def get_folder_artifacts(
         self,
@@ -565,16 +580,16 @@ class MongoReadRepository(PageReadModel, ArtifactReadModel, DashboardReadModel, 
             if "-" in tag_value:
                 year, month = tag_value.split("-", 1)
                 month_int = int(month)
-                start = datetime(int(year), month_int, 1, tzinfo=timezone.utc).isoformat()
+                start = datetime(int(year), month_int, 1, tzinfo=UTC).isoformat()
                 if month_int == 12:
-                    end = datetime(int(year) + 1, 1, 1, tzinfo=timezone.utc).isoformat()
+                    end = datetime(int(year) + 1, 1, 1, tzinfo=UTC).isoformat()
                 else:
-                    end = datetime(int(year), month_int + 1, 1, tzinfo=timezone.utc).isoformat()
+                    end = datetime(int(year), month_int + 1, 1, tzinfo=UTC).isoformat()
                 query["presentation_date.date"] = {"$gte": start, "$lt": end}
             else:
                 year_int = int(tag_value)
-                start = datetime(year_int, 1, 1, tzinfo=timezone.utc).isoformat()
-                end = datetime(year_int + 1, 1, 1, tzinfo=timezone.utc).isoformat()
+                start = datetime(year_int, 1, 1, tzinfo=UTC).isoformat()
+                end = datetime(year_int + 1, 1, 1, tzinfo=UTC).isoformat()
                 query["presentation_date.date"] = {"$gte": start, "$lt": end}
             return await self._get_folder_artifacts_simple(query=query, skip=skip, limit=limit)
 
@@ -588,7 +603,7 @@ class MongoReadRepository(PageReadModel, ArtifactReadModel, DashboardReadModel, 
         )
 
     async def _get_folder_artifacts_simple(
-        self, query: dict, skip: int, limit: int
+        self, query: dict, skip: int, limit: int,
     ) -> list[ArtifactBrowseItemDTO]:
         """Fetch folder artifacts without tag provenance (authors, dates)."""
         projection = {
@@ -702,7 +717,11 @@ class MongoReadRepository(PageReadModel, ArtifactReadModel, DashboardReadModel, 
             name="idx_browse_tags",
         )
         await self.artifacts.create_index(
-            [("workspace_id", 1), ("tag_mentions.entity_type", 1), ("tag_mentions.tag_normalized", 1)],
+            [
+                ("workspace_id", 1),
+                ("tag_mentions.entity_type", 1),
+                ("tag_mentions.tag_normalized", 1),
+            ],
             name="idx_browse_tags_normalized",
         )
         await self.artifacts.create_index(

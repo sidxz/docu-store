@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import structlog
 from returns.result import Failure, Result, Success
 
+from application.dtos.embedding_dtos import RerankInfoDTO
 from application.dtos.errors import AppError
 from application.dtos.search_dtos import (
     ChunkHit,
@@ -18,10 +19,13 @@ from application.dtos.search_dtos import (
     SummarySearchResultDTO,
 )
 
+from application.ports.reranker import RerankDocument
+
 if TYPE_CHECKING:
     from uuid import UUID
 
     from application.ports.embedding_generator import EmbeddingGenerator
+    from application.ports.reranker import Reranker
     from application.ports.repositories.artifact_read_models import ArtifactReadModel
     from application.ports.repositories.page_read_models import PageReadModel
     from application.ports.summary_vector_store import SummarySearchResult, SummaryVectorStore
@@ -169,12 +173,14 @@ class HierarchicalSearchUseCase:
         summary_vector_store: SummaryVectorStore,
         page_read_model: PageReadModel,
         artifact_read_model: ArtifactReadModel,
+        reranker: Reranker | None = None,
     ) -> None:
         self.embedding_generator = embedding_generator
         self.vector_store = vector_store
         self.summary_vector_store = summary_vector_store
         self.page_read_model = page_read_model
         self.artifact_read_model = artifact_read_model
+        self.reranker = reranker
 
     async def execute(
         self,
@@ -202,8 +208,9 @@ class HierarchicalSearchUseCase:
             )
 
             chunk_hits: list[ChunkHit] = []
+            chunk_rerank_info: RerankInfoDTO | None = None
             if request.include_chunks:
-                chunk_hits = await self._search_chunks(
+                chunk_hits, chunk_rerank_info = await self._search_chunks(
                     query_embedding,
                     request,
                     allowed_artifact_ids,
@@ -226,6 +233,7 @@ class HierarchicalSearchUseCase:
                     total_summary_hits=len(summary_hits),
                     total_chunk_hits=len(chunk_hits),
                     model_used=str(model_info.get("model_name", "unknown")),
+                    chunk_rerank_info=chunk_rerank_info,
                 ),
             )
 
@@ -285,11 +293,13 @@ class HierarchicalSearchUseCase:
         request: HierarchicalSearchRequest,
         allowed_artifact_ids: list[UUID] | None,
         workspace_id: UUID | None,
-    ) -> list[ChunkHit]:
-        """Query the raw chunk collection with server-side dedup, then enrich."""
+    ) -> tuple[list[ChunkHit], RerankInfoDTO | None]:
+        """Query the raw chunk collection with server-side dedup, rerank, then enrich."""
+        retrieval_limit = request.limit * 3 if self.reranker else request.limit
+
         grouped_results = await self.vector_store.search_pages_grouped(
             query_embedding=query_embedding,
-            limit=request.limit,
+            limit=retrieval_limit,
             score_threshold=request.score_threshold,
             allowed_artifact_ids=allowed_artifact_ids,
             workspace_id=workspace_id,
@@ -298,12 +308,58 @@ class HierarchicalSearchUseCase:
             tag_match_mode=request.tag_match_mode,
         )
 
+        rerank_info: RerankInfoDTO | None = None
+        rerank_scores: dict[str, tuple[float, int]] = {}
+
+        if self.reranker and grouped_results:
+            rerank_docs: list[RerankDocument] = []
+            for r in grouped_results:
+                page = await self.page_read_model.get_page_by_id(r.page_id)
+                text = ""
+                if page and page.text_mention and page.text_mention.text:
+                    text = page.text_mention.text[:2000]
+                if not text.strip():
+                    continue
+                rerank_docs.append(RerankDocument(id=str(r.page_id), text=text))
+
+            reranked = self.reranker.rerank(
+                query=request.query_text,
+                documents=rerank_docs,
+                top_k=request.limit,
+            )
+
+            rerank_scores = {r.id: (r.score, r.original_rank) for r in reranked}
+            rerank_order = {r.id: i for i, r in enumerate(reranked)}
+            grouped_results = sorted(
+                [r for r in grouped_results if str(r.page_id) in rerank_order],
+                key=lambda r: rerank_order[str(r.page_id)],
+            )
+
+            promotions = [r.original_rank - i for i, r in enumerate(reranked)]
+            rerank_info = RerankInfoDTO(
+                reranker_model=self.reranker.model_name
+                if hasattr(self.reranker, "model_name")
+                else "unknown",
+                candidates_before=len(rerank_docs),
+                results_after=len(reranked),
+                top_promotion=max(promotions) if promotions else None,
+            )
+
+            logger.info(
+                "hierarchical_chunk_rerank",
+                candidates=len(rerank_docs),
+                returned=len(reranked),
+                top_promotion=rerank_info.top_promotion,
+            )
+
         chunk_hits: list[ChunkHit] = []
         for r in grouped_results:
-            chunk_hits.append(
-                await self._enrich_chunk_hit(r.page_id, r.artifact_id, r.page_index, r.score),
-            )
-        return chunk_hits
+            rr_score, rr_original = rerank_scores.get(str(r.page_id), (None, None))
+            hit = await self._enrich_chunk_hit(r.page_id, r.artifact_id, r.page_index, r.score)
+            hit.rerank_score = rr_score
+            hit.original_rank = rr_original
+            chunk_hits.append(hit)
+        return chunk_hits, rerank_info
 
     async def _enrich_chunk_hit(
         self,

@@ -79,7 +79,9 @@ class SentenceTransformerGenerator(EmbeddingGenerator):
 
             logger.info("loading_sentence_transformer_model", model_name=self.model_name)
             self._model = SentenceTransformer(
-                self.model_name, device=self.device, trust_remote_code=True,
+                self.model_name,
+                device=self.device,
+                trust_remote_code=True,
             )
             self._dimensions = self._model.get_sentence_embedding_dimension()
             logger.info(

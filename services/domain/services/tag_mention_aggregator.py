@@ -41,6 +41,7 @@ def aggregate_tag_mentions(
     A single deduplicated list suitable for ``Artifact.update_tag_mentions()``,
     with ``sources``, ``tag_normalized``, ``max_confidence``, and ``page_count``
     populated on each entry.
+
     """
     # Group by (entity_type, normalized tag) → list of (TagMention, page_id, page_index)
     groups: dict[tuple[str, str], list[tuple[TagMention, UUID, int]]] = {}

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Literal
 
 import structlog
 
-from application.ports.reranker import Reranker, RerankDocument, RerankResult
+from application.ports.reranker import RerankDocument, Reranker, RerankResult
 
 if TYPE_CHECKING:
     from sentence_transformers import CrossEncoder as _CrossEncoder

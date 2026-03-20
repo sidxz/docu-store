@@ -1,5 +1,6 @@
 import { getAuthzClient } from "./authz-client";
 import { API_URL } from "./constants";
+import { ApiError } from "./api-error";
 
 /**
  * Fetch wrapper that injects Sentinel auth headers and retries on 401.
@@ -40,6 +41,6 @@ export async function authFetchJson<T>(
   init?: RequestInit,
 ): Promise<T> {
   const res = await authFetch(path, init);
-  if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+  if (!res.ok) throw new ApiError(`API error: ${res.statusText}`, res.status);
   return res.json();
 }

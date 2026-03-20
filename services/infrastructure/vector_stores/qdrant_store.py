@@ -105,7 +105,9 @@ class QdrantStore(VectorStore):
             except UnexpectedResponse as e:
                 if e.status_code == 409:
                     # Race condition: another process created it between check and create
-                    logger.info("collection_created_by_another_process", collection=self.collection_name)
+                    logger.info(
+                        "collection_created_by_another_process", collection=self.collection_name,
+                    )
                     return
                 raise
 
@@ -429,8 +431,12 @@ class QdrantStore(VectorStore):
         """
         client = await self._get_client()
         query_filter = self._build_filter(
-            artifact_id_filter, allowed_artifact_ids, workspace_id,
-            tags, entity_types, tag_match_mode,
+            artifact_id_filter,
+            allowed_artifact_ids,
+            workspace_id,
+            tags,
+            entity_types,
+            tag_match_mode,
         )
 
         try:
@@ -487,8 +493,12 @@ class QdrantStore(VectorStore):
         """
         client = await self._get_client()
         query_filter = self._build_filter(
-            artifact_id_filter, allowed_artifact_ids, workspace_id,
-            tags, entity_types, tag_match_mode,
+            artifact_id_filter,
+            allowed_artifact_ids,
+            workspace_id,
+            tags,
+            entity_types,
+            tag_match_mode,
         )
 
         try:
@@ -559,8 +569,12 @@ class QdrantStore(VectorStore):
         """Hybrid search: dense + sparse, fused with Reciprocal Rank Fusion."""
         client = await self._get_client()
         query_filter = self._build_filter(
-            artifact_id_filter, allowed_artifact_ids, workspace_id,
-            tags, entity_types, tag_match_mode,
+            artifact_id_filter,
+            allowed_artifact_ids,
+            workspace_id,
+            tags,
+            entity_types,
+            tag_match_mode,
         )
 
         try:
@@ -619,8 +633,12 @@ class QdrantStore(VectorStore):
         """Hybrid search with server-side dedup by page_id via RRF fusion."""
         client = await self._get_client()
         query_filter = self._build_filter(
-            artifact_id_filter, allowed_artifact_ids, workspace_id,
-            tags, entity_types, tag_match_mode,
+            artifact_id_filter,
+            allowed_artifact_ids,
+            workspace_id,
+            tags,
+            entity_types,
+            tag_match_mode,
         )
 
         try:

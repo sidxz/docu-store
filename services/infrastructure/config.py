@@ -230,10 +230,10 @@ class Settings(BaseSettings):
 
     # Browse (tag-based document browser)
     browse_default_category_limit: int = Field(
-        default=5, validation_alias="BROWSE_DEFAULT_CATEGORY_LIMIT"
+        default=5, validation_alias="BROWSE_DEFAULT_CATEGORY_LIMIT",
     )
     browse_sticky_categories: str = Field(
-        default="target", validation_alias="BROWSE_STICKY_CATEGORIES"
+        default="target", validation_alias="BROWSE_STICKY_CATEGORIES",
     )
 
     @property

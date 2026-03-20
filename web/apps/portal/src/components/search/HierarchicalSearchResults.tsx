@@ -19,6 +19,15 @@ interface ChunkHit {
   text_preview?: string | null;
   artifact_name?: string | null;
   page_name?: string | null;
+  rerank_score?: number | null;
+  original_rank?: number | null;
+}
+
+interface RerankInfo {
+  reranker_model: string;
+  candidates_before: number;
+  results_after: number;
+  top_promotion?: number | null;
 }
 
 interface HierarchicalSearchResultsProps {
@@ -29,6 +38,7 @@ interface HierarchicalSearchResultsProps {
     total_summary_hits: number;
     total_chunk_hits: number;
     model_used: string;
+    chunk_rerank_info?: RerankInfo | null;
   };
   workspace: string;
 }
@@ -88,8 +98,22 @@ export function HierarchicalSearchResults({
       {data.chunk_hits.length > 0 && (
         <div>
           <h3 className="mb-2 text-sm font-medium text-text-secondary">
-            Text Chunk Matches
+            Exact Matches
           </h3>
+
+          {data.chunk_rerank_info && (
+            <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs dark:border-blue-800 dark:bg-blue-950">
+              <span className="font-medium text-blue-700 dark:text-blue-300">Reranked</span>
+              <span className="ml-2 text-blue-600 dark:text-blue-400">
+                {data.chunk_rerank_info.candidates_before} candidates → {data.chunk_rerank_info.results_after} results
+                {data.chunk_rerank_info.top_promotion != null && data.chunk_rerank_info.top_promotion > 0 && (
+                  <> · top result promoted {data.chunk_rerank_info.top_promotion} positions</>
+                )}
+                <span className="ml-2 opacity-60">({data.chunk_rerank_info.reranker_model})</span>
+              </span>
+            </div>
+          )}
+
           <div className="space-y-3">
             {data.chunk_hits.map((c) => (
               <SearchResultCard
@@ -107,7 +131,23 @@ export function HierarchicalSearchResults({
                   label: "View document",
                   href: `/${workspace}/documents/${c.artifact_id}`,
                 }}
-              />
+              >
+                {c.rerank_score != null && (
+                  <div className="mt-1.5 flex items-center gap-2 text-xs text-text-muted">
+                    <span>vector: {c.score.toFixed(3)}</span>
+                    <span>→ rerank: {c.rerank_score.toFixed(3)}</span>
+                    {c.original_rank != null && (
+                      <span className={
+                        c.original_rank > 0
+                          ? "text-green-600 dark:text-green-400"
+                          : "text-text-muted"
+                      }>
+                        {c.original_rank > 0 ? `↑${c.original_rank}` : "—"}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </SearchResultCard>
             ))}
           </div>
         </div>

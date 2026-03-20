@@ -232,7 +232,7 @@ class TestSearchSimilarPagesUseCase:
             mime_type="application/pdf",
             storage_location="/s/paper.pdf",
             pages=[page_id],
-            tags=["chemistry"],
+            tag_mentions=[],
             summary_candidate=None,
             title_mention=None,
         )

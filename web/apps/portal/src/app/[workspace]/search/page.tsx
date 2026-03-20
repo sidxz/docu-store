@@ -27,9 +27,9 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 type SearchMode = "text" | "summary" | "hierarchical";
 
 const SEARCH_MODES = [
-  { label: "Text Chunks", value: "text" as SearchMode },
-  { label: "Summaries", value: "summary" as SearchMode },
-  { label: "Hierarchical", value: "hierarchical" as SearchMode },
+  { label: "Exact Match", value: "text" as SearchMode },
+  { label: "Overview Search", value: "summary" as SearchMode },
+  { label: "Deep Search", value: "hierarchical" as SearchMode },
 ];
 
 export default function SearchPage() {

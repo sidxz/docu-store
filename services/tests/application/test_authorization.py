@@ -13,7 +13,7 @@ from application.use_cases.artifact_use_cases import (
     AddPagesUseCase,
     CreateArtifactUseCase,
     DeleteArtifactUseCase,
-    UpdateTagsUseCase,
+    UpdateTagMentionsUseCase,
     UpdateTitleMentionUseCase,
 )
 from application.use_cases.page_use_cases import (
@@ -23,6 +23,7 @@ from application.use_cases.page_use_cases import (
 from domain.aggregates.artifact import Artifact
 from domain.aggregates.page import Page
 from domain.value_objects.artifact_type import ArtifactType
+from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.mime_type import MimeType
 from domain.value_objects.text_mention import TextMention
 from domain.value_objects.title_mention import TitleMention
@@ -107,8 +108,9 @@ class TestRoleBasedAccess:
         repo = MockArtifactRepository()
         repo.save(artifact)
 
-        use_case = UpdateTagsUseCase(repo)
-        result = await use_case.execute(artifact.id, ["tag"], auth=auth)
+        use_case = UpdateTagMentionsUseCase(repo)
+        tag = TagMention(tag="tag", confidence=0.9)
+        result = await use_case.execute(artifact.id, [tag], auth=auth)
 
         assert isinstance(result, Failure)
         assert result.failure().category == "forbidden"
@@ -206,8 +208,9 @@ class TestWorkspaceIsolation:
         repo = MockArtifactRepository()
         repo.save(artifact)
 
-        use_case = UpdateTagsUseCase(repo)
-        result = await use_case.execute(artifact.id, ["tag1"], auth=auth)
+        use_case = UpdateTagMentionsUseCase(repo)
+        tag = TagMention(tag="tag1", confidence=0.9)
+        result = await use_case.execute(artifact.id, [tag], auth=auth)
 
         assert isinstance(result, Success)
 

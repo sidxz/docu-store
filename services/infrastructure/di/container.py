@@ -18,11 +18,13 @@ from application.ports.pdf_service import PDFService
 from application.ports.permission_registrar import PermissionRegistrar
 from application.ports.prompt_repository import PromptRepositoryPort
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
-from application.ports.repositories.dashboard_read_models import DashboardReadModel
 from application.ports.repositories.artifact_repository import ArtifactRepository
+from application.ports.repositories.dashboard_read_models import DashboardReadModel
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.page_repository import PageRepository
+from application.ports.reranker import Reranker
 from application.ports.smiles_validator import SmilesValidator
+from application.ports.sparse_embedding_generator import SparseEmbeddingGenerator
 from application.ports.structured_extractor import StructuredExtractorPort
 from application.ports.summary_vector_store import SummaryVectorStore
 from application.ports.text_chunker import TextChunker
@@ -65,11 +67,6 @@ from application.use_cases.page_use_cases import (
 from application.use_cases.search_use_cases import HierarchicalSearchUseCase, SearchSummariesUseCase
 from application.use_cases.smiles_embedding_use_cases import EmbedCompoundSmilesUseCase
 from application.use_cases.smiles_search_use_cases import SearchSimilarCompoundsUseCase
-from application.ports.reranker import Reranker
-from application.ports.sparse_embedding_generator import SparseEmbeddingGenerator
-from infrastructure.rerankers.cross_encoder_reranker import CrossEncoderReranker
-from application.use_cases.vector_metadata_use_cases import SyncPageTagsToVectorStoreUseCase
-from infrastructure.embeddings.tfidf_sparse_generator import TfidfSparseGenerator
 from application.use_cases.summarization_use_cases import (
     SummarizeArtifactUseCase,
     SummarizePageUseCase,
@@ -78,6 +75,7 @@ from application.use_cases.summary_embedding_use_cases import (
     EmbedArtifactSummaryUseCase,
     EmbedPageSummaryUseCase,
 )
+from application.use_cases.vector_metadata_use_cases import SyncPageTagsToVectorStoreUseCase
 from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
 from application.workflow_use_cases.trigger_artifact_summarization_use_case import (
     TriggerArtifactSummarizationUseCase,
@@ -127,6 +125,7 @@ from infrastructure.config import settings
 from infrastructure.cser.cser_pipeline_service import CserPipelineService
 from infrastructure.embeddings.chemberta_generator import ChemBertaEmbeddingGenerator
 from infrastructure.embeddings.sentence_transformer_generator import SentenceTransformerGenerator
+from infrastructure.embeddings.tfidf_sparse_generator import TfidfSparseGenerator
 from infrastructure.event_projectors.event_projector import EventProjector
 from infrastructure.event_sourced_repositories.artifact_repository import (
     EventSourcedArtifactRepository,
@@ -144,6 +143,7 @@ from infrastructure.read_repositories.mongo_read_model_materializer import (
     MongoReadModelMaterializer,
 )
 from infrastructure.read_repositories.mongo_read_repository import MongoReadRepository
+from infrastructure.rerankers.cross_encoder_reranker import CrossEncoderReranker
 from infrastructure.serialization.pydantic_transcoder import PydanticTranscoding
 from infrastructure.temporal.orchestrator import TemporalWorkflowOrchestrator
 from infrastructure.text_chunkers.langchain_chunker import LangChainTextChunker
@@ -245,7 +245,9 @@ def create_container() -> Container:  # noqa: PLR0915
     container[PageReadModel] = mongo_repository_factory
     container[ArtifactReadModel] = mongo_repository_factory
 
-    from application.ports.repositories.tag_browse_read_model import TagBrowseReadModel  # noqa: PLC0415
+    from application.ports.repositories.tag_browse_read_model import (
+        TagBrowseReadModel,
+    )
 
     container[TagBrowseReadModel] = mongo_repository_factory
     container[DashboardReadModel] = mongo_repository_factory
@@ -592,6 +594,7 @@ def create_container() -> Container:  # noqa: PLR0915
         summary_vector_store=c[SummaryVectorStore],
         page_read_model=c[PageReadModel],
         artifact_read_model=c[ArtifactReadModel],
+        reranker=c[Reranker],
     )
 
     return container

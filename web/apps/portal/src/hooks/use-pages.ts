@@ -4,15 +4,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@docu-store/api-client";
 import type { WorkflowMap } from "@docu-store/types";
 import { queryKeys } from "@/lib/query-keys";
+import { throwApiError } from "@/lib/api-error";
 
 export function usePage(pageId: string) {
   return useQuery({
     queryKey: queryKeys.pages.detail(pageId),
     queryFn: async () => {
-      const { data, error } = await apiClient.GET("/pages/{page_id}", {
+      const { data, error, response } = await apiClient.GET("/pages/{page_id}", {
         params: { path: { page_id: pageId } },
       });
-      if (error) throw new Error("Failed to fetch page");
+      if (error) throwApiError("Failed to fetch page", error, response.status);
 
       if (process.env.NODE_ENV === "development") {
         console.groupCollapsed(
@@ -58,11 +59,11 @@ export function usePageWorkflows(pageId: string) {
   return useQuery({
     queryKey: queryKeys.pages.workflows(pageId),
     queryFn: async () => {
-      const { data, error } = await apiClient.GET(
+      const { data, error, response } = await apiClient.GET(
         "/pages/{page_id}/workflows",
         { params: { path: { page_id: pageId } } },
       );
-      if (error) throw new Error("Failed to fetch page workflows");
+      if (error) throwApiError("Failed to fetch page workflows", error, response.status);
       const result = data as WorkflowMap;
 
       if (process.env.NODE_ENV === "development" && result?.workflows) {
@@ -143,7 +144,7 @@ export function useRerunPageWorkflow(pageId: string) {
           throw new Error(`No rerun endpoint for workflow: ${workflowName}`);
       }
 
-      if (error) throw new Error(`Failed to rerun ${workflowName}`);
+      if (error) throwApiError(`Failed to rerun ${workflowName}`, error);
 
       if (process.env.NODE_ENV === "development") {
         console.log(

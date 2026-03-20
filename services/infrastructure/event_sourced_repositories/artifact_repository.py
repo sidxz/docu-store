@@ -1,10 +1,11 @@
 from uuid import UUID
 
 from eventsourcing.application import Application
+from eventsourcing.persistence import IntegrityError as EventSourcingIntegrityError
 
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from domain.aggregates.artifact import Artifact
-from domain.exceptions import AggregateNotFoundError, InfrastructureError
+from domain.exceptions import AggregateNotFoundError, ConcurrencyError, InfrastructureError
 
 
 def _raise_artifact_not_found(artifact_id: UUID) -> None:
@@ -27,13 +28,16 @@ class EventSourcedArtifactRepository(ArtifactRepository):
         """Save an artifact entity to the event-sourced repository.
 
         Raises:
+            ConcurrencyError: If an optimistic locking conflict occurs.
             InfrastructureError: If the event store operation fails.
 
         """
         try:
             self.application.save(artifact)
+        except EventSourcingIntegrityError as e:
+            msg = f"Concurrency conflict saving artifact: {e!s}"
+            raise ConcurrencyError(msg) from e
         except Exception as e:
-            # Let infrastructure errors bubble up for proper error handling at API layer
             msg = f"Failed to save artifact: {e!s}"
             raise InfrastructureError(msg) from e
 

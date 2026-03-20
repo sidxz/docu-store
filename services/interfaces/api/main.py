@@ -54,7 +54,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.info("qdrant_summary_collection_initialized")
 
             # Ensure MongoDB browse indexes
-            from application.ports.repositories.tag_browse_read_model import TagBrowseReadModel  # noqa: PLC0415
+            from application.ports.repositories.tag_browse_read_model import (
+                TagBrowseReadModel,
+            )
 
             browse_read_model = container[TagBrowseReadModel]
             await browse_read_model.ensure_browse_indexes()

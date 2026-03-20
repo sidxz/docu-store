@@ -101,7 +101,7 @@ class TestEventProjector:
         assert fields["source_uri"] == "https://example.com/paper.pdf"
         assert fields["source_filename"] == "paper.pdf"
         assert fields["pages"] == []
-        assert fields["tags"] == []
+        assert fields["tag_mentions"] == []
         assert fields["title_mention"] is None
 
     def test_artifact_projector_pages_added_and_removed(self) -> None:
@@ -157,9 +157,10 @@ class TestEventProjector:
         summary_event = list(artifact.collect_events())[0]
         projector.summary_candidate_updated(summary_event, _tracking())
 
-        artifact.update_tags(["chemistry"])
+        tag = TagMention(tag="chemistry", confidence=0.9)
+        artifact.update_tag_mentions([tag])
         tags_event = list(artifact.collect_events())[0]
-        projector.tags_updated(tags_event, _tracking())
+        projector.tag_mentions_updated(tags_event, _tracking())
 
         artifact.delete()
         deleted_event = list(artifact.collect_events())[0]
@@ -167,7 +168,7 @@ class TestEventProjector:
 
         assert materializer.upsert_artifact_calls[0][1]["title_mention"]["title"] == "Title"
         assert materializer.upsert_artifact_calls[1][1]["summary_candidate"]["summary"] == "Summary"
-        assert materializer.upsert_artifact_calls[2][1]["tags"] == ["chemistry"]
+        assert materializer.upsert_artifact_calls[2][1]["tag_mentions"][0]["tag"] == "chemistry"
         assert materializer.delete_artifact_calls[0][0] == str(deleted_event.originator_id)
 
     def test_page_projector_events(self) -> None:

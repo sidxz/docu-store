@@ -181,6 +181,7 @@ class MockVectorStore:
         page_index: int,
         chunk_count: int,
         metadata: dict | None = None,
+        sparse_embeddings: list | None = None,
     ) -> None:
         self.upsert_chunk_calls.append(
             {"page_id": page_id, "embeddings": embeddings, "chunk_count": chunk_count}
@@ -197,6 +198,48 @@ class MockVectorStore:
     ) -> list[PageSearchResult]:
         self.search_calls.append({"limit": limit, "filter": artifact_id_filter, "allowed_artifact_ids": allowed_artifact_ids, "workspace_id": workspace_id})
         return self._search_results
+
+    async def search_pages_grouped(
+        self,
+        query_embedding: TextEmbedding,
+        limit: int = 10,
+        artifact_id_filter: UUID | None = None,
+        score_threshold: float | None = None,
+        allowed_artifact_ids: list[UUID] | None = None,
+        workspace_id: UUID | None = None,
+        tags: list[str] | None = None,
+        entity_types: list[str] | None = None,
+        tag_match_mode: str = "any",
+        group_size: int = 1,
+    ) -> list[PageSearchResult]:
+        self.search_calls.append({"limit": limit, "filter": artifact_id_filter, "allowed_artifact_ids": allowed_artifact_ids, "workspace_id": workspace_id})
+        # Deduplicate by page_id (keep best score) and respect limit
+        seen: dict[UUID, PageSearchResult] = {}
+        for r in self._search_results:
+            if r.page_id not in seen or r.score > seen[r.page_id].score:
+                seen[r.page_id] = r
+        return list(seen.values())[:limit]
+
+    async def search_hybrid_grouped(
+        self,
+        dense_query: TextEmbedding,
+        sparse_query: object,
+        limit: int = 10,
+        prefetch_limit: int = 100,
+        artifact_id_filter: UUID | None = None,
+        score_threshold: float | None = None,
+        allowed_artifact_ids: list[UUID] | None = None,
+        workspace_id: UUID | None = None,
+        tags: list[str] | None = None,
+        entity_types: list[str] | None = None,
+        tag_match_mode: str = "any",
+        group_size: int = 1,
+    ) -> list[PageSearchResult]:
+        self.search_calls.append({"limit": limit, "filter": artifact_id_filter, "allowed_artifact_ids": allowed_artifact_ids, "workspace_id": workspace_id})
+        return self._search_results
+
+    async def set_page_payload(self, page_id: UUID, payload: dict) -> None:
+        pass
 
     async def get_collection_info(self) -> dict:
         return {}

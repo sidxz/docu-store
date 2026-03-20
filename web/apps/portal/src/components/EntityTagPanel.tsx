@@ -19,7 +19,6 @@ const FALLBACK_STYLE = { label: "", dot: "bg-zinc-400", pill: "border-zinc-400/3
 
 interface EntityTagPanelProps {
   tagMentions: TagMentionItem[];
-  /** Used to build page links: /{workspace}/documents/{artifactId}/pages/{pageId} */
   workspace: string;
   artifactId: string;
 }
@@ -39,6 +38,8 @@ function groupTags(tagMentions: TagMentionItem[]) {
   }
   return { compounds, grouped };
 }
+
+// ── Source badges ──
 
 function SourceBadges({
   sources,
@@ -92,6 +93,118 @@ function SourcePillSuffix({
   );
 }
 
+// ── Entity type section (targets, diseases, etc.) ──
+
+function EntityTypeSection({
+  entityType,
+  tags,
+  workspace,
+  artifactId,
+}: {
+  entityType: string;
+  tags: TagMentionItem[];
+  workspace: string;
+  artifactId: string;
+}) {
+  const style = ENTITY_STYLE[entityType] ?? FALLBACK_STYLE;
+  return (
+    <div>
+      <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
+        <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
+        {style.label || entityType.replace(/_/g, " ")}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {tags.map((tm, i) => {
+          const sources = (tm as Record<string, unknown>).sources as
+            | { page_id: string; page_index: number }[]
+            | undefined;
+          const hasSources = sources && sources.length > 0;
+          return (
+            <span
+              key={`${tm.tag}-${i}`}
+              className={`inline-flex items-center rounded-md border ${style.pill} bg-surface-elevated text-sm`}
+            >
+              <span className={`py-1 pl-3 font-medium text-text-primary ${hasSources ? "pr-2" : "pr-3"}`}>
+                {tm.tag}
+              </span>
+              {hasSources && (
+                <SourcePillSuffix sources={sources} workspace={workspace} artifactId={artifactId} />
+              )}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Bioactivity table ──
+
+function ActivityTable({ activities }: { activities: Bioactivity[] }) {
+  return (
+    <div className="mt-2.5 overflow-hidden rounded-md border border-border-subtle">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-border-subtle bg-surface-sunken/50">
+            <th className="px-2 py-1.5 text-left font-medium text-text-muted">Assay</th>
+            <th className="px-2 py-1.5 text-left font-medium text-text-muted">Value</th>
+            <th className="px-2 py-1.5 text-left font-medium text-text-muted">Source</th>
+          </tr>
+        </thead>
+        <tbody>
+          {activities.map((a, j) => (
+            <tr key={j} className="border-b border-border-subtle last:border-0">
+              <td className="px-2 py-1.5 font-mono font-medium text-text-primary">{a.assay_type}</td>
+              <td className="px-2 py-1.5 font-mono text-text-primary">{a.value}{a.unit ? ` ${a.unit}` : ""}</td>
+              <td className="px-2 py-1.5 text-text-muted">{a.raw_text}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Compound card ──
+
+function CompoundCard({
+  tagMention,
+  expanded,
+  workspace,
+  artifactId,
+}: {
+  tagMention: TagMentionItem;
+  expanded: boolean;
+  workspace: string;
+  artifactId: string;
+}) {
+  const params = tagMention.additional_model_params as Record<string, unknown> | undefined;
+  const activities = params?.bioactivities as Bioactivity[] | undefined;
+  const synonyms = params?.synonyms as string | undefined;
+  const sources = (tagMention as Record<string, unknown>).sources as
+    | { page_id: string; page_index: number }[]
+    | undefined;
+
+  return (
+    <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.03] p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-baseline gap-2 overflow-hidden">
+          <span className="text-sm font-semibold text-text-primary">{tagMention.tag}</span>
+          {expanded && synonyms && (
+            <span className="truncate text-xs text-text-muted">aka {synonyms}</span>
+          )}
+        </div>
+        <SourceBadges sources={sources} workspace={workspace} artifactId={artifactId} />
+      </div>
+      {expanded && activities && activities.length > 0 && (
+        <ActivityTable activities={activities} />
+      )}
+    </div>
+  );
+}
+
+// ── Main panel ──
+
 export function EntityTagPanel({ tagMentions, workspace, artifactId }: EntityTagPanelProps) {
   const { compounds, grouped } = groupTags(tagMentions);
   const [expanded, setExpanded] = useState(false);
@@ -107,38 +220,15 @@ export function EntityTagPanel({ tagMentions, workspace, artifactId }: EntityTag
     <Card>
       <h3 className="mb-4 text-sm font-medium text-text-secondary">Entities</h3>
       <div className="space-y-5">
-        {[...grouped.entries()].map(([entityType, tags]) => {
-          const style = ENTITY_STYLE[entityType] ?? FALLBACK_STYLE;
-          return (
-            <div key={entityType}>
-              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
-                <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
-                {style.label || entityType.replace(/_/g, " ")}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {tags.map((tm, i) => {
-                  const sources = (tm as Record<string, unknown>).sources as
-                    | { page_id: string; page_index: number }[]
-                    | undefined;
-                  const hasSources = sources && sources.length > 0;
-                  return (
-                    <span
-                      key={`${tm.tag}-${i}`}
-                      className={`inline-flex items-center rounded-md border ${style.pill} bg-surface-elevated text-sm`}
-                    >
-                      <span className={`py-1 pl-3 font-medium text-text-primary ${hasSources ? "pr-2" : "pr-3"}`}>
-                        {tm.tag}
-                      </span>
-                      {hasSources && (
-                        <SourcePillSuffix sources={sources} workspace={workspace} artifactId={artifactId} />
-                      )}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
+        {[...grouped.entries()].map(([entityType, tags]) => (
+          <EntityTypeSection
+            key={entityType}
+            entityType={entityType}
+            tags={tags}
+            workspace={workspace}
+            artifactId={artifactId}
+          />
+        ))}
         {compounds.length > 0 && (
           <div>
             <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
@@ -165,52 +255,15 @@ export function EntityTagPanel({ tagMentions, workspace, artifactId }: EntityTag
               )}
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
-              {compounds.map((tm, i) => {
-                const params = tm.additional_model_params as Record<string, unknown> | undefined;
-                const activities = params?.bioactivities as Bioactivity[] | undefined;
-                const synonyms = params?.synonyms as string | undefined;
-                const sources = (tm as Record<string, unknown>).sources as
-                  | { page_id: string; page_index: number }[]
-                  | undefined;
-                return (
-                  <div
-                    key={`${tm.tag}-${i}`}
-                    className="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.03] p-3"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-baseline gap-2 overflow-hidden">
-                        <span className="text-sm font-semibold text-text-primary">{tm.tag}</span>
-                        {expanded && synonyms && (
-                          <span className="truncate text-xs text-text-muted">aka {synonyms}</span>
-                        )}
-                      </div>
-                      <SourceBadges sources={sources} workspace={workspace} artifactId={artifactId} />
-                    </div>
-                    {expanded && activities && activities.length > 0 && (
-                      <div className="mt-2.5 overflow-hidden rounded-md border border-border-subtle">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="border-b border-border-subtle bg-surface-sunken/50">
-                              <th className="px-2 py-1.5 text-left font-medium text-text-muted">Assay</th>
-                              <th className="px-2 py-1.5 text-left font-medium text-text-muted">Value</th>
-                              <th className="px-2 py-1.5 text-left font-medium text-text-muted">Source</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {activities.map((a, j) => (
-                              <tr key={j} className="border-b border-border-subtle last:border-0">
-                                <td className="px-2 py-1.5 font-mono font-medium text-text-primary">{a.assay_type}</td>
-                                <td className="px-2 py-1.5 font-mono text-text-primary">{a.value}{a.unit ? ` ${a.unit}` : ""}</td>
-                                <td className="px-2 py-1.5 text-text-muted">{a.raw_text}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {compounds.map((tm, i) => (
+                <CompoundCard
+                  key={`${tm.tag}-${i}`}
+                  tagMention={tm}
+                  expanded={expanded}
+                  workspace={workspace}
+                  artifactId={artifactId}
+                />
+              ))}
             </div>
           </div>
         )}

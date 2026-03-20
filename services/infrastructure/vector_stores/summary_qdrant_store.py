@@ -11,7 +11,7 @@ Payload fields (indexed for filtering):
   - artifact_id: str(UUID)
 """
 
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 import structlog
@@ -383,7 +383,9 @@ class SummaryQdrantStore(SummaryVectorStore):
     ) -> None:
         """Patch payload fields on a summary point without re-embedding."""
         client = await self._get_client()
-        point_id = _page_point_id(entity_id) if entity_type == "page" else _artifact_point_id(entity_id)
+        point_id = (
+            _page_point_id(entity_id) if entity_type == "page" else _artifact_point_id(entity_id)
+        )
         try:
             await client.set_payload(
                 collection_name=self.collection_name,
