@@ -199,6 +199,15 @@
     outline-offset: 2px;
   }
 
+  /* Citation highlight flash — used when clicking [N] in chat answers */
+  @keyframes citation-flash {
+    0% { background-color: var(--ds-accent-muted); }
+    100% { background-color: transparent; }
+  }
+  .citation-highlight {
+    animation: citation-flash 1.5s ease-out;
+  }
+
   /* Selection color */
   ::selection {
     background-color: var(--ds-accent-muted);

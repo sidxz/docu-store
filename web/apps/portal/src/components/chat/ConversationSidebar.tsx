@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Trash2, MessageSquare } from "lucide-react";
 import { Button } from "primereact/button";
 import { useConversations, useCreateConversation, useDeleteConversation } from "@/hooks/use-chat";
+import { useChatStore } from "@/lib/stores/chat-store";
 import type { Conversation } from "@docu-store/types";
 
 interface ConversationSidebarProps {
@@ -22,7 +23,10 @@ export function ConversationSidebar({
   const createConversation = useCreateConversation();
   const deleteConversation = useDeleteConversation();
 
+  const resetChat = useChatStore((s) => s.reset);
+
   const handleNew = async () => {
+    resetChat();
     const conv = await createConversation.mutateAsync();
     router.push(`/${workspace}/chat/${conv.conversation_id}`);
   };
@@ -31,11 +35,13 @@ export function ConversationSidebar({
     e.stopPropagation();
     await deleteConversation.mutateAsync(id);
     if (id === activeConversationId) {
+      resetChat();
       router.push(`/${workspace}/chat`);
     }
   };
 
   const handleSelect = (id: string) => {
+    resetChat();
     router.push(`/${workspace}/chat/${id}`);
   };
 

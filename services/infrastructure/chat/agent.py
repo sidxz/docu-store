@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING
@@ -166,6 +167,12 @@ class ChatAgent:
                     status="completed",
                 )
 
+                # Determine which citations were actually used in the answer
+                cited_indices = _extract_cited_indices(draft_answer)
+                used_citations = [c for c in citations if c.citation_index in cited_indices]
+                # Build source text for grounding using only cited sources
+                used_sources_text = _build_cited_sources_text(used_citations, sources_text)
+
                 if _debug:
                     log.info(
                         "chat.debug.agent.synthesis_done",
@@ -173,18 +180,21 @@ class ChatAgent:
                         answer_len=len(draft_answer),
                         tokens_streamed=total_tokens,
                         answer_preview=draft_answer[:300],
+                        cited_indices=sorted(cited_indices),
+                        total_retrieved=len(citations),
+                        actually_used=len(used_citations),
                     )
 
-                # ── Step 4: Grounding Verification ──
+                # ── Step 4: Grounding Verification (against cited sources only) ──
                 t4 = time.monotonic()
                 yield AgentEvent(
                     type="step_started",
                     step="verification",
                     status="started",
-                    description="Verifying answer is grounded in sources...",
+                    description=f"Verifying {len(used_citations)} cited sources...",
                 )
 
-                grounding = await self._grounding.run(draft_answer, sources_text)
+                grounding = await self._grounding.run(draft_answer, used_sources_text)
 
                 verification_ms = int((time.monotonic() - t4) * 1000)
                 yield AgentEvent(
@@ -244,16 +254,24 @@ class ChatAgent:
                     total_duration_ms=elapsed_ms,
                     analysis_ms=analysis_ms,
                     total_tokens=total_tokens,
-                    citation_count=len(citations),
+                    retrieved_count=len(citations),
+                    cited_count=len(used_citations),
                     retries=retry_count,
                 )
 
+            # done event carries only the actually-cited sources
+            log.info(
+                "chat.agent.citation_filter",
+                retrieved=len(citations),
+                cited_indices=sorted(cited_indices),
+                used=len(used_citations),
+            )
             yield AgentEvent(
                 type="done",
                 message_id=message_id,
                 total_tokens=total_tokens,
                 duration_ms=elapsed_ms,
-                sources=citations,
+                sources=used_citations,
             )
 
         except Exception as exc:
@@ -262,3 +280,38 @@ class ChatAgent:
                 type="error",
                 error_message=f"An error occurred: {exc!s}",
             )
+
+
+_CITATION_RE = re.compile(r"\[(\d{1,2})\]")
+
+
+def _extract_cited_indices(answer: str) -> set[int]:
+    """Extract the set of citation indices actually used in the answer text."""
+    return {int(m) for m in _CITATION_RE.findall(answer)}
+
+
+def _build_cited_sources_text(
+    used_citations: list,
+    full_sources_text: str,
+) -> str:
+    """Build source text containing only the cited sources for grounding verification.
+
+    Parses the formatted sources text (which has [N] headers) and keeps only
+    sections matching used citation indices. Falls back to full text if parsing fails.
+    """
+    if not used_citations:
+        return full_sources_text
+
+    used_indices = {c.citation_index for c in used_citations}
+    sections = full_sources_text.split("\n\n")
+    kept = []
+    for section in sections:
+        # Each section starts with [N] — extract the index
+        match = _CITATION_RE.match(section.strip())
+        if match and int(match.group(1)) in used_indices:
+            kept.append(section)
+        elif not match:
+            # Non-indexed section (header, etc.) — keep it
+            kept.append(section)
+
+    return "\n\n".join(kept) if kept else full_sources_text

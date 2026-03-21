@@ -116,6 +116,7 @@ interface ChatStoreActions {
   addStep: (step: AgentStep) => void;
   updateStep: (stepName: string, update: Partial<AgentStep>) => void;
   setSources: (sources: SourceCitation[]) => void;
+  setFinalSources: (sources: SourceCitation[]) => void;
   setGroundingResult: (result: GroundingStatus) => void;
   recordEvent: (event: AgentEvent) => void;
   setDoneEvent: (event: AgentEvent) => void;
@@ -206,7 +207,8 @@ function handleAgentEvent(
 
     case "done":
       if (event.sources) {
-        store.setSources(event.sources);
+        // Set finalSources (cited-only) — distinct from streamingSources (all retrieved)
+        store.setFinalSources(event.sources);
       }
       store.setDoneEvent(event);
       break;

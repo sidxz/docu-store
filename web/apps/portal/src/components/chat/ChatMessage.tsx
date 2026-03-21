@@ -43,33 +43,36 @@ export function ChatMessage({ message, workspace, isStreaming }: ChatMessageProp
 
         {/* Message body */}
         <div
-          className={`inline-block rounded-xl px-4 py-3 max-w-full ${
+          className={`rounded-xl px-4 py-3 max-w-full ${
             isUser
-              ? "bg-accent text-text-inverse rounded-tr-sm"
+              ? "inline-block bg-accent text-text-inverse rounded-tr-sm"
               : "bg-surface-elevated text-text-primary rounded-tl-sm border border-border-subtle"
           }`}
         >
           {isUser ? (
             <p className="whitespace-pre-wrap text-sm">{message.content}</p>
           ) : (
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <MarkdownRenderer content={message.content} />
-              {isStreaming && !message.content && (
-                <span className="inline-block w-2 h-4 bg-text-muted animate-pulse rounded-sm" />
+            <>
+              {/* Grounding indicator — top-right of the reply */}
+              {message.content && (
+                <div className="float-right ml-3 mb-1">
+                  <GroundingBar
+                    isStreaming={isStreaming}
+                    streamingResult={groundingResult}
+                    persistedGrounded={message.agent_trace?.grounding_is_grounded ?? null}
+                    persistedConfidence={message.agent_trace?.grounding_confidence ?? null}
+                  />
+                </div>
               )}
-            </div>
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <MarkdownRenderer content={message.content} messageId={message.message_id} />
+                {isStreaming && !message.content && (
+                  <span className="inline-block w-2 h-4 bg-text-muted animate-pulse rounded-sm" />
+                )}
+              </div>
+            </>
           )}
         </div>
-
-        {/* Grounding bar — for ALL assistant messages with content */}
-        {!isUser && message.content && (
-          <GroundingBar
-            isStreaming={isStreaming}
-            streamingResult={groundingResult}
-            persistedGrounded={message.agent_trace?.grounding_is_grounded ?? null}
-            persistedConfidence={message.agent_trace?.grounding_confidence ?? null}
-          />
-        )}
 
         {/* Dev-mode diagnostics */}
         {devMode && !isUser && !isStreaming && message.content && (
@@ -123,7 +126,7 @@ function GroundingBar({
   // Pending: streaming and no result yet
   if (isStreaming && confidence == null) {
     return (
-      <div className="mt-1.5 flex items-center gap-2 text-xs text-text-muted">
+      <div className="mt-1.5 flex items-center gap-2 text-xs text-ds-warning">
         <Loader2 className="w-3 h-3 animate-spin" />
         <span>Pending verification</span>
       </div>

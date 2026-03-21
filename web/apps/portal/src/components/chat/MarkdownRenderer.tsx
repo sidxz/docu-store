@@ -3,12 +3,14 @@
 import type { ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useChatStore } from "@/lib/stores/chat-store";
 
 interface MarkdownRendererProps {
   content: string;
+  messageId?: string;
 }
 
-export function MarkdownRenderer({ content }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, messageId }: MarkdownRendererProps) {
   if (!content) return null;
 
   return (
@@ -55,8 +57,8 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
             {children}
           </a>
         ),
-        p: ({ children }) => <p>{styleCitations(children)}</p>,
-        li: ({ children }) => <li>{styleCitations(children)}</li>,
+        p: ({ children }) => <p>{styleCitations(children, messageId)}</p>,
+        li: ({ children }) => <li>{styleCitations(children, messageId)}</li>,
       }}
     >
       {content}
@@ -66,17 +68,17 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
 
 const CITATION_PATTERN = /\[(\d{1,2})\]/g;
 
-function styleCitations(children: ReactNode): ReactNode {
+function styleCitations(children: ReactNode, messageId?: string): ReactNode {
   if (!children) return children;
 
   if (typeof children === "string") {
-    return replaceCitationsInText(children);
+    return replaceCitationsInText(children, messageId);
   }
 
   if (Array.isArray(children)) {
     return children.map((child, i) => {
       if (typeof child === "string") {
-        return <span key={i}>{replaceCitationsInText(child)}</span>;
+        return <span key={i}>{replaceCitationsInText(child, messageId)}</span>;
       }
       return child;
     });
@@ -85,7 +87,7 @@ function styleCitations(children: ReactNode): ReactNode {
   return children;
 }
 
-function replaceCitationsInText(text: string): ReactNode {
+function replaceCitationsInText(text: string, messageId?: string): ReactNode {
   const parts: ReactNode[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -96,13 +98,16 @@ function replaceCitationsInText(text: string): ReactNode {
       parts.push(text.slice(lastIndex, match.index));
     }
     const idx = match[1];
+    const citationNum = parseInt(idx, 10);
     parts.push(
-      <span
+      <button
         key={`c${match.index}`}
-        className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 mx-0.5 rounded bg-accent-light text-accent-text text-[10px] font-semibold align-baseline"
+        type="button"
+        onClick={() => useChatStore.getState().highlightCitation(citationNum, messageId)}
+        className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 mx-0.5 rounded bg-accent-light text-accent-text text-[10px] font-semibold align-baseline cursor-pointer hover:bg-accent-muted transition-colors"
       >
         {idx}
-      </span>,
+      </button>,
     );
     lastIndex = match.index + match[0].length;
   }

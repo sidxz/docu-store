@@ -24,6 +24,20 @@ export function MessageList({
   workspace,
 }: MessageListProps) {
   const pendingUserMessage = useChatStore((s) => s.pendingUserMessage);
+  const finalSources = useChatStore((s) => s.finalSources);
+  const groundingResult = useChatStore((s) => s.groundingResult);
+  const doneEvent = useChatStore((s) => s.doneEvent);
+
+  // Determine if the API data already includes the response we just streamed.
+  // If the done event has a message_id, check if the messages array contains it.
+  const apiHasCaughtUp = doneEvent?.message_id
+    ? messages.some((m) => m.message_id === doneEvent.message_id)
+    : false;
+
+  // Show the optimistic messages (pending user + streaming assistant) when:
+  // - Currently streaming, OR
+  // - Streaming finished but the API refetch hasn't returned the new messages yet
+  const showOptimistic = isStreaming || (streamingContent && !apiHasCaughtUp);
 
   if (isLoading) {
     return (
@@ -47,8 +61,8 @@ export function MessageList({
         <ChatMessage key={msg.message_id} message={msg} workspace={workspace} />
       ))}
 
-      {/* Show user message immediately while agent processes */}
-      {isStreaming && pendingUserMessage && (
+      {/* Show user message immediately — persists until API catches up */}
+      {showOptimistic && pendingUserMessage && (
         <ChatMessage
           message={{
             conversation_id: "",
@@ -65,30 +79,32 @@ export function MessageList({
         />
       )}
 
-      {/* Streaming assistant message */}
-      {isStreaming && (
+      {/* Streaming / just-completed assistant message — persists until API catches up */}
+      {showOptimistic && (
         <ChatMessage
           message={{
             conversation_id: "",
             message_id: "streaming",
             role: "assistant",
             content: streamingContent,
-            sources: streamingSources,
+            sources: finalSources ?? streamingSources,
             agent_trace: {
               steps: streamingSteps,
-              total_duration_ms: null,
+              total_duration_ms: doneEvent?.duration_ms ?? null,
               retry_count: 0,
+              grounding_is_grounded: groundingResult?.is_grounded ?? null,
+              grounding_confidence: groundingResult?.confidence ?? null,
             },
             structured_content: null,
             token_usage: null,
             created_at: new Date().toISOString(),
           }}
           workspace={workspace}
-          isStreaming
+          isStreaming={isStreaming}
         />
       )}
 
-      {messages.length === 0 && !isStreaming && (
+      {messages.length === 0 && !showOptimistic && (
         <div className="text-center text-text-muted py-12">
           <p className="text-lg">Ask a question about your documents</p>
           <p className="text-sm mt-1">

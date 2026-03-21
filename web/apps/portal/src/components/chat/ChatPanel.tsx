@@ -46,15 +46,48 @@ export function ChatPanel({
     }
   }, [isStreaming, streamingContent]);
 
-  // Push sources to the layout — prefer streaming sources when active, otherwise last assistant message sources
+  // Push sources to the layout.
+  // Priority: activeSourcesMessageId (user clicked citation) > finalSources (cited-only after done)
+  //         > streamingSources (all retrieved during streaming) > persisted message sources
+  const doneEvent = useChatStore((s) => s.doneEvent);
+  const finalSources = useChatStore((s) => s.finalSources);
+  const activeSourcesMessageId = useChatStore((s) => s.activeSourcesMessageId);
+
   useEffect(() => {
+    const messages = data?.messages ?? [];
+
+    // 1. User clicked a citation in a specific message — show THAT message's sources
+    if (activeSourcesMessageId) {
+      if (activeSourcesMessageId === "streaming") {
+        // For the streaming message, prefer finalSources (cited-only) if available
+        onSourcesChange(finalSources ?? streamingSources);
+        return;
+      }
+      const targetMsg = messages.find((m) => m.message_id === activeSourcesMessageId);
+      if (targetMsg && targetMsg.sources.length > 0) {
+        onSourcesChange(targetMsg.sources);
+        return;
+      }
+    }
+
+    // 2. Answer complete — show only cited sources (finalSources from done event)
+    if (finalSources && finalSources.length > 0) {
+      const apiHasCaughtUp = doneEvent?.message_id
+        ? messages.some((m) => m.message_id === doneEvent.message_id)
+        : false;
+      if (!apiHasCaughtUp) {
+        onSourcesChange(finalSources);
+        return;
+      }
+    }
+
+    // 3. Still streaming — show all retrieved sources
     if (isStreaming && streamingSources.length > 0) {
       onSourcesChange(streamingSources);
       return;
     }
 
-    // Find last assistant message with sources
-    const messages = data?.messages ?? [];
+    // Default: last assistant message sources
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role === "assistant" && messages[i].sources.length > 0) {
         onSourcesChange(messages[i].sources);
@@ -62,7 +95,7 @@ export function ChatPanel({
       }
     }
     onSourcesChange([]);
-  }, [isStreaming, streamingSources, data?.messages, onSourcesChange]);
+  }, [isStreaming, streamingSources, finalSources, data?.messages, doneEvent, activeSourcesMessageId, onSourcesChange]);
 
   // Auto-send queued message after navigating to a new conversation
   const queuedMessage = useChatStore((s) => s.queuedMessage);

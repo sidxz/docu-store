@@ -234,6 +234,7 @@ class SendMessageUseCase:
             yield event
 
         # Save assistant response with full step trace + grounding result
+        # Sources are already filtered to cited-only by the agent's done event
         if draft_answer:
             agent_trace = AgentTraceDTO(
                 steps=list(trace_steps.values()),

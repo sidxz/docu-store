@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { FileText, X, ChevronDown, ChevronRight, Users, Calendar } from "lucide-react";
 import { Skeleton } from "primereact/skeleton";
@@ -8,6 +8,7 @@ import { Button } from "primereact/button";
 import type { SourceCitation } from "@docu-store/types";
 import { useAuthBlobUrl } from "@/hooks/use-auth-blob-url";
 import { useDevModeStore } from "@/lib/stores/dev-mode-store";
+import { useChatStore } from "@/lib/stores/chat-store";
 import { API_URL } from "@/lib/constants";
 
 interface SourcesPanelProps {
@@ -72,6 +73,14 @@ function SourceArtifactCard({
   devMode: boolean;
 }) {
   const [pagesExpanded, setPagesExpanded] = useState(false);
+  const highlightedCitation = useChatStore((s) => s.highlightedCitation);
+
+  // Auto-expand pages when a citation in this card is highlighted
+  useEffect(() => {
+    if (highlightedCitation != null && citations.some((c) => c.citation_index === highlightedCitation)) {
+      setPagesExpanded(true);
+    }
+  }, [highlightedCitation, citations]);
 
   const best = citations.reduce((a, b) =>
     (b.similarity_score ?? 0) > (a.similarity_score ?? 0) ? b : a,
@@ -169,14 +178,31 @@ function SourcePageRow({
   workspace: string;
   devMode: boolean;
 }) {
+  const highlightedCitation = useChatStore((s) => s.highlightedCitation);
+  const rowRef = useRef<HTMLAnchorElement>(null);
+  const isHighlighted = highlightedCitation === citation.citation_index;
+
+  // Scroll into view and trigger flash animation when highlighted
+  useEffect(() => {
+    if (isHighlighted && rowRef.current) {
+      rowRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Re-trigger animation by removing and re-adding the class
+      rowRef.current.classList.remove("citation-highlight");
+      // Force reflow
+      void rowRef.current.offsetWidth;
+      rowRef.current.classList.add("citation-highlight");
+    }
+  }, [isHighlighted]);
+
   const pageHref = citation.page_id
     ? `/${workspace}/documents/${citation.artifact_id}/pages/${citation.page_id}`
     : `/${workspace}/documents/${citation.artifact_id}`;
 
   return (
     <Link
+      ref={rowRef}
       href={pageHref}
-      className="flex items-start gap-2 px-3 py-2 hover:bg-surface-hover transition-colors border-t border-border-subtle"
+      className="flex items-start gap-2 px-3 py-2 hover:bg-surface-hover transition-colors border-t border-border-subtle rounded-sm"
     >
       <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-accent-light text-accent-text font-semibold text-[10px] flex-shrink-0 mt-0.5">
         {citation.citation_index}

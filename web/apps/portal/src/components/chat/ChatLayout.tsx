@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useChatStore } from "@/lib/stores/chat-store";
 import { ConversationSidebar } from "./ConversationSidebar";
 import { ChatPanel } from "./ChatPanel";
 import { SourcesPanel } from "./SourcesPanel";
@@ -15,24 +14,26 @@ interface ChatLayoutProps {
 export function ChatLayout({ workspace, conversationId }: ChatLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(true);
-  // Track the "active" sources to display — set by ChatPanel when sources arrive
   const [activeSources, setActiveSources] = useState<SourceCitation[]>([]);
 
   const hasSources = activeSources.length > 0;
+  const showSources = hasSources && sourcesOpen;
 
   return (
     <div className="flex h-full overflow-hidden">
       {/* Left: Conversation sidebar */}
       <div
-        className={`border-r border-border-default transition-all duration-200 flex-shrink-0 ${
-          sidebarCollapsed ? "w-0 overflow-hidden" : "w-72"
+        className={`border-r border-border-default transition-all duration-300 ease-in-out flex-shrink-0 overflow-hidden ${
+          sidebarCollapsed ? "w-0" : "w-72"
         }`}
       >
-        <ConversationSidebar
-          workspace={workspace}
-          activeConversationId={conversationId}
-          onCollapse={() => setSidebarCollapsed(true)}
-        />
+        <div className="w-72 h-full">
+          <ConversationSidebar
+            workspace={workspace}
+            activeConversationId={conversationId}
+            onCollapse={() => setSidebarCollapsed(true)}
+          />
+        </div>
       </div>
 
       {/* Center: Chat panel */}
@@ -43,21 +44,27 @@ export function ChatLayout({ workspace, conversationId }: ChatLayoutProps) {
           sidebarCollapsed={sidebarCollapsed}
           onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
           onSourcesChange={setActiveSources}
-          sourcesOpen={sourcesOpen && hasSources}
+          sourcesOpen={showSources}
           onToggleSources={() => setSourcesOpen(!sourcesOpen)}
         />
       </div>
 
-      {/* Right: Sources panel */}
-      {hasSources && sourcesOpen && (
-        <div className="w-80 border-l border-border-default flex-shrink-0 bg-surface">
-          <SourcesPanel
-            sources={activeSources}
-            workspace={workspace}
-            onClose={() => setSourcesOpen(false)}
-          />
+      {/* Right: Sources panel — always rendered, animated via width */}
+      <div
+        className={`border-l border-border-default flex-shrink-0 bg-surface transition-all duration-300 ease-in-out overflow-hidden ${
+          showSources ? "w-80 opacity-100" : "w-0 opacity-0 border-l-0"
+        }`}
+      >
+        <div className="w-80 h-full">
+          {hasSources && (
+            <SourcesPanel
+              sources={activeSources}
+              workspace={workspace}
+              onClose={() => setSourcesOpen(false)}
+            />
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
