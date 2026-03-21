@@ -13,6 +13,7 @@ class TagDictionaryReadModel(ABC):
     ) -> list[dict[str, str]]:
         pass
 
+
     @abstractmethod
     async def get_popular_tags(
         self,

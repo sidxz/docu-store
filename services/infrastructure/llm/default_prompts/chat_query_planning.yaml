@@ -1,0 +1,45 @@
+name: chat_query_planning
+version: "1.0"
+description: >
+  Analyze a user question for the Thinking Mode pipeline — classify query type,
+  decompose into sub-queries, generate HyDE hypothesis, and assess confidence.
+  NER entity extraction and author detection are handled separately.
+input_variables:
+  - question
+  - conversation_context
+  - enable_sub_queries
+  - enable_hyde
+template: |
+  Analyze the following question and produce a detailed query plan for a scientific document retrieval system.
+
+  Conversation context (if any):
+  {conversation_context}
+
+  Current question: {question}
+
+  Respond with ONLY a JSON object (no markdown, no extra text):
+  {{
+    "query_type": "factual|comparative|exploratory|compound|follow_up",
+    "reformulated_query": "optimized standalone search query combining context and question",
+    "sub_queries": ["optional sub-query 1", "optional sub-query 2"],
+    "entities": ["key", "entities", "mentioned"],
+    "smiles_detected": ["any", "SMILES", "strings"],
+    "search_strategy": "hierarchical|summary|compound|hybrid",
+    "hyde_hypothesis": "optional: a short hypothetical answer (1-2 sentences) if the query is exploratory",
+    "confidence": 0.8,
+    "summary": "brief one-line description of what the user is asking"
+  }}
+
+  Guidelines:
+  - "query_type":
+    - "factual": specific fact or value (IC50, mechanism, date, yield)
+    - "comparative": comparing entities (drugs, targets, studies, methods)
+    - "exploratory": broad overview or "what do we know about X"
+    - "compound": involves chemical structures or SMILES
+    - "follow_up": references prior conversation context
+  - "reformulated_query": combine conversation context with the current question into a standalone search query. This is the PRIMARY search query.
+  - "sub_queries": {enable_sub_queries} — If enabled and the question has multiple facets, decompose into 1-3 focused sub-queries. Each sub-query should target a different aspect. Leave empty for simple questions. Max 3.
+  - "entities": list key scientific entities mentioned (targets, compounds, genes, diseases, assays). These are for context only — filtering is handled separately.
+  - "search_strategy": use "hierarchical" for factual/comparative, "summary" for exploratory, "compound" if SMILES detected, "hybrid" for complex multi-faceted queries
+  - "hyde_hypothesis": {enable_hyde} — If enabled AND query_type is "exploratory", write a short (1-2 sentence) hypothetical answer that a good document might contain. This helps find semantically similar documents. Set to null for non-exploratory queries.
+  - "confidence": 0.0-1.0 estimate of how well-defined the query is. High (0.8-1.0) for specific factual queries. Medium (0.5-0.8) for moderately ambiguous queries. Low (<0.5) for very vague or under-specified queries.

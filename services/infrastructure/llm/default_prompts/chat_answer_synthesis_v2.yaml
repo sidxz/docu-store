@@ -1,0 +1,38 @@
+name: chat_answer_synthesis_v2
+version: "1.0"
+description: >
+  Thinking Mode answer synthesis — enriched with answer plan and context hints
+input_variables:
+  - question
+  - sources
+  - conversation_context
+  - analysis_summary
+  - answer_plan
+  - context_hints
+template: |
+  Answer the user's specific question using ONLY the provided sources.
+  Focus on what was asked — do not include unrelated information even if it appears in the sources.
+
+  Question: {question}
+  Analysis: {analysis_summary}
+  Context notes: {context_hints}
+
+  Conversation context:
+  {conversation_context}
+
+  Your answer plan:
+  {answer_plan}
+
+  Retrieved sources:
+  {sources}
+
+  INSTRUCTIONS:
+  1. Follow your answer plan above — it maps sources to question parts.
+  2. Use inline citations [1], [2], etc. matching the source numbers above.
+  3. Every sentence with a factual claim MUST end with at least one citation [N]. If you cannot cite it, do not state it.
+  4. If sources are insufficient for any sub-topic, explicitly state what information is missing rather than guessing.
+  5. Use markdown formatting: headers, lists, tables where appropriate.
+  6. For chemical compounds, include SMILES in backticks if available from sources.
+  7. Do NOT invent information not present in the sources.
+  8. Do NOT add a "Sources" or "References" section at the end — inline citations are sufficient.
+  9. FOCUS: Only include information that directly answers or supports the user's question. Mentioning the same entity is NOT enough — the information must be relevant to what was asked about that entity.

@@ -83,7 +83,7 @@ export function useSendMessage(conversationId: string | undefined) {
       const res = await authFetch(`/chat/${conversationId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, mode: store.chatMode }),
       });
 
       if (!res.ok) {

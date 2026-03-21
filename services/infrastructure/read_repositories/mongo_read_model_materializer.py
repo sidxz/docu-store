@@ -162,12 +162,25 @@ class MongoReadModelMaterializer(MongoReadModelTracking):
             )
             workspace_id = artifact.get("workspace_id") if artifact else None
 
-            # 1. Pull this artifact from ALL existing tag entries
-            self.tag_dictionary.update_many(
-                {"artifact_ids": artifact_id},
-                {"$pull": {"artifact_ids": artifact_id}},
-                session=session,
-            )
+            # 1. Pull this artifact from tag entries with matching entity_types
+            # (scoped so that e.g. author updates don't wipe tag_mentions)
+            entity_types_in_batch = list({t["entity_type"] for t in tags}) if tags else []
+            if entity_types_in_batch:
+                self.tag_dictionary.update_many(
+                    {
+                        "artifact_ids": artifact_id,
+                        "entity_type": {"$in": entity_types_in_batch},
+                    },
+                    {"$pull": {"artifact_ids": artifact_id}},
+                    session=session,
+                )
+            else:
+                # Empty tags = remove this artifact from ALL entries (cleanup)
+                self.tag_dictionary.update_many(
+                    {"artifact_ids": artifact_id},
+                    {"$pull": {"artifact_ids": artifact_id}},
+                    session=session,
+                )
 
             # 2. Upsert each tag with $addToSet
             now = datetime.now(UTC)
@@ -188,8 +201,9 @@ class MongoReadModelMaterializer(MongoReadModelTracking):
                 )
 
             # 3. Recompute artifact_count on affected docs
+            recount_filter: dict = {"artifact_ids": artifact_id} if tags else {"workspace_id": workspace_id}
             self.tag_dictionary.update_many(
-                {"artifact_ids": artifact_id} if tags else {"workspace_id": workspace_id},
+                recount_filter,
                 [{"$set": {"artifact_count": {"$size": {"$ifNull": ["$artifact_ids", []]}}}}],
                 session=session,
             )

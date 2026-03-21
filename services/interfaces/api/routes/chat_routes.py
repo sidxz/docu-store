@@ -138,6 +138,7 @@ async def send_message(
                 owner_id=auth.user_id,
                 message=request.message,
                 allowed_artifact_ids=allowed_artifact_ids,
+                mode=request.mode,
             ):
                 event_type = _map_event_type(event.type)
                 data = event.model_dump(mode="json", exclude_none=True)

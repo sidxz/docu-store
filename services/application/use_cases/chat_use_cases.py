@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 from uuid import UUID, uuid4
 
 import structlog
@@ -20,7 +20,7 @@ from application.dtos.chat_dtos import (
 from application.dtos.errors import AppError
 
 if TYPE_CHECKING:
-    from application.ports.chat_agent import ChatAgentPort
+    from application.ports.chat_agent import ChatAgentRouter
     from application.ports.chat_repository import ChatRepository
 
 log = structlog.get_logger(__name__)
@@ -152,7 +152,7 @@ class SendMessageUseCase:
     def __init__(
         self,
         chat_repository: ChatRepository,
-        chat_agent: ChatAgentPort,
+        chat_agent: ChatAgentRouter,
     ) -> None:
         self._repo = chat_repository
         self._agent = chat_agent
@@ -164,6 +164,7 @@ class SendMessageUseCase:
         owner_id: UUID,
         message: str,
         allowed_artifact_ids: list[UUID] | None = None,
+        mode: Literal["quick", "thinking"] | None = None,
     ) -> AsyncGenerator[AgentEvent, None]:
         # Verify conversation exists
         conversation = await self._repo.get_conversation(
@@ -209,6 +210,7 @@ class SendMessageUseCase:
             conversation_history=history,
             workspace_id=workspace_id,
             allowed_artifact_ids=allowed_artifact_ids,
+            mode=mode,
         ):
             if event.type == "token":
                 draft_answer += event.delta or ""

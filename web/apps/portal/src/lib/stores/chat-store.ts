@@ -10,7 +10,12 @@ interface StepTiming {
   durationMs: number | null;
 }
 
+export type ChatMode = "quick" | "thinking";
+
 interface ChatState {
+  // Pipeline mode
+  chatMode: ChatMode;
+
   // Streaming state
   isStreaming: boolean;
   streamingContent: string;
@@ -38,6 +43,7 @@ interface ChatState {
   doneEvent: AgentEvent | null;
 
   // Actions
+  setChatMode: (mode: ChatMode) => void;
   highlightCitation: (index: number, messageId?: string) => void;
   setActiveSourcesMessageId: (id: string | null) => void;
   setQueuedMessage: (msg: string | null) => void;
@@ -55,6 +61,7 @@ interface ChatState {
 }
 
 export const useChatStore = create<ChatState>((set) => ({
+  chatMode: "thinking" as ChatMode,
   isStreaming: false,
   streamingContent: "",
   streamingSteps: [],
@@ -68,6 +75,8 @@ export const useChatStore = create<ChatState>((set) => ({
   stepTimings: [],
   rawEvents: [],
   doneEvent: null,
+
+  setChatMode: (mode) => set({ chatMode: mode }),
 
   highlightCitation: (index, messageId) => {
     set({

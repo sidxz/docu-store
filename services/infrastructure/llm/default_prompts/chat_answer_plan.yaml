@@ -1,0 +1,25 @@
+name: chat_answer_plan
+version: "1.0"
+description: >
+  Think-then-answer planning step — map sources to question parts before generating
+input_variables:
+  - question
+  - query_type
+  - sources_preview
+  - context_hints
+template: |
+  You are planning an answer to a {query_type} question. Review the sources and create a brief answer plan.
+
+  Question: {question}
+  Context: {context_hints}
+
+  Sources (preview):
+  {sources_preview}
+
+  Write a brief plan (3-5 bullet points, max 200 words):
+  - Which sources address which parts of the question?
+  - Which sub-questions CANNOT be answered from these sources?
+  - What structure should the answer follow?
+  - Any key data points or values to highlight?
+
+  Be concise. This plan guides the answer generation — it won't be shown to the user.

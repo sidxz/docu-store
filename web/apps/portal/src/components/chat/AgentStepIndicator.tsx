@@ -4,7 +4,12 @@ import { Check, Loader2, AlertCircle } from "lucide-react";
 import type { AgentStep } from "@docu-store/types";
 
 const STEP_LABELS: Record<string, string> = {
+  // Quick Mode steps
   analysis: "Question Analysis",
+  // Thinking Mode steps
+  planning: "Query Planning",
+  assembly: "Context Assembly",
+  // Shared steps
   retrieval: "Document Retrieval",
   synthesis: "Answer Generation",
   verification: "Grounding Verification",

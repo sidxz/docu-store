@@ -145,7 +145,12 @@ from infrastructure.file_services.font_title_extractor import FontTitleExtractor
 from infrastructure.file_services.py_mu_pfd_service import PyMuPDFService
 from infrastructure.kafka.kafka_external_event_streamer import KafkaExternalEventPublisher
 from infrastructure.kafka.kafka_publisher import KafkaPublisher
-from infrastructure.llm.factory import create_chat_llm_client, create_llm_client, create_prompt_repository
+from infrastructure.llm.factory import (
+    create_chat_llm_client,
+    create_llm_client,
+    create_prompt_repository,
+    create_tool_calling_llm_client,
+)
 from infrastructure.ner.gliner2_extractor import GLiNER2Extractor
 from infrastructure.ner.structflo_ner_extractor import StructfloNERExtractor
 from infrastructure.permissions.sentinel_permission_registrar import SentinelPermissionRegistrar
@@ -658,7 +663,7 @@ def create_container() -> Container:  # noqa: PLR0915
     )
 
     # --- Chat (Agentic RAG) ---
-    from application.ports.chat_agent import ChatAgentPort  # noqa: PLC0415
+    from application.ports.chat_agent import ChatAgentPort, ChatAgentRouter  # noqa: PLC0415
     from application.ports.chat_repository import ChatRepository  # noqa: PLC0415
     from infrastructure.chat.agent import ChatAgent  # noqa: PLC0415
     from infrastructure.chat.context_builder import ContextBuilder  # noqa: PLC0415
@@ -667,6 +672,13 @@ def create_container() -> Container:  # noqa: PLR0915
     from infrastructure.chat.nodes.grounding_verification import GroundingVerificationNode  # noqa: PLC0415
     from infrastructure.chat.nodes.question_analysis import QuestionAnalysisNode  # noqa: PLC0415
     from infrastructure.chat.nodes.retrieval import RetrievalNode  # noqa: PLC0415
+    from infrastructure.chat.thinking_agent import ThinkingAgent  # noqa: PLC0415
+    from infrastructure.chat.nodes.query_planning import QueryPlanningNode  # noqa: PLC0415
+    from infrastructure.chat.nodes.agentic_retrieval import AgenticRetrievalNode  # noqa: PLC0415
+    from infrastructure.chat.nodes.context_assembly import ContextAssemblyNode  # noqa: PLC0415
+    from infrastructure.chat.nodes.adaptive_synthesis import AdaptiveSynthesisNode  # noqa: PLC0415
+    from infrastructure.chat.nodes.inline_verification import InlineVerificationNode  # noqa: PLC0415
+    from infrastructure.chat.tools.retrieval_tools import ToolRegistry  # noqa: PLC0415
 
     # Chat LLM client (separate from batch LLM, falls back to same settings)
     chat_llm_client = create_chat_llm_client(settings)
@@ -676,6 +688,7 @@ def create_container() -> Container:  # noqa: PLR0915
         db_name=settings.mongo_db,
     )
 
+    # --- Quick Mode nodes (existing pipeline) ---
     container[QuestionAnalysisNode] = lambda _: QuestionAnalysisNode(
         llm_client=chat_llm_client,
         prompt_repository=container[PromptRepositoryPort],
@@ -695,12 +708,60 @@ def create_container() -> Container:  # noqa: PLR0915
         prompt_repository=container[PromptRepositoryPort],
     )
 
-    container[ChatAgentPort] = lambda c: ChatAgent(
+    quick_agent = lambda c: ChatAgent(
         question_analysis=c[QuestionAnalysisNode],
         retrieval=c[RetrievalNode],
         answer_synthesis=c[AnswerSynthesisNode],
         grounding_verification=c[GroundingVerificationNode],
         max_retries=settings.chat_max_retries,
+    )
+
+    # --- Thinking Mode nodes (v2 — agentic retrieval) ---
+    container[QueryPlanningNode] = lambda c: QueryPlanningNode(
+        llm_client=chat_llm_client,
+        prompt_repository=c[PromptRepositoryPort],
+        ner_extractor=c[NERExtractorPort],
+        structured_extractor=c[StructuredExtractorPort],
+    )
+
+    # Tool-calling LLM + tool registry for agentic retrieval
+    tool_calling_llm = create_tool_calling_llm_client(settings)
+    container[ToolRegistry] = lambda c: ToolRegistry(
+        hierarchical_search=c[HierarchicalSearchUseCase],
+        summary_search=c[SearchSummariesUseCase],
+        page_read_model=c[PageReadModel],
+    )
+    container[AgenticRetrievalNode] = lambda c: AgenticRetrievalNode(
+        tool_llm=tool_calling_llm,
+        tool_registry=c[ToolRegistry],
+        prompt_repository=c[PromptRepositoryPort],
+    )
+
+    container[ContextAssemblyNode] = lambda _: ContextAssemblyNode()
+    container[AdaptiveSynthesisNode] = lambda _: AdaptiveSynthesisNode(
+        llm_client=chat_llm_client,
+        prompt_repository=container[PromptRepositoryPort],
+    )
+    container[InlineVerificationNode] = lambda _: InlineVerificationNode(
+        llm_client=chat_llm_client,
+        prompt_repository=container[PromptRepositoryPort],
+    )
+
+    thinking_agent = lambda c: ThinkingAgent(
+        query_planning=c[QueryPlanningNode],
+        agentic_retrieval=c[AgenticRetrievalNode],
+        context_assembly=c[ContextAssemblyNode],
+        adaptive_synthesis=c[AdaptiveSynthesisNode],
+        inline_verification=c[InlineVerificationNode],
+        tag_dictionary=c[TagDictionaryReadModel],
+        max_retries=settings.chat_max_retries,
+    )
+
+    # --- Agent Router (dispatches to quick or thinking) ---
+    container[ChatAgentRouter] = lambda c: ChatAgentRouter(
+        quick_agent=quick_agent(c),
+        thinking_agent=thinking_agent(c),
+        default_mode=settings.chat_default_mode,
     )
 
     container[ContextBuilder] = lambda c: ContextBuilder(
@@ -725,7 +786,7 @@ def create_container() -> Container:  # noqa: PLR0915
     )
     container[SendMessageUseCase] = lambda c: SendMessageUseCase(
         chat_repository=c[ChatRepository],
-        chat_agent=c[ChatAgentPort],
+        chat_agent=c[ChatAgentRouter],
     )
 
     return container

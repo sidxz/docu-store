@@ -117,6 +117,62 @@ def create_chat_llm_client(settings: Settings) -> LLMClientPort:
     raise ValueError(msg)
 
 
+def create_tool_calling_llm_client(settings: Settings) -> ToolCallingLLMPort:
+    """Instantiate a tool-calling LLM adapter for the agentic retrieval loop.
+
+    Uses the same provider/model as the chat LLM. Mode selection:
+    - "auto": native for OpenAI, react for Ollama
+    - "native": always use bind_tools()
+    - "react": always use ReAct text parsing
+    """
+    from application.ports.tool_calling_llm import ToolCallingLLMPort  # noqa: PLC0415
+    from infrastructure.llm.adapters.tool_calling_adapter import (  # noqa: PLC0415
+        NativeToolCallingAdapter,
+        ReactToolCallingAdapter,
+    )
+
+    effective_provider = settings.chat_llm_provider or settings.llm_provider
+    effective_model = settings.chat_llm_model_name or settings.llm_model_name
+    effective_base_url = settings.chat_llm_base_url or settings.llm_base_url
+    effective_api_key = settings.chat_llm_api_key or settings.llm_api_key or settings.openai_api_key
+    effective_temperature = settings.chat_llm_temperature
+    mode = settings.chat_agent_tool_calling_mode
+
+    use_native = (
+        mode == "native"
+        or (mode == "auto" and effective_provider == "openai")
+    )
+
+    log.info(
+        "llm.factory.tool_calling",
+        provider=effective_provider,
+        model=effective_model,
+        mode=mode,
+        use_native=use_native,
+    )
+
+    langfuse_handler = _make_langfuse_callback_handler(settings)
+
+    if use_native:
+        return NativeToolCallingAdapter(
+            provider=effective_provider,
+            model_name=effective_model,
+            api_key=effective_api_key,
+            base_url=effective_base_url,
+            temperature=effective_temperature,
+            langfuse_handler=langfuse_handler,
+        )
+
+    return ReactToolCallingAdapter(
+        provider=effective_provider,
+        model_name=effective_model,
+        api_key=effective_api_key,
+        base_url=effective_base_url,
+        temperature=effective_temperature,
+        langfuse_handler=langfuse_handler,
+    )
+
+
 def create_prompt_repository(settings: Settings) -> PromptRepositoryPort:
     """Instantiate the prompt repository selected by PROMPT_REPOSITORY_TYPE in config."""
     repo_type = settings.prompt_repository_type

@@ -284,6 +284,65 @@ class Settings(BaseSettings):
         description="Enable verbose debug logging for the entire chat agent chain.",
     )
 
+    # Thinking Mode settings
+    chat_default_mode: Literal["quick", "thinking"] = Field(
+        default="thinking",
+        validation_alias="CHAT_DEFAULT_MODE",
+        description="Default chat pipeline mode. 'quick' = existing 4-step, 'thinking' = advanced 5-stage.",
+    )
+    chat_enable_sub_queries: bool = Field(
+        default=True,
+        validation_alias="CHAT_ENABLE_SUB_QUERIES",
+        description="Allow Thinking Mode to decompose complex queries into sub-queries.",
+    )
+    chat_enable_hyde: bool = Field(
+        default=True,
+        validation_alias="CHAT_ENABLE_HYDE",
+        description="Allow Thinking Mode to generate hypothetical answers for embedding (exploratory only).",
+    )
+    chat_thinking_max_retrieval_results: int = Field(
+        default=15,
+        validation_alias="CHAT_THINKING_MAX_RETRIEVAL_RESULTS",
+        description="Max sources for Thinking Mode standard retrieval.",
+    )
+    chat_context_budget_chars: int = Field(
+        default=12000,
+        validation_alias="CHAT_CONTEXT_BUDGET_CHARS",
+        description="Max chars for assembled context in Thinking Mode (~3000 tokens).",
+    )
+    chat_verification_coverage_threshold: float = Field(
+        default=0.7,
+        validation_alias="CHAT_VERIFICATION_COVERAGE_THRESHOLD",
+        description="Citation coverage ratio below which LLM verification is triggered.",
+    )
+    chat_verification_relevance_threshold: float = Field(
+        default=0.4,
+        validation_alias="CHAT_VERIFICATION_RELEVANCE_THRESHOLD",
+        description="Avg relevance score below which LLM verification is triggered.",
+    )
+
+    # Agentic retrieval settings (Thinking Mode v2)
+    chat_agent_max_iterations: int = Field(
+        default=5,
+        validation_alias="CHAT_AGENT_MAX_ITERATIONS",
+        description="Max tool-calling iterations in the agentic retrieval loop.",
+    )
+    chat_agent_iteration_timeout_s: float = Field(
+        default=30.0,
+        validation_alias="CHAT_AGENT_ITERATION_TIMEOUT_S",
+        description="Timeout per single iteration (LLM call + tool execution) in seconds.",
+    )
+    chat_agent_total_timeout_s: float = Field(
+        default=120.0,
+        validation_alias="CHAT_AGENT_TOTAL_TIMEOUT_S",
+        description="Total timeout for the entire agentic retrieval loop.",
+    )
+    chat_agent_tool_calling_mode: Literal["auto", "native", "react"] = Field(
+        default="auto",
+        validation_alias="CHAT_AGENT_TOOL_CALLING_MODE",
+        description="Tool calling mode: 'auto' picks based on provider, 'native' for OpenAI, 'react' for Ollama.",
+    )
+
     # Sentinel (AuthZ mode)
     sentinel_url: str = Field(default="http://localhost:9003", validation_alias="SENTINEL_URL")
     sentinel_service_key: str = Field(default="", validation_alias="SENTINEL_SERVICE_KEY")

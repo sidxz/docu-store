@@ -152,6 +152,10 @@ class SendMessageRequest(BaseModel):
     """Request to send a message in a conversation."""
 
     message: str = Field(..., min_length=1, max_length=10000)
+    mode: Literal["quick", "thinking"] | None = Field(
+        default=None,
+        description="Pipeline mode. 'quick' = fast 4-step, 'thinking' = advanced 5-stage. None = server default.",
+    )
 
 
 class ListConversationsRequest(BaseModel):
