@@ -6,3 +6,4 @@ export type * from "./permission";
 export type * from "./search";
 export type * from "./workflow";
 export type * from "./workspace";
+export type * from "./chat";

@@ -1,21 +1,18 @@
-import { MessageSquare } from "lucide-react";
+"use client";
 
-import { PageHeader } from "@/components/ui/PageHeader";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { use } from "react";
+import { ChatLayout } from "@/components/chat/ChatLayout";
 
-export default function ChatPage() {
+export default function ChatPage({
+  params,
+}: {
+  params: Promise<{ workspace: string }>;
+}) {
+  const { workspace } = use(params);
+
   return (
-    <div>
-      <PageHeader
-        icon={MessageSquare}
-        title="Chat"
-        subtitle="Conversational interface for document intelligence"
-      />
-      <EmptyState
-        icon={MessageSquare}
-        title="Chat with your documents"
-        description="Ask questions about your uploaded documents using RAG-powered conversational AI. This feature is coming soon."
-      />
+    <div className="-m-6 h-[calc(100%+3rem)]">
+      <ChatLayout workspace={workspace} />
     </div>
   );
 }

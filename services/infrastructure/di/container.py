@@ -64,6 +64,13 @@ from application.use_cases.page_use_cases import (
 from application.use_cases.page_use_cases import (
     UpdateSummaryCandidateUseCase as UpdatePageSummaryCandidateUseCase,
 )
+from application.use_cases.chat_use_cases import (
+    CreateConversationUseCase,
+    DeleteConversationUseCase,
+    GetConversationUseCase,
+    ListConversationsUseCase,
+    SendMessageUseCase,
+)
 from application.use_cases.search_use_cases import HierarchicalSearchUseCase, SearchSummariesUseCase
 from application.use_cases.smiles_embedding_use_cases import EmbedCompoundSmilesUseCase
 from application.use_cases.smiles_search_use_cases import SearchSimilarCompoundsUseCase
@@ -138,7 +145,7 @@ from infrastructure.file_services.font_title_extractor import FontTitleExtractor
 from infrastructure.file_services.py_mu_pfd_service import PyMuPDFService
 from infrastructure.kafka.kafka_external_event_streamer import KafkaExternalEventPublisher
 from infrastructure.kafka.kafka_publisher import KafkaPublisher
-from infrastructure.llm.factory import create_llm_client, create_prompt_repository
+from infrastructure.llm.factory import create_chat_llm_client, create_llm_client, create_prompt_repository
 from infrastructure.ner.gliner2_extractor import GLiNER2Extractor
 from infrastructure.ner.structflo_ner_extractor import StructfloNERExtractor
 from infrastructure.permissions.sentinel_permission_registrar import SentinelPermissionRegistrar
@@ -648,6 +655,77 @@ def create_container() -> Container:  # noqa: PLR0915
         artifact_read_model=c[ArtifactReadModel],
         reranker=c[Reranker],
         sparse_embedding_generator=c[SparseEmbeddingGenerator],
+    )
+
+    # --- Chat (Agentic RAG) ---
+    from application.ports.chat_agent import ChatAgentPort  # noqa: PLC0415
+    from application.ports.chat_repository import ChatRepository  # noqa: PLC0415
+    from infrastructure.chat.agent import ChatAgent  # noqa: PLC0415
+    from infrastructure.chat.context_builder import ContextBuilder  # noqa: PLC0415
+    from infrastructure.chat.mongo_chat_repository import MongoChatRepository  # noqa: PLC0415
+    from infrastructure.chat.nodes.answer_synthesis import AnswerSynthesisNode  # noqa: PLC0415
+    from infrastructure.chat.nodes.grounding_verification import GroundingVerificationNode  # noqa: PLC0415
+    from infrastructure.chat.nodes.question_analysis import QuestionAnalysisNode  # noqa: PLC0415
+    from infrastructure.chat.nodes.retrieval import RetrievalNode  # noqa: PLC0415
+
+    # Chat LLM client (separate from batch LLM, falls back to same settings)
+    chat_llm_client = create_chat_llm_client(settings)
+
+    container[ChatRepository] = lambda c: MongoChatRepository(
+        client=c[AsyncIOMotorClient],
+        db_name=settings.mongo_db,
+    )
+
+    container[QuestionAnalysisNode] = lambda _: QuestionAnalysisNode(
+        llm_client=chat_llm_client,
+        prompt_repository=container[PromptRepositoryPort],
+    )
+    container[RetrievalNode] = lambda c: RetrievalNode(
+        hierarchical_search=c[HierarchicalSearchUseCase],
+        summary_search=c[SearchSummariesUseCase],
+        page_read_model=c[PageReadModel],
+        max_results=settings.chat_max_retrieval_results,
+    )
+    container[AnswerSynthesisNode] = lambda _: AnswerSynthesisNode(
+        llm_client=chat_llm_client,
+        prompt_repository=container[PromptRepositoryPort],
+    )
+    container[GroundingVerificationNode] = lambda _: GroundingVerificationNode(
+        llm_client=chat_llm_client,
+        prompt_repository=container[PromptRepositoryPort],
+    )
+
+    container[ChatAgentPort] = lambda c: ChatAgent(
+        question_analysis=c[QuestionAnalysisNode],
+        retrieval=c[RetrievalNode],
+        answer_synthesis=c[AnswerSynthesisNode],
+        grounding_verification=c[GroundingVerificationNode],
+        max_retries=settings.chat_max_retries,
+    )
+
+    container[ContextBuilder] = lambda c: ContextBuilder(
+        chat_repository=c[ChatRepository],
+        llm_client=chat_llm_client,
+        prompt_repository=c[PromptRepositoryPort],
+        max_recent_messages=settings.chat_max_history_messages,
+    )
+
+    # Chat Use Cases
+    container[CreateConversationUseCase] = lambda c: CreateConversationUseCase(
+        chat_repository=c[ChatRepository],
+    )
+    container[ListConversationsUseCase] = lambda c: ListConversationsUseCase(
+        chat_repository=c[ChatRepository],
+    )
+    container[GetConversationUseCase] = lambda c: GetConversationUseCase(
+        chat_repository=c[ChatRepository],
+    )
+    container[DeleteConversationUseCase] = lambda c: DeleteConversationUseCase(
+        chat_repository=c[ChatRepository],
+    )
+    container[SendMessageUseCase] = lambda c: SendMessageUseCase(
+        chat_repository=c[ChatRepository],
+        chat_agent=c[ChatAgentPort],
     )
 
     return container

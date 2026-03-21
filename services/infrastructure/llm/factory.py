@@ -72,6 +72,51 @@ def create_llm_client(settings: Settings) -> LLMClientPort:
     raise ValueError(msg)
 
 
+def create_chat_llm_client(settings: Settings) -> LLMClientPort:
+    """Instantiate a separate LLM client for chat, with fallback to batch LLM settings."""
+    from infrastructure.config import Settings as SettingsType  # noqa: PLC0415
+
+    # Build effective settings by falling back to batch LLM values
+    effective_provider = settings.chat_llm_provider or settings.llm_provider
+    effective_model = settings.chat_llm_model_name or settings.llm_model_name
+    effective_base_url = settings.chat_llm_base_url or settings.llm_base_url
+    effective_api_key = settings.chat_llm_api_key or settings.llm_api_key
+    effective_temperature = settings.chat_llm_temperature
+
+    log.info(
+        "llm.factory.chat",
+        provider=effective_provider,
+        model=effective_model,
+        temperature=effective_temperature,
+    )
+
+    if effective_provider == "ollama":
+        from infrastructure.llm.adapters.ollama_client import OllamaLLMClient  # noqa: PLC0415
+
+        return OllamaLLMClient(
+            model_name=effective_model,
+            base_url=effective_base_url,
+            temperature=effective_temperature,
+            langfuse_handler=_make_langfuse_callback_handler(settings),
+        )
+
+    if effective_provider == "openai":
+        from infrastructure.llm.adapters.openai_client import OpenAILLMClient  # noqa: PLC0415
+
+        api_key = effective_api_key or settings.openai_api_key
+        if not api_key:
+            msg = "CHAT_LLM_API_KEY or OPENAI_API_KEY must be set when CHAT_LLM_PROVIDER=openai"
+            raise ValueError(msg)
+        return OpenAILLMClient(
+            model_name=effective_model,
+            api_key=api_key,
+            temperature=effective_temperature,
+        )
+
+    msg = f"Unsupported CHAT_LLM_PROVIDER: {effective_provider!r}. Valid options: ollama, openai"
+    raise ValueError(msg)
+
+
 def create_prompt_repository(settings: Settings) -> PromptRepositoryPort:
     """Instantiate the prompt repository selected by PROMPT_REPOSITORY_TYPE in config."""
     repo_type = settings.prompt_repository_type

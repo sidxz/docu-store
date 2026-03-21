@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from typing import Protocol
 
 
@@ -34,6 +35,31 @@ class LLMClientPort(Protocol):
 
         """
         ...
+
+    async def stream(
+        self,
+        prompt: str,
+        *,
+        system_prompt: str | None = None,
+        temperature: float | None = None,
+    ) -> AsyncGenerator[str, None]:
+        """Stream tokens one by one from the model.
+
+        Args:
+            prompt: The user prompt to send to the model
+            system_prompt: Optional system/instruction prompt
+            temperature: Override instance temperature for this call
+
+        Yields:
+            String token deltas as they are generated
+
+        Raises:
+            RuntimeError: If the LLM call fails or times out
+
+        """
+        ...
+        # Make this an async generator in the protocol
+        yield ""  # noqa: RET503
 
     async def complete_with_image(
         self,

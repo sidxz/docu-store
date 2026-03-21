@@ -12,6 +12,7 @@ from infrastructure.config import settings
 from infrastructure.logging import setup_logging
 from interfaces.api.routes.artifact_routes import router as artifact_router
 from interfaces.api.routes.browse_routes import router as browse_router
+from interfaces.api.routes.chat_routes import router as chat_router
 from interfaces.api.routes.dashboard_routes import router as dashboard_router
 from interfaces.api.routes.page_routes import router as page_router
 from interfaces.api.routes.search_routes import router as search_router
@@ -70,6 +71,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             user_store = container[UserPreferencesStore]
             await user_store.ensure_indexes()
             logger.info("mongodb_user_indexes_initialized")
+
+            # Ensure chat indexes
+            from application.ports.chat_repository import ChatRepository  # noqa: PLC0415
+
+            chat_repo = container[ChatRepository]
+            await chat_repo.ensure_indexes()
+            logger.info("mongodb_chat_indexes_initialized")
 
             # Warm up embedding models so first search request is fast
             from application.ports.embedding_generator import EmbeddingGenerator  # noqa: PLC0415
@@ -130,6 +138,7 @@ def create_app() -> FastAPI:
     # Include routers
     app.include_router(artifact_router)
     app.include_router(browse_router)
+    app.include_router(chat_router)
     app.include_router(dashboard_router)
     app.include_router(page_router)
     app.include_router(search_router)

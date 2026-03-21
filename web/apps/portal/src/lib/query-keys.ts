@@ -57,6 +57,14 @@ export const queryKeys = {
       documents: () => [...queryKeys.user.all, "activity", "documents"] as const,
     },
   },
+  chat: {
+    all: ["chat"] as const,
+    list: () => [...queryKeys.chat.all, "list"] as const,
+    detail: (conversationId: string) =>
+      [...queryKeys.chat.all, conversationId] as const,
+    messages: (conversationId: string) =>
+      [...queryKeys.chat.all, conversationId, "messages"] as const,
+  },
   browse: {
     all: ["browse"] as const,
     categories: () => [...queryKeys.browse.all, "categories"] as const,

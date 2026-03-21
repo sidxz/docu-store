@@ -1,0 +1,33 @@
+name: chat_question_analysis
+version: "1.0"
+description: >
+  Analyze a user question to determine search strategy and extract entities
+input_variables:
+  - question
+  - conversation_context
+template: |
+  Analyze the following question and provide a structured analysis for a RAG retrieval system.
+
+  Conversation context (if any):
+  {conversation_context}
+
+  Current question: {question}
+
+  Respond with ONLY a JSON object (no markdown, no extra text):
+  {{
+    "query_type": "factual|comparative|exploratory|compound|follow_up",
+    "reformulated_query": "optimized search query combining context and question",
+    "entities": ["list", "of", "key", "entities"],
+    "smiles_detected": ["any", "SMILES", "strings"],
+    "search_strategy": "hierarchical|summary|compound|hybrid",
+    "summary": "brief one-line description of what the user is asking"
+  }}
+
+  Guidelines:
+  - "factual": specific fact or value (IC50, mechanism, date)
+  - "comparative": comparing entities (drugs, targets, studies)
+  - "exploratory": broad overview of a topic
+  - "compound": involves chemical structures or SMILES
+  - "follow_up": references prior conversation context
+  - For "reformulated_query": combine conversation context with the current question into a standalone search query
+  - For "search_strategy": use "hierarchical" for factual/comparative, "summary" for exploratory, "compound" if SMILES detected, "hybrid" for complex multi-faceted queries

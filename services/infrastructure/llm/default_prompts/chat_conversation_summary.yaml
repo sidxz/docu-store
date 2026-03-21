@@ -1,0 +1,12 @@
+name: chat_conversation_summary
+version: "1.0"
+description: >
+  Summarize older conversation messages into a concise context
+  for the sliding-window context builder.
+input_variables:
+  - conversation_text
+template: |
+  Summarize the following conversation concisely, preserving key facts, questions asked, and answers given. Focus on information that would be needed to understand follow-up questions.
+
+  Conversation:
+  {conversation_text}

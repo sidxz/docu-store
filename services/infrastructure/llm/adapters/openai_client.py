@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING
 
 import structlog
@@ -59,6 +60,29 @@ class OpenAILLMClient:
         log.debug("openai.complete", model=self._model_name)
         response = await llm.ainvoke(messages)
         return str(response.content)
+
+    async def stream(
+        self,
+        prompt: str,
+        *,
+        system_prompt: str | None = None,
+        temperature: float | None = None,
+    ) -> AsyncGenerator[str, None]:
+        from langchain_core.messages import HumanMessage, SystemMessage  # noqa: PLC0415
+
+        llm = self._get_llm()
+        if temperature is not None:
+            llm = llm.bind(temperature=temperature)
+
+        messages = []
+        if system_prompt:
+            messages.append(SystemMessage(content=system_prompt))
+        messages.append(HumanMessage(content=prompt))
+
+        log.debug("openai.stream", model=self._model_name)
+        async for chunk in llm.astream(messages):
+            if chunk.content:
+                yield str(chunk.content)
 
     async def complete_with_image(
         self,

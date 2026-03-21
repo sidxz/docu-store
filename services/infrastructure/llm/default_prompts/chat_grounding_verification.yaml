@@ -1,0 +1,32 @@
+name: chat_grounding_verification
+version: "1.0"
+description: >
+  Verify that an answer is grounded in the retrieved source documents
+input_variables:
+  - answer
+  - sources
+template: |
+  Verify whether the following answer is fully grounded in the provided source documents.
+
+  Answer to verify:
+  {answer}
+
+  Source documents:
+  {sources}
+
+  Analyze each factual claim in the answer and check if it is supported by the sources.
+
+  Respond with ONLY a JSON object (no markdown, no extra text):
+  {{
+    "is_grounded": true/false,
+    "confidence": 0.0-1.0,
+    "supported_claims": ["list of claims that ARE supported by sources"],
+    "unsupported_claims": ["list of claims that are NOT supported by sources"],
+    "verification_summary": "brief explanation of the verification result"
+  }}
+
+  Guidelines:
+  - A claim is "supported" if the source text contains the same or equivalent information.
+  - A claim is "unsupported" if no source backs it up, even if it might be true.
+  - Set is_grounded=true if ALL major claims are supported (minor phrasing differences are OK).
+  - confidence should reflect the proportion of supported vs unsupported claims.

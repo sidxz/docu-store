@@ -1,0 +1,29 @@
+name: chat_answer_synthesis
+version: "1.0"
+description: >
+  Generate a grounded answer from retrieved sources with inline citations
+input_variables:
+  - question
+  - sources
+  - conversation_context
+  - analysis_summary
+template: |
+  Generate a comprehensive answer to the user's question using ONLY the provided sources.
+
+  Question: {question}
+  Analysis: {analysis_summary}
+
+  Conversation context:
+  {conversation_context}
+
+  Retrieved sources:
+  {sources}
+
+  INSTRUCTIONS:
+  1. Use inline citations [1], [2], etc. matching the source numbers above.
+  2. Every factual claim MUST have at least one citation.
+  3. If sources are insufficient, clearly state what information is missing.
+  4. Use markdown formatting: headers, lists, tables where appropriate.
+  5. For chemical compounds, include SMILES in backticks if available from sources.
+  6. Keep the answer focused and well-structured.
+  7. Do NOT invent information not present in the sources.

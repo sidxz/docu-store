@@ -235,6 +235,55 @@ class Settings(BaseSettings):
         description="Low temperature for deterministic summaries.",
     )
 
+    # Chat LLM (separate from batch LLM — allows different model/temperature for interactive chat)
+    chat_llm_provider: Literal["ollama", "openai", "gemini"] | None = Field(
+        default=None,
+        validation_alias="CHAT_LLM_PROVIDER",
+        description="LLM provider for chat. Falls back to llm_provider if not set.",
+    )
+    chat_llm_model_name: str | None = Field(
+        default=None,
+        validation_alias="CHAT_LLM_MODEL_NAME",
+        description="Model name for chat. Falls back to llm_model_name if not set.",
+    )
+    chat_llm_base_url: str | None = Field(
+        default=None,
+        validation_alias="CHAT_LLM_BASE_URL",
+        description="Base URL for chat LLM. Falls back to llm_base_url if not set.",
+    )
+    chat_llm_api_key: str | None = Field(
+        default=None,
+        validation_alias="CHAT_LLM_API_KEY",
+        description="API key for chat LLM. Falls back to llm_api_key if not set.",
+    )
+    chat_llm_temperature: float = Field(
+        default=0.3,
+        validation_alias="CHAT_LLM_TEMPERATURE",
+        description="Slightly higher temperature for more conversational chat responses.",
+    )
+
+    # Chat settings
+    chat_max_history_messages: int = Field(
+        default=10,
+        validation_alias="CHAT_MAX_HISTORY_MESSAGES",
+        description="Max recent message pairs to include in context window.",
+    )
+    chat_max_retrieval_results: int = Field(
+        default=10,
+        validation_alias="CHAT_MAX_RETRIEVAL_RESULTS",
+        description="Max sources to retrieve per query.",
+    )
+    chat_max_retries: int = Field(
+        default=1,
+        validation_alias="CHAT_MAX_RETRIES",
+        description="Max grounding verification retries.",
+    )
+    chat_debug: bool = Field(
+        default=False,
+        validation_alias="CHAT_DEBUG",
+        description="Enable verbose debug logging for the entire chat agent chain.",
+    )
+
     # Sentinel (AuthZ mode)
     sentinel_url: str = Field(default="http://localhost:9003", validation_alias="SENTINEL_URL")
     sentinel_service_key: str = Field(default="", validation_alias="SENTINEL_SERVICE_KEY")
