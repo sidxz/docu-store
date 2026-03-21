@@ -38,13 +38,13 @@ export default function UploadPage() {
     if (!file) return;
 
     try {
-      await uploadMutation.mutateAsync({
+      const result = await uploadMutation.mutateAsync({
         file,
         artifactType,
         sourceUri: sourceUri || undefined,
         visibility: defaultScope,
       });
-      router.push(`/${workspace}/documents`);
+      router.push(`/${workspace}/documents/${result.artifact_id}`);
     } catch {
       // Error is available via uploadMutation.error
     }

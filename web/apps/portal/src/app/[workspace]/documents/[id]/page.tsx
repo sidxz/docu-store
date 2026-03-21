@@ -1,13 +1,13 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { Button } from "primereact/button";
 import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 import { Message } from "primereact/message";
 import { TabPanel, TabView } from "primereact/tabview";
 import { Toast } from "primereact/toast";
-import { FileText, ArrowLeft, Lock, Users } from "lucide-react";
+import { FileText, ArrowLeft, Lock, Users, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -31,7 +31,24 @@ import { getErrorMessage } from "@/lib/api-error";
 export default function ArtifactDetailPage() {
   const { workspace, id } = useParams<{ workspace: string; id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const toast = useRef<Toast>(null);
+
+  const TAB_KEYS = ["overview", "pages", "pdf", "workflows"] as const;
+  const tabParam = searchParams.get("tab");
+  const activeTab = Math.max(0, TAB_KEYS.indexOf(tabParam as typeof TAB_KEYS[number]));
+
+  const handleTabChange = (index: number) => {
+    const key = TAB_KEYS[index] ?? "overview";
+    const sp = new URLSearchParams(searchParams.toString());
+    if (key === "overview") {
+      sp.delete("tab");
+    } else {
+      sp.set("tab", key);
+    }
+    const qs = sp.toString();
+    router.replace(`/${workspace}/documents/${id}${qs ? `?${qs}` : ""}`, { scroll: false });
+  };
   const { user } = useSession();
   const { data: artifact, isLoading, error } = useArtifact(id);
   const { data: workflowData } = useArtifactWorkflows(id);
@@ -160,7 +177,48 @@ export default function ArtifactDetailPage() {
         }
       />
 
-      <TabView className="mt-2">
+      {/* Workflow status banner */}
+      {workflows && (() => {
+        const running = workflows.filter((w) => w.status === "RUNNING");
+        const failed = workflows.filter((w) => w.status === "FAILED" || w.status === "TIMED_OUT");
+        const allDone = workflows.every((w) => w.status === "COMPLETED" || w.status === "NOT_FOUND");
+
+        if (running.length > 0) {
+          return (
+            <div className="mt-3 flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-4 py-2.5">
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-blue-500" />
+              <div className="min-w-0 text-sm">
+                <span className="font-medium text-blue-400">
+                  {running.length} {running.length === 1 ? "workflow" : "workflows"} running
+                </span>
+                <span className="ml-2 text-xs text-text-muted">
+                  {running.map((w) => w.name.replace(/_/g, " ")).join(", ")}
+                </span>
+              </div>
+            </div>
+          );
+        }
+
+        if (failed.length > 0) {
+          return (
+            <div className="mt-3 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-2.5">
+              <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
+              <div className="min-w-0 text-sm">
+                <span className="font-medium text-red-400">
+                  {failed.length} {failed.length === 1 ? "workflow" : "workflows"} failed
+                </span>
+                <span className="ml-2 text-xs text-text-muted">
+                  {failed.map((w) => w.name.replace(/_/g, " ")).join(", ")}
+                </span>
+              </div>
+            </div>
+          );
+        }
+
+        return null;
+      })()}
+
+      <TabView className="mt-2" activeIndex={activeTab} onTabChange={(e) => handleTabChange(e.index)}>
         {/* Overview Tab */}
         <TabPanel header="Overview">
           <OverviewTab

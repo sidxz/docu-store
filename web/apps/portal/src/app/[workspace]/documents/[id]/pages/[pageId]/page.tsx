@@ -117,7 +117,7 @@ export default function PageViewerPage() {
         <Button
           label="Back to Artifact"
           icon={<ArrowLeft className="h-4 w-4" />}
-          onClick={() => router.push(`/${workspace}/documents/${id}`)}
+          onClick={() => router.push(`/${workspace}/documents/${id}?tab=pages`)}
           text
           severity="secondary"
           className="mt-4"
@@ -134,7 +134,7 @@ export default function PageViewerPage() {
       <Button
         label="Back to document"
         icon={<ArrowLeft className="h-3.5 w-3.5" />}
-        onClick={() => router.push(`/${workspace}/documents/${id}`)}
+        onClick={() => router.push(`/${workspace}/documents/${id}?tab=pages`)}
         text
         severity="secondary"
         className="mb-4"
