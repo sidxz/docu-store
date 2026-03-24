@@ -293,6 +293,12 @@ class SendMessageUseCase:
                 grounded=query_context.grounded,
             )
 
+        # Update title with reformulated query from planning (more descriptive)
+        if query_context and query_context.reformulated_query:
+            await self._repo.update_conversation(
+                conversation_id, title=query_context.reformulated_query[:100],
+            )
+
         # Save assistant response with full step trace + grounding result
         # Sources are already filtered to cited-only by the agent's done event
         if draft_answer:

@@ -28,7 +28,7 @@ export function useConversation(conversationId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.chat.detail(conversationId ?? ""),
     queryFn: () =>
-      authFetchJson<{ conversation: Conversation; messages: ChatMessage[] }>(
+      authFetchJson<Conversation & { messages: ChatMessage[] }>(
         `/chat/${conversationId}`,
       ),
     enabled: !!conversationId,

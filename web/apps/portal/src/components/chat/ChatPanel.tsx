@@ -37,6 +37,18 @@ export function ChatPanel({
   const sendMessage = useSendMessage(conversationId);
   const { isStreaming, streamingContent, streamingSteps, streamingSources } =
     useChatStore();
+  const planningSummary = useChatStore((s) => {
+    const step = s.streamingSteps.find((st) => st.step === "planning" && st.status === "completed");
+    if (!step?.thinking_content) return null;
+    try {
+      const match = step.thinking_content.match(/```json\s*\n([\s\S]*?)\n```/);
+      const parsed = JSON.parse(match ? match[1] : step.thinking_content);
+      return (parsed?.reformulated_query as string) || null;
+    } catch {
+      return null;
+    }
+  });
+  const pendingUserMessage = useChatStore((s) => s.pendingUserMessage);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll when streaming
@@ -174,7 +186,10 @@ export function ChatPanel({
           />
         )}
         <h2 className="text-sm font-medium text-text-primary truncate flex-1">
-          {data?.conversation?.title || "Loading..."}
+          {data?.title
+            || planningSummary
+            || pendingUserMessage
+            || (isLoading ? "" : "New Chat")}
         </h2>
         {/* Sources toggle */}
         {sourceCount > 0 && (

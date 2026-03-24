@@ -14,6 +14,7 @@ export function useAuthBlobUrl(url: string) {
   useEffect(() => {
     setBlobUrl(null);
     setError(false);
+    if (!url) return;
     const controller = new AbortController();
     let revoke: string | null = null;
     const headers = getAuthzClient().getHeaders();
