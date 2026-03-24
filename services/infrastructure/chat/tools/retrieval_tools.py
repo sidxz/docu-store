@@ -312,7 +312,7 @@ class GetPageContentTool:
             artifact_id=page.artifact_id,
             artifact_title=None,
             page_id=page_id,
-            page_index=page.page_index,
+            page_index=page.index,
             page_name=page.name,
             expanded_text=full_text[:3000],  # Cap to avoid blowing context
             matched_text=full_text[:500],
@@ -320,7 +320,7 @@ class GetPageContentTool:
             query_source="tool_page_content",
         )
 
-        summary = f"Page '{page.name or page_id_str}' (page {page.page_index}): {len(full_text)} chars of text content."
+        summary = f"Page '{page.name or page_id_str}' (page {page.index}): {len(full_text)} chars of text content."
         return [result], summary
 
 
