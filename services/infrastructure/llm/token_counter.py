@@ -1,4 +1,4 @@
-"""Thread-safe token usage accumulator using contextvars.
+"""Token usage accumulator using contextvars.
 
 Usage in agents:
     from infrastructure.llm.token_counter import TokenCounter

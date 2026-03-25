@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
 import {
   BarChart3,
   Activity,
@@ -13,6 +15,8 @@ import {
   Search,
   Shield,
   Coins,
+  FileText,
+  CircleHelp,
 } from "lucide-react";
 import { Skeleton } from "primereact/skeleton";
 import { SelectButton } from "primereact/selectbutton";
@@ -39,6 +43,8 @@ import {
   useChatLatencyStats,
   useSearchQualityStats,
   useGroundingStats,
+  useKnowledgeGaps,
+  useCitationFrequency,
 } from "@/hooks/use-stats";
 
 // ---------------------------------------------------------------------------
@@ -546,12 +552,15 @@ const PERIOD_OPTIONS = [
 ];
 
 function AnalyticsSection() {
+  const { workspace } = useParams<{ workspace: string }>();
   const [period, setPeriod] = useState("week");
 
   const { data: tokenData } = useTokenUsageStats(period);
   const { data: latencyData } = useChatLatencyStats(period);
   const { data: searchData } = useSearchQualityStats(period);
   const { data: groundingData } = useGroundingStats(period);
+  const { data: gapsData } = useKnowledgeGaps(period);
+  const { data: citationData } = useCitationFrequency(period);
 
   // Token chart: aggregate by date (sum across modes)
   const tokenChartData = useMemo(() => {
@@ -856,6 +865,168 @@ function AnalyticsSection() {
           ) : (
             <p className="py-8 text-center text-sm text-text-muted">
               No grounding data in this period.
+            </p>
+          )}
+        </Card>
+      </div>
+
+      {/* ---- Knowledge Gaps + Citation Frequency ---- */}
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Knowledge Gaps */}
+        <Card>
+          <CardHeader title="Knowledge Gaps" />
+          <p className="text-xs text-text-muted -mt-2 mb-4">
+            Entities detected in chat queries where the corpus couldn&apos;t provide grounded answers
+          </p>
+          {gapsData && gapsData.gaps.length > 0 ? (
+            <div className="space-y-2.5">
+              {gapsData.gaps.map((g) => (
+                <div key={`${g.entity_text}-${g.entity_type}`} className="flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <CircleHelp className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+                      <span className="text-sm font-medium text-text-primary truncate">
+                        {g.entity_text}
+                      </span>
+                      <span className="text-[10px] rounded-full bg-surface-sunken px-1.5 py-0.5 text-text-muted flex-shrink-0">
+                        {g.entity_type}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex h-1.5 w-full overflow-hidden rounded-full bg-surface-sunken">
+                      <div
+                        className="h-full rounded-full bg-amber-500 transition-all"
+                        style={{ width: `${g.gap_rate * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0 w-20">
+                    <span className="text-xs tabular-nums font-medium text-amber-500">
+                      {(g.gap_rate * 100).toFixed(0)}% gap
+                    </span>
+                    <p className="text-[10px] text-text-muted tabular-nums">
+                      {g.gap_count}/{g.query_count} queries
+                    </p>
+                  </div>
+                </div>
+              ))}
+              <div className="pt-2 border-t border-border-subtle flex justify-between text-xs text-text-muted">
+                <span>
+                  {gapsData.total_gap_entities} gap entities / {gapsData.total_unique_entities} total
+                </span>
+              </div>
+            </div>
+          ) : (
+            <p className="py-8 text-center text-sm text-text-muted">
+              No knowledge gaps detected — all queried entities are well covered.
+            </p>
+          )}
+        </Card>
+
+        {/* Citation Frequency */}
+        <Card>
+          <CardHeader title="Citation Frequency" />
+          <p className="text-xs text-text-muted -mt-2 mb-4">
+            Which documents are cited most and least in chat answers
+          </p>
+          {citationData && citationData.most_cited.length > 0 ? (
+            <div className="space-y-4">
+              {/* Most cited */}
+              <div>
+                <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
+                  Most Cited
+                </h4>
+                <div className="space-y-1.5">
+                  {citationData.most_cited.map((a, i) => (
+                    <Link
+                      key={a.artifact_id}
+                      href={`/${workspace}/documents/${a.artifact_id}`}
+                      className="flex items-center gap-2 group/cite rounded-md -mx-1 px-1 py-0.5 hover:bg-surface-hover transition-colors"
+                    >
+                      <span className="text-[10px] font-mono text-text-muted w-4 text-right">{i + 1}</span>
+                      <FileText className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                      <span className="text-sm text-text-primary truncate flex-1 group-hover/cite:text-accent" title={a.artifact_title ?? a.artifact_id}>
+                        {a.artifact_title ?? a.artifact_id.slice(0, 12)}
+                      </span>
+                      <span className="text-xs tabular-nums font-medium text-text-secondary flex-shrink-0">
+                        {a.citation_count}
+                      </span>
+                      <span className="text-[10px] text-text-muted flex-shrink-0">
+                        ({a.unique_conversation_count} conv)
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+
+              {/* Least cited */}
+              {citationData.least_cited.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
+                    Least Cited
+                  </h4>
+                  <div className="space-y-1.5">
+                    {citationData.least_cited.map((a) => (
+                      <Link
+                        key={a.artifact_id}
+                        href={`/${workspace}/documents/${a.artifact_id}`}
+                        className="flex items-center gap-2 group/cite rounded-md -mx-1 px-1 py-0.5 hover:bg-surface-hover transition-colors"
+                      >
+                        <FileText className="h-3.5 w-3.5 text-text-muted flex-shrink-0 ml-5" />
+                        <span className="text-sm text-text-secondary truncate flex-1 group-hover/cite:text-accent" title={a.artifact_title ?? a.artifact_id}>
+                          {a.artifact_title ?? a.artifact_id.slice(0, 12)}
+                        </span>
+                        <span className="text-xs tabular-nums text-text-muted flex-shrink-0">
+                          {a.citation_count}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Never cited */}
+              {citationData.never_cited.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-medium text-amber-500 uppercase tracking-wider mb-2">
+                    Never Cited
+                  </h4>
+                  <div className="space-y-1.5">
+                    {citationData.never_cited.map((a) => (
+                      <Link
+                        key={a.artifact_id}
+                        href={`/${workspace}/documents/${a.artifact_id}`}
+                        className="flex items-center gap-2 group/cite rounded-md -mx-1 px-1 py-0.5 hover:bg-surface-hover transition-colors"
+                      >
+                        <FileText className="h-3.5 w-3.5 text-amber-500/60 flex-shrink-0 ml-5" />
+                        <span className="text-sm text-text-muted truncate flex-1 group-hover/cite:text-accent" title={a.artifact_title ?? a.artifact_id}>
+                          {a.artifact_title ?? a.artifact_id.slice(0, 12)}
+                        </span>
+                      </Link>
+                    ))}
+                    {citationData.never_cited_count > citationData.never_cited.length && (
+                      <p className="text-[11px] text-text-muted ml-5">
+                        + {citationData.never_cited_count - citationData.never_cited.length} more
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Summary */}
+              <div className="pt-2 border-t border-border-subtle flex justify-between text-xs text-text-muted">
+                <span>
+                  {citationData.total_artifacts - citationData.never_cited_count} / {citationData.total_artifacts} documents cited
+                </span>
+                {citationData.never_cited_count > 0 && (
+                  <span className="text-amber-500">
+                    {citationData.never_cited_count} never cited
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="py-8 text-center text-sm text-text-muted">
+              No citation data in this period.
             </p>
           )}
         </Card>

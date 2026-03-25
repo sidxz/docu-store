@@ -291,6 +291,7 @@ def create_container() -> Container:  # noqa: PLR0915
     container[AnalyticsReadModel] = lambda c: MongoAnalyticsStore(
         client=c[AsyncIOMotorClient],
         db_name=settings.mongo_db,
+        artifacts_collection_name=settings.mongo_artifacts_collection,
     )
 
     # Register Pipeline Orchestrator (Temporal)

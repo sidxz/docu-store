@@ -13,9 +13,11 @@ from temporalio.client import Client
 from application.dtos.stats_dtos import (
     ActiveWorkflow,
     ChatLatencyStatsResponse,
+    CitationFrequencyResponse,
     CollectionStats,
     FailedWorkflow,
     GroundingStatsResponse,
+    KnowledgeGapsResponse,
     PipelineStatsResponse,
     SearchQualityStatsResponse,
     TokenUsageStatsResponse,
@@ -344,7 +346,7 @@ async def get_token_usage_stats(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
 
     analytics = container[AnalyticsReadModel]
-    return await analytics.get_token_usage(_period_to_days(period))
+    return await analytics.get_token_usage(_period_to_days(period), workspace_id=auth.workspace_id)
 
 
 @router.get("/chat-latency", status_code=status.HTTP_200_OK)
@@ -358,7 +360,7 @@ async def get_chat_latency_stats(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
 
     analytics = container[AnalyticsReadModel]
-    return await analytics.get_chat_latency(_period_to_days(period))
+    return await analytics.get_chat_latency(_period_to_days(period), workspace_id=auth.workspace_id)
 
 
 @router.get("/search-quality", status_code=status.HTTP_200_OK)
@@ -372,7 +374,7 @@ async def get_search_quality_stats(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
 
     analytics = container[AnalyticsReadModel]
-    return await analytics.get_search_quality(_period_to_days(period))
+    return await analytics.get_search_quality(_period_to_days(period), workspace_id=auth.workspace_id)
 
 
 @router.get("/grounding", status_code=status.HTTP_200_OK)
@@ -386,4 +388,32 @@ async def get_grounding_stats(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
 
     analytics = container[AnalyticsReadModel]
-    return await analytics.get_grounding_stats(_period_to_days(period))
+    return await analytics.get_grounding_stats(_period_to_days(period), workspace_id=auth.workspace_id)
+
+
+@router.get("/knowledge-gaps", status_code=status.HTTP_200_OK)
+async def get_knowledge_gaps(
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+    period: str = Query("week", pattern="^(day|week|month)$"),
+) -> KnowledgeGapsResponse:
+    """Entities detected in chat queries that the corpus couldn't ground (admin only)."""
+    if not auth.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
+    analytics = container[AnalyticsReadModel]
+    return await analytics.get_knowledge_gaps(_period_to_days(period), workspace_id=auth.workspace_id)
+
+
+@router.get("/citation-frequency", status_code=status.HTTP_200_OK)
+async def get_citation_frequency(
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+    period: str = Query("week", pattern="^(day|week|month)$"),
+) -> CitationFrequencyResponse:
+    """Document citation frequency from chat answers (admin only)."""
+    if not auth.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
+    analytics = container[AnalyticsReadModel]
+    return await analytics.get_citation_frequency(_period_to_days(period), workspace_id=auth.workspace_id)

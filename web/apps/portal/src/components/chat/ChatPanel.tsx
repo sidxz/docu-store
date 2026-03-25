@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { MessageSquare, PanelLeftOpen, FileText } from "lucide-react";
 import { Button } from "primereact/button";
 import { Badge } from "primereact/badge";
-import { useConversation, useCreateConversation, useSendMessage } from "@/hooks/use-chat";
+import { useConversation, useCreateConversation, useSendMessage, useChatFeedback } from "@/hooks/use-chat";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { MessageList } from "./MessageList";
 import { ChatInput } from "./ChatInput";
@@ -35,7 +35,8 @@ export function ChatPanel({
   const { data, isLoading } = useConversation(conversationId);
   const createConversation = useCreateConversation();
   const sendMessage = useSendMessage(conversationId);
-  const { isStreaming, streamingContent, streamingSteps, streamingSources } =
+  const feedbackMutation = useChatFeedback(conversationId);
+  const { isStreaming, streamingContent, streamingSteps, streamingSources, chatMode } =
     useChatStore();
   const planningSummary = useChatStore((s) => {
     const step = s.streamingSteps.find((st) => st.step === "planning" && st.status === "completed");
@@ -50,6 +51,13 @@ export function ChatPanel({
   });
   const pendingUserMessage = useChatStore((s) => s.pendingUserMessage);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const handleFeedback = useCallback(
+    (messageId: string, feedback: "positive" | "negative") => {
+      feedbackMutation.mutate({ messageId, feedback, mode: chatMode });
+    },
+    [feedbackMutation, chatMode],
+  );
 
   // Auto-scroll when streaming
   useEffect(() => {
@@ -214,6 +222,7 @@ export function ChatPanel({
           streamingSteps={streamingSteps}
           streamingSources={streamingSources}
           workspace={workspace}
+          onFeedback={handleFeedback}
         />
       </div>
 

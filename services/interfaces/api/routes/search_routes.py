@@ -82,7 +82,11 @@ async def search_pages(
         allowed_artifact_ids=allowed_artifact_ids,
     )
     latency_ms = round((time.monotonic() - t0) * 1000, 2)
-    result_count = len(result.unwrap().results) if isinstance(result, Success) and result.unwrap().results else 0
+    if isinstance(result, Success):
+        inner = result.unwrap()
+        result_count = len(inner.results) if inner.results else 0
+    else:
+        result_count = 0
     logger.info(
         "search.latency",
         search_type="pages",
@@ -177,7 +181,11 @@ async def search_compounds(
         allowed_artifact_ids=allowed_artifact_ids,
     )
     latency_ms = round((time.monotonic() - t0) * 1000, 2)
-    result_count = len(result.unwrap().results) if isinstance(result, Success) and result.unwrap().results else 0
+    if isinstance(result, Success):
+        inner = result.unwrap()
+        result_count = len(inner.results) if inner.results else 0
+    else:
+        result_count = 0
     logger.info(
         "search.latency",
         search_type="compounds",
@@ -224,7 +232,11 @@ async def search_summaries(
         allowed_artifact_ids=allowed_artifact_ids,
     )
     latency_ms = round((time.monotonic() - t0) * 1000, 2)
-    result_count = len(result.unwrap().results) if isinstance(result, Success) and result.unwrap().results else 0
+    if isinstance(result, Success):
+        inner = result.unwrap()
+        result_count = len(inner.results) if inner.results else 0
+    else:
+        result_count = 0
     logger.info(
         "search.latency",
         search_type="summaries",

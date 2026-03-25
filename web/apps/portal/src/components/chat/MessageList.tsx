@@ -12,6 +12,7 @@ interface MessageListProps {
   streamingSteps: AgentStep[];
   streamingSources: SourceCitation[];
   workspace: string;
+  onFeedback?: (messageId: string, feedback: "positive" | "negative") => void;
 }
 
 export function MessageList({
@@ -22,6 +23,7 @@ export function MessageList({
   streamingSteps,
   streamingSources,
   workspace,
+  onFeedback,
 }: MessageListProps) {
   const pendingUserMessage = useChatStore((s) => s.pendingUserMessage);
   const finalSources = useChatStore((s) => s.finalSources);
@@ -58,7 +60,7 @@ export function MessageList({
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       {messages.map((msg) => (
-        <ChatMessage key={msg.message_id} message={msg} workspace={workspace} />
+        <ChatMessage key={msg.message_id} message={msg} workspace={workspace} onFeedback={onFeedback} />
       ))}
 
       {/* Show user message immediately — persists until API catches up */}

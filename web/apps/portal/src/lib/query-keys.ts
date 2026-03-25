@@ -69,6 +69,8 @@ export const queryKeys = {
     chatLatency: (period: string) => [...queryKeys.stats.all, "chat-latency", period] as const,
     searchQuality: (period: string) => [...queryKeys.stats.all, "search-quality", period] as const,
     grounding: (period: string) => [...queryKeys.stats.all, "grounding", period] as const,
+    knowledgeGaps: (period: string) => [...queryKeys.stats.all, "knowledge-gaps", period] as const,
+    citationFrequency: (period: string) => [...queryKeys.stats.all, "citation-frequency", period] as const,
   },
   user: {
     all: ["user"] as const,

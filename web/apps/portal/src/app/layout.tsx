@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import Script from "next/script";
 import type { ReactNode } from "react";
 
 import { Providers } from "@/components/providers/Providers";
@@ -28,14 +27,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             __html: `(function(){try{var t=JSON.parse(localStorage.getItem('ds-theme')||'{}');var v=t.state&&t.state.theme;if(!v){v=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'}document.documentElement.setAttribute('data-theme',v)}catch(e){}})()`,
           }}
         />
-        {/* Umami analytics — self-hosted, privacy-first */}
-        {process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID && (
-          <Script
-            src={`${process.env.NEXT_PUBLIC_UMAMI_URL}/ds-analytics`}
-            data-website-id={process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID}
-            strategy="afterInteractive"
-          />
-        )}
       </head>
       <body>
         <Providers>{children}</Providers>

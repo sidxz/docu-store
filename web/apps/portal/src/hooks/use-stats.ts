@@ -181,6 +181,62 @@ export function useGroundingStats(period = "week") {
   });
 }
 
+// ---------- Knowledge gaps & citation frequency types ----------
+
+interface KnowledgeGapEntry {
+  entity_text: string;
+  entity_type: string;
+  query_count: number;
+  gap_count: number;
+  gap_rate: number;
+}
+
+interface KnowledgeGapsResponse {
+  gaps: KnowledgeGapEntry[];
+  total_unique_entities: number;
+  total_gap_entities: number;
+}
+
+interface CitedArtifactEntry {
+  artifact_id: string;
+  artifact_title: string | null;
+  citation_count: number;
+  unique_conversation_count: number;
+}
+
+interface UncitedArtifactEntry {
+  artifact_id: string;
+  artifact_title: string | null;
+}
+
+interface CitationFrequencyResponse {
+  most_cited: CitedArtifactEntry[];
+  least_cited: CitedArtifactEntry[];
+  never_cited: UncitedArtifactEntry[];
+  never_cited_count: number;
+  total_artifacts: number;
+}
+
+// ---------- Knowledge gaps & citation frequency hooks ----------
+
+export function useKnowledgeGaps(period = "week") {
+  return useQuery({
+    queryKey: queryKeys.stats.knowledgeGaps(period),
+    queryFn: () =>
+      authFetchJson<KnowledgeGapsResponse>(`/stats/knowledge-gaps?period=${period}`),
+    refetchInterval: 60_000,
+  });
+}
+
+export function useCitationFrequency(period = "week") {
+  return useQuery({
+    queryKey: queryKeys.stats.citationFrequency(period),
+    queryFn: () =>
+      authFetchJson<CitationFrequencyResponse>(`/stats/citation-frequency?period=${period}`),
+    refetchInterval: 60_000,
+  });
+}
+
 // ---------- Re-exports for page consumption ----------
 
 export type {
@@ -199,4 +255,9 @@ export type {
   SearchQualityStatsResponse,
   GroundingBucket,
   GroundingStatsResponse,
+  KnowledgeGapEntry,
+  KnowledgeGapsResponse,
+  CitedArtifactEntry,
+  UncitedArtifactEntry,
+  CitationFrequencyResponse,
 };

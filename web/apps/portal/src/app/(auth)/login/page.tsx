@@ -93,8 +93,7 @@ export default function LoginPage() {
         <div
           className="relative flex w-full flex-shrink-0 items-center justify-center px-8 md:w-[460px]"
           style={{
-            background: "rgba(8, 14, 27, 0.88)",
-            backdropFilter: "blur(32px) saturate(150%)",
+            background: "rgba(8, 14, 27, 0.95)",
           }}
         >
           {/* Left edge line — desktop only */}
