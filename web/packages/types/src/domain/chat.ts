@@ -27,6 +27,8 @@ export interface ContentBlock {
   smiles: string | null;
   label: string | null;
   sources: SourceCitation[] | null;
+  page_id: string | null;
+  artifact_id: string | null;
 }
 
 // --- Agent tracing ---

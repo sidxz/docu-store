@@ -1,6 +1,10 @@
 """Stage 1 (Thinking Mode): Query Planning & Decomposition.
 
-Three parallel tracks: NER extraction + GLiNER2 author detection + LLM planning.
+Four parallel tracks:
+  A) NER extraction (StructfloNER)
+  B) GLiNER2 author detection
+  C) LLM planning (query type, sub-queries, HyDE)
+  D) Deterministic SMILES detection + resolution via compound vector store
 """
 
 from __future__ import annotations
@@ -10,13 +14,20 @@ import json
 from typing import TYPE_CHECKING
 
 import structlog
+from returns.result import Failure
 
 from infrastructure.chat.models import (
     QUERY_FILTER_ENTITY_TYPES,
     NEREntityFilter,
     QueryPlan,
+    ResolvedCompound,
+    SmilesContext,
 )
 from infrastructure.chat.utils import build_follow_up_context, strip_markdown_fences
+from infrastructure.chemistry.smiles_detector import (
+    detect_smiles,
+    infer_smiles_search_mode,
+)
 from infrastructure.config import settings
 
 if TYPE_CHECKING:
@@ -24,7 +35,9 @@ if TYPE_CHECKING:
     from application.ports.llm_client import LLMClientPort
     from application.ports.ner_extractor import NERExtractorPort
     from application.ports.prompt_repository import PromptRepositoryPort
+    from application.ports.smiles_validator import SmilesValidator
     from application.ports.structured_extractor import StructuredExtractorPort
+    from application.use_cases.smiles_search_use_cases import SearchSimilarCompoundsUseCase
 
 log = structlog.get_logger(__name__)
 
@@ -43,11 +56,15 @@ class QueryPlanningNode:
         prompt_repository: PromptRepositoryPort,
         ner_extractor: NERExtractorPort,
         structured_extractor: StructuredExtractorPort,
+        smiles_validator: SmilesValidator | None = None,
+        smiles_search: SearchSimilarCompoundsUseCase | None = None,
     ) -> None:
         self._llm = llm_client
         self._prompts = prompt_repository
         self._ner = ner_extractor
         self._structured_extractor = structured_extractor
+        self._smiles_validator = smiles_validator
+        self._smiles_search = smiles_search
 
     async def run(
         self,
@@ -55,6 +72,7 @@ class QueryPlanningNode:
         conversation_history: list[ChatMessageDTO],
     ) -> tuple[QueryPlan, str]:
         """Return (plan, raw_llm_output) — raw output is the LLM's reasoning."""
+        log.info("chat.planning.v2_with_smiles_rewrite")  # confirms new code is active
         conversation_context = build_follow_up_context(conversation_history)
         _debug = settings.chat_debug
 
@@ -65,15 +83,17 @@ class QueryPlanningNode:
                 history_len=len(conversation_history),
             )
 
-        # Run all 3 extractors in parallel
+        # Run all 4 extractors in parallel
         ner_task = self._run_ner(question)
         author_task = self._run_author_detection(question)
         llm_task = self._run_llm_planning(question, conversation_context)
+        smiles_task = self._run_smiles_resolution(question)
 
-        ner_filters, author_mentions, llm_result = await asyncio.gather(
+        ner_filters, author_mentions, llm_result, smiles_ctx = await asyncio.gather(
             ner_task,
             author_task,
             llm_task,
+            smiles_task,
             return_exceptions=True,
         )
 
@@ -90,17 +110,72 @@ class QueryPlanningNode:
             llm_plan = _default_llm_plan(question)
         else:
             llm_plan, raw_llm_output = llm_result
+        if isinstance(smiles_ctx, BaseException):
+            log.warning("chat.planning.smiles_failed", error=str(smiles_ctx))
+            smiles_ctx = None
+
+        # Inject resolved SMILES compound IDs into NER entity filters
+        if smiles_ctx and smiles_ctx.resolved:
+            existing_texts = {f.entity_text.lower() for f in ner_filters}
+            for compound in smiles_ctx.resolved:
+                for ext_id in compound.extracted_ids:
+                    if ext_id.lower() not in existing_texts:
+                        ner_filters.append(
+                            NEREntityFilter(entity_text=ext_id, entity_type="compound_name"),
+                        )
+                        existing_texts.add(ext_id.lower())
+            log.info(
+                "chat.planning.smiles_resolved",
+                detected=smiles_ctx.detected,
+                resolved=[c.canonical_smiles for c in smiles_ctx.resolved],
+                unresolved=smiles_ctx.unresolved,
+                mode=smiles_ctx.mode,
+                injected_ids=[
+                    ext_id
+                    for c in smiles_ctx.resolved
+                    for ext_id in c.extracted_ids
+                ],
+            )
+
+        # Rewrite reformulated_query and sub_queries to use compound names
+        # instead of raw SMILES (the LLM generated these before resolution)
+        if smiles_ctx and smiles_ctx.resolved:
+            from infrastructure.chat.utils import replace_smiles_with_names
+
+            rewritten_query = replace_smiles_with_names(
+                llm_plan.reformulated_query, smiles_ctx,
+            )
+            rewritten_subs = [
+                replace_smiles_with_names(sq, smiles_ctx)
+                for sq in llm_plan.sub_queries
+            ]
+            if rewritten_query != llm_plan.reformulated_query:
+                log.info(
+                    "chat.planning.smiles_query_rewrite",
+                    original=llm_plan.reformulated_query[:200],
+                    rewritten=rewritten_query[:200],
+                )
+                llm_plan = llm_plan.model_copy(
+                    update={
+                        "reformulated_query": rewritten_query,
+                        "sub_queries": rewritten_subs,
+                    },
+                )
 
         # Merge into QueryPlan
         plan = llm_plan.model_copy(
             update={
                 "ner_entity_filters": ner_filters,
                 "author_mentions": author_mentions,
+                "smiles_context": smiles_ctx,
             },
         )
 
-        # Merge NER context from previous grounded turns
-        plan = self._merge_ner_context(plan, conversation_history)
+        # Merge NER context from previous grounded turns (ablation toggle)
+        if settings.chat_enable_entity_accumulation:
+            plan = self._merge_ner_context(plan, conversation_history)
+        elif settings.chat_debug:
+            log.info("chat.debug.planning.ner_merge_disabled", reason="entity_accumulation_off")
 
         if _debug:
             log.info(
@@ -112,6 +187,8 @@ class QueryPlanningNode:
                 ner_filters=[(f.entity_text, f.entity_type) for f in plan.ner_entity_filters],
                 author_mentions=plan.author_mentions,
                 hyde=plan.hyde_hypothesis is not None,
+                smiles_detected=plan.smiles_context.detected if plan.smiles_context else [],
+                smiles_mode=plan.smiles_context.mode if plan.smiles_context else None,
             )
 
         return plan, raw_llm_output
@@ -145,6 +222,103 @@ class QueryPlanningNode:
         authors = [f.value for f in fields if f.name == "author_name" and f.value.strip()]
         log.info("chat.planning.authors_done", count=len(authors), authors=authors)
         return authors
+
+    async def _run_smiles_resolution(self, question: str) -> SmilesContext | None:
+        """Detect SMILES in the question and resolve against the compound store."""
+        if not self._smiles_validator or not self._smiles_search or not settings.chat_smiles_resolution_enabled:
+            log.warning(
+                "chat.planning.smiles_resolution_skipped",
+                has_validator=bool(self._smiles_validator),
+                has_search=bool(self._smiles_search),
+                enabled=settings.chat_smiles_resolution_enabled,
+            )
+            return None
+
+        from application.dtos.smiles_embedding_dtos import CompoundSearchRequest
+
+        detected = detect_smiles(question, self._smiles_validator)
+        if not detected:
+            log.info("chat.planning.smiles_none_detected")
+            return None
+
+        log.info(
+            "chat.planning.smiles_detected",
+            count=len(detected),
+            originals=[d.original[:40] for d in detected],
+            canonicals=[d.canonical[:40] for d in detected],
+        )
+
+        mode = infer_smiles_search_mode(question)
+        threshold = (
+            settings.chat_smiles_similar_threshold
+            if mode == "similar"
+            else settings.chat_smiles_exact_threshold
+        )
+
+        resolved: list[ResolvedCompound] = []
+        unresolved: list[str] = []
+
+        for det in detected:
+            log.info(
+                "chat.planning.smiles_search_start",
+                canonical=det.canonical[:60],
+                threshold=threshold,
+                limit=settings.chat_smiles_max_results,
+            )
+            result = await self._smiles_search.execute(
+                CompoundSearchRequest(
+                    query_smiles=det.canonical,
+                    limit=settings.chat_smiles_max_results,
+                    score_threshold=threshold,
+                ),
+            )
+            is_ok = not isinstance(result, Failure)
+            log.info(
+                "chat.planning.smiles_search_result",
+                is_success=is_ok,
+                result_count=len(result.unwrap().results) if is_ok else 0,
+                failure=str(result.failure()) if not is_ok else None,
+            )
+            if is_ok and result.unwrap().results:
+                search_resp = result.unwrap()
+                # Group unique extracted_ids, collect artifact/page IDs
+                ext_ids: list[str] = []
+                artifact_ids: list[str] = []
+                page_ids: list[str] = []
+                best_sim = 0.0
+                seen_ids: set[str] = set()
+                for r in search_resp.results:
+                    if r.extracted_id and r.extracted_id not in seen_ids:
+                        ext_ids.append(r.extracted_id)
+                        seen_ids.add(r.extracted_id)
+                    artifact_ids.append(str(r.artifact_id))
+                    page_ids.append(str(r.page_id))
+                    best_sim = max(best_sim, r.similarity_score)
+
+                from uuid import UUID
+
+                resolved.append(
+                    ResolvedCompound(
+                        canonical_smiles=det.canonical,
+                        extracted_ids=ext_ids,
+                        best_similarity=best_sim,
+                        artifact_ids=[UUID(a) for a in dict.fromkeys(artifact_ids)],
+                        page_ids=[UUID(p) for p in dict.fromkeys(page_ids)],
+                    ),
+                )
+            else:
+                unresolved.append(det.canonical)
+
+        if not resolved and not unresolved:
+            return None
+
+        return SmilesContext(
+            detected=[d.canonical for d in detected],
+            detected_originals=[d.original for d in detected],
+            resolved=resolved,
+            unresolved=unresolved,
+            mode=mode,
+        )
 
     async def _run_llm_planning(
         self,

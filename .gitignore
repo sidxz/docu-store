@@ -58,3 +58,7 @@ logs/
 .env.local
 .env.*.local
 services/coverage.xml
+
+
+paper/
+services/evaluation/

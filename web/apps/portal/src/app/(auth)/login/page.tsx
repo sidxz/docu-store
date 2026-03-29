@@ -4,10 +4,12 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { FlaskConical } from "lucide-react";
 import { useAuthz } from "@sentinel-auth/react";
+import { useAppConfig } from "@/lib/app-config";
 import { ShapeGrid } from "@/components/backgrounds/ShapeGrid";
 
 export default function LoginPage() {
   const { login, isAuthenticated, isLoading } = useAuthz();
+  const { googleClientId, githubClientId, entraIdClientId } = useAppConfig();
   const router = useRouter();
 
   useEffect(() => {
@@ -151,7 +153,7 @@ export default function LoginPage() {
             <div className="space-y-3">
               {/* Google */}
               <button
-                disabled={!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+                disabled={!googleClientId}
                 onClick={() => login("google")}
                 className="flex w-full cursor-pointer items-center justify-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 hover:-translate-y-px hover:shadow-lg active:translate-y-0"
                 style={{
@@ -166,7 +168,7 @@ export default function LoginPage() {
 
               {/* GitHub */}
               <button
-                disabled={!process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID}
+                disabled={!githubClientId}
                 onClick={() => login("github")}
                 className="flex w-full cursor-pointer items-center justify-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 hover:-translate-y-px hover:shadow-lg active:translate-y-0"
                 style={{
@@ -181,7 +183,7 @@ export default function LoginPage() {
 
               {/* Entra ID (disabled) */}
               <button
-                disabled={!process.env.NEXT_PUBLIC_ENTRA_ID_CLIENT_ID}
+                disabled={!entraIdClientId}
                 className="flex w-full cursor-not-allowed items-center justify-center gap-3 rounded-xl border px-4 py-2.5 text-sm font-medium opacity-40"
                 style={{
                   background: "rgba(30, 41, 59, 0.4)",

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from application.dtos.chat_dtos import ChatMessageDTO
+    from infrastructure.chat.models import SmilesContext
 
 CITATION_RE = re.compile(r"\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]")
 
@@ -148,3 +149,41 @@ def strip_markdown_fences(text: str) -> str:
         cleaned = cleaned.removesuffix("```")
         cleaned = cleaned.strip()
     return cleaned
+
+
+def replace_smiles_with_names(
+    text: str,
+    smiles_ctx: SmilesContext | None,
+) -> str:
+    """Replace raw SMILES strings in text with resolved compound names.
+
+    Uses detected_originals (user-typed forms) for matching and replaces
+    with the primary extracted_id from resolved compounds.
+    Falls back to detected (canonical forms) if originals are not available.
+    """
+    if not smiles_ctx or not smiles_ctx.resolved:
+        return text
+
+    # Build mapping: canonical_smiles -> primary compound name
+    canonical_to_name: dict[str, str] = {}
+    for compound in smiles_ctx.resolved:
+        if compound.extracted_ids:
+            canonical_to_name[compound.canonical_smiles] = compound.extracted_ids[0]
+
+    if not canonical_to_name:
+        return text
+
+    # detected_originals[i] corresponds to detected[i] (canonical)
+    originals = smiles_ctx.detected_originals or smiles_ctx.detected
+    canonicals = smiles_ctx.detected
+
+    result = text
+    for orig, canon in zip(originals, canonicals):
+        name = canonical_to_name.get(canon)
+        if name:
+            result = result.replace(orig, name)
+            # Also replace canonical form if different from original
+            if canon != orig:
+                result = result.replace(canon, name)
+
+    return result

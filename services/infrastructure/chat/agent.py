@@ -108,11 +108,24 @@ class ChatAgent:
                 )
 
             # Emit query_context for NER accumulation
+            smiles_ctx = analysis.smiles_context
             yield AgentEvent(
                 type="query_context",
                 query_context_entities=[],  # Quick mode has no NER
                 query_context_type=analysis.query_type,
                 query_context_reformulated=analysis.reformulated_query,
+                query_context_smiles=smiles_ctx.detected if smiles_ctx else None,
+                query_context_smiles_resolved=[
+                    {
+                        "canonical_smiles": c.canonical_smiles,
+                        "extracted_ids": c.extracted_ids,
+                        "best_similarity": c.best_similarity,
+                        "mode": smiles_ctx.mode,
+                    }
+                    for c in smiles_ctx.resolved
+                ]
+                if smiles_ctx and smiles_ctx.resolved
+                else None,
             )
 
             retry_count = 0

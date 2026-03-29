@@ -150,6 +150,7 @@ class ThinkingAgent:
                 )
 
             # Emit query_context for NER accumulation
+            smiles_ctx = plan.smiles_context
             yield AgentEvent(
                 type="query_context",
                 query_context_entities=[
@@ -159,15 +160,32 @@ class ThinkingAgent:
                 query_context_authors=plan.author_mentions,
                 query_context_type=plan.query_type,
                 query_context_reformulated=plan.reformulated_query,
+                query_context_smiles=smiles_ctx.detected if smiles_ctx else None,
+                query_context_smiles_resolved=[
+                    {
+                        "canonical_smiles": c.canonical_smiles,
+                        "extracted_ids": c.extracted_ids,
+                        "best_similarity": c.best_similarity,
+                        "mode": smiles_ctx.mode,
+                    }
+                    for c in smiles_ctx.resolved
+                ]
+                if smiles_ctx and smiles_ctx.resolved
+                else None,
             )
 
-            # Factual + NER filters → try filtered-only first, broaden on retry
+            # Factual + NER filters → try filtered-only first, broaden on retry.
+            # Compound queries with resolved SMILES also use strict mode — the
+            # resolved compound name is in NER filters and should scope retrieval.
             has_filters = bool(plan.ner_entity_filters or plan.author_mentions)
+            has_resolved_smiles = bool(
+                plan.smiles_context and plan.smiles_context.resolved
+            )
             skipped_unfiltered = (
-                plan.query_type == "factual"
+                plan.query_type in ("factual", "compound")
                 and has_filters
                 and settings.chat_factual_skip_unfiltered
-            )
+            ) or (has_resolved_smiles and has_filters)
 
             retry_count = 0
             while retry_count <= self._max_retries:

@@ -1,7 +1,8 @@
 """Retrieval tools for the agentic retrieval loop.
 
 Each tool wraps an existing search use case and returns results as
-RetrievalResult models + a compact text summary for the LLM.
+RetrievalResult models + a compact text summary for the LLM + optional
+AgentEvent objects (e.g. molecule structured blocks).
 """
 
 from __future__ import annotations
@@ -12,11 +13,13 @@ from uuid import UUID
 import structlog
 from returns.result import Failure
 
+from application.dtos.chat_dtos import AgentEvent, ContentBlockDTO
 from application.dtos.search_dtos import HierarchicalSearchRequest, SummarySearchRequest
 from application.ports.tool_calling_llm import ToolDefinition
 from infrastructure.chat.models import RetrievalResult
 
 if TYPE_CHECKING:
+    from application.ports.compound_vector_store import CompoundVectorStore
     from application.ports.repositories.artifact_read_models import ArtifactReadModel
     from application.ports.repositories.page_read_models import PageReadModel
     from application.ports.repositories.tag_dictionary_read_model import TagDictionaryReadModel
@@ -24,6 +27,9 @@ if TYPE_CHECKING:
         HierarchicalSearchUseCase,
         SearchSummariesUseCase,
     )
+
+# Type alias for tool return — (results, summary_for_model, events_to_emit)
+ToolResult = tuple[list[RetrievalResult], str, list[AgentEvent]]
 
 log = structlog.get_logger(__name__)
 
@@ -147,8 +153,8 @@ class SearchDocumentsTool:
         args: dict[str, Any],
         workspace_id: UUID,
         allowed_artifact_ids: list[UUID] | None,
-    ) -> tuple[list[RetrievalResult], str]:
-        """Execute search and return (results, text_summary_for_model)."""
+    ) -> ToolResult:
+        """Execute search and return (results, text_summary_for_model, events)."""
         query = args.get("query", "")
         entity_types = args.get("entity_types") or None
         tags = args.get("tags") or None
@@ -173,7 +179,7 @@ class SearchDocumentsTool:
         )
 
         if isinstance(result, Failure):
-            return [], f"Search failed: {result.failure()}"
+            return [], f"Search failed: {result.failure()}", []
 
         response = result.unwrap()
         retrieval_results: list[RetrievalResult] = []
@@ -226,7 +232,7 @@ class SearchDocumentsTool:
             )
 
         summary = _format_results_for_model(retrieval_results, query)
-        return retrieval_results, summary
+        return retrieval_results, summary, []
 
 
 class SearchSummariesTool:
@@ -270,7 +276,7 @@ class SearchSummariesTool:
         )
 
         if isinstance(result, Failure):
-            return [], f"Summary search failed: {result.failure()}"
+            return [], f"Summary search failed: {result.failure()}", []
 
         response = result.unwrap()
         retrieval_results: list[RetrievalResult] = []
@@ -292,7 +298,7 @@ class SearchSummariesTool:
             )
 
         summary = _format_results_for_model(retrieval_results, query)
-        return retrieval_results, summary
+        return retrieval_results, summary, []
 
 
 class GetPageContentTool:
@@ -310,27 +316,27 @@ class GetPageContentTool:
         args: dict[str, Any],
         workspace_id: UUID,
         allowed_artifact_ids: list[UUID] | None,
-    ) -> tuple[list[RetrievalResult], str]:
+    ) -> ToolResult:
         page_id_str = args.get("page_id", "")
         try:
             page_id = UUID(page_id_str)
         except (ValueError, AttributeError):
-            return [], f"Invalid page_id: {page_id_str}"
+            return [], f"Invalid page_id: {page_id_str}", []
 
         page = await self._pages.get_page_by_id(page_id)
         if not page:
-            return [], f"Page {page_id_str} not found."
+            return [], f"Page {page_id_str} not found.", []
 
         # Access control: check artifact is allowed
         if allowed_artifact_ids and page.artifact_id not in allowed_artifact_ids:
-            return [], f"Page {page_id_str} is not accessible."
+            return [], f"Page {page_id_str} is not accessible.", []
 
         full_text = ""
         if page.text_mention and page.text_mention.text:
             full_text = page.text_mention.text
 
         if not full_text:
-            return [], f"Page {page_id_str} has no text content."
+            return [], f"Page {page_id_str} has no text content.", []
 
         result = RetrievalResult(
             source_type="chunk",
@@ -346,7 +352,7 @@ class GetPageContentTool:
         )
 
         summary = f"Page '{page.name or page_id_str}' (page {page.index}): {len(full_text)} chars of text content."
-        return [result], summary
+        return [result], summary, []
 
 
 SEARCH_STRUCTURED_BIOACTIVITY_DEF = ToolDefinition(
@@ -394,12 +400,12 @@ class SearchStructuredBioactivityTool:
         args: dict[str, Any],
         workspace_id: UUID,
         allowed_artifact_ids: list[UUID] | None,
-    ) -> tuple[list[RetrievalResult], str]:
+    ) -> ToolResult:
         compound = args.get("compound_name", "")
         target = args.get("target_name")
 
         if not compound:
-            return [], "No compound name provided."
+            return [], "No compound name provided.", []
 
         # 1. Find artifacts with this compound
         compound_artifact_ids = await self._tag_dict.get_artifact_ids_for_tag(
@@ -408,7 +414,7 @@ class SearchStructuredBioactivityTool:
             workspace_id=workspace_id,
         )
         if not compound_artifact_ids:
-            return [], f"No documents found containing compound '{compound}'."
+            return [], f"No documents found containing compound '{compound}'.", []
 
         # 2. If target specified, intersect with target artifacts
         matched_ids = set(compound_artifact_ids)
@@ -436,7 +442,7 @@ class SearchStructuredBioactivityTool:
         if not matched_ids:
             return [], f"No accessible documents with compound '{compound}'" + (
                 f" and target '{target}'" if target else ""
-            ) + "."
+            ) + ".", []
 
         # 4. Look up artifact metadata (title, authors, date)
         matched_uuids = [UUID(aid) for aid in matched_ids]
@@ -556,7 +562,177 @@ class SearchStructuredBioactivityTool:
             )
 
         summary = f"Bioactivity search for '{compound}': {len(table_rows)} data points from {len(matched_ids)} documents."
-        return retrieval_results, summary
+        return retrieval_results, summary, []
+
+
+SEARCH_COMPOUND_STRUCTURE_DEF = ToolDefinition(
+    name="search_compound_structure",
+    description=(
+        "Look up a compound by name or ID to get its SMILES structure and find "
+        "structurally similar compounds. Use when the user asks about a compound's "
+        "structure, SMILES, or wants to see similar molecules. "
+        "This renders 2D molecule structures in the response."
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "compound_name": {
+                "type": "string",
+                "description": "Compound name or ID (e.g., 'SACC-111', 'Aspirin').",
+            },
+            "similarity_threshold": {
+                "type": "number",
+                "description": "Min cosine similarity for related compounds (0-1, default 0.95).",
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Max similar compounds to return (default 5).",
+            },
+        },
+        "required": ["compound_name"],
+    },
+)
+
+
+class SearchCompoundStructureTool:
+    """Looks up a compound by name, retrieves its SMILES, and finds similar structures.
+
+    Emits molecule structured_block events for frontend rendering.
+    """
+
+    def __init__(self, compound_vector_store: CompoundVectorStore) -> None:
+        self._store = compound_vector_store
+
+    @property
+    def definition(self) -> ToolDefinition:
+        return SEARCH_COMPOUND_STRUCTURE_DEF
+
+    async def execute(
+        self,
+        args: dict[str, Any],
+        workspace_id: UUID,
+        allowed_artifact_ids: list[UUID] | None,
+    ) -> ToolResult:
+        from uuid import uuid4
+
+        from domain.value_objects.text_embedding import TextEmbedding
+
+        # "query" is the ReAct fallback key when the LLM outputs a bare string
+        # instead of JSON: Action Input: GSK286 → {"query": "GSK286"}
+        compound_name = args.get("compound_name") or args.get("query", "")
+        compound_name = compound_name.strip()
+        threshold = args.get("similarity_threshold", 0.95)
+        limit = args.get("limit", 5)
+
+        if not compound_name:
+            return [], "No compound name provided.", []
+
+        # 1. Reverse lookup: name → SMILES + vectors
+        name_results = await self._store.get_compounds_by_extracted_id(
+            extracted_id=compound_name,
+            workspace_id=workspace_id,
+            allowed_artifact_ids=allowed_artifact_ids,
+        )
+
+        if not name_results:
+            return [], f"No compound found with ID '{compound_name}' in the document store.", []
+
+        # 2. Build the anchor compound (first unique structure)
+        anchor = name_results[0]
+        anchor_smiles = anchor.canonical_smiles or anchor.smiles
+
+        # 3. Emit molecule event for the anchor compound
+        events: list[AgentEvent] = [
+            AgentEvent(
+                type="structured_block",
+                block=ContentBlockDTO(
+                    type="molecule",
+                    smiles=anchor_smiles,
+                    label=compound_name,
+                    page_id=anchor.page_id,
+                    artifact_id=anchor.artifact_id,
+                ),
+            ),
+        ]
+
+        # 4. If we have a vector, find similar compounds
+        similar_lines: list[str] = []
+        anchor_vector = anchor.metadata.get("_vector") if anchor.metadata else None
+
+        if anchor_vector:
+            anchor_embedding = TextEmbedding(
+                embedding_id=uuid4(),
+                vector=anchor_vector,
+                model_name="chemberta-77M-mtr",
+                dimensions=len(anchor_vector),
+            )
+            similar_results = await self._store.search_similar_compounds(
+                query_embedding=anchor_embedding,
+                limit=limit + 1,  # +1 because anchor itself may appear
+                score_threshold=threshold,
+                workspace_id=workspace_id,
+                allowed_artifact_ids=allowed_artifact_ids,
+            )
+
+            seen_canonical = {anchor_smiles}
+            for sr in similar_results:
+                sr_smiles = sr.canonical_smiles or sr.smiles
+                if sr_smiles in seen_canonical:
+                    continue
+                seen_canonical.add(sr_smiles)
+
+                sr_label = sr.extracted_id or sr_smiles[:30]
+                pct = f"{sr.score * 100:.0f}%"
+                is_exact = sr.score >= 0.9999
+                similar_lines.append(f"- {sr_label} (SMILES: {sr_smiles}, similarity: {pct})")
+
+                events.append(
+                    AgentEvent(
+                        type="structured_block",
+                        block=ContentBlockDTO(
+                            type="molecule",
+                            smiles=sr_smiles,
+                            label=f"{sr_label} ({pct} similar)",
+                            page_id=sr.page_id if is_exact else None,
+                            artifact_id=sr.artifact_id if is_exact else None,
+                        ),
+                    ),
+                )
+
+        # 5. Build retrieval result for LLM context
+        expanded_lines = [
+            f"Compound: {compound_name}",
+            f"Chemical structure (SMILES notation): `{anchor_smiles}`",
+            f"Note: The SMILES string above IS the complete molecular structure of {compound_name}. "
+            f"SMILES encodes all atoms, bonds, stereochemistry, and connectivity. "
+            f"A 2D molecule diagram has been rendered for the user from this SMILES.",
+            f"Source: artifact {anchor.artifact_id}, page {anchor.page_index}",
+        ]
+        if similar_lines:
+            expanded_lines.append(f"\nStructurally similar compounds (≥{threshold * 100:.0f}% similarity):")
+            expanded_lines.extend(similar_lines)
+        else:
+            expanded_lines.append("\nNo structurally similar compounds found above the threshold.")
+
+        retrieval_result = RetrievalResult(
+            source_type="chunk",
+            artifact_id=anchor.artifact_id,
+            artifact_title=None,
+            page_id=anchor.page_id,
+            page_index=anchor.page_index,
+            expanded_text="\n".join(expanded_lines),
+            matched_text=f"{compound_name}: {anchor_smiles}",
+            similarity_score=1.0,
+            query_source=f"tool_structure:{compound_name}",
+        )
+
+        summary = (
+            f"Compound '{compound_name}' chemical structure found as SMILES: `{anchor_smiles}`. "
+            f"The structure is known — a 2D molecule diagram has been rendered for the user. "
+            f"{len(similar_lines)} similar compounds above {threshold * 100:.0f}% threshold."
+        )
+
+        return [retrieval_result], summary, events
 
 
 # ── Tool Registry ──
@@ -572,13 +748,15 @@ class ToolRegistry:
         page_read_model: PageReadModel,
         tag_dictionary: TagDictionaryReadModel | None = None,
         artifact_read_model: ArtifactReadModel | None = None,
+        compound_vector_store: CompoundVectorStore | None = None,
     ) -> None:
         self._tools: dict[
             str,
             SearchDocumentsTool
             | SearchSummariesTool
             | GetPageContentTool
-            | SearchStructuredBioactivityTool,
+            | SearchStructuredBioactivityTool
+            | SearchCompoundStructureTool,
         ] = {
             "search_documents": SearchDocumentsTool(hierarchical_search),
             "search_summaries": SearchSummariesTool(summary_search),
@@ -589,6 +767,10 @@ class ToolRegistry:
                 tag_dictionary=tag_dictionary,
                 page_read_model=page_read_model,
                 artifact_read_model=artifact_read_model,
+            )
+        if compound_vector_store is not None:
+            self._tools["search_compound_structure"] = SearchCompoundStructureTool(
+                compound_vector_store=compound_vector_store,
             )
 
     @property
@@ -602,17 +784,17 @@ class ToolRegistry:
         args: dict[str, Any],
         workspace_id: UUID,
         allowed_artifact_ids: list[UUID] | None,
-    ) -> tuple[list[RetrievalResult], str]:
-        """Execute a tool by name. Returns (results, summary_for_model)."""
+    ) -> ToolResult:
+        """Execute a tool by name. Returns (results, summary_for_model, events)."""
         tool = self._tools.get(tool_name)
         if not tool:
-            return [], f"Unknown tool: {tool_name}"
+            return [], f"Unknown tool: {tool_name}", []
 
         try:
             return await tool.execute(args, workspace_id, allowed_artifact_ids)
         except Exception as exc:
             log.warning("tool.execution_failed", tool=tool_name, error=str(exc))
-            return [], f"Tool {tool_name} failed: {exc!s}"
+            return [], f"Tool {tool_name} failed: {exc!s}", []
 
 
 # ── Helpers ──

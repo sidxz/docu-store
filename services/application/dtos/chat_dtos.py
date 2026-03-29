@@ -48,6 +48,9 @@ class AgentEvent(BaseModel):
     query_context_authors: list[str] | None = None
     query_context_type: str | None = None
     query_context_reformulated: str | None = None
+    # SMILES detection + resolution (emitted with query_context event)
+    query_context_smiles: list[str] | None = None  # canonical SMILES detected
+    query_context_smiles_resolved: list[dict] | None = None  # [{canonical_smiles, extracted_ids, mode}]
 
 
 # --- Source Citations ---
@@ -81,6 +84,8 @@ class ContentBlockDTO(BaseModel):
     smiles: str | None = None
     label: str | None = None
     sources: list[SourceCitationDTO] | None = None
+    page_id: UUID | None = None
+    artifact_id: UUID | None = None
 
 
 # --- Thinking Blocks ---
@@ -94,6 +99,8 @@ class QueryContextDTO(BaseModel):
     query_type: str = ""
     reformulated_query: str = ""
     grounded: bool = False
+    smiles_detected: list[str] = Field(default_factory=list)  # canonical SMILES found
+    smiles_resolved: list[dict] = Field(default_factory=list)  # [{canonical_smiles, extracted_ids, mode}]
 
 
 class ThinkingBlockDTO(BaseModel):

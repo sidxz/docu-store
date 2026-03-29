@@ -35,6 +35,14 @@ template: |
   The initial search used entity filters. If filtered results don't address the
   question, search WITHOUT entity_types and tags — just use query text alone.
 
+  ## SMILES / Chemical Structure Queries
+
+  When the query contains SMILES notation:
+  - NEVER use raw SMILES strings as search queries — they produce poor results
+  - Use the resolved compound name/ID from the SMILES Resolution section or Detected entities
+  - Search for compound name, bioactivity data, and related documents by name
+  - The SMILES-to-compound mapping is pre-resolved; trust it and search by name
+
   ## Tips
 
   - Use specific scientific terms and compound names

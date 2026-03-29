@@ -100,6 +100,20 @@ class CompoundVectorStore(Protocol):
         """
         ...
 
+    async def get_compounds_by_extracted_id(
+        self,
+        extracted_id: str,
+        workspace_id: UUID | None = None,
+        allowed_artifact_ids: list[UUID] | None = None,
+        limit: int = 10,
+    ) -> list[CompoundSearchResult]:
+        """Find compounds by their extracted document ID (e.g., 'SACC-111').
+
+        Uses metadata filtering (not vector search). Returns results with
+        vectors accessible via metadata['_vector'] for subsequent similarity search.
+        """
+        ...
+
     async def get_compound_collection_info(self) -> dict:
         """Get stats for the compound collection."""
         ...

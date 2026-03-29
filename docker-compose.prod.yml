@@ -1,0 +1,170 @@
+# docu-store — Application Stack (Production / Docker Swarm)
+#
+# Prerequisites:
+#   1. Deploy infra first:  docker stack deploy -c docker-compose.infra.yml docu-store-infra
+#   2. Copy env template:   cp .env.prod.example .env.prod  (fill in secrets)
+#
+# Deploy:
+#   docker stack deploy -c docker-compose.prod.yml docu-store
+#
+# Local testing (non-Swarm, after infra is up):
+#   docker compose -f docker-compose.prod.yml up
+#
+# Images (pre-built, pushed to Docker Hub):
+#   ghcr.io/sidxz/docu-store:latest       — backend (all 6 processes)
+#   ghcr.io/sidxz/docu-store-web:latest   — frontend (Next.js)
+#
+# Infrastructure services (mongo, eventstoredb, kafka, temporal, qdrant)
+# are managed separately via docker-compose.infra.yml and connected
+# through the shared "docu-store" overlay network.
+
+services:
+
+  api:
+    image: ghcr.io/sidxz/docu-store:${VERSION:-latest}
+    env_file: .env.prod
+    environment:
+      EVENTSTOREDB_URI: esdb://eventstoredb:2113?tls=false
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+      TEMPORAL_ADDRESS: temporal:7233
+      QDRANT_URL: http://qdrant:6333
+      EMBEDDING_DEVICE: cpu
+      SMILES_EMBEDDING_DEVICE: cpu
+      RERANKER_DEVICE: cpu
+      APP_ENV: production
+    ports:
+      - "${API_PORT:-8000}:8000"
+    networks:
+      - docu-store
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2.0"
+
+  read-worker:
+    image: ghcr.io/sidxz/docu-store:${VERSION:-latest}
+    command: [".venv/bin/python", "-m", "infrastructure.read_worker"]
+    env_file: .env.prod
+    environment:
+      EVENTSTOREDB_URI: esdb://eventstoredb:2113?tls=false
+      MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    networks:
+      - docu-store
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+  pipeline-worker:
+    image: ghcr.io/sidxz/docu-store:${VERSION:-latest}
+    command: [".venv/bin/python", "-m", "infrastructure.pipeline_worker"]
+    env_file: .env.prod
+    environment:
+      EVENTSTOREDB_URI: esdb://eventstoredb:2113?tls=false
+      MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+      TEMPORAL_ADDRESS: temporal:7233
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    networks:
+      - docu-store
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+  temporal-worker:
+    image: ghcr.io/sidxz/docu-store:${VERSION:-latest}
+    command: [".venv/bin/python", "-m", "infrastructure.temporal.worker"]
+    env_file: .env.prod
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      QDRANT_URL: http://qdrant:6333
+      MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+      EMBEDDING_DEVICE: cpu
+      SMILES_EMBEDDING_DEVICE: cpu
+      RERANKER_DEVICE: cpu
+      TEMPORAL_MAX_CONCURRENT_ACTIVITIES: ${TEMPORAL_MAX_CONCURRENT_ACTIVITIES:-5}
+    volumes:
+      - huggingface-cache:/home/docustore/.cache/huggingface
+    networks:
+      - docu-store
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "2.0"
+
+  llm-worker:
+    image: ghcr.io/sidxz/docu-store:${VERSION:-latest}
+    command: [".venv/bin/python", "-m", "infrastructure.temporal.llm_worker"]
+    env_file: .env.prod
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+      TEMPORAL_MAX_CONCURRENT_LLM_ACTIVITIES: ${TEMPORAL_MAX_CONCURRENT_LLM_ACTIVITIES:-2}
+    networks:
+      - docu-store
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+
+  plugin-consumer:
+    image: ghcr.io/sidxz/docu-store:${VERSION:-latest}
+    command: [".venv/bin/python", "-m", "infrastructure.plugins.plugin_consumer"]
+    env_file: .env.prod
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      TEMPORAL_ADDRESS: temporal:7233
+      MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+    networks:
+      - docu-store
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+  web:
+    image: ghcr.io/sidxz/docu-store-web:${VERSION:-latest}
+    env_file: .env.prod
+    ports:
+      - "${WEB_PORT:-15000}:15000"
+    networks:
+      - docu-store
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:15000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+volumes:
+  huggingface-cache:
+
+networks:
+  docu-store:
+    external: true

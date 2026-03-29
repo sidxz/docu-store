@@ -118,8 +118,8 @@ class ContextAssemblyNode:
                 medium.append(r)
                 continue
 
-            # Bioactivity results always HIGH (deterministic structured data)
-            if r.query_source.startswith("tool_bioactivity:"):
+            # Bioactivity and structure results always HIGH (deterministic structured data)
+            if r.query_source.startswith("tool_bioactivity:") or r.query_source.startswith("tool_structure:"):
                 high.append(r)
                 continue
 
@@ -253,6 +253,9 @@ class ContextAssemblyNode:
                 if r.query_source.startswith("tool_bioactivity:"):
                     compound_name = r.query_source.split(":", 1)[1] if ":" in r.query_source else ""
                     label = f"STRUCTURED BIOACTIVITY DATA for {compound_name}"
+                elif r.query_source.startswith("tool_structure:"):
+                    compound_name = r.query_source.split(":", 1)[1] if ":" in r.query_source else ""
+                    label = f"COMPOUND STRUCTURE DATA for {compound_name}"
                 elif r.source_type == "chunk":
                     label = f"Page {r.page_index}" if r.page_index is not None else "Page"
                     if r.page_name:

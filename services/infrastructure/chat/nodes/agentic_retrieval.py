@@ -91,7 +91,7 @@ class AgenticRetrievalNode:
             )
             for c in previous_citations:
                 if c.citation_index in explicit_refs and c.page_id:
-                    page_results, _ = await self._tools.execute(
+                    page_results, _, _ = await self._tools.execute(
                         "get_page_content",
                         {"page_id": str(c.page_id)},
                         workspace_id,
@@ -124,7 +124,7 @@ class AgenticRetrievalNode:
         if tags:
             seed_args_filtered["tags"] = tags
 
-        filtered_results, filtered_summary = await self._tools.execute(
+        filtered_results, filtered_summary, _ = await self._tools.execute(
             "search_documents",
             seed_args_filtered,
             workspace_id,
@@ -147,7 +147,7 @@ class AgenticRetrievalNode:
                 )
             else:
                 unfiltered_args = {"query": plan.reformulated_query, "limit": 10}
-                unfiltered_results, unfiltered_summary = await self._tools.execute(
+                unfiltered_results, unfiltered_summary, _ = await self._tools.execute(
                     "search_documents",
                     unfiltered_args,
                     workspace_id,
@@ -174,7 +174,7 @@ class AgenticRetrievalNode:
                 bio_args: dict[str, str] = {"compound_name": compound.entity_text}
                 if target_entities:
                     bio_args["target_name"] = target_entities[0].entity_text
-                bio_results, bio_summary = await self._tools.execute(
+                bio_results, bio_summary, _ = await self._tools.execute(
                     "search_structured_bioactivity",
                     bio_args,
                     workspace_id,
@@ -218,7 +218,74 @@ class AgenticRetrievalNode:
                     ),
                 )
 
-        total_seed = len(filtered_results) + new_from_unfiltered + bioactivity_count
+        # ── 1c. SMILES-resolved page pre-fetch ──
+        smiles_page_count = 0
+        if plan.smiles_context and plan.smiles_context.resolved:
+            for compound in plan.smiles_context.resolved:
+                for page_id in compound.page_ids[:3]:  # cap per compound
+                    page_results, _, _ = await self._tools.execute(
+                        "get_page_content",
+                        {"page_id": str(page_id)},
+                        workspace_id,
+                        allowed_artifact_ids,
+                    )
+                    if page_results:
+                        new_smiles = accumulator.add_results(
+                            page_results,
+                            f"smiles:{compound.canonical_smiles}",
+                        )
+                        smiles_page_count += new_smiles
+
+                log.info(
+                    "chat.agentic_retrieval.smiles_page_prefetch",
+                    canonical_smiles=compound.canonical_smiles,
+                    extracted_ids=compound.extracted_ids,
+                    pages_fetched=min(len(compound.page_ids), 3),
+                    new_results=smiles_page_count,
+                )
+
+            if smiles_page_count > 0:
+                yield (
+                    "event",
+                    AgentEvent(
+                        type="step_completed",
+                        step="retrieval",
+                        status="completed",
+                        output=(
+                            f"SMILES resolution: {len(plan.smiles_context.resolved)} compounds "
+                            f"({', '.join(c.canonical_smiles for c in plan.smiles_context.resolved)}) "
+                            f"→ {smiles_page_count} new pages"
+                        ),
+                    ),
+                )
+
+        # ── 1d. Compound structure pre-fetch for NER compound mentions ──
+        structure_count = 0
+        if compound_entities and "search_compound_structure" in self._tools._tools:
+            for compound in compound_entities[:3]:  # cap to 3 compounds
+                struct_results, struct_summary, struct_events = await self._tools.execute(
+                    "search_compound_structure",
+                    {"compound_name": compound.entity_text},
+                    workspace_id,
+                    allowed_artifact_ids,
+                )
+                for evt in struct_events:
+                    yield ("event", evt)
+                new_struct = accumulator.add_results(
+                    struct_results, f"structure:{compound.entity_text}",
+                )
+                structure_count += new_struct
+                if struct_summary:
+                    seed_summary += f"\n\nCompound structure data:\n{struct_summary}"
+                log.info(
+                    "chat.agentic_retrieval.structure_prefetch",
+                    compound=compound.entity_text,
+                    results=len(struct_results),
+                    new=new_struct,
+                    events=len(struct_events),
+                )
+
+        total_seed = len(filtered_results) + new_from_unfiltered + bioactivity_count + smiles_page_count + structure_count
         output_parts = [f"Initial search: {len(filtered_results)} filtered"]
         if has_filters and not did_skip_unfiltered:
             output_parts.append(f" + {new_from_unfiltered} unfiltered")
@@ -226,6 +293,10 @@ class AgenticRetrievalNode:
             output_parts.append(" (unfiltered skipped — factual mode)")
         if bioactivity_count > 0:
             output_parts.append(f" + {bioactivity_count} bioactivity")
+        if smiles_page_count > 0:
+            output_parts.append(f" + {smiles_page_count} SMILES pages")
+        if structure_count > 0:
+            output_parts.append(f" + {structure_count} structures")
         output_parts.append(f" = {total_seed} results")
         yield (
             "event",
@@ -258,6 +329,28 @@ class AgenticRetrievalNode:
         if plan.author_mentions:
             entities += (", " if entities else "") + ", ".join(plan.author_mentions)
 
+        # Build SMILES resolution briefing for the retrieval LLM
+        smiles_briefing = ""
+        if plan.smiles_context and plan.smiles_context.resolved:
+            briefing_lines = ["## SMILES Resolution"]
+            for compound in plan.smiles_context.resolved:
+                if compound.extracted_ids:
+                    names = ", ".join(compound.extracted_ids)
+                    briefing_lines.append(
+                        f"- SMILES `{compound.canonical_smiles}` = compound **{names}**. "
+                        f"Search using '{compound.extracted_ids[0]}', NOT the raw SMILES."
+                    )
+            if plan.smiles_context.unresolved:
+                briefing_lines.append(
+                    f"- Unresolved SMILES (no match in database): "
+                    f"{', '.join(plan.smiles_context.unresolved)}"
+                )
+            briefing_lines.append(
+                "\nIMPORTANT: Always search using compound names/IDs, never raw SMILES strings. "
+                "SMILES notation is not useful for text-based document search."
+            )
+            smiles_briefing = "\n".join(briefing_lines)
+
         prompt_name = (
             "chat_agentic_retrieval"
             if self._tool_llm.supports_native_tools
@@ -269,7 +362,7 @@ class AgenticRetrievalNode:
             question=question,
             plan_summary=plan_summary,
             entities=entities or "None detected",
-            conversation_context="",
+            conversation_context=smiles_briefing,
         )
 
         carried_note = ""
@@ -279,13 +372,26 @@ class AgenticRetrievalNode:
                 "the previous turn. They are already in the accumulator."
             )
 
+        smiles_note = ""
+        if plan.smiles_context and plan.smiles_context.resolved:
+            mappings = [
+                f"{c.canonical_smiles} = {c.extracted_ids[0]}"
+                for c in plan.smiles_context.resolved
+                if c.extracted_ids
+            ]
+            if mappings:
+                smiles_note = (
+                    f"\n\nSMILES mapping: {'; '.join(mappings)}. "
+                    "Search using compound names, not SMILES strings."
+                )
+
         messages: list[dict] = [
             {
                 "role": "user",
                 "content": (
                     f"I need to answer: {question}\n\n"
                     f"Here are the initial search results:\n{seed_summary}\n\n"
-                    f"{accumulator.summary_for_model()}{carried_note}\n\n"
+                    f"{accumulator.summary_for_model()}{carried_note}{smiles_note}\n\n"
                     "Evaluate these results. If they are sufficient, call finish_retrieval. "
                     "Otherwise, search for additional information."
                 ),
@@ -423,12 +529,14 @@ class AgenticRetrievalNode:
                     )
 
                 # Execute the tool
-                tool_results, tool_summary = await self._tools.execute(
+                tool_results, tool_summary, tool_events = await self._tools.execute(
                     tc.tool_name,
                     tool_args,
                     workspace_id,
                     allowed_artifact_ids,
                 )
+                for evt in tool_events:
+                    yield ("event", evt)
                 new_count = accumulator.add_results(
                     tool_results, str(tc.tool_args.get("query", "")),
                 )

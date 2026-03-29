@@ -140,7 +140,9 @@ class GeneratePageEmbeddingUseCase:
             raw_chunk_texts = [chunk.text for chunk in chunks]
 
             context_prefix = ""
-            if self.artifact_repository:
+            from infrastructure.config import settings as _settings
+
+            if self.artifact_repository and _settings.embedding_enable_context_enrichment:
                 artifact_title = None
                 try:
                     artifact = self.artifact_repository.get_by_id(page.artifact_id)

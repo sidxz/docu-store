@@ -16,6 +16,7 @@ from application.dtos.chat_dtos import (
     AgentTraceDTO,
     ChatFeedbackDTO,
     ChatMessageDTO,
+    ContentBlockDTO,
     ConversationDetailDTO,
     ConversationDTO,
     QueryContextDTO,
@@ -241,6 +242,7 @@ class SendMessageUseCase:
         grounding_is_grounded: bool | None = None
         grounding_confidence: float | None = None
         query_context: QueryContextDTO | None = None
+        structured_blocks: list[ContentBlockDTO] = []
 
         async for event in self._agent.run(
             message=message,
@@ -284,7 +286,11 @@ class SendMessageUseCase:
                     authors=event.query_context_authors or [],
                     query_type=event.query_context_type or "",
                     reformulated_query=event.query_context_reformulated or "",
+                    smiles_detected=event.query_context_smiles or [],
+                    smiles_resolved=event.query_context_smiles_resolved or [],
                 )
+            elif event.type == "structured_block" and event.block:
+                structured_blocks.append(event.block)
             elif event.type == "grounding_result":
                 grounding_is_grounded = event.grounding_is_grounded
                 grounding_confidence = event.grounding_confidence
@@ -340,6 +346,7 @@ class SendMessageUseCase:
                 content=draft_answer,
                 sources=final_sources,
                 agent_trace=agent_trace,
+                structured_content=structured_blocks if structured_blocks else None,
                 token_usage=token_usage,
                 query_context=query_context,
                 created_at=datetime.now(UTC),

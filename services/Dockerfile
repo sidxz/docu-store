@@ -1,0 +1,45 @@
+# docu-store backend — single image, multiple entrypoints
+#
+# Default CMD runs the FastAPI API server.
+# Workers override CMD in docker-compose:
+#   read-worker:      .venv/bin/python -m infrastructure.read_worker
+#   pipeline-worker:  .venv/bin/python -m infrastructure.pipeline_worker
+#   temporal-worker:  .venv/bin/python -m infrastructure.temporal.worker
+#   llm-worker:       .venv/bin/python -m infrastructure.temporal.llm_worker
+#   plugin-consumer:  .venv/bin/python -m infrastructure.plugins.plugin_consumer
+
+FROM python:3.12-slim
+
+# System deps: librdkafka for confluent-kafka, poppler for pdf2image, wget for healthcheck
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      build-essential \
+      librdkafka-dev \
+      poppler-utils \
+      wget \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# Deps layer — cached until pyproject.toml or uv.lock changes
+COPY pyproject.toml uv.lock ./
+RUN uv sync --no-dev --no-install-project --frozen
+
+# Application code
+COPY application/ application/
+COPY domain/ domain/
+COPY infrastructure/ infrastructure/
+COPY interfaces/ interfaces/
+
+# Non-root user (UID 1000 — standard for k8s SecurityContext)
+RUN useradd -r -u 1000 -m docustore
+USER docustore
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD wget -qO- http://localhost:8000/health || exit 1
+
+CMD [".venv/bin/uvicorn", "interfaces.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-server-header"]
