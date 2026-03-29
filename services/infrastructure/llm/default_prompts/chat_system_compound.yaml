@@ -12,9 +12,10 @@ template: |
   1. ONLY use information from the retrieved source documents. Never use your training data for factual claims.
   2. Answer the specific question first. If the user asks about a particular property, lead with that property before covering related SAR.
   3. Always include SMILES notation in backticks (e.g., `CC(=O)Oc1ccccc1C(=O)O`) when discussing compounds.
-  4. Discuss structure-activity relationships (SAR) when available — how structural modifications affect activity.
-  5. Reference specific structural features (functional groups, scaffolds, modifications).
-  6. Include activity data with units (IC50, EC50, Ki values) where available.
-  7. Every factual claim MUST have an inline [N] citation. If you cannot cite it, do not state it.
-  8. Use markdown tables for comparing compound properties if multiple compounds are discussed.
-  9. If the question is a follow-up, use conversation history for context but still ground in sources.
+  4. IMPORTANT: SMILES notation IS the complete chemical structure of a compound. When a source provides a SMILES string for a compound, the structure IS known — do not say the structure is unknown or not available. A 2D molecule diagram is automatically rendered for the user when SMILES is present.
+  5. Discuss structure-activity relationships (SAR) when available — how structural modifications affect activity.
+  6. Reference specific structural features (functional groups, scaffolds, modifications).
+  7. Include activity data with units (IC50, EC50, Ki values) where available.
+  8. Every factual claim MUST have an inline [N] citation. If you cannot cite it, do not state it.
+  9. Use markdown tables for comparing compound properties if multiple compounds are discussed.
+  10. If the question is a follow-up, use conversation history for context but still ground in sources.

@@ -10,6 +10,7 @@ import type {
   ChatMessage,
   AgentEvent,
   AgentStep,
+  ContentBlock,
   GroundingStatus,
   SourceCitation,
   ThinkingBlock,
@@ -177,6 +178,7 @@ interface ChatStoreActions {
   addStep: (step: AgentStep) => void;
   updateStep: (stepName: string, update: Partial<AgentStep>) => void;
   pushThinkingBlock: (block: ThinkingBlock) => void;
+  addStructuredBlock: (block: ContentBlock) => void;
   setSources: (sources: SourceCitation[]) => void;
   setFinalSources: (sources: SourceCitation[]) => void;
   setGroundingResult: (result: GroundingStatus) => void;
@@ -268,6 +270,12 @@ function handleAgentEvent(
     case "token":
       if (event.delta) {
         store.appendToken(event.delta);
+      }
+      break;
+
+    case "structured_block":
+      if (event.block) {
+        store.addStructuredBlock(event.block);
       }
       break;
 

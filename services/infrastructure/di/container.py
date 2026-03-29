@@ -391,8 +391,12 @@ def create_container() -> Container:
     container[TextChunker] = text_chunker_instance
 
     # Sparse Embedding Generator (hashing-based for hybrid search)
-    sparse_generator_instance = TfidfSparseGenerator()
-    container[SparseEmbeddingGenerator] = sparse_generator_instance
+    # Only wired when SPARSE_ENCODING_ENABLED=true (ablation config 10)
+    if settings.sparse_encoding_enabled:
+        sparse_generator_instance = TfidfSparseGenerator()
+        container[SparseEmbeddingGenerator] = sparse_generator_instance
+    else:
+        container[SparseEmbeddingGenerator] = None  # type: ignore[assignment]
 
     # Cross-encoder reranker (Stage 2 — reranks retrieval candidates) — singleton
     if settings.reranker_enabled:
@@ -719,6 +723,8 @@ def create_container() -> Container:
     container[QuestionAnalysisNode] = lambda c: QuestionAnalysisNode(
         llm_client=chat_llm_client,
         prompt_repository=c[PromptRepositoryPort],
+        smiles_validator=c[SmilesValidator],
+        smiles_search=c[SearchSimilarCompoundsUseCase],
     )
     container[RetrievalNode] = lambda c: RetrievalNode(
         hierarchical_search=c[HierarchicalSearchUseCase],
@@ -755,6 +761,8 @@ def create_container() -> Container:
         prompt_repository=c[PromptRepositoryPort],
         ner_extractor=c[NERExtractorPort],
         structured_extractor=c[StructuredExtractorPort],
+        smiles_validator=c[SmilesValidator],
+        smiles_search=c[SearchSimilarCompoundsUseCase],
     )
 
     # Tool-calling LLM + tool registry for agentic retrieval
@@ -765,6 +773,7 @@ def create_container() -> Container:
         page_read_model=c[PageReadModel],
         tag_dictionary=c[TagDictionaryReadModel],
         artifact_read_model=c[ArtifactReadModel],
+        compound_vector_store=c[CompoundVectorStore],
     )
     container[AgenticRetrievalNode] = lambda c: AgenticRetrievalNode(
         tool_llm=tool_calling_llm,

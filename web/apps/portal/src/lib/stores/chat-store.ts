@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import type { AgentEvent, AgentStep, GroundingStatus, SourceCitation, ThinkingBlock } from "@docu-store/types";
+import type { AgentEvent, AgentStep, ContentBlock, GroundingStatus, SourceCitation, ThinkingBlock } from "@docu-store/types";
 
 interface StepTiming {
   step: string;
@@ -29,6 +29,9 @@ interface ChatState {
   // Chronological thinking blocks (one per LLM thought)
   streamingThinkingBlocks: ThinkingBlock[];
 
+  // Structured content blocks (molecules, tables, etc.)
+  streamingStructuredBlocks: ContentBlock[];
+
   // Grounding verification state
   groundingResult: GroundingStatus | null;
 
@@ -55,6 +58,7 @@ interface ChatState {
   addStep: (step: AgentStep) => void;
   updateStep: (stepName: string, update: Partial<AgentStep>) => void;
   pushThinkingBlock: (block: ThinkingBlock) => void;
+  addStructuredBlock: (block: ContentBlock) => void;
   setSources: (sources: SourceCitation[]) => void;
   setFinalSources: (sources: SourceCitation[]) => void;
   setGroundingResult: (result: GroundingStatus) => void;
@@ -74,6 +78,7 @@ export const useChatStore = create<ChatState>((set) => ({
   pendingUserMessage: null,
   queuedMessage: null,
   streamingThinkingBlocks: [],
+  streamingStructuredBlocks: [],
   groundingResult: null,
   highlightedCitation: null,
   activeSourcesMessageId: null,
@@ -110,6 +115,7 @@ export const useChatStore = create<ChatState>((set) => ({
       finalSources: null,
       pendingUserMessage: userMessage,
       streamingThinkingBlocks: [],
+      streamingStructuredBlocks: [],
       groundingResult: null,
       stepTimings: [],
       rawEvents: [],
@@ -156,6 +162,11 @@ export const useChatStore = create<ChatState>((set) => ({
       streamingThinkingBlocks: [...state.streamingThinkingBlocks, block],
     })),
 
+  addStructuredBlock: (block) =>
+    set((state) => ({
+      streamingStructuredBlocks: [...state.streamingStructuredBlocks, block],
+    })),
+
   setSources: (sources) => set({ streamingSources: sources }),
 
   setFinalSources: (sources) => set({ finalSources: sources }),
@@ -196,6 +207,7 @@ export const useChatStore = create<ChatState>((set) => ({
       finalSources: null,
       pendingUserMessage: null,
       streamingThinkingBlocks: [],
+      streamingStructuredBlocks: [],
       groundingResult: null,
       highlightedCitation: null,
       activeSourcesMessageId: null,

@@ -12,6 +12,26 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
+class ResolvedCompound(BaseModel):
+    """A SMILES string that was resolved against the compound vector store."""
+
+    canonical_smiles: str
+    extracted_ids: list[str] = Field(default_factory=list)
+    best_similarity: float = 0.0
+    artifact_ids: list[UUID] = Field(default_factory=list)
+    page_ids: list[UUID] = Field(default_factory=list)
+
+
+class SmilesContext(BaseModel):
+    """SMILES detection + resolution results from Stage 1."""
+
+    detected: list[str] = Field(default_factory=list)  # canonical SMILES found in input
+    detected_originals: list[str] = Field(default_factory=list)  # original SMILES as typed by user
+    resolved: list[ResolvedCompound] = Field(default_factory=list)
+    unresolved: list[str] = Field(default_factory=list)  # detected but not in DB
+    mode: Literal["exact", "similar"] = "exact"
+
+
 class QuestionAnalysis(BaseModel):
     """Output of the question analysis node (Quick Mode)."""
 
@@ -21,6 +41,9 @@ class QuestionAnalysis(BaseModel):
     smiles_detected: list[str] = Field(default_factory=list)
     search_strategy: str  # hierarchical, summary, compound, hybrid
     summary: str
+
+    # Deterministic SMILES detection + resolution (populated outside LLM)
+    smiles_context: SmilesContext | None = None
 
 
 class GroundingResult(BaseModel):
@@ -68,6 +91,9 @@ class QueryPlan(BaseModel):
 
     # From StructuredExtractorPort (GLiNER2)
     author_mentions: list[str] = Field(default_factory=list)
+
+    # Deterministic SMILES detection + resolution (populated outside LLM)
+    smiles_context: SmilesContext | None = None
 
 
 class RetrievalResult(BaseModel):

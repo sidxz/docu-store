@@ -8,6 +8,7 @@ import { useChatStore } from "@/lib/stores/chat-store";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { AgentThinkingPanel } from "./AgentThinkingPanel";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import { RichContentRenderer } from "./RichContentRenderer";
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -94,6 +95,11 @@ export function ChatMessage({ message, workspace, isStreaming, onFeedback }: Cha
                   <span className="inline-block w-2 h-4 bg-text-muted animate-pulse rounded-sm" />
                 )}
               </div>
+              {message.structured_content && message.structured_content.length > 0 && (
+                <div className="mt-3 border-t border-border-subtle pt-3">
+                  <RichContentRenderer blocks={message.structured_content} workspace={workspace} />
+                </div>
+              )}
             </>
           )}
         </div>

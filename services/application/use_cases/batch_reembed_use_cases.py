@@ -150,7 +150,13 @@ class BatchReEmbedArtifactPagesUseCase:
                 continue
 
             chunks = self.text_chunker.chunk_text(page.text_mention.text)
-            context_prefix = self._build_chunk_context(artifact_title, page)
+            from infrastructure.config import settings as _settings
+
+            context_prefix = (
+                self._build_chunk_context(artifact_title, page)
+                if _settings.embedding_enable_context_enrichment
+                else ""
+            )
 
             for chunk in chunks:
                 all_contextual_texts.append(context_prefix + chunk.text)

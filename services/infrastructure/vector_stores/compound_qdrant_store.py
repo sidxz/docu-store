@@ -1,3 +1,4 @@
+import re
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 import structlog
@@ -8,6 +9,54 @@ from application.ports.compound_vector_store import CompoundSearchResult, Compou
 from domain.value_objects.text_embedding import TextEmbedding
 
 logger = structlog.get_logger()
+
+# Pattern to split compound names at letter/digit boundaries: GSK286 → GSK 286
+_LETTER_DIGIT_BOUNDARY = re.compile(r"(?<=[A-Za-z])(?=\d)|(?<=\d)(?=[A-Za-z])")
+
+
+def _compound_name_variants(name: str) -> list[str]:
+    """Generate normalised variants of a compound name for fuzzy matching.
+
+    Handles common mismatches between user input and CSER-extracted labels:
+    - GSK286 vs GSK-286 vs GSK 286
+    - Case differences
+    - Leading/trailing whitespace
+    """
+    name = name.strip()
+    if not name:
+        return []
+
+    seen: set[str] = set()
+    variants: list[str] = []
+
+    def _add(v: str) -> None:
+        if v and v not in seen:
+            seen.add(v)
+            variants.append(v)
+
+    # 1. Original
+    _add(name)
+
+    # 2. Case variants
+    _add(name.upper())
+    _add(name.lower())
+
+    # 3. Strip hyphens / replace with nothing
+    no_hyphen = name.replace("-", "").replace(" ", "")
+    _add(no_hyphen)
+    _add(no_hyphen.upper())
+
+    # 4. Split at letter/digit boundary with hyphen: GSK286 → GSK-286
+    hyphenated = _LETTER_DIGIT_BOUNDARY.sub("-", name.replace("-", "").replace(" ", ""))
+    _add(hyphenated)
+    _add(hyphenated.upper())
+
+    # 5. Split at letter/digit boundary with space: GSK286 → GSK 286
+    spaced = _LETTER_DIGIT_BOUNDARY.sub(" ", name.replace("-", "").replace(" ", ""))
+    _add(spaced)
+    _add(spaced.upper())
+
+    return variants
 
 
 class CompoundQdrantStore(CompoundVectorStore):
@@ -56,45 +105,22 @@ class CompoundQdrantStore(CompoundVectorStore):
             collections = await client.get_collections()
             exists = any(c.name == self.collection_name for c in collections.collections)
 
-            if exists:
-                logger.info("compound_collection_already_exists", collection=self.collection_name)
-                return
+            if not exists:
+                await client.create_collection(
+                    collection_name=self.collection_name,
+                    vectors_config=VectorParams(
+                        size=self.VECTOR_SIZE,
+                        distance=Distance.COSINE,
+                    ),
+                )
+                logger.info(
+                    "compound_collection_created",
+                    collection=self.collection_name,
+                    vector_size=self.VECTOR_SIZE,
+                )
 
-            await client.create_collection(
-                collection_name=self.collection_name,
-                vectors_config=VectorParams(
-                    size=self.VECTOR_SIZE,
-                    distance=Distance.COSINE,
-                ),
-            )
-
-            # Payload indices for efficient filtering
-            await client.create_payload_index(
-                collection_name=self.collection_name,
-                field_name="page_id",
-                field_schema=models.PayloadSchemaType.KEYWORD,
-            )
-            await client.create_payload_index(
-                collection_name=self.collection_name,
-                field_name="artifact_id",
-                field_schema=models.PayloadSchemaType.KEYWORD,
-            )
-            await client.create_payload_index(
-                collection_name=self.collection_name,
-                field_name="canonical_smiles",
-                field_schema=models.PayloadSchemaType.KEYWORD,
-            )
-            await client.create_payload_index(
-                collection_name=self.collection_name,
-                field_name="workspace_id",
-                field_schema=models.PayloadSchemaType.KEYWORD,
-            )
-
-            logger.info(
-                "compound_collection_created",
-                collection=self.collection_name,
-                vector_size=self.VECTOR_SIZE,
-            )
+            # Ensure indexes exist (idempotent — safe on existing collections)
+            await self._ensure_indexes(client)
 
         except Exception as e:
             logger.exception(
@@ -103,6 +129,20 @@ class CompoundQdrantStore(CompoundVectorStore):
                 error=str(e),
             )
             raise
+
+    async def _ensure_indexes(self, client: AsyncQdrantClient) -> None:
+        """Create payload indexes if they don't already exist. Idempotent."""
+        index_fields = ["page_id", "artifact_id", "canonical_smiles", "workspace_id", "extracted_id"]
+        for field in index_fields:
+            try:
+                await client.create_payload_index(
+                    collection_name=self.collection_name,
+                    field_name=field,
+                    field_schema=models.PayloadSchemaType.KEYWORD,
+                )
+            except Exception:
+                # Index already exists — Qdrant returns an error on duplicates, which is fine
+                logger.debug("compound_index_already_exists", field=field)
 
     async def upsert_compound_embeddings(
         self,
@@ -264,6 +304,100 @@ class CompoundQdrantStore(CompoundVectorStore):
                 limit=limit,
             )
             return results
+
+    async def get_compounds_by_extracted_id(
+        self,
+        extracted_id: str,
+        workspace_id: UUID | None = None,
+        allowed_artifact_ids: list[UUID] | None = None,
+        limit: int = 10,
+    ) -> list[CompoundSearchResult]:
+        """Find compounds by their extracted document ID (name/label).
+
+        Uses metadata filtering with the extracted_id KEYWORD index.
+        Tries multiple normalised variants (with/without hyphens, spaces)
+        because CSER labels may differ from user input.
+        Returns results with vectors stashed in metadata['_vector'] for
+        subsequent similarity search without re-embedding.
+        """
+        client = await self._get_client()
+
+        # Generate normalised variants to handle common mismatches:
+        #   "GSK286" vs "GSK-286" vs "GSK 286" vs "gsk286"
+        variants = _compound_name_variants(extracted_id)
+
+        must_conditions = [
+            models.FieldCondition(
+                key="extracted_id",
+                match=models.MatchAny(any=variants),
+            ),
+        ]
+        if workspace_id:
+            must_conditions.append(
+                models.FieldCondition(
+                    key="workspace_id",
+                    match=models.MatchValue(value=str(workspace_id)),
+                ),
+            )
+        if allowed_artifact_ids is not None:
+            must_conditions.append(
+                models.FieldCondition(
+                    key="artifact_id",
+                    match=models.MatchAny(any=[str(aid) for aid in allowed_artifact_ids]),
+                ),
+            )
+
+        try:
+            scroll_result, _next_offset = await client.scroll(
+                collection_name=self.collection_name,
+                scroll_filter=models.Filter(must=must_conditions),
+                limit=limit,
+                with_payload=True,
+                with_vectors=True,
+            )
+        except Exception as e:
+            logger.exception(
+                "compound_lookup_by_name_failed",
+                extracted_id=extracted_id,
+                error=str(e),
+            )
+            raise
+
+        # Deduplicate by canonical_smiles — same compound can appear on multiple pages
+        seen_canonical: set[str] = set()
+        results: list[CompoundSearchResult] = []
+
+        for point in scroll_result:
+            canonical = point.payload.get("canonical_smiles") or point.payload.get("smiles", "")
+            if canonical in seen_canonical:
+                continue
+            seen_canonical.add(canonical)
+
+            # Stash the vector in metadata so callers can reuse it for similarity search
+            metadata = dict(point.payload)
+            if point.vector is not None:
+                metadata["_vector"] = point.vector
+
+            results.append(
+                CompoundSearchResult(
+                    page_id=UUID(point.payload["page_id"]),
+                    artifact_id=UUID(point.payload["artifact_id"]),
+                    score=1.0,  # exact metadata match
+                    page_index=point.payload["page_index"],
+                    smiles=point.payload["smiles"],
+                    canonical_smiles=point.payload.get("canonical_smiles"),
+                    extracted_id=point.payload.get("extracted_id"),
+                    metadata=metadata,
+                ),
+            )
+
+        logger.info(
+            "compound_lookup_by_name_completed",
+            extracted_id=extracted_id,
+            raw_matches=len(scroll_result),
+            unique_structures=len(results),
+        )
+        return results
 
     async def get_compound_collection_info(self) -> dict:
         """Return basic stats about the compound collection."""

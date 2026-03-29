@@ -370,6 +370,34 @@ class Settings(BaseSettings):
         description="Character budget for follow-up conversation context window.",
     )
 
+    # SMILES detection and resolution in chat
+    chat_smiles_resolution_enabled: bool = Field(
+        default=True,
+        validation_alias="CHAT_SMILES_RESOLUTION_ENABLED",
+        description="Enable deterministic SMILES detection + compound resolution in chat pipeline.",
+    )
+    chat_smiles_exact_threshold: float = Field(
+        default=0.99,
+        ge=0.0,
+        le=1.0,
+        validation_alias="CHAT_SMILES_EXACT_THRESHOLD",
+        description="Cosine similarity threshold for exact SMILES match in chat.",
+    )
+    chat_smiles_similar_threshold: float = Field(
+        default=0.85,
+        ge=0.0,
+        le=1.0,
+        validation_alias="CHAT_SMILES_SIMILAR_THRESHOLD",
+        description="Cosine similarity threshold for similar SMILES search in chat.",
+    )
+    chat_smiles_max_results: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+        validation_alias="CHAT_SMILES_MAX_RESULTS",
+        description="Max compound results per detected SMILES in chat.",
+    )
+
     # Sentinel (AuthZ mode)
     sentinel_url: str = Field(default="http://localhost:9003", validation_alias="SENTINEL_URL")
     sentinel_service_key: str = Field(default="", validation_alias="SENTINEL_SERVICE_KEY")
@@ -402,6 +430,45 @@ class Settings(BaseSettings):
         if not self.browse_sticky_categories:
             return []
         return [c.strip() for c in self.browse_sticky_categories.split(",") if c.strip()]
+
+    # Ablation / Evaluation toggles
+    sparse_encoding_enabled: bool = Field(
+        default=False,
+        validation_alias="SPARSE_ENCODING_ENABLED",
+        description="Enable sparse (TF-IDF) vectors in hybrid search. When False, only dense search is used.",
+    )
+    chat_enable_entity_accumulation: bool = Field(
+        default=True,
+        validation_alias="CHAT_ENABLE_ENTITY_ACCUMULATION",
+        description="Accumulate NER entities from previous grounded turns for multi-turn continuity.",
+    )
+    embedding_enable_context_enrichment: bool = Field(
+        default=True,
+        validation_alias="EMBEDDING_ENABLE_CONTEXT_ENRICHMENT",
+        description="Prepend document title/tags/summary context to chunks before dense embedding.",
+    )
+
+    # Evaluation (LLM-as-judge)
+    eval_judge_provider: Literal["openai", "gemini"] = Field(
+        default="openai",
+        validation_alias="EVAL_JUDGE_PROVIDER",
+        description="LLM provider for evaluation judge.",
+    )
+    eval_judge_model: str = Field(
+        default="gpt-4o",
+        validation_alias="EVAL_JUDGE_MODEL",
+        description="Model name for evaluation judge.",
+    )
+    eval_judge_api_key: str | None = Field(
+        default=None,
+        validation_alias="EVAL_JUDGE_API_KEY",
+        description="API key for evaluation judge LLM.",
+    )
+    eval_judge_temperature: float = Field(
+        default=0.0,
+        validation_alias="EVAL_JUDGE_TEMPERATURE",
+        description="Temperature for evaluation judge (0 for deterministic scoring).",
+    )
 
     # Plugin system
     enabled_plugins: str = Field(

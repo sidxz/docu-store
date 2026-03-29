@@ -49,6 +49,16 @@ template: |
   don't address the specific question, try searching WITHOUT entity_types and
   tags parameters — just use the query text alone.
 
+  ## SMILES / Chemical Structure Queries
+
+  When the user's question contains SMILES notation (chemical structure strings):
+  - NEVER use raw SMILES strings as search queries — they will produce poor results
+  - Use the resolved compound name/ID instead (provided in the SMILES Resolution
+    section below, or in the Detected entities list)
+  - If a compound name like "DDU597" is listed as a detected entity, search for
+    that name, its bioactivity data, and related documents
+  - The SMILES → compound mapping is pre-resolved; trust it and search by name
+
   ## Tips for effective searching
 
   - Use specific scientific terms and compound names
