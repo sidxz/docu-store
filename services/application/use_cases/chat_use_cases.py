@@ -346,7 +346,7 @@ class SendMessageUseCase:
                 content=draft_answer,
                 sources=final_sources,
                 agent_trace=agent_trace,
-                structured_content=structured_blocks if structured_blocks else None,
+                structured_content=structured_blocks or None,
                 token_usage=token_usage,
                 query_context=query_context,
                 created_at=datetime.now(UTC),
