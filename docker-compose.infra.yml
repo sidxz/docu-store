@@ -1,0 +1,580 @@
+# docu-store — Infrastructure Stack (Production / Docker Swarm)
+#
+# All infrastructure in one file: core (Mongo, EventStoreDB, Kafka,
+# Temporal, Qdrant), Langfuse (LLM observability), and Umami (web analytics).
+#
+# Deploy:
+#   docker stack deploy -c docker-compose.infra.yml docu-store-infra
+#
+# Local testing:
+#   docker compose -f docker-compose.infra.yml up -d
+#
+# The application stack (docker-compose.prod.yml) connects via the
+# shared "docu-store" overlay network.
+
+services:
+
+  # ════════════════════════════════════════════════════════════
+  # CORE INFRASTRUCTURE
+  # ════════════════════════════════════════════════════════════
+
+  # ── MongoDB (Event Store read models, tracking) ────────────
+
+  mongo:
+    image: mongo:7.0
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - docu-store
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 })"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+      restart_policy:
+        condition: any
+
+  mongo-init:
+    image: mongo:7.0
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - docu-store
+    entrypoint: >
+      mongosh --host mongo:27017 --eval '
+        try { if (rs.status().ok) print("Replica set already up."); }
+        catch(e) { rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "mongo:27017" }] }); }
+      '
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
+  # ── EventStoreDB (Domain event persistence) ────────────────
+
+  eventstoredb:
+    image: eventstore/eventstore:24.10.0-jammy
+    environment:
+      EVENTSTORE_CLUSTER_SIZE: 1
+      EVENTSTORE_RUN_PROJECTIONS: All
+      EVENTSTORE_START_STANDARD_PROJECTIONS: "true"
+      EVENTSTORE_INSECURE: "true"
+      EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP: "true"
+    ports:
+      - "${ESDB_PORT:-2113}:2113"
+    volumes:
+      - eventstoredb-data:/var/lib/eventstore
+    networks:
+      - docu-store
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+      restart_policy:
+        condition: any
+
+  # ── Kafka (External event streaming, plugin system) ────────
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    environment:
+      CLUSTER_ID: "OVWC3qSNRGCEH7iVaUz6XQ"
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - docu-store
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+      restart_policy:
+        condition: any
+
+  # ── PostgreSQL (Temporal backend) ──────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: ${TEMPORAL_POSTGRES_PASSWORD}
+      POSTGRES_USER: temporal
+      POSTGRES_DB: temporal
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - docu-store
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+      restart_policy:
+        condition: any
+
+  # ── Temporal (Workflow orchestration) ──────────────────────
+
+  temporal-admin-tools:
+    image: temporalio/admin-tools:1.29
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB: postgres12_pgx
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: ${TEMPORAL_POSTGRES_PASSWORD}
+      POSTGRES_SEEDS: postgres
+    networks:
+      - docu-store
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        until pg_isready -h postgres -p 5432 -U temporal; do
+          echo "Waiting for postgres..."
+          sleep 1
+        done
+
+        PGPASSWORD=$${POSTGRES_PWD} psql -h postgres -U temporal -d temporal \
+          -c "CREATE DATABASE temporal_visibility;" 2>/dev/null || echo "temporal_visibility already exists"
+
+        temporal-sql-tool --plugin postgres12_pgx --ep postgres -p 5432 -u temporal -pw $${POSTGRES_PWD} --db temporal setup-schema -v 0.0
+        temporal-sql-tool --plugin postgres12_pgx --ep postgres -p 5432 -u temporal -pw $${POSTGRES_PWD} --db temporal update-schema -d ./schema/postgresql/v12/temporal/versioned
+
+        temporal-sql-tool --plugin postgres12_pgx --ep postgres -p 5432 -u temporal -pw $${POSTGRES_PWD} --db temporal_visibility setup-schema -v 0.0
+        temporal-sql-tool --plugin postgres12_pgx --ep postgres -p 5432 -u temporal -pw $${POSTGRES_PWD} --db temporal_visibility update-schema -d ./schema/postgresql/v12/visibility/versioned
+
+        echo "Temporal schema ready"
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
+  temporal:
+    image: temporalio/server:1.29.2
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB: postgres12_pgx
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: ${TEMPORAL_POSTGRES_PASSWORD}
+      POSTGRES_SEEDS: postgres
+    ports:
+      - "${TEMPORAL_PORT:-7233}:7233"
+    networks:
+      - docu-store
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+      restart_policy:
+        condition: any
+
+  temporal-namespace-init:
+    image: temporalio/admin-tools:1.29
+    depends_on:
+      - temporal
+    networks:
+      - docu-store
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        for i in $$(seq 1 60); do
+          temporal operator namespace list --address temporal:7233 > /dev/null 2>&1 && break
+          echo "Waiting for Temporal... ($$i/60)"
+          sleep 2
+        done
+        temporal operator namespace create --address temporal:7233 default 2>/dev/null \
+          && echo "Default namespace created" \
+          || echo "Default namespace already exists"
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
+  # ── Qdrant (Vector search) ─────────────────────────────────
+
+  qdrant:
+    image: qdrant/qdrant:v1.16.2
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    networks:
+      - docu-store
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6333/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+      restart_policy:
+        condition: any
+
+  # ════════════════════════════════════════════════════════════
+  # LANGFUSE (LLM Observability & Prompt Management)
+  # ════════════════════════════════════════════════════════════
+
+  langfuse-postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${LANGFUSE_PG_USER:-langfuse}
+      POSTGRES_PASSWORD: ${LANGFUSE_PG_PASSWORD}
+      POSTGRES_DB: langfuse
+    volumes:
+      - langfuse-postgres-data:/var/lib/postgresql/data
+    networks:
+      - docu-store
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+      restart_policy:
+        condition: any
+
+  langfuse-clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: ${LANGFUSE_CLICKHOUSE_USER:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD}
+    volumes:
+      - langfuse-clickhouse-data:/var/lib/clickhouse
+      - langfuse-clickhouse-logs:/var/log/clickhouse-server
+    networks:
+      - docu-store
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+      restart_policy:
+        condition: any
+
+  langfuse-minio:
+    image: minio/minio
+    entrypoint: sh
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      MINIO_ROOT_USER: ${LANGFUSE_MINIO_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${LANGFUSE_MINIO_PASSWORD}
+    volumes:
+      - langfuse-minio-data:/data
+    networks:
+      - docu-store
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+      restart_policy:
+        condition: any
+
+  langfuse-redis:
+    image: redis:7
+    command: >
+      --requirepass ${LANGFUSE_REDIS_PASSWORD}
+      --maxmemory-policy noeviction
+    volumes:
+      - langfuse-redis-data:/data
+    networks:
+      - docu-store
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${LANGFUSE_REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.25"
+      restart_policy:
+        condition: any
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
+    depends_on:
+      langfuse-postgres:
+        condition: service_healthy
+      langfuse-minio:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      langfuse-clickhouse:
+        condition: service_healthy
+    environment: &langfuse-env
+      DATABASE_URL: postgresql://${LANGFUSE_PG_USER:-langfuse}:${LANGFUSE_PG_PASSWORD}@langfuse-postgres:5432/langfuse
+      NEXTAUTH_URL: ${LANGFUSE_URL:-http://langfuse-web:3000}
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET}
+      SALT: ${LANGFUSE_SALT}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY}
+      TELEMETRY_ENABLED: "false"
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "false"
+      # ClickHouse
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+      CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+      CLICKHOUSE_USER: ${LANGFUSE_CLICKHOUSE_USER:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD}
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      # MinIO (S3-compatible)
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${LANGFUSE_MINIO_USER:-minio}
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD}
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${LANGFUSE_MINIO_USER:-minio}
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD}
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+      # Redis
+      REDIS_HOST: langfuse-redis
+      REDIS_PORT: "6379"
+      REDIS_AUTH: ${LANGFUSE_REDIS_PASSWORD}
+      REDIS_TLS_ENABLED: "false"
+    networks:
+      - docu-store
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+      restart_policy:
+        condition: any
+
+  langfuse-web:
+    image: langfuse/langfuse:3
+    depends_on:
+      langfuse-postgres:
+        condition: service_healthy
+      langfuse-minio:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      langfuse-clickhouse:
+        condition: service_healthy
+    ports:
+      - "${LANGFUSE_PORT:-3000}:3000"
+    environment:
+      <<: *langfuse-env
+      # Pre-seed org/project/keys (set in .env.prod)
+      LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-docu-store-org}
+      LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_NAME:-DocuStore}
+      LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-docu-store-project}
+      LANGFUSE_INIT_PROJECT_NAME: ${LANGFUSE_INIT_PROJECT_NAME:-docu-store}
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_ADMIN_EMAIL}
+      LANGFUSE_INIT_USER_NAME: ${LANGFUSE_ADMIN_NAME:-admin}
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_ADMIN_PASSWORD}
+    networks:
+      - docu-store
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000/api/public/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+      restart_policy:
+        condition: any
+
+  # ════════════════════════════════════════════════════════════
+  # UMAMI (Web Analytics)
+  # ════════════════════════════════════════════════════════════
+
+  umami-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: umami
+      POSTGRES_USER: umami
+      POSTGRES_PASSWORD: ${UMAMI_PG_PASSWORD}
+    volumes:
+      - umami-data:/var/lib/postgresql/data
+    networks:
+      - docu-store
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U umami"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.25"
+      restart_policy:
+        condition: any
+
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    depends_on:
+      umami-db:
+        condition: service_healthy
+    ports:
+      - "${UMAMI_PORT:-3001}:3000"
+    environment:
+      DATABASE_URL: postgresql://umami:${UMAMI_PG_PASSWORD}@umami-db:5432/umami
+      TRACKER_SCRIPT_NAME: ${UMAMI_TRACKER_SCRIPT:-ds-analytics}
+    networks:
+      - docu-store
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000/api/heartbeat || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+      restart_policy:
+        condition: any
+
+  # ════════════════════════════════════════════════════════════
+  # ADMIN / DEBUG UIs
+  # ════════════════════════════════════════════════════════════
+
+  temporal-ui:
+    image: temporalio/ui:2.44.1
+    depends_on:
+      - temporal
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "${TEMPORAL_UI_PORT:-8233}:8080"
+    networks:
+      - docu-store
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.25"
+      restart_policy:
+        condition: any
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_CLUSTERS_0_NAME: docu-store
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    ports:
+      - "${KAFKA_UI_PORT:-5051}:8080"
+    networks:
+      - docu-store
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.25"
+      restart_policy:
+        condition: any
+
+  qdrant-ui:
+    image: qdrant/qdrant-web-ui:latest
+    ports:
+      - "${QDRANT_UI_PORT:-6334}:80"
+    environment:
+      QDRANT_URL: http://qdrant:6333
+    networks:
+      - docu-store
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.25"
+      restart_policy:
+        condition: any
+
+volumes:
+  # Core
+  mongo-data:
+  eventstoredb-data:
+  kafka-data:
+  postgres-data:
+  qdrant-data:
+  # Langfuse
+  langfuse-postgres-data:
+  langfuse-clickhouse-data:
+  langfuse-clickhouse-logs:
+  langfuse-minio-data:
+  langfuse-redis-data:
+  # Umami
+  umami-data:
+
+networks:
+  docu-store:
+    driver: overlay
