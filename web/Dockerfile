@@ -1,9 +1,10 @@
-# docu-store frontend — Next.js standalone
+# docu-store frontend — Next.js standalone (universal image)
 #
-# Build args (NEXT_PUBLIC_* are baked into client JS at build time):
-#   NEXT_PUBLIC_API_URL, NEXT_PUBLIC_APP_URL, NEXT_PUBLIC_SENTINEL_URL,
-#   NEXT_PUBLIC_GOOGLE_CLIENT_ID, NEXT_PUBLIC_GITHUB_CLIENT_ID,
-#   NEXT_PUBLIC_UMAMI_URL, NEXT_PUBLIC_UMAMI_WEBSITE_ID
+# Configuration is loaded at RUNTIME via /api/config endpoint,
+# not baked at build time. Set APP_* env vars in docker-compose:
+#   APP_API_URL, APP_URL, APP_SENTINEL_URL,
+#   APP_GOOGLE_CLIENT_ID, APP_GITHUB_CLIENT_ID,
+#   APP_UMAMI_URL, APP_UMAMI_WEBSITE_ID
 
 # ── Stage 1: Install + Build ──────────────────────────────────
 FROM node:22-alpine AS builder
@@ -24,15 +25,6 @@ RUN pnpm install --frozen-lockfile
 
 # Source code (postinstall already copied RDKit WASM + PrimeReact themes)
 COPY . .
-
-# Build-time env vars
-ARG NEXT_PUBLIC_API_URL
-ARG NEXT_PUBLIC_APP_URL
-ARG NEXT_PUBLIC_SENTINEL_URL
-ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
-ARG NEXT_PUBLIC_GITHUB_CLIENT_ID
-ARG NEXT_PUBLIC_UMAMI_URL
-ARG NEXT_PUBLIC_UMAMI_WEBSITE_ID
 
 RUN pnpm --filter portal build
 

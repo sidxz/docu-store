@@ -24,15 +24,10 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
         run: echo "VERSION=${REF_NAME#web-v}" >> "$GITHUB_OUTPUT"
 
+      # No build-args needed — config is loaded at runtime via /api/config
       - uses: docker/build-push-action@v6
         with:
           context: web/
-          build-args: |
-            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
-            NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL }}
-            NEXT_PUBLIC_SENTINEL_URL=${{ vars.NEXT_PUBLIC_SENTINEL_URL }}
-            NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ vars.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
-            NEXT_PUBLIC_GITHUB_CLIENT_ID=${{ vars.NEXT_PUBLIC_GITHUB_CLIENT_ID }}
           push: true
           tags: |
             sidxz/docu-store-web:${{ steps.version.outputs.VERSION }}

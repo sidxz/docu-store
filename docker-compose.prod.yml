@@ -144,6 +144,7 @@ services:
 
   web:
     image: sidxz/docu-store-web:${VERSION:-latest}
+    env_file: .env.prod
     ports:
       - "${WEB_PORT:-15000}:15000"
     networks:

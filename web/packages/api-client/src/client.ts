@@ -11,8 +11,12 @@
 import createClient from "openapi-fetch";
 import type { paths } from "./schema";
 
-const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-
-export const apiClient = createClient<paths>({
-  baseUrl,
+/** Mutable singleton — reconfigured once at app init via `setApiBaseUrl`. */
+export let apiClient = createClient<paths>({
+  baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000",
 });
+
+/** Recreate the API client with a new base URL (called once during app init). */
+export function setApiBaseUrl(url: string) {
+  apiClient = createClient<paths>({ baseUrl: url });
+}
