@@ -10,13 +10,17 @@ jobs:
   publish:
     name: Build & Push Docker Image
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
       - uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract version from tag
         id: version
@@ -29,5 +33,5 @@ jobs:
           context: services/
           push: true
           tags: |
-            sidxz/docu-store:${{ steps.version.outputs.VERSION }}
-            sidxz/docu-store:latest
+            ghcr.io/${{ github.repository_owner }}/docu-store:${{ steps.version.outputs.VERSION }}
+            ghcr.io/${{ github.repository_owner }}/docu-store:latest

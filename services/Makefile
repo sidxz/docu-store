@@ -110,7 +110,7 @@ test-quick: ## Run tests without coverage
 	uv run pytest tests/ -v
 
 docker-build: ## Build backend Docker image locally
-	docker build -t sidxz/docu-store:dev .
+	docker build -t ghcr.io/sidxz/docu-store:dev .
 
 docker-build-web: ## Build frontend Docker image locally
-	docker build -t sidxz/docu-store-web:dev ../web/
+	docker build -t ghcr.io/sidxz/docu-store-web:dev ../web/

@@ -11,8 +11,8 @@
 #   docker compose -f docker-compose.prod.yml up
 #
 # Images (pre-built, pushed to Docker Hub):
-#   sidxz/docu-store:latest       — backend (all 6 processes)
-#   sidxz/docu-store-web:latest   — frontend (Next.js)
+#   ghcr.io/sidxz/docu-store:latest       — backend (all 6 processes)
+#   ghcr.io/sidxz/docu-store-web:latest   — frontend (Next.js)
 #
 # Infrastructure services (mongo, eventstoredb, kafka, temporal, qdrant)
 # are managed separately via docker-compose.infra.yml and connected
@@ -21,7 +21,7 @@
 services:
 
   api:
-    image: sidxz/docu-store:${VERSION:-latest}
+    image: ghcr.io/sidxz/docu-store:${VERSION:-latest}
     env_file: .env.prod
     environment:
       EVENTSTOREDB_URI: esdb://eventstoredb:2113?tls=false
@@ -51,7 +51,7 @@ services:
           cpus: "2.0"
 
   read-worker:
-    image: sidxz/docu-store:${VERSION:-latest}
+    image: ghcr.io/sidxz/docu-store:${VERSION:-latest}
     command: [".venv/bin/python", "-m", "infrastructure.read_worker"]
     env_file: .env.prod
     environment:
@@ -68,7 +68,7 @@ services:
           cpus: "0.5"
 
   pipeline-worker:
-    image: sidxz/docu-store:${VERSION:-latest}
+    image: ghcr.io/sidxz/docu-store:${VERSION:-latest}
     command: [".venv/bin/python", "-m", "infrastructure.pipeline_worker"]
     env_file: .env.prod
     environment:
@@ -86,7 +86,7 @@ services:
           cpus: "0.5"
 
   temporal-worker:
-    image: sidxz/docu-store:${VERSION:-latest}
+    image: ghcr.io/sidxz/docu-store:${VERSION:-latest}
     command: [".venv/bin/python", "-m", "infrastructure.temporal.worker"]
     env_file: .env.prod
     environment:
@@ -109,7 +109,7 @@ services:
           cpus: "2.0"
 
   llm-worker:
-    image: sidxz/docu-store:${VERSION:-latest}
+    image: ghcr.io/sidxz/docu-store:${VERSION:-latest}
     command: [".venv/bin/python", "-m", "infrastructure.temporal.llm_worker"]
     env_file: .env.prod
     environment:
@@ -126,7 +126,7 @@ services:
           cpus: "1.0"
 
   plugin-consumer:
-    image: sidxz/docu-store:${VERSION:-latest}
+    image: ghcr.io/sidxz/docu-store:${VERSION:-latest}
     command: [".venv/bin/python", "-m", "infrastructure.plugins.plugin_consumer"]
     env_file: .env.prod
     environment:
@@ -143,7 +143,7 @@ services:
           cpus: "0.5"
 
   web:
-    image: sidxz/docu-store-web:${VERSION:-latest}
+    image: ghcr.io/sidxz/docu-store-web:${VERSION:-latest}
     env_file: .env.prod
     ports:
       - "${WEB_PORT:-15000}:15000"
