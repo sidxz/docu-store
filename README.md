@@ -135,25 +135,119 @@ docker stack deploy -c docker-compose.prod.yml docu-store
 
 ### Configuration
 
-All configuration is via environment variables. See `.env.prod.example` for the full reference.
+All configuration is via environment variables in `.env.prod`. Copy the template and fill in:
 
-**Backend**: reads env vars via pydantic-settings (`services/infrastructure/config.py`).
+```bash
+cp .env.prod.example .env.prod
+```
 
-**Frontend**: reads `APP_*` env vars at runtime via `/api/config` endpoint (not baked at build time). For local dev, `NEXT_PUBLIC_*` vars in `.env.local` are used as fallback.
+**How the pieces connect:**
 
-| Variable | Purpose |
-|----------|---------|
-| `EVENTSTOREDB_URI` | EventStoreDB connection |
-| `MONGO_URI` | MongoDB connection (requires replica set) |
-| `TEMPORAL_ADDRESS` | Temporal server address |
-| `QDRANT_URL` | Qdrant vector DB URL |
-| `KAFKA_BOOTSTRAP_SERVERS` | Kafka broker address |
-| `SENTINEL_URL` | Sentinel auth service URL |
-| `SENTINEL_SERVICE_KEY` | Sentinel service API key |
-| `LLM_PROVIDER` | LLM backend: `ollama`, `openai`, `gemini` |
-| `EMBEDDING_DEVICE` | `cpu`, `cuda`, or `mps` |
-| `APP_API_URL` | Frontend: API base URL (runtime) |
-| `APP_SENTINEL_URL` | Frontend: Sentinel URL (runtime) |
+```
+Browser ──> Frontend (web)        ──> /api/config reads APP_* env vars at runtime
+                │
+                │  APP_API_URL points here
+                v
+            Backend (api)         ──> SENTINEL_URL validates tokens with Sentinel
+                │
+                │  Internal service DNS (set in compose environment block)
+                v
+            Infra (mongo, eventstoredb, kafka, temporal, qdrant)
+```
+
+The `docker-compose.prod.yml` `environment:` block overrides service URLs with Docker DNS names (e.g., `MONGO_URI: mongodb://mongo:27017`). You only need to configure secrets and external URLs in `.env.prod`.
+
+#### Infrastructure (set in compose, not in .env.prod)
+
+These are hardcoded in the compose `environment:` block — you don't need to set them unless pointing at external services:
+
+| Variable | Default (compose) | Override when... |
+|----------|-------------------|------------------|
+| `EVENTSTOREDB_URI` | `esdb://eventstoredb:2113?tls=false` | Using external EventStoreDB |
+| `MONGO_URI` | `mongodb://mongo:27017/?replicaSet=rs0` | Using external MongoDB (must be replica set) |
+| `TEMPORAL_ADDRESS` | `temporal:7233` | Using Temporal Cloud |
+| `QDRANT_URL` | `http://qdrant:6333` | Using Qdrant Cloud |
+| `KAFKA_BOOTSTRAP_SERVERS` | `kafka:9092` | Using external Kafka/Confluent |
+| `EMBEDDING_DEVICE` | `cpu` | Set `cuda` for GPU nodes |
+
+#### Authentication (Sentinel)
+
+DocuStore uses [Sentinel](https://github.com/sidxz/identity-service) for authorization. The backend validates tokens, the frontend redirects users to the IdP via Sentinel.
+
+```env
+# Backend — validates authorization tokens with Sentinel
+SENTINEL_URL=https://sentinel.example.com
+SENTINEL_SERVICE_KEY=sk_...          # Generate in Sentinel admin panel (/admin/service-apps)
+SENTINEL_SERVICE_NAME=docu-store
+SENTINEL_IDP_JWKS_URL=https://www.googleapis.com/oauth2/v3/certs
+
+# Frontend — tells the browser where to redirect for login
+APP_SENTINEL_URL=https://sentinel.example.com
+APP_GOOGLE_CLIENT_ID=185792...       # OAuth client ID from Google Console
+APP_GITHUB_CLIENT_ID=Iv1_...         # OAuth app from GitHub Settings
+# APP_ENTRA_ID_CLIENT_ID=            # Azure AD (optional)
+```
+
+The backend `SENTINEL_URL` and frontend `APP_SENTINEL_URL` usually point to the same Sentinel instance. The difference: backend reads it as a server-side env var, frontend reads it at runtime via `/api/config`.
+
+#### Frontend ↔ Backend connection
+
+The frontend needs to know where the API lives. Set `APP_API_URL` to the backend's public URL:
+
+```env
+# Frontend runtime config (read by /api/config, not baked at build time)
+APP_API_URL=https://api.example.com        # Backend API URL (public, reachable from browser)
+APP_URL=https://app.example.com            # Frontend's own URL (for OAuth redirects)
+APP_SENTINEL_URL=https://sentinel.example.com
+APP_GOOGLE_CLIENT_ID=...
+APP_GITHUB_CLIENT_ID=...
+```
+
+In Docker Compose, both the `api` and `web` services read from the same `.env.prod` file. The backend ignores `APP_*` vars, the frontend ignores `SENTINEL_SERVICE_KEY`, etc.
+
+#### LLM Provider
+
+```env
+LLM_PROVIDER=ollama                        # ollama | openai | gemini
+LLM_MODEL_NAME=gemma3:27b
+LLM_BASE_URL=http://ollama:11434           # Ollama service URL (internal Docker DNS)
+# LLM_API_KEY=sk-...                       # Required for openai/gemini, not for ollama
+```
+
+For chat (interactive), you can override with separate settings:
+```env
+CHAT_LLM_PROVIDER=openai                   # Use a different model for chat
+CHAT_LLM_MODEL_NAME=gpt-4o
+CHAT_LLM_API_KEY=sk-...
+```
+
+#### Observability (optional)
+
+```env
+# Langfuse — LLM tracing and prompt management
+PROMPT_REPOSITORY_TYPE=langfuse            # or "yaml" to use local prompts
+LANGFUSE_HOST=http://langfuse-web:3000     # Internal Docker DNS or external URL
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+
+# Umami — web analytics (frontend)
+APP_UMAMI_URL=https://umami.example.com
+APP_UMAMI_WEBSITE_ID=7e5f446f-...
+```
+
+#### Blob Storage
+
+```env
+# Local filesystem (default — mount a volume for persistence)
+BLOB_BASE_URL=file:///data/blobs
+
+# S3-compatible (for production)
+BLOB_BASE_URL=s3://your-bucket/docu-store
+```
+
+#### Full reference
+
+See `.env.prod.example` for every available variable with documentation and generation hints.
 
 ## CI/CD
 
