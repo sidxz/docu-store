@@ -20,7 +20,6 @@ class TestArtifactType:
 
     def test_artifact_type_values(self) -> None:
         """Test that ArtifactType has expected values."""
-        assert ArtifactType.GENERIC_PRESENTATION == "GENERIC_PRESENTATION"
         assert ArtifactType.SCIENTIFIC_PRESENTATION == "SCIENTIFIC_PRESENTATION"
         assert ArtifactType.RESEARCH_ARTICLE == "RESEARCH_ARTICLE"
         assert ArtifactType.SCIENTIFIC_DOCUMENT == "SCIENTIFIC_DOCUMENT"
