@@ -1,2 +1,2 @@
-export { apiClient } from "./client";
+export { apiClient, setApiBaseUrl } from "./client";
 export type { paths, components } from "./schema";
