@@ -1,94 +1,193 @@
-# DAIKON DOCU STORE
+# DocuStore
 
-A human-first document intelligence store for drug discovery, built to keep scientific work explainable, searchable, and ready for the next breakthrough.
+Document intelligence for drug discovery. Event-sourced, AI-enriched, built to keep scientific work explainable, searchable, and ready for the next breakthrough.
 
-## Status
+[![CI](https://github.com/sidxz/docu-store/actions/workflows/tests.yml/badge.svg)](https://github.com/sidxz/docu-store/actions/workflows/tests.yml)
+[![Python 3.12+](https://img.shields.io/badge/Python-3.12+-3776ab?logo=python&logoColor=white)](https://www.python.org/)
+[![Next.js 16](https://img.shields.io/badge/Next.js-16-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
 
-[![Tests](https://github.com/sidxz/docu-store/actions/workflows/tests.yml/badge.svg)](https://github.com/sidxz/docu-store/actions/workflows/tests.yml)
-[![Python](https://img.shields.io/badge/Python-3.11+-3776ab?logo=python&logoColor=white)](https://www.python.org/)
-[![Event Sourcing](https://img.shields.io/badge/Event%20Sourcing-Yes-brightgreen)](https://martinfowler.com/eaaDev/EventSourcing.html)
-[![CQRS](https://img.shields.io/badge/CQRS-Yes-brightgreen)](https://martinfowler.com/bliki/CQRS.html)
-[![Kafka](https://img.shields.io/badge/Kafka-Streaming-000000?logo=apache-kafka&logoColor=white)](https://kafka.apache.org/)
-[![MongoDB](https://img.shields.io/badge/MongoDB-ReadModels-13aa52?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
-[![Docker](https://img.shields.io/badge/Docker-Compose-2496ed?logo=docker&logoColor=white)](https://www.docker.com/)
-[![Temporal](https://img.shields.io/badge/Temporal-Workflows-000000?logo=temporal&logoColor=white)](https://temporal.io/)
+## Architecture
 
-## Why it exists
-
-Drug discovery generates a river of documents: experimental protocols, assay results, regulatory artifacts, and research narratives. Docu Store exists to keep that river navigable. We want a system where every update is traceable, every decision is defensible, and every insight is easy to rediscover.
-
-## Capabilities
-
-- **Event-sourced core** for durable provenance and rollback analysis.
-- **CQRS read models** tuned for search, dashboards, and review flows.
-- **Streaming integration** via Kafka to connect lab systems and pipelines.
-- **API-first architecture** built on FastAPI.
-- **AI-powered enrichment (in progress)**: OCR extraction of SMILES from images and PDFs, document embeddings across formats, and a vector database for semantic retrieval.
-
-## Architecture at a glance
-
-```mermaid
-flowchart LR
-    UI[Client / Integrations] --> API[FastAPI Command API]
-    API -->|Commands| ES[(Event Store)]
-    ES -->|Events| Kafka[Kafka Topics]
-    Kafka --> Proj[Projection Workers]
-    Proj --> RM[(MongoDB Read Models)]
-    RM --> QAPI[FastAPI Query API]
-    QAPI --> UI
+```
+                                    +------------------+
+                                    |   Next.js 16     |
+                                    |   Portal (web)   |
+                                    +--------+---------+
+                                             |
++----------------+    +---------+    +-------v--------+    +----------------+
+| EventStoreDB   |<-->| FastAPI |<-->|   MongoDB      |    | Qdrant         |
+| (event store)  |    | (API)   |    | (read models)  |    | (vectors)      |
++-------+--------+    +----+----+    +----------------+    +-------+--------+
+        |                  |                                       |
+        v                  v                                       |
++-------+--------+  +-----+------+                                |
+| Read Worker    |  | Pipeline   |     +------------------+       |
+| (projections)  |  | Worker     +---->| Temporal         +-------+
++----------------+  | (triggers) |     | CPU/LLM Workers  |
+                    +-----+------+     +------------------+
+                          |
+                    +-----v------+
+                    | Kafka      |
+                    | (plugins)  |
+                    +------------+
 ```
 
-## Event lifecycle
+**Backend** (`services/`): Python, FastAPI, event sourcing (EventStoreDB), CQRS (MongoDB), Temporal workflows, Qdrant vector search, Kafka event streaming.
 
-```mermaid
-sequenceDiagram
-    participant U as Scientist
-    participant C as Command API
-    participant E as Event Store
-    participant K as Kafka
-    participant P as Projector
-    participant M as Read Models
+**Frontend** (`web/`): Next.js 16, PrimeReact, TanStack Query, pnpm monorepo.
 
-    U->>C: Submit Document Update
-    C->>E: Append Events
-    E-->>K: Publish Events
-    K-->>P: Stream Events
-    P->>M: Update Projections
-    M-->>U: Consistent Query Results
+**6 backend processes** from a single image:
+
+| Process | Purpose |
+|---------|---------|
+| API | FastAPI server (port 8000) |
+| Read Worker | Event projections to MongoDB |
+| Pipeline Worker | Event-driven workflow triggers |
+| Temporal Worker | Embeddings, compound extraction (CPU-bound) |
+| LLM Worker | Summarization, NER, metadata extraction |
+| Plugin Consumer | Kafka-to-Temporal plugin bridge |
+
+## Quick Start (Development)
+
+**Prerequisites**: Docker, Python 3.12+, uv, Node.js 22+, pnpm
+
+```bash
+# 1. Start infrastructure (Mongo, EventStoreDB, Kafka, Temporal, Qdrant, Langfuse, Umami)
+cd services
+make docker-up
+
+# 2. Install backend dependencies
+make dev-install
+
+# 3. Start all backend services
+make run-all
+
+# 4. Start frontend (separate terminal)
+cd web
+pnpm install
+pnpm dev
 ```
 
-## Intelligence roadmap
+**Services**:
+- API: http://localhost:8000
+- Portal: http://localhost:15000
+- EventStoreDB UI: http://localhost:2113
+- Temporal UI: http://localhost:8233
+- Kafka UI: http://localhost:5051
+- Qdrant: http://localhost:6333/dashboard
+- Langfuse: http://localhost:3000
+- Umami: http://localhost:3001
 
-Docu Store is in active development. The vision is to pair trustworthy data lineage with modern retrieval so scientists can move from “where is that file?” to “what does it imply?” in seconds.
+## Docker Images
 
-```mermaid
-flowchart TD
-    Raw[Images / PDFs / Lab Docs] --> OCR[OCR + SMILES Extraction]
-    Raw --> Parser[Structured Parsers]
-    OCR --> Embed[Embedding Pipeline]
-    Parser --> Embed
-    Embed --> VectorDB[(Vector Database)]
-    VectorDB --> Search[Semantic Search + Reranking]
-    Search --> UI[Discovery UI / API]
+Both images are universal (config via environment variables at runtime).
+
+| Image | Registry |
+|-------|----------|
+| `ghcr.io/sidxz/docu-store` | Backend (all 6 processes) |
+| `ghcr.io/sidxz/docu-store-web` | Frontend (Next.js standalone) |
+
+### Build locally
+
+```bash
+cd services && make docker-build      # backend
+cd services && make docker-build-web  # frontend
 ```
 
-## What makes it intelligent
+### Publish (via GitHub Actions)
 
-- **Context-aware history**: every document state is derived, not overwritten.
-- **Separation of concerns**: write paths stay correct, read paths stay fast.
-- **Composable signals**: events and embeddings become reusable blocks for analytics.
-- **Search that feels human**: semantic retrieval that understands chemistry artifacts and experimental context.
-- **Operational clarity**: streaming pipelines are explicit, observable, testable.
+Tag pushes trigger image builds:
 
-## Next steps
+```bash
+git tag services-v0.2.0 && git push origin services-v0.2.0  # backend
+git tag web-v0.2.0 && git push origin web-v0.2.0            # frontend
+```
 
-- Skim `TESTING_QUICK_REFERENCE.md` for a fast local setup.
-- Review `WORKER_SETUP.md` for projector and worker configuration.
+## Deployment
 
-## Features
+### Docker Compose (standalone)
 
-- Event sourcing architecture
-- CQRS pattern for read/write separation
-- Kafka for event streaming
-- MongoDB for read models
-- FastAPI for REST API
+Everything needed to run DocuStore in two compose files:
+
+```bash
+# 1. Copy and fill in secrets
+cp .env.prod.example .env.prod
+
+# 2. Start infrastructure
+docker compose -f docker-compose.infra.yml up -d
+
+# 3. Start application
+docker compose -f docker-compose.prod.yml up -d
+```
+
+### Docker Swarm
+
+```bash
+# 1. Create the overlay network
+docker network create -d overlay docu-store
+
+# 2. Deploy infrastructure
+docker stack deploy -c docker-compose.infra.yml docu-store-infra
+
+# 3. Deploy application
+docker stack deploy -c docker-compose.prod.yml docu-store
+```
+
+### Configuration
+
+All configuration is via environment variables. See `.env.prod.example` for the full reference.
+
+**Backend**: reads env vars via pydantic-settings (`services/infrastructure/config.py`).
+
+**Frontend**: reads `APP_*` env vars at runtime via `/api/config` endpoint (not baked at build time). For local dev, `NEXT_PUBLIC_*` vars in `.env.local` are used as fallback.
+
+| Variable | Purpose |
+|----------|---------|
+| `EVENTSTOREDB_URI` | EventStoreDB connection |
+| `MONGO_URI` | MongoDB connection (requires replica set) |
+| `TEMPORAL_ADDRESS` | Temporal server address |
+| `QDRANT_URL` | Qdrant vector DB URL |
+| `KAFKA_BOOTSTRAP_SERVERS` | Kafka broker address |
+| `SENTINEL_URL` | Sentinel auth service URL |
+| `SENTINEL_SERVICE_KEY` | Sentinel service API key |
+| `LLM_PROVIDER` | LLM backend: `ollama`, `openai`, `gemini` |
+| `EMBEDDING_DEVICE` | `cpu`, `cuda`, or `mps` |
+| `APP_API_URL` | Frontend: API base URL (runtime) |
+| `APP_SENTINEL_URL` | Frontend: Sentinel URL (runtime) |
+
+## CI/CD
+
+| Workflow | Trigger | What it does |
+|----------|---------|-------------|
+| `tests.yml` | Push/PR to `main` | Lint (ruff), tests (pytest), Trivy container scan |
+| `publish-services.yml` | `services-v*` tag | Build + push backend to GHCR |
+| `publish-web.yml` | `web-v*` tag | Build + push frontend to GHCR |
+
+All workflows use GitHub Actions Docker layer caching for fast rebuilds.
+
+## Project Structure
+
+```
+docu-store/
+├── services/                    # Backend (Python)
+│   ├── domain/                  #   DDD aggregates, value objects
+│   ├── application/             #   Use cases, DTOs, ports
+│   ├── infrastructure/          #   Adapters, workers, Temporal, vector stores
+│   ├── interfaces/api/          #   FastAPI routes
+│   ├── tests/                   #   Unit + integration tests
+│   ├── Dockerfile               #   Backend image
+│   └── docker-compose.yml       #   Dev infrastructure
+├── web/                         # Frontend (Next.js 16, pnpm monorepo)
+│   ├── apps/portal/             #   Main web application
+│   ├── packages/                #   Shared: api-client, types, ui, tsconfig
+│   └── Dockerfile               #   Frontend image
+├── docker-compose.infra.yml     # Production infrastructure
+├── docker-compose.prod.yml      # Production application
+└── .env.prod.example            # Production config template
+```
+
+## Further Reading
+
+- `services/design_docs/TESTING_QUICK_REFERENCE.md` — local test setup
+- `services/design_docs/WORKER_SETUP.md` — worker configuration
+- `services/design_docs/SUMMARY_EMBEDDINGS_AND_SEARCH.md` — search architecture
