@@ -31,7 +31,7 @@ RUN pnpm --filter portal build
 # ── Stage 2: Runtime ──────────────────────────────────────────
 FROM node:22-alpine
 
-RUN adduser -D -u 1000 nextjs
+RUN adduser -D -u 1001 nextjs
 
 WORKDIR /app
 
