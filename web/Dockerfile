@@ -21,9 +21,12 @@ COPY packages/types/package.json packages/types/package.json
 COPY packages/ui/package.json packages/ui/package.json
 COPY packages/tsconfig/package.json packages/tsconfig/package.json
 
+# Postinstall scripts needed during pnpm install (copy WASM + themes)
+COPY apps/portal/scripts/ apps/portal/scripts/
+
 RUN pnpm install --frozen-lockfile
 
-# Source code (postinstall already copied RDKit WASM + PrimeReact themes)
+# Source code
 COPY . .
 
 RUN pnpm --filter portal build
