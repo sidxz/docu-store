@@ -10,13 +10,16 @@
 
 FROM python:3.12-slim
 
-# System deps: librdkafka for confluent-kafka, poppler for pdf2image, wget for healthcheck
+# System deps: librdkafka for confluent-kafka, poppler for pdf2image, wget for healthcheck,
+# libgl1-mesa-glx + libglib2.0-0 for opencv (required by DECIMER/OCSR)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       build-essential \
       librdkafka-dev \
       poppler-utils \
       wget \
+      libgl1-mesa-glx \
+      libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
