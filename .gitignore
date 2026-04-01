@@ -31,6 +31,7 @@ htmlcov/
 # Package managers
 node_modules/
 package-lock.json
+!cli/package-lock.json
 yarn.lock
 
 # Next.js
