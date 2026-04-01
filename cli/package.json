@@ -1,6 +1,6 @@
 {
   "name": "@docu-store/cli",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "CLI client for docu-store — upload, search, chat with documents",
   "license": "MIT",
   "type": "module",
