@@ -10,13 +10,48 @@ import { statusCommand } from "./commands/status.js";
 import { summaryCommand } from "./commands/summary.js";
 import { exportCommand } from "./commands/export.js";
 import { deleteCommand } from "./commands/delete.js";
+import {
+  chatCommand,
+  chatListCommand,
+  chatShowCommand,
+  chatDeleteCommand,
+} from "./commands/chat.js";
+import { dashboardCommand } from "./commands/dashboard.js";
+import {
+  tagsPopularCommand,
+  tagsSuggestCommand,
+  tagsCategoriesCommand,
+} from "./commands/tags.js";
+import { compoundsSearchCommand } from "./commands/compounds.js";
+import {
+  adminWorkflowsCommand,
+  adminPipelineCommand,
+  adminVectorsCommand,
+  adminTokensCommand,
+} from "./commands/admin.js";
+import { reprocessCommand } from "./commands/reprocess.js";
+
+declare const __CLI_VERSION__: string;
 
 const program = new Command();
 
 program
   .name("docu")
   .description("CLI client for docu-store — manage and search documents")
-  .version("0.1.0");
+  .version(__CLI_VERSION__)
+  .addHelpText("after", `
+Examples:
+  $ docu login                              Authenticate via OAuth
+  $ docu upload ./papers --recursive        Upload a directory of PDFs
+  $ docu search "kinase inhibitor"          Semantic search
+  $ docu chat "What compounds target EGFR?" One-shot RAG chat
+  $ docu chat -i                            Interactive chat REPL
+  $ docu compounds search "CC(=O)Oc1ccccc1C(=O)O"
+  $ docu dashboard                          Workspace overview
+  $ docu status                             Processing status
+
+Run docu <command> --help for details on any command.
+`);
 
 // ── Login ──────────────────────────────────────────────────────────
 
@@ -138,5 +173,146 @@ program
   .option("-f, --force", "Skip confirmation prompt")
   .option("--api-url <url>", "Override API URL")
   .action(deleteCommand);
+
+// ── Chat ──────────────────────────────────────────────────────────
+
+const chatCmd = program
+  .command("chat [message]")
+  .description("Chat with your documents (RAG)")
+  .option("-i, --interactive", "Interactive REPL mode")
+  .option("--mode <mode>", "Pipeline mode (quick, thinking, deep_thinking)")
+  .option("--json", "Output as JSON")
+  .option("--api-url <url>", "Override API URL")
+  .addHelpText("after", `
+Examples:
+  $ docu chat "What is the mechanism of action of aspirin?"
+  $ docu chat -i                            Interactive REPL
+  $ docu chat -i --mode thinking            Use thinking mode
+  $ docu chat list                          List conversations
+  $ docu chat show <id>                     Show conversation
+`)
+  .action(chatCommand);
+
+chatCmd
+  .command("list")
+  .description("List past conversations")
+  .option("-l, --limit <n>", "Number of conversations", "20")
+  .option("--json", "Output as JSON")
+  .option("--api-url <url>", "Override API URL")
+  .action(chatListCommand);
+
+chatCmd
+  .command("show <conversation-id>")
+  .description("Show conversation with messages")
+  .option("--json", "Output as JSON")
+  .option("--api-url <url>", "Override API URL")
+  .action(chatShowCommand);
+
+chatCmd
+  .command("delete <conversation-id>")
+  .description("Delete a conversation")
+  .option("-f, --force", "Skip confirmation prompt")
+  .option("--api-url <url>", "Override API URL")
+  .action(chatDeleteCommand);
+
+// ── Dashboard ─────────────────────────────────────────────────────
+
+program
+  .command("dashboard")
+  .description("Show workspace statistics")
+  .option("--json", "Output as JSON")
+  .option("--api-url <url>", "Override API URL")
+  .action(dashboardCommand);
+
+// ── Tags ──────────────────────────────────────────────────────────
+
+const tagsCmd = program
+  .command("tags")
+  .description("Browse tags and categories");
+
+tagsCmd
+  .command("popular")
+  .description("Show most popular tags")
+  .option("-l, --limit <n>", "Number of tags", "10")
+  .option("--json", "Output as JSON")
+  .option("--api-url <url>", "Override API URL")
+  .action(tagsPopularCommand);
+
+tagsCmd
+  .command("suggest <query>")
+  .description("Autocomplete tag suggestions")
+  .option("-l, --limit <n>", "Number of suggestions", "10")
+  .option("--json", "Output as JSON")
+  .option("--api-url <url>", "Override API URL")
+  .action(tagsSuggestCommand);
+
+tagsCmd
+  .command("categories")
+  .description("List tag categories with counts")
+  .option("--json", "Output as JSON")
+  .option("--api-url <url>", "Override API URL")
+  .action(tagsCategoriesCommand);
+
+// ── Compounds ─────────────────────────────────────────────────────
+
+const compoundsCmd = program
+  .command("compounds")
+  .description("Compound structure search");
+
+compoundsCmd
+  .command("search <smiles>")
+  .description("Search by SMILES structural similarity")
+  .option("-l, --limit <n>", "Max results", "10")
+  .option("--threshold <score>", "Min similarity score (0-1)", "0.7")
+  .option("--json", "Output as JSON")
+  .option("--api-url <url>", "Override API URL")
+  .action(compoundsSearchCommand);
+
+// ── Admin ─────────────────────────────────────────────────────────
+
+const adminCmd = program
+  .command("admin")
+  .description("Admin statistics (requires admin access)");
+
+adminCmd
+  .command("workflows")
+  .description("Show Temporal workflow statistics")
+  .option("--json", "Output as JSON")
+  .option("--api-url <url>", "Override API URL")
+  .action(adminWorkflowsCommand);
+
+adminCmd
+  .command("pipeline")
+  .description("Show document pipeline statistics")
+  .option("--json", "Output as JSON")
+  .option("--api-url <url>", "Override API URL")
+  .action(adminPipelineCommand);
+
+adminCmd
+  .command("vectors")
+  .description("Show vector store statistics")
+  .option("--json", "Output as JSON")
+  .option("--api-url <url>", "Override API URL")
+  .action(adminVectorsCommand);
+
+adminCmd
+  .command("tokens")
+  .description("Show token usage statistics")
+  .option("--period <period>", "Aggregation period (day, week, month)", "week")
+  .option("--json", "Output as JSON")
+  .option("--api-url <url>", "Override API URL")
+  .action(adminTokensCommand);
+
+// ── Reprocess ─────────────────────────────────────────────────────
+
+program
+  .command("reprocess <filename>")
+  .description("Re-trigger document processing workflows")
+  .option("--id <artifact-id>", "Look up by artifact ID instead of filename")
+  .option("--summarize", "Trigger summarization only")
+  .option("--metadata", "Trigger metadata extraction only")
+  .option("--all", "Trigger all workflows")
+  .option("--api-url <url>", "Override API URL")
+  .action(reprocessCommand);
 
 program.parse();

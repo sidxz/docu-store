@@ -1,7 +1,8 @@
 {
   "name": "@docu-store/cli",
-  "version": "0.1.0",
-  "description": "CLI client for docu-store — login and upload documents",
+  "version": "0.2.0",
+  "description": "CLI client for docu-store — upload, search, chat with documents",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "docu": "./bin/docu.mjs"
@@ -13,9 +14,29 @@
   "engines": {
     "node": ">=18.0.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sidxz/docu-store",
+    "directory": "cli"
+  },
+  "homepage": "https://github.com/sidxz/docu-store/tree/main/cli#readme",
+  "bugs": {
+    "url": "https://github.com/sidxz/docu-store/issues"
+  },
+  "keywords": [
+    "cli",
+    "document-store",
+    "search",
+    "rag",
+    "scientific-documents"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
-    "dev": "tsup --watch"
+    "dev": "tsup --watch",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "commander": "^13.0.0",
