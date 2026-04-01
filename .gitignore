@@ -37,8 +37,15 @@ yarn.lock
 .next/
 out/
 
+# TypeScript build info
+*.tsbuildinfo
+
 # Turbopack
 .turbo/
+
+# Superpowers plugin
+.superpowers/
+docs/superpowers/
 
 # Playwright
 test-results/
