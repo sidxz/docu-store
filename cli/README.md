@@ -1,13 +1,15 @@
 # docu-store CLI
 
-Command-line client for docu-store. Upload, search, and manage documents — no service keys required.
+Command-line client for docu-store. Upload, search, chat, and manage documents — no service keys required.
 
 ## Quick Start
 
 ```bash
-# Install
-cd cli && npm install && npm run build
-npm link  # makes `docu` available globally
+# Install from npm
+npm install -g @docu-store/cli
+
+# Or install from source
+cd cli && npm install && npm run build && npm link
 
 # Configure
 docu config set sentinel-url https://sentinel.example.com
@@ -20,7 +22,9 @@ docu login --provider github
 docu upload ./papers --recursive
 docu status
 docu search "kinase inhibitor"
+docu chat "What compounds target EGFR?"
 docu summary paper.pdf
+docu dashboard
 ```
 
 ## Installation
@@ -28,13 +32,17 @@ docu summary paper.pdf
 Requires **Node.js 18+**.
 
 ```bash
+# From npm (recommended)
+npm install -g @docu-store/cli
+
+# From source
 cd cli
 npm install
 npm run build
 npm link
 ```
 
-After `npm link`, the `docu` command is available globally. To uninstall: `npm unlink -g @docu-store/cli`.
+After install, the `docu` command is available globally. To uninstall: `npm uninstall -g @docu-store/cli`.
 
 ## Commands
 
@@ -179,6 +187,93 @@ Delete a document (with confirmation prompt).
 docu delete paper.pdf                   # Prompts for confirmation
 docu rm paper.pdf -f                    # Skip confirmation
 docu delete --id abc-123-def            # By artifact ID
+```
+
+### `docu chat`
+
+Chat with your documents using RAG (Retrieval-Augmented Generation).
+
+```bash
+docu chat "What is the mechanism of action of aspirin?"  # One-shot question
+docu chat -i                               # Interactive REPL mode
+docu chat -i --mode thinking               # Use thinking pipeline mode
+docu chat "kinase inhibitors" --json       # JSON output
+```
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-i, --interactive` | Interactive REPL mode | off |
+| `--mode` | Pipeline mode (`quick`, `thinking`, `deep_thinking`) | server default |
+| `--json` | Output as JSON | off |
+
+**Subcommands:**
+
+```bash
+docu chat list                              # List past conversations
+docu chat show <conversation-id>            # Show conversation with messages
+docu chat delete <conversation-id>          # Delete conversation
+```
+
+In interactive mode, type `/quit` or `/exit` to end the session, or press Ctrl+C.
+
+### `docu compounds search`
+
+Search by chemical structure similarity using SMILES strings.
+
+```bash
+docu compounds search "CC(=O)Oc1ccccc1C(=O)O"          # Aspirin
+docu compounds search "c1ccc2[nH]ccc2c1" --limit 20    # Indole
+docu compounds search "CCO" --threshold 0.5             # Ethanol, lower threshold
+```
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-l, --limit` | Max results | `10` |
+| `--threshold` | Min similarity score (0-1) | `0.7` |
+| `--json` | Output as JSON | off |
+
+### `docu dashboard`
+
+Show workspace statistics at a glance.
+
+```bash
+docu dashboard
+docu dashboard --json
+```
+
+### `docu tags`
+
+Browse tags and categories in the document corpus.
+
+```bash
+docu tags popular                           # Most popular tags
+docu tags popular --limit 20               # Show more
+docu tags suggest "kinase"                  # Autocomplete suggestions
+docu tags categories                        # Tag categories with counts
+```
+
+### `docu reprocess`
+
+Re-trigger document processing workflows (summarization, metadata extraction).
+
+```bash
+docu reprocess paper.pdf                    # Trigger all workflows
+docu reprocess paper.pdf --summarize        # Summarization only
+docu reprocess paper.pdf --metadata         # Metadata extraction only
+docu reprocess --id abc-123-def --all       # By artifact ID
+```
+
+### `docu admin`
+
+Admin-only statistics (requires admin access).
+
+```bash
+docu admin workflows                        # Temporal workflow stats
+docu admin pipeline                         # Document pipeline stats
+docu admin vectors                          # Vector store stats
+docu admin tokens                           # Token usage
+docu admin tokens --period month            # Monthly token usage
+docu admin tokens --json                    # JSON output
 ```
 
 ### `docu whoami`
