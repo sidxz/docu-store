@@ -113,7 +113,7 @@ class TestEmbedCompoundSmilesUseCase:
         repo.pages[page.id] = page
 
         use_case = EmbedCompoundSmilesUseCase(
-            repo, MockEmbeddingGenerator(), MockCompoundVectorStore()
+            repo, MockEmbeddingGenerator(), MockCompoundVectorStore(),
         )
         result = await use_case.execute(page.id)
 
@@ -143,7 +143,7 @@ class TestEmbedCompoundSmilesUseCase:
         repo.pages[page.id] = page
 
         use_case = EmbedCompoundSmilesUseCase(
-            repo, MockEmbeddingGenerator(model_name="chemberta"), MockCompoundVectorStore()
+            repo, MockEmbeddingGenerator(model_name="chemberta"), MockCompoundVectorStore(),
         )
         await use_case.execute(page.id)
 
@@ -160,7 +160,7 @@ class TestEmbedCompoundSmilesUseCase:
         repo.pages[page.id] = page
 
         use_case = EmbedCompoundSmilesUseCase(
-            repo, MockEmbeddingGenerator(model_name="chemberta-v2"), MockCompoundVectorStore()
+            repo, MockEmbeddingGenerator(model_name="chemberta-v2"), MockCompoundVectorStore(),
         )
         result = await use_case.execute(page.id)
 
@@ -170,7 +170,7 @@ class TestEmbedCompoundSmilesUseCase:
     @pytest.mark.asyncio
     async def test_fails_when_page_not_found(self) -> None:
         use_case = EmbedCompoundSmilesUseCase(
-            MockPageRepository(), MockEmbeddingGenerator(), MockCompoundVectorStore()
+            MockPageRepository(), MockEmbeddingGenerator(), MockCompoundVectorStore(),
         )
         result = await use_case.execute(uuid4())
 

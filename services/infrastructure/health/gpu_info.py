@@ -7,12 +7,12 @@ Used by both the health checker (API process) and the heartbeat reporter
 from __future__ import annotations
 
 import importlib.metadata
-from pathlib import Path
 import platform
 import socket
 import sys
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 
 import structlog
 
@@ -22,14 +22,12 @@ logger = structlog.get_logger()
 
 
 def _get_app_version() -> str:
-    """Read the version from pyproject.toml (source of truth), falling back to installed metadata."""
-    # pyproject.toml lives at the services/ root, one level above infrastructure/
+    """Read version from pyproject.toml, falling back to installed metadata."""
     pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
     if pyproject.is_file():
         for line in pyproject.read_text().splitlines():
             stripped = line.strip()
             if stripped.startswith("version"):
-                # version = "0.2.1"
                 _, _, value = stripped.partition("=")
                 return value.strip().strip('"').strip("'")
 
@@ -87,7 +85,7 @@ def get_gpu_info() -> GpuInfo:
                         memory_total_mb=round(total / 1024**2),
                         memory_used_mb=round((total - free) / 1024**2),
                         memory_free_mb=round(free / 1024**2),
-                    )
+                    ),
                 )
             except Exception:
                 logger.warning("gpu_info_failed", device_index=i)

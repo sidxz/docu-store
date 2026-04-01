@@ -107,7 +107,7 @@ class TestExtractCompoundMentionsUseCase:
     @pytest.mark.asyncio
     async def test_invalid_smiles_stored_with_flag(self) -> None:
         results = [
-            CserCompoundResult(smiles="invalid-smiles", label_text="X", match_confidence=0.5)
+            CserCompoundResult(smiles="invalid-smiles", label_text="X", match_confidence=0.5),
         ]
         use_case, page, _, _, _ = _make_use_case(cser_results=results, valid=False)
 
@@ -122,7 +122,7 @@ class TestExtractCompoundMentionsUseCase:
     async def test_valid_smiles_gets_canonicalized(self) -> None:
         results = [CserCompoundResult(smiles="c1ccccc1", label_text="Benz", match_confidence=0.9)]
         use_case, page, _, _, _ = _make_use_case(
-            cser_results=results, valid=True, canonical="c1ccccc1"
+            cser_results=results, valid=True, canonical="c1ccccc1",
         )
 
         result = await use_case.execute(page.id)

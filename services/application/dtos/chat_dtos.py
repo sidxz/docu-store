@@ -103,7 +103,7 @@ class QueryContextDTO(BaseModel):
     grounded: bool = False
     smiles_detected: list[str] = Field(default_factory=list)  # canonical SMILES found
     smiles_resolved: list[dict] = Field(
-        default_factory=list
+        default_factory=list,
     )  # [{canonical_smiles, extracted_ids, mode}]
 
 

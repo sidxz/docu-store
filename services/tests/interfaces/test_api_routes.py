@@ -40,7 +40,7 @@ class FakeArtifactReadModel(ArtifactReadModel):
         self._artifacts = artifacts
 
     async def get_artifact_by_id(
-        self, artifact_id: UUID, workspace_id: UUID | None = None
+        self, artifact_id: UUID, workspace_id: UUID | None = None,
     ) -> ArtifactResponse | None:
         return self._artifacts.get(artifact_id)
 
@@ -62,12 +62,12 @@ class FakePageReadModel(PageReadModel):
         self._pages = pages
 
     async def get_page_by_id(
-        self, page_id: UUID, workspace_id: UUID | None = None
+        self, page_id: UUID, workspace_id: UUID | None = None,
     ) -> PageResponse | None:
         return self._pages.get(page_id)
 
     async def get_pages_by_id(
-        self, page_ids: list[UUID], workspace_id: UUID | None = None
+        self, page_ids: list[UUID], workspace_id: UUID | None = None,
     ) -> list[PageResponse]:
         return [self._pages[pid] for pid in page_ids if pid in self._pages]
 
@@ -75,7 +75,7 @@ class FakePageReadModel(PageReadModel):
         return 0
 
     async def get_pages_by_artifact_ids(
-        self, artifact_ids: list[UUID], workspace_id: UUID | None = None
+        self, artifact_ids: list[UUID], workspace_id: UUID | None = None,
     ) -> list[PageResponse]:
         return [p for p in self._pages.values() if p.artifact_id in artifact_ids]
 
@@ -189,7 +189,7 @@ class TestArtifactRoutes:
             {
                 UpdateTitleMentionUseCase: use_case,
                 ArtifactReadModel: read_model,
-            }
+            },
         )
 
         response = client.patch(
@@ -280,7 +280,7 @@ class TestPageRoutes:
             {
                 DeletePageUseCase: use_case,
                 PageReadModel: read_model,
-            }
+            },
         )
 
         response = client.delete(f"/pages/{page_id}")

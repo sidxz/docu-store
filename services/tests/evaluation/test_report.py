@@ -107,7 +107,7 @@ class TestReportGeneration:
         report = self._sample_report()
         # Add significance marker to second config
         report.config_results[1].significance_vs_baseline["precision_at_5"] = SignificanceResult(
-            statistic=-0.3, p_value=0.001, method="paired_bootstrap"
+            statistic=-0.3, p_value=0.001, method="paired_bootstrap",
         )
         latex = format_latex_table(report)
         assert "**" in latex  # p < 0.01 marker
@@ -115,7 +115,7 @@ class TestReportGeneration:
     def test_ablation_table_with_ci(self):
         report = self._sample_report()
         report.config_results[0].confidence_intervals["precision_at_5"] = ConfidenceInterval(
-            mean=0.8, lower=0.75, upper=0.85
+            mean=0.8, lower=0.75, upper=0.85,
         )
         table = generate_ablation_table(report, include_ci=True)
         assert "0.750" in table

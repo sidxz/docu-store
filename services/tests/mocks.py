@@ -183,7 +183,7 @@ class MockVectorStore:
         sparse_embeddings: list | None = None,
     ) -> None:
         self.upsert_chunk_calls.append(
-            {"page_id": page_id, "embeddings": embeddings, "chunk_count": chunk_count}
+            {"page_id": page_id, "embeddings": embeddings, "chunk_count": chunk_count},
         )
 
     async def search_similar_pages(
@@ -201,7 +201,7 @@ class MockVectorStore:
                 "filter": artifact_id_filter,
                 "allowed_artifact_ids": allowed_artifact_ids,
                 "workspace_id": workspace_id,
-            }
+            },
         )
         return self._search_results
 
@@ -224,7 +224,7 @@ class MockVectorStore:
                 "filter": artifact_id_filter,
                 "allowed_artifact_ids": allowed_artifact_ids,
                 "workspace_id": workspace_id,
-            }
+            },
         )
         # Deduplicate by page_id (keep best score) and respect limit
         seen: dict[UUID, PageSearchResult] = {}
@@ -254,7 +254,7 @@ class MockVectorStore:
                 "filter": artifact_id_filter,
                 "allowed_artifact_ids": allowed_artifact_ids,
                 "workspace_id": workspace_id,
-            }
+            },
         )
         return self._search_results
 
@@ -287,7 +287,7 @@ class MockCompoundVectorStore:
         workspace_id: UUID | None = None,
     ) -> None:
         self.upsert_calls.append(
-            {"page_id": page_id, "count": len(embeddings), "workspace_id": workspace_id}
+            {"page_id": page_id, "count": len(embeddings), "workspace_id": workspace_id},
         )
 
     async def delete_compound_embeddings_for_page(self, page_id: UUID) -> None:
@@ -335,7 +335,7 @@ class MockTextChunker:
                     start_char=start,
                     end_char=end,
                     total_chunks=self.num_chunks,
-                )
+                ),
             )
         return chunks
 
@@ -353,7 +353,7 @@ class MockCserService:
         self.extract_calls: list[dict] = []
 
     def extract_compounds_from_pdf_page(
-        self, storage_key: str, page_index: int
+        self, storage_key: str, page_index: int,
     ) -> list[CserCompoundResult]:
         self.extract_calls.append({"storage_key": storage_key, "page_index": page_index})
         return self._results
@@ -530,7 +530,7 @@ class MockPermissionRegistrar:
                 "workspace_id": workspace_id,
                 "owner_id": owner_id,
                 "visibility": visibility,
-            }
+            },
         )
 
 
@@ -552,12 +552,12 @@ class MockWorkflowOrchestrator:
         self.artifact_summary_embedding_calls: list[UUID] = []
 
     async def start_artifact_processing_workflow(
-        self, artifact_id: UUID, storage_location: str
+        self, artifact_id: UUID, storage_location: str,
     ) -> None:
         if self.raise_on_call:
             raise self.raise_on_call
         self.artifact_processing_calls.append(
-            {"artifact_id": artifact_id, "storage_location": storage_location}
+            {"artifact_id": artifact_id, "storage_location": storage_location},
         )
 
     async def start_embedding_workflow(self, page_id: UUID, *, skip_sparse: bool = False) -> None:

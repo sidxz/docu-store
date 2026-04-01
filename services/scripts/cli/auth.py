@@ -112,7 +112,7 @@ class CliAuth:
             )
         except AuthError:
             raise AuthError(
-                "Session expired — your IdP token may have been revoked. Run: docu-store login"
+                "Session expired — your IdP token may have been revoked. Run: docu-store login",
             )
 
         self._creds["authz_token"] = data["authz_token"]

@@ -117,7 +117,7 @@ class TestGeneratePageEmbeddingUseCase:
         repo.pages[page.id] = page
 
         use_case = GeneratePageEmbeddingUseCase(
-            repo, MockEmbeddingGenerator(), MockVectorStore(), MockTextChunker()
+            repo, MockEmbeddingGenerator(), MockVectorStore(), MockTextChunker(),
         )
         result = await use_case.execute(page.id)
 
@@ -127,7 +127,7 @@ class TestGeneratePageEmbeddingUseCase:
     @pytest.mark.asyncio
     async def test_fails_when_page_not_found(self) -> None:
         use_case = GeneratePageEmbeddingUseCase(
-            MockPageRepository(), MockEmbeddingGenerator(), MockVectorStore(), MockTextChunker()
+            MockPageRepository(), MockEmbeddingGenerator(), MockVectorStore(), MockTextChunker(),
         )
         result = await use_case.execute(uuid4())
 
@@ -142,7 +142,7 @@ class TestGeneratePageEmbeddingUseCase:
 
         generator = MockEmbeddingGenerator(raise_on_call=RuntimeError("GPU OOM"))
         use_case = GeneratePageEmbeddingUseCase(
-            repo, generator, MockVectorStore(), MockTextChunker(num_chunks=1)
+            repo, generator, MockVectorStore(), MockTextChunker(num_chunks=1),
         )
         result = await use_case.execute(page.id)
 
@@ -157,7 +157,7 @@ class TestGeneratePageEmbeddingUseCase:
 
         generator = MockEmbeddingGenerator(model_name="my-model", dims=8)
         use_case = GeneratePageEmbeddingUseCase(
-            repo, generator, MockVectorStore(), MockTextChunker(num_chunks=1)
+            repo, generator, MockVectorStore(), MockTextChunker(num_chunks=1),
         )
         result = await use_case.execute(page.id)
 
@@ -190,7 +190,7 @@ class TestSearchSimilarPagesUseCase:
         generator = MockEmbeddingGenerator()
 
         use_case = SearchSimilarPagesUseCase(
-            generator, vector_store, MockPageReadModel(), MockArtifactReadModel()
+            generator, vector_store, MockPageReadModel(), MockArtifactReadModel(),
         )
         request = SearchRequest(query_text="test query", limit=10)
         result = await use_case.execute(request)
@@ -243,7 +243,7 @@ class TestSearchSimilarPagesUseCase:
         )
 
         vector_store = MockVectorStore(
-            search_results=[self._make_search_result(page_id, artifact_id)]
+            search_results=[self._make_search_result(page_id, artifact_id)],
         )
         use_case = SearchSimilarPagesUseCase(
             MockEmbeddingGenerator(),
@@ -284,7 +284,7 @@ class TestSearchSimilarPagesUseCase:
 
         vector_store = MockVectorStore(search_results=results)
         use_case = SearchSimilarPagesUseCase(
-            MockEmbeddingGenerator(), vector_store, MockPageReadModel(), MockArtifactReadModel()
+            MockEmbeddingGenerator(), vector_store, MockPageReadModel(), MockArtifactReadModel(),
         )
         result = await use_case.execute(SearchRequest(query_text="query", limit=3))
 

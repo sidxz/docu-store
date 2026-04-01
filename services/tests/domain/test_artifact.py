@@ -289,7 +289,7 @@ class TestArtifactTagMentions:
         assert sample_artifact.tag_mentions == []
 
     def test_update_tag_mentions_raises_on_deleted_artifact(
-        self, sample_artifact: Artifact
+        self, sample_artifact: Artifact,
     ) -> None:
         """Test that updating tag mentions on deleted artifact raises error."""
         sample_artifact.delete()

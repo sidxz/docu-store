@@ -7,7 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from lagom import Container
 from sentinel_auth import RequestAuth
 
-from application.dtos.health_dtos import BulkReEmbedRequest, BulkWorkflowResponse, DetailedHealthResponse
+from application.dtos.health_dtos import (
+    BulkReEmbedRequest,
+    BulkWorkflowResponse,
+    DetailedHealthResponse,
+)
 from application.use_cases.system_health_use_case import GetSystemHealthUseCase
 from application.workflow_use_cases.trigger_bulk_reembed_use_case import TriggerBulkReEmbedUseCase
 from interfaces.dependencies import get_auth, get_container

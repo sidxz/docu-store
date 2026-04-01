@@ -41,7 +41,7 @@ async def ensure_payload_indexes() -> None:
                 field_schema=models.PayloadSchemaType.KEYWORD,
             )
             logger.info(
-                "payload_index_created", collection=collection, field="artifact_tag_normalized"
+                "payload_index_created", collection=collection, field="artifact_tag_normalized",
             )
     finally:
         await client.close()

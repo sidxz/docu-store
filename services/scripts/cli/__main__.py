@@ -124,11 +124,11 @@ def main() -> None:
     upload_parser.add_argument("--api-url", default="http://localhost:8000", help="API base URL")
     upload_parser.add_argument("--artifact-type", default="RESEARCH_ARTICLE", help="Artifact type")
     upload_parser.add_argument(
-        "--visibility", default="workspace", help="Visibility (workspace/private)"
+        "--visibility", default="workspace", help="Visibility (workspace/private)",
     )
     upload_parser.add_argument("--delay", type=float, default=2.0, help="Seconds between uploads")
     upload_parser.add_argument(
-        "--dry-run", action="store_true", help="List files without uploading"
+        "--dry-run", action="store_true", help="List files without uploading",
     )
     upload_parser.add_argument("--resume", action="store_true", help="Skip already-uploaded files")
     upload_parser.add_argument("--recursive", "-r", action="store_true", help="Scan subdirectories")

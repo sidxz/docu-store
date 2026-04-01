@@ -62,14 +62,14 @@ from infrastructure.temporal.activities.summary_embedding_activities import (
     create_embed_page_summary_activity,
 )
 from infrastructure.temporal.workflows.artifact_processing import ProcessArtifactWorkflow
-from infrastructure.temporal.workflows.batch_reembed_workflow import (
-    BatchReEmbedArtifactPagesWorkflow,
-)
 from infrastructure.temporal.workflows.batch_reembed_smiles_workflow import (
     BatchReEmbedSmilesWorkflow,
 )
 from infrastructure.temporal.workflows.batch_reembed_summaries_workflow import (
     BatchReEmbedSummariesWorkflow,
+)
+from infrastructure.temporal.workflows.batch_reembed_workflow import (
+    BatchReEmbedArtifactPagesWorkflow,
 )
 from infrastructure.temporal.workflows.compound_workflow import ExtractCompoundMentionsWorkflow
 from infrastructure.temporal.workflows.embedding_workflow import GeneratePageEmbeddingWorkflow

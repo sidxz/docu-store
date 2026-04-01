@@ -715,7 +715,7 @@ class SearchCompoundStructureTool:
         ]
         if similar_lines:
             expanded_lines.append(
-                f"\nStructurally similar compounds (≥{threshold * 100:.0f}% similarity):"
+                f"\nStructurally similar compounds (≥{threshold * 100:.0f}% similarity):",
             )
             expanded_lines.extend(similar_lines)
         else:

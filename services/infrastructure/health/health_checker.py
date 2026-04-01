@@ -166,7 +166,7 @@ class InfrastructureHealthChecker:
             members = rs_status.get("members", [])
             details["members"] = len(members)
             details["primary"] = next(
-                (m["name"] for m in members if m.get("stateStr") == "PRIMARY"), None
+                (m["name"] for m in members if m.get("stateStr") == "PRIMARY"), None,
             )
         except Exception:
             details["replica_set"] = "unavailable"

@@ -19,7 +19,7 @@ class TestClassifyFailures:
                     "recall_at_20": 0.9,
                     "precision_at_5": 0.5,
                 },
-            }
+            },
         ]
         failures = classify_failures(results, "test_config")
         types = {f.failure_type for f in failures}
@@ -30,7 +30,7 @@ class TestClassifyFailures:
             {
                 "query_id": "q1",
                 "metrics": {"answer_correctness": 1.0, "recall_at_20": 0.9, "precision_at_5": 0.5},
-            }
+            },
         ]
         failures = classify_failures(results, "test_config")
         types = {f.failure_type for f in failures}
@@ -48,7 +48,7 @@ class TestClassifyFailures:
                     "citation_coverage": 0.9,
                     "precision_at_5": 0.8,
                 },
-            }
+            },
         ]
         failures = classify_failures(results, "test_config")
         assert len(failures) == 0

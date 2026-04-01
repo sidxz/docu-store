@@ -120,7 +120,7 @@ class TestDetectSmiles:
         assert len(result) == 1
 
     def test_detects_smiles_with_4_plus_carbons_no_structural_features(
-        self, validator: _StubValidator
+        self, validator: _StubValidator,
     ) -> None:
         """CCCC has 4 carbons — Papadatos heuristic should pass it."""
         text = "Is CCCC present in our data?"

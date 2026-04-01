@@ -309,7 +309,7 @@ class TestTagMentionAggregator:
             [
                 _page_data(page1_tags, 0),
                 _page_data(page2_tags, 1),
-            ]
+            ],
         )
 
         assert len(result) == 1
@@ -333,7 +333,7 @@ class TestTagMentionAggregator:
             [
                 (pid1, 0, page1_tags),
                 (pid2, 2, page2_tags),
-            ]
+            ],
         )
 
         assert len(result) == 1
@@ -355,10 +355,10 @@ class TestTagMentionAggregator:
                 {
                     "entity_type": "compound_name",
                     "bioactivities": [
-                        {"assay_type": "IC50", "value": "5", "unit": "nM", "raw_text": "IC50 5nM"}
+                        {"assay_type": "IC50", "value": "5", "unit": "nM", "raw_text": "IC50 5nM"},
                     ],
                 },
-            )
+            ),
         ]
         page2_tags = [
             _tm(
@@ -372,16 +372,16 @@ class TestTagMentionAggregator:
                             "value": "2",
                             "unit": "µg/mL",
                             "raw_text": "MIC 2µg/mL",
-                        }
+                        },
                     ],
                 },
-            )
+            ),
         ]
         result = aggregate_tag_mentions(
             [
                 _page_data(page1_tags, 0),
                 _page_data(page2_tags, 1),
-            ]
+            ],
         )
 
         assert len(result) == 1
@@ -401,7 +401,7 @@ class TestTagMentionAggregator:
                     "entity_type": "compound_name",
                     "bioactivities": [bio],
                 },
-            )
+            ),
         ]
         page2_tags = [
             _tm(
@@ -411,13 +411,13 @@ class TestTagMentionAggregator:
                     "entity_type": "compound_name",
                     "bioactivities": [bio],
                 },
-            )
+            ),
         ]
         result = aggregate_tag_mentions(
             [
                 _page_data(page1_tags, 0),
                 _page_data(page2_tags, 1),
-            ]
+            ],
         )
 
         activities = result[0].additional_model_params["bioactivities"]
@@ -431,7 +431,7 @@ class TestTagMentionAggregator:
             [
                 _page_data(page1_tags, 0),
                 _page_data(page2_tags, 1),
-            ]
+            ],
         )
 
         assert len(result) == 1
@@ -451,7 +451,7 @@ class TestTagMentionAggregator:
                 [
                     _page_data([], 0),
                     _page_data([], 1),
-                ]
+                ],
             )
             == []
         )
@@ -466,7 +466,7 @@ class TestTagMentionAggregator:
                     "entity_type": "compound_name",
                     "synonyms": "ASA",
                 },
-            )
+            ),
         ]
         page2_tags = [
             _tm(
@@ -476,13 +476,13 @@ class TestTagMentionAggregator:
                     "entity_type": "compound_name",
                     "synonyms": "acetylsalicylic acid",
                 },
-            )
+            ),
         ]
         result = aggregate_tag_mentions(
             [
                 _page_data(page1_tags, 0),
                 _page_data(page2_tags, 1),
-            ]
+            ],
         )
 
         synonyms = result[0].additional_model_params["synonyms"]

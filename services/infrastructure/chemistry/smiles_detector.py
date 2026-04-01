@@ -50,7 +50,7 @@ _CHEMISTRY_KEYWORDS = frozenset(
         "formula",
         "chemical",
         "chemistry",
-    }
+    },
 )
 
 # Keywords that signal "find similar compounds" rather than exact lookup
@@ -67,7 +67,7 @@ _SIMILAR_KEYWORDS = frozenset(
         "scaffold",
         "sar",
         "structure-activity",
-    }
+    },
 )
 
 # Tokenisation delimiters — split on whitespace + punctuation that is NOT
@@ -144,7 +144,7 @@ def detect_smiles(
 
         # Must have structural features OR ≥ 4 carbons (Papadatos heuristic)
         has_structure = bool(
-            _STRUCTURAL_FEATURE_RE.search(cleaned) or _RING_DIGIT_RE.search(cleaned)
+            _STRUCTURAL_FEATURE_RE.search(cleaned) or _RING_DIGIT_RE.search(cleaned),
         )
 
         # Length gate — Papadatos candidates (4+ carbons) bypass the min-length check

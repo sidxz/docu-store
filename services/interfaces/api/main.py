@@ -157,14 +157,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             async def _check_reranker() -> ModelStatus:
                 if not settings.reranker_enabled or _hb_reranker is None:
                     return ModelStatus(
-                        name="Reranker", loaded=False, device="none", model_name="disabled"
+                        name="Reranker", loaded=False, device="none", model_name="disabled",
                     )
                 return ModelStatus(
                     name="Reranker",
                     loaded=getattr(_hb_reranker, "_model", None) is not None,
                     device=str(getattr(_hb_reranker, "device", settings.reranker_device)),
                     model_name=str(
-                        getattr(_hb_reranker, "model_name", settings.reranker_model_name)
+                        getattr(_hb_reranker, "model_name", settings.reranker_model_name),
                     ),
                     inference_ok=True,
                 )

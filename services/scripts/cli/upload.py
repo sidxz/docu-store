@@ -112,7 +112,7 @@ def upload_directory(
             pages = result.get("pages", [])
             page_count = len(pages) if isinstance(pages, list) else "?"
             print(
-                f"  [{i}/{len(pdf_files)}] OK {pdf_path.name} -> {artifact_id} ({page_count} pages, {elapsed:.1f}s)"
+                f"  [{i}/{len(pdf_files)}] OK {pdf_path.name} -> {artifact_id} ({page_count} pages, {elapsed:.1f}s)",
             )
             succeeded += 1
         except Exception as e:

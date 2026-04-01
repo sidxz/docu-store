@@ -345,16 +345,16 @@ class AgenticRetrievalNode:
                     names = ", ".join(compound.extracted_ids)
                     briefing_lines.append(
                         f"- SMILES `{compound.canonical_smiles}` = compound **{names}**. "
-                        f"Search using '{compound.extracted_ids[0]}', NOT the raw SMILES."
+                        f"Search using '{compound.extracted_ids[0]}', NOT the raw SMILES.",
                     )
             if plan.smiles_context.unresolved:
                 briefing_lines.append(
                     f"- Unresolved SMILES (no match in database): "
-                    f"{', '.join(plan.smiles_context.unresolved)}"
+                    f"{', '.join(plan.smiles_context.unresolved)}",
                 )
             briefing_lines.append(
                 "\nIMPORTANT: Always search using compound names/IDs, never raw SMILES strings. "
-                "SMILES notation is not useful for text-based document search."
+                "SMILES notation is not useful for text-based document search.",
             )
             smiles_briefing = "\n".join(briefing_lines)
 

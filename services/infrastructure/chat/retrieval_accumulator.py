@@ -139,7 +139,7 @@ class RetrievalAccumulator:
         different information (e.g., SMILES annotation vs. full page text).
         """
         if r.query_source.startswith("tool_structure:") or r.query_source.startswith(
-            "tool_bioactivity:"
+            "tool_bioactivity:",
         ):
             return f"{r.query_source}:{r.page_id or r.artifact_id}"
         if r.source_type == "chunk" and r.page_id:

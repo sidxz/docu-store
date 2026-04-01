@@ -41,7 +41,7 @@ class RepoBackedArtifactReadModel:
         self._repo = repo
 
     async def get_artifact_by_id(
-        self, artifact_id: UUID, workspace_id: UUID | None = None
+        self, artifact_id: UUID, workspace_id: UUID | None = None,
     ) -> ArtifactResponse | None:
         try:
             a = self._repo.get_by_id(artifact_id)
@@ -75,7 +75,7 @@ class RepoBackedPageReadModel:
         self._repo = repo
 
     async def get_page_by_id(
-        self, page_id: UUID, workspace_id: UUID | None = None
+        self, page_id: UUID, workspace_id: UUID | None = None,
     ) -> PageResponse | None:
         try:
             p = self._repo.get_by_id(page_id)
