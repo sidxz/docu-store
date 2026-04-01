@@ -21,7 +21,7 @@ export function AnalyticsProvider() {
 
   useEffect(() => {
     if (!scriptReady || !isAuthenticated || !user.id || !window.umami) return;
-    window.umami.identify(user.id, { workspace_id: workspace.id });
+    window.umami.identify({ user_id: user.id, workspace_id: workspace.id });
   }, [scriptReady, isAuthenticated, user.id, workspace.id]);
 
   useSectionTimer();

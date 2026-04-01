@@ -50,7 +50,11 @@ export function usePreferencesSync() {
       method: "PATCH",
       body: JSON.stringify(changes),
       headers: { "Content-Type": "application/json" },
-    }).catch(() => {});
+    }).catch((err) => {
+      if (process.env.NODE_ENV === "development") {
+        console.warn("Preferences sync failed:", err);
+      }
+    });
   }, []);
 
   const scheduleFlush = useCallback(() => {
@@ -62,10 +66,14 @@ export function usePreferencesSync() {
   useEffect(() => {
     if (isSuccess && serverPrefs && !hydrated) {
       syncing.current = true;
-      useThemeStore.getState().setTheme(serverPrefs.theme as "light" | "dark");
+      const theme = serverPrefs.theme === "light" || serverPrefs.theme === "dark"
+        ? serverPrefs.theme : "light";
+      const scope = serverPrefs.default_scope === "workspace" || serverPrefs.default_scope === "private"
+        ? serverPrefs.default_scope : "workspace";
+      useThemeStore.getState().setTheme(theme);
       useDevModeStore.getState().setEnabled(serverPrefs.dev_mode);
       useSidebarStore.getState().setCollapsed(serverPrefs.sidebar_collapsed);
-      useScopeStore.getState().setDefaultScope(serverPrefs.default_scope as "workspace" | "private");
+      useScopeStore.getState().setDefaultScope(scope);
       syncing.current = false;
       setHydrated(true);
     }

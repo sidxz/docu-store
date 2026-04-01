@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { trackEvent } from "@/lib/analytics";
 
 // localStorage key — must match the key read by the inline anti-flash script
 // in app/layout.tsx, which runs before React hydrates.
@@ -20,9 +21,7 @@ export const useThemeStore = create<ThemeState>()(
       toggleTheme: () =>
         set((state) => {
           const newTheme = state.theme === "light" ? "dark" : "light";
-          if (typeof window !== "undefined" && window.umami) {
-            window.umami.track("theme_toggled", { new_theme: newTheme });
-          }
+          trackEvent("theme_toggled", { new_theme: newTheme });
           return { theme: newTheme };
         }),
       setTheme: (theme) => set({ theme }),

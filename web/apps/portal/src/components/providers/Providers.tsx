@@ -42,30 +42,60 @@ export function Providers({ children }: { children: ReactNode }) {
   const queryClient = getQueryClient();
   const clientRef = useRef<SentinelAuthz | null>(null);
   const configRef = useRef<AppConfig | null>(null);
+  const middlewareApplied = useRef(false);
   const [mounted, setMounted] = useState(false);
+  const [configError, setConfigError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    fetchAppConfig().then((config) => {
-      if (cancelled) return;
+    fetchAppConfig()
+      .then((config) => {
+        if (cancelled) return;
 
-      // Reconfigure singletons with runtime URLs
-      setApiBaseUrl(config.apiUrl);
-      _setApiUrl(config.apiUrl);
+        // Reconfigure singletons with runtime URLs
+        setApiBaseUrl(config.apiUrl);
+        _setApiUrl(config.apiUrl);
 
-      clientRef.current = getAuthzClient(config);
-      configRef.current = config;
+        clientRef.current = getAuthzClient(config);
+        configRef.current = config;
 
-      apiClient.use(authMiddleware);
-      setMounted(true);
-    });
+        apiClient.use(authMiddleware);
+        middlewareApplied.current = true;
+        setMounted(true);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setConfigError(
+          err instanceof Error ? err.message : "Failed to load app configuration",
+        );
+      });
 
     return () => {
       cancelled = true;
-      apiClient.eject(authMiddleware);
+      if (middlewareApplied.current) {
+        apiClient.eject(authMiddleware);
+        middlewareApplied.current = false;
+      }
     };
   }, []);
+
+  if (configError) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "system-ui, sans-serif" }}>
+        <div style={{ textAlign: "center", maxWidth: 420 }}>
+          <h2 style={{ marginBottom: 8 }}>Configuration Error</h2>
+          <p style={{ color: "#666", marginBottom: 16 }}>{configError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{ padding: "8px 20px", cursor: "pointer", borderRadius: 6, border: "1px solid #ccc", background: "#fff" }}
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!mounted || !configRef.current) return null;
 

@@ -82,7 +82,7 @@ export function useSummarySearchQuery(params: SearchParams | null) {
 export function useHierarchicalSearchQuery(params: (SearchParams & { include_chunks?: boolean }) | null) {
   const { trackEvent } = useAnalytics();
   return useQuery({
-    queryKey: queryKeys.search.hierarchical(params?.query_text ?? "", params?.tags, params?.tag_match_mode),
+    queryKey: queryKeys.search.hierarchical(params?.query_text ?? "", params?.tags, params?.tag_match_mode, params?.include_chunks),
     queryFn: async () => {
       const t0 = performance.now();
       const { data, error, response } = await apiClient.POST("/search/hierarchical", {

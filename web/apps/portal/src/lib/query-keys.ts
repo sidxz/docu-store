@@ -52,8 +52,8 @@ export const queryKeys = {
       ["search", "text", query, tags, tagMatchMode] as const,
     summary: (query: string, tags?: string[], tagMatchMode?: string) =>
       ["search", "summary", query, tags, tagMatchMode] as const,
-    hierarchical: (query: string, tags?: string[], tagMatchMode?: string) =>
-      ["search", "hierarchical", query, tags, tagMatchMode] as const,
+    hierarchical: (query: string, tags?: string[], tagMatchMode?: string, includeChunks?: boolean) =>
+      ["search", "hierarchical", query, tags, tagMatchMode, includeChunks] as const,
     compound: (smiles: string) => ["search", "compound", smiles] as const,
   },
   dashboard: {

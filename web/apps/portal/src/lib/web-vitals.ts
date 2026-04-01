@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { trackEvent } from "@/lib/analytics";
 
 /**
  * Reports Core Web Vitals (CLS, FCP, LCP, TTFB) as Umami custom events.
@@ -8,11 +9,9 @@ import { useEffect } from "react";
  */
 export function useWebVitals() {
   useEffect(() => {
-    if (typeof window === "undefined" || !window.umami) return;
-
     import("web-vitals").then(({ onCLS, onFCP, onLCP, onTTFB }) => {
       const report = (metric: { name: string; value: number; rating: string }) => {
-        window.umami?.track("web_vital", {
+        trackEvent("web_vital", {
           metric: metric.name,
           value: Math.round(metric.value),
           rating: metric.rating,

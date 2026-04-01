@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import type { AgentEvent, AgentStep, ContentBlock, GroundingStatus, SourceCitation, ThinkingBlock } from "@docu-store/types";
+import { trackEvent } from "@/lib/analytics";
 
 interface StepTiming {
   step: string;
@@ -68,6 +69,8 @@ interface ChatState {
   reset: () => void;
 }
 
+let highlightTimer: ReturnType<typeof setTimeout> | null = null;
+
 export const useChatStore = create<ChatState>((set) => ({
   chatMode: "thinking" as ChatMode,
   isStreaming: false,
@@ -87,19 +90,21 @@ export const useChatStore = create<ChatState>((set) => ({
   doneEvent: null,
 
   setChatMode: (mode) => {
-    if (typeof window !== "undefined" && window.umami) {
-      window.umami.track("chat_mode_changed", { mode });
-    }
+    trackEvent("chat_mode_changed", { mode });
     set({ chatMode: mode });
   },
 
   highlightCitation: (index, messageId) => {
+    if (highlightTimer) clearTimeout(highlightTimer);
     set({
       highlightedCitation: index,
       // Switch the sources panel to the clicked message's sources
       ...(messageId ? { activeSourcesMessageId: messageId } : {}),
     });
-    setTimeout(() => set({ highlightedCitation: null }), 1500);
+    highlightTimer = setTimeout(() => {
+      highlightTimer = null;
+      set({ highlightedCitation: null });
+    }, 1500);
   },
 
   setActiveSourcesMessageId: (id) => set({ activeSourcesMessageId: id }),
@@ -183,12 +188,12 @@ export const useChatStore = create<ChatState>((set) => ({
   finishStreaming: () =>
     set((state) => {
       const doneEvent = state.doneEvent;
-      if (typeof window !== "undefined" && window.umami && doneEvent) {
+      if (doneEvent) {
         const totalDuration =
           (doneEvent as unknown as Record<string, unknown>).duration_ms as number | undefined;
         const firstStep = state.stepTimings[0];
         const ttft = firstStep?.durationMs ?? undefined;
-        window.umami.track("chat_pipeline_completed", {
+        trackEvent("chat_pipeline_completed", {
           total_duration_ms: totalDuration ?? 0,
           time_to_first_step_ms: ttft ?? 0,
           mode: state.chatMode,

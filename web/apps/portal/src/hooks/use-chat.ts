@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { authFetch, authFetchJson } from "@/lib/auth-fetch";
@@ -107,10 +108,16 @@ export function useSendMessage(conversationId: string | undefined) {
   const queryClient = useQueryClient();
   const store = useChatStore();
   const { trackEvent } = useAnalytics();
+  const abortRef = useRef<AbortController | null>(null);
 
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: async (message: string) => {
       if (!conversationId) throw new Error("No conversation selected");
+
+      // Abort any in-flight stream before starting a new one
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
 
       const mode = store.chatMode;
       trackEvent("chat_message_sent", { mode, message_length: message.length });
@@ -135,6 +142,7 @@ export function useSendMessage(conversationId: string | undefined) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message, mode }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -142,7 +150,7 @@ export function useSendMessage(conversationId: string | undefined) {
         throw new Error(`Chat failed: ${res.statusText}`);
       }
 
-      await processSSEStream(res, store, trackEvent);
+      await processSSEStream(res, store, controller.signal, trackEvent);
       store.finishStreaming();
 
       const durationMs = Math.round(performance.now() - streamStart);
@@ -162,6 +170,8 @@ export function useSendMessage(conversationId: string | undefined) {
       }
     },
     onError: (error) => {
+      // AbortError is expected on navigation — don't treat as a real error
+      if (error instanceof DOMException && error.name === "AbortError") return;
       store.finishStreaming();
       trackEvent("chat_error", {
         mode: store.chatMode,
@@ -169,6 +179,14 @@ export function useSendMessage(conversationId: string | undefined) {
       });
     },
   });
+
+  /** Abort any in-flight stream. Call on unmount. */
+  const abort = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  };
+
+  return { ...mutation, abort };
 }
 
 // ── SSE Parser ─────────────────────────────────────────────────────────────
@@ -191,39 +209,49 @@ type TrackEventFn = (name: string, data?: Record<string, string | number>) => vo
 async function processSSEStream(
   response: Response,
   store: ChatStoreActions,
+  signal: AbortSignal,
   trackEvent?: TrackEventFn,
 ): Promise<void> {
   const reader = response.body?.getReader();
   if (!reader) return;
 
+  // Cancel the reader when the signal aborts
+  const onAbort = () => reader.cancel();
+  signal.addEventListener("abort", onAbort);
+
   const decoder = new TextDecoder();
   let buffer = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
 
-    let currentEventType = "";
+      let currentEventType = "";
 
-    for (const line of lines) {
-      if (line.startsWith("event: ")) {
-        currentEventType = line.slice(7).trim();
-      } else if (line.startsWith("data: ")) {
-        const jsonStr = line.slice(6);
-        try {
-          const event = JSON.parse(jsonStr) as AgentEvent;
-          store.recordEvent(event);
-          handleAgentEvent(event, currentEventType, store, trackEvent);
-        } catch {
-          // skip malformed events
+      for (const line of lines) {
+        if (line.startsWith("event: ")) {
+          currentEventType = line.slice(7).trim();
+        } else if (line.startsWith("data: ")) {
+          const jsonStr = line.slice(6);
+          try {
+            const event = JSON.parse(jsonStr) as AgentEvent;
+            store.recordEvent(event);
+            handleAgentEvent(event, currentEventType, store, trackEvent);
+          } catch {
+            // skip malformed events
+          }
+          currentEventType = "";
         }
-        currentEventType = "";
       }
     }
+  } finally {
+    signal.removeEventListener("abort", onAbort);
+    reader.releaseLock();
   }
 }
 

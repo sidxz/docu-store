@@ -3,7 +3,15 @@ import { getAuthzClient } from "./authz-client";
 
 // Store request bodies before they're consumed by fetch, so 401 retries
 // can resend the original body.
+//
+// Safety note: the backend rejects 401 at the auth middleware layer, before
+// the request handler processes any mutations. Replaying the original request
+// after a token refresh is therefore safe for all HTTP methods — the first
+// attempt never reached the handler.
 const savedBodies = new WeakMap<Request, string | null>();
+
+// Track whether a request has already been retried to prevent infinite loops
+const retriedRequests = new WeakSet<Request>();
 
 export const authMiddleware: Middleware = {
   async onRequest({ request }) {
@@ -20,7 +28,8 @@ export const authMiddleware: Middleware = {
     return request;
   },
   async onResponse({ response, request }) {
-    if (response.status === 401) {
+    if (response.status === 401 && !retriedRequests.has(request)) {
+      retriedRequests.add(request);
       const client = getAuthzClient();
       const refreshed = await client.refresh();
       if (refreshed) {

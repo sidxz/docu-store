@@ -35,6 +35,9 @@ export function ChatPanel({
   const { data, isLoading } = useConversation(conversationId);
   const createConversation = useCreateConversation();
   const sendMessage = useSendMessage(conversationId);
+
+  // Abort in-flight SSE stream on unmount (e.g. navigating away from chat)
+  useEffect(() => () => sendMessage.abort(), []); // eslint-disable-line react-hooks/exhaustive-deps
   const feedbackMutation = useChatFeedback(conversationId);
   const { isStreaming, streamingContent, streamingSteps, streamingSources, chatMode } =
     useChatStore();
