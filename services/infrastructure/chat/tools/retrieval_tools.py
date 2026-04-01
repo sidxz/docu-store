@@ -440,9 +440,13 @@ class SearchStructuredBioactivityTool:
             matched_ids &= allowed_set
 
         if not matched_ids:
-            return [], f"No accessible documents with compound '{compound}'" + (
-                f" and target '{target}'" if target else ""
-            ) + ".", []
+            return (
+                [],
+                f"No accessible documents with compound '{compound}'"
+                + (f" and target '{target}'" if target else "")
+                + ".",
+                [],
+            )
 
         # 4. Look up artifact metadata (title, authors, date)
         matched_uuids = [UUID(aid) for aid in matched_ids]
@@ -451,7 +455,8 @@ class SearchStructuredBioactivityTool:
             for aid_uuid in matched_uuids:
                 try:
                     art = await self._artifacts.get_artifact_by_id(
-                        aid_uuid, workspace_id=workspace_id,
+                        aid_uuid,
+                        workspace_id=workspace_id,
                     )
                     if art:
                         title = (
@@ -709,7 +714,9 @@ class SearchCompoundStructureTool:
             f"Source: artifact {anchor.artifact_id}, page {anchor.page_index}",
         ]
         if similar_lines:
-            expanded_lines.append(f"\nStructurally similar compounds (≥{threshold * 100:.0f}% similarity):")
+            expanded_lines.append(
+                f"\nStructurally similar compounds (≥{threshold * 100:.0f}% similarity):"
+            )
             expanded_lines.extend(similar_lines)
         else:
             expanded_lines.append("\nNo structurally similar compounds found above the threshold.")

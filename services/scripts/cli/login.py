@@ -18,7 +18,6 @@ import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import TYPE_CHECKING
-from urllib.parse import parse_qs, urlparse
 
 if TYPE_CHECKING:
     from scripts.cli.auth import CliAuth
@@ -103,8 +102,7 @@ def browser_login(
 
     # Open browser to Sentinel's OAuth proxy
     login_url = (
-        f"{auth.sentinel_url}/authz/idp/{provider}/login"
-        f"?redirect_uri={callback_url}&nonce={nonce}"
+        f"{auth.sentinel_url}/authz/idp/{provider}/login?redirect_uri={callback_url}&nonce={nonce}"
     )
     print(f"Opening browser for {provider} login...")
     print(f"If the browser doesn't open, visit: {login_url}")

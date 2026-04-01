@@ -7,6 +7,7 @@ import {
   Search,
   Atom,
   MessageSquare,
+  Activity,
   BarChart3,
   Settings,
   Sun,
@@ -38,6 +39,7 @@ const mainNav: NavItem[] = [
   { label: "Compounds", icon: Atom, href: "/compounds" },
   { label: "Chat", icon: MessageSquare, href: "/chat" },
   { label: "Stats", icon: BarChart3, href: "/stats", requireAdmin: true },
+  { label: "Status", icon: Activity, href: "/status", requireAdmin: true },
 ];
 
 export function Sidebar({ workspaceSlug }: { workspaceSlug: string }) {

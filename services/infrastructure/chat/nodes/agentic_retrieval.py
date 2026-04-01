@@ -272,7 +272,8 @@ class AgenticRetrievalNode:
                 for evt in struct_events:
                     yield ("event", evt)
                 new_struct = accumulator.add_results(
-                    struct_results, f"structure:{compound.entity_text}",
+                    struct_results,
+                    f"structure:{compound.entity_text}",
                 )
                 structure_count += new_struct
                 if struct_summary:
@@ -285,7 +286,13 @@ class AgenticRetrievalNode:
                     events=len(struct_events),
                 )
 
-        total_seed = len(filtered_results) + new_from_unfiltered + bioactivity_count + smiles_page_count + structure_count
+        total_seed = (
+            len(filtered_results)
+            + new_from_unfiltered
+            + bioactivity_count
+            + smiles_page_count
+            + structure_count
+        )
         output_parts = [f"Initial search: {len(filtered_results)} filtered"]
         if has_filters and not did_skip_unfiltered:
             output_parts.append(f" + {new_from_unfiltered} unfiltered")
@@ -538,7 +545,8 @@ class AgenticRetrievalNode:
                 for evt in tool_events:
                     yield ("event", evt)
                 new_count = accumulator.add_results(
-                    tool_results, str(tc.tool_args.get("query", "")),
+                    tool_results,
+                    str(tc.tool_args.get("query", "")),
                 )
 
                 # Attach model reasoning to the first tool call event only

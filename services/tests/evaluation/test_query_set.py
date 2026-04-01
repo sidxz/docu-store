@@ -1,8 +1,6 @@
 """Tests for evaluation.query_set module."""
 
-import json
 import tempfile
-from pathlib import Path
 
 from evaluation.query_set import EvalQuery, QuerySet, load_query_set, save_query_set
 

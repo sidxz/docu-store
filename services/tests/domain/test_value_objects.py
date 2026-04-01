@@ -183,6 +183,7 @@ class TestValueObjectImmutability:
 
     def test_extraction_metadata_is_frozen(self) -> None:
         from domain.value_objects.extraction_metadata import ExtractionMetadata
+
         em = ExtractionMetadata(confidence=0.9)
         with pytest.raises(ValidationError):
             em.confidence = 0.5  # type: ignore[misc]
@@ -190,9 +191,13 @@ class TestValueObjectImmutability:
     def test_embedding_metadata_is_frozen(self) -> None:
         from datetime import UTC, datetime
         from uuid import uuid4
+
         from domain.value_objects.embedding_metadata import EmbeddingMetadata
+
         em = EmbeddingMetadata(
-            embedding_id=uuid4(), model_name="test", dimensions=384,
+            embedding_id=uuid4(),
+            model_name="test",
+            dimensions=384,
             generated_at=datetime.now(UTC),
         )
         with pytest.raises(ValidationError):
@@ -200,9 +205,13 @@ class TestValueObjectImmutability:
 
     def test_text_embedding_is_frozen(self) -> None:
         from uuid import uuid4
+
         from domain.value_objects.text_embedding import TextEmbedding
+
         te = TextEmbedding(
-            embedding_id=uuid4(), vector=[0.1, 0.2], model_name="test",
+            embedding_id=uuid4(),
+            vector=[0.1, 0.2],
+            model_name="test",
             dimensions=2,
         )
         with pytest.raises(ValidationError):
@@ -210,13 +219,16 @@ class TestValueObjectImmutability:
 
     def test_blob_ref_is_frozen(self) -> None:
         from domain.value_objects.blob_ref import BlobRef
+
         br = BlobRef(key="k", sha256="abc", size_bytes=100, mime_type=None, filename=None)
         with pytest.raises(ValidationError):
             br.key = "new"  # type: ignore[misc]
 
     def test_tag_source_is_frozen(self) -> None:
         from uuid import uuid4
+
         from domain.value_objects.tag_mention import TagSource
+
         ts = TagSource(page_id=uuid4(), page_index=0)
         with pytest.raises(ValidationError):
             ts.page_index = 5  # type: ignore[misc]

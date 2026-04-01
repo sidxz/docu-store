@@ -43,12 +43,20 @@ class FakeMaterializer:
         self.delete_page_calls.append((page_id, tracking))
 
     def add_to_artifact_array(
-        self, artifact_id: str, field: str, values: list, tracking: object,
+        self,
+        artifact_id: str,
+        field: str,
+        values: list,
+        tracking: object,
     ) -> None:
         self.add_to_array_calls.append((artifact_id, field, values, tracking))
 
     def pull_from_artifact_array(
-        self, artifact_id: str, field: str, values: list, tracking: object,
+        self,
+        artifact_id: str,
+        field: str,
+        values: list,
+        tracking: object,
     ) -> None:
         self.pull_from_array_calls.append((artifact_id, field, values, tracking))
 
@@ -56,7 +64,11 @@ class FakeMaterializer:
         self.replace_tags_calls.append((artifact_id, tags, tracking))
 
     def upsert_artifact_and_replace_tags(
-        self, artifact_id: str, fields: dict, tags: list, tracking: object,
+        self,
+        artifact_id: str,
+        fields: dict,
+        tags: list,
+        tracking: object,
     ) -> None:
         self.upsert_artifact_calls.append((artifact_id, fields, tracking))
         self.replace_tags_calls.append((artifact_id, tags, tracking))

@@ -805,7 +805,9 @@ class QdrantStore(VectorStore):
             )
         except Exception as e:
             logger.warning(
-                "failed_to_set_artifact_payload", artifact_id=str(artifact_id), error=str(e),
+                "failed_to_set_artifact_payload",
+                artifact_id=str(artifact_id),
+                error=str(e),
             )
 
     async def close(self) -> None:

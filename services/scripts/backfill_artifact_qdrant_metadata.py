@@ -31,13 +31,18 @@ async def ensure_payload_indexes() -> None:
     """Create artifact_tag_normalized index on both collections (idempotent)."""
     client = AsyncQdrantClient(url=settings.qdrant_url, api_key=settings.qdrant_api_key, timeout=30)
     try:
-        for collection in [settings.qdrant_collection_name, settings.qdrant_summary_collection_name]:
+        for collection in [
+            settings.qdrant_collection_name,
+            settings.qdrant_summary_collection_name,
+        ]:
             await client.create_payload_index(
                 collection_name=collection,
                 field_name="artifact_tag_normalized",
                 field_schema=models.PayloadSchemaType.KEYWORD,
             )
-            logger.info("payload_index_created", collection=collection, field="artifact_tag_normalized")
+            logger.info(
+                "payload_index_created", collection=collection, field="artifact_tag_normalized"
+            )
     finally:
         await client.close()
 

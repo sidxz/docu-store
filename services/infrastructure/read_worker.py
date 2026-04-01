@@ -40,6 +40,19 @@ def run() -> None:
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
 
+    # Heartbeat reporter — sync mode for this synchronous worker
+    from infrastructure.config import settings
+    from infrastructure.health.heartbeat_reporter import HeartbeatReporter
+
+    reporter = HeartbeatReporter(
+        mongo_uri=settings.mongo_uri,
+        mongo_db=settings.mongo_db,
+        worker_type="read_projector",
+        worker_name="Read Model Projector",
+        interval_seconds=settings.worker_heartbeat_interval_seconds,
+    )
+    reporter.start_sync_background()
+
     logger.info("read_model_projector_started", topics=len(event_projector.topics))
 
     try:
@@ -108,6 +121,7 @@ def run() -> None:
         logger.exception("read_model_projector_error")
         raise
     finally:
+        reporter.stop()
         logger.info("read_model_projector_stopped")
 
 

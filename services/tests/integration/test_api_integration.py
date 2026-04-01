@@ -7,6 +7,7 @@ from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
+from sentinel_auth.authz_middleware import AuthzMiddleware
 
 from application.dtos.artifact_dtos import ArtifactResponse
 from application.dtos.page_dtos import PageResponse
@@ -21,7 +22,6 @@ from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.mime_type import MimeType
 from interfaces.api.main import app
 from interfaces.dependencies import get_auth, get_container
-from sentinel_auth.authz_middleware import AuthzMiddleware
 from tests.fakes.fake_auth import FakeAuth
 from tests.mocks import MockArtifactRepository, MockPageRepository
 
@@ -40,7 +40,9 @@ class RepoBackedArtifactReadModel:
     def __init__(self, repo: MockArtifactRepository) -> None:
         self._repo = repo
 
-    async def get_artifact_by_id(self, artifact_id: UUID, workspace_id: UUID | None = None) -> ArtifactResponse | None:
+    async def get_artifact_by_id(
+        self, artifact_id: UUID, workspace_id: UUID | None = None
+    ) -> ArtifactResponse | None:
         try:
             a = self._repo.get_by_id(artifact_id)
         except Exception:
@@ -56,7 +58,13 @@ class RepoBackedArtifactReadModel:
             owner_id=a.owner_id,
         )
 
-    async def list_artifacts(self, workspace_id: UUID | None = None, skip: int = 0, limit: int = 100, allowed_artifact_ids: list[UUID] | None = None) -> list:
+    async def list_artifacts(
+        self,
+        workspace_id: UUID | None = None,
+        skip: int = 0,
+        limit: int = 100,
+        allowed_artifact_ids: list[UUID] | None = None,
+    ) -> list:
         return []
 
 
@@ -66,7 +74,9 @@ class RepoBackedPageReadModel:
     def __init__(self, repo: MockPageRepository) -> None:
         self._repo = repo
 
-    async def get_page_by_id(self, page_id: UUID, workspace_id: UUID | None = None) -> PageResponse | None:
+    async def get_page_by_id(
+        self, page_id: UUID, workspace_id: UUID | None = None
+    ) -> PageResponse | None:
         try:
             p = self._repo.get_by_id(page_id)
         except Exception:

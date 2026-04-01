@@ -158,10 +158,48 @@ async def run() -> None:
         max_concurrent_activities=settings.temporal_max_concurrent_activities,
     )
 
+    # Heartbeat reporter — reports GPU and model status to MongoDB
+    from application.dtos.health_dtos import ModelStatus
+    from application.ports.embedding_generator import EmbeddingGenerator
+    from infrastructure.embeddings.chemberta_generator import ChemBertaEmbeddingGenerator
+    from infrastructure.health.heartbeat_reporter import HeartbeatReporter
+
+    embedding_gen = container[EmbeddingGenerator]
+    chemberta_gen = container[ChemBertaEmbeddingGenerator]
+
+    async def _check_text_embedding() -> ModelStatus:
+        info = await embedding_gen.get_model_info()
+        return ModelStatus(
+            name="Text Embedding",
+            loaded=True,
+            device=str(info.get("device", "unknown")),
+            model_name=str(info.get("model_name", "unknown")),
+            inference_ok=True,
+        )
+
+    async def _check_chemberta() -> ModelStatus:
+        info = await chemberta_gen.get_model_info()
+        return ModelStatus(
+            name="SMILES Embedding (ChemBERTa)",
+            loaded=True,
+            device=str(info.get("device", "unknown")),
+            model_name=str(info.get("model_name", "unknown")),
+            inference_ok=True,
+        )
+
+    reporter = HeartbeatReporter(
+        mongo_uri=settings.mongo_uri,
+        mongo_db=settings.mongo_db,
+        worker_type="temporal_cpu",
+        worker_name="Temporal CPU/IO Worker",
+        interval_seconds=settings.worker_heartbeat_interval_seconds,
+        model_info_providers=[_check_text_embedding, _check_chemberta],
+    )
+
     logger.info("temporal_worker_started")
 
     try:
-        await worker.run()
+        await asyncio.gather(worker.run(), reporter.run_forever())
     except KeyboardInterrupt:
         logger.info("temporal_worker_interrupted")
     except Exception:

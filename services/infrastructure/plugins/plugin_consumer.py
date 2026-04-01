@@ -230,7 +230,18 @@ async def _run_async() -> None:
         task_queues=sorted(unique_task_queues),
     )
 
-    # Run Kafka consumer + Temporal workers concurrently
+    # Heartbeat reporter — no ML models
+    from infrastructure.health.heartbeat_reporter import HeartbeatReporter
+
+    reporter = HeartbeatReporter(
+        mongo_uri=settings.mongo_uri,
+        mongo_db=settings.mongo_db,
+        worker_type="plugin_consumer",
+        worker_name="Plugin Consumer",
+        interval_seconds=settings.worker_heartbeat_interval_seconds,
+    )
+
+    # Run Kafka consumer + Temporal workers + heartbeat concurrently
     await asyncio.gather(
         run_plugin_consumer(
             registry=registry,
@@ -239,6 +250,7 @@ async def _run_async() -> None:
             kafka_topic=settings.kafka_topic,
         ),
         run_temporal_workers(),
+        reporter.run_forever(),
     )
 
 

@@ -132,7 +132,13 @@ class CompoundQdrantStore(CompoundVectorStore):
 
     async def _ensure_indexes(self, client: AsyncQdrantClient) -> None:
         """Create payload indexes if they don't already exist. Idempotent."""
-        index_fields = ["page_id", "artifact_id", "canonical_smiles", "workspace_id", "extracted_id"]
+        index_fields = [
+            "page_id",
+            "artifact_id",
+            "canonical_smiles",
+            "workspace_id",
+            "extracted_id",
+        ]
         for field in index_fields:
             try:
                 await client.create_payload_index(

@@ -178,9 +178,7 @@ class ThinkingAgent:
             # Compound queries with resolved SMILES also use strict mode — the
             # resolved compound name is in NER filters and should scope retrieval.
             has_filters = bool(plan.ner_entity_filters or plan.author_mentions)
-            has_resolved_smiles = bool(
-                plan.smiles_context and plan.smiles_context.resolved
-            )
+            has_resolved_smiles = bool(plan.smiles_context and plan.smiles_context.resolved)
             skipped_unfiltered = (
                 plan.query_type in ("factual", "compound")
                 and has_filters

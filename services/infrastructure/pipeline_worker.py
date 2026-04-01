@@ -54,6 +54,7 @@ from application.workflow_use_cases.trigger_smiles_embedding_use_case import (
 )
 from domain.aggregates.artifact import Artifact
 from domain.aggregates.page import Page
+from infrastructure.config import settings
 from infrastructure.di.container import create_container
 from infrastructure.lib.pipeline_worker_tracking import PipelineWorkerTracking
 from infrastructure.logging import setup_logging
@@ -123,6 +124,18 @@ async def run(worker_name: str = "pipeline_worker") -> None:
     ]
 
     logger.info("pipeline_worker_started", worker_name=worker_name, topics=topics)
+
+    # Heartbeat reporter — no ML models, just reports system/GPU info
+    from infrastructure.health.heartbeat_reporter import HeartbeatReporter
+
+    reporter = HeartbeatReporter(
+        mongo_uri=settings.mongo_uri,
+        mongo_db=settings.mongo_db,
+        worker_type="pipeline",
+        worker_name="Pipeline Worker",
+        interval_seconds=settings.worker_heartbeat_interval_seconds,
+    )
+    heartbeat_task = asyncio.create_task(reporter.run_forever())
 
     pipeline_tracking = PipelineWorkerTracking(worker_name=worker_name)
 
@@ -386,6 +399,7 @@ async def run(worker_name: str = "pipeline_worker") -> None:
         logger.exception("pipeline_worker_error")
         raise
     finally:
+        heartbeat_task.cancel()
         logger.info("pipeline_worker_stopped")
 
 

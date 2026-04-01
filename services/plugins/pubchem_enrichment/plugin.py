@@ -59,9 +59,9 @@ class PubChemEventHandler:
 
     async def _handle_deletion(self, event_type: str, data: dict[str, Any]) -> None:
         """Clean up enrichment records when artifacts or pages are deleted."""
-        from uuid import UUID  # noqa: PLC0415
+        from uuid import UUID
 
-        from plugins.pubchem_enrichment.storage.enrichment_store import (  # noqa: PLC0415
+        from plugins.pubchem_enrichment.storage.enrichment_store import (
             PubChemEnrichmentStore,
         )
 
@@ -96,21 +96,21 @@ class PubChemEnrichmentPlugin:
         )
 
     def create_workflows(self) -> list[type]:
-        from plugins.pubchem_enrichment.temporal.workflows import (  # noqa: PLC0415
+        from plugins.pubchem_enrichment.temporal.workflows import (
             PubChemEnrichmentWorkflow,
         )
 
         return [PubChemEnrichmentWorkflow]
 
     def create_activities(self, context: Any) -> list[Any]:
-        from plugins.pubchem_enrichment.temporal.activities import (  # noqa: PLC0415
+        from plugins.pubchem_enrichment.temporal.activities import (
             create_enrich_activity,
         )
 
         return [create_enrich_activity(context.mongo_db)]
 
     def create_router(self, context: Any) -> Any:
-        from plugins.pubchem_enrichment.api.routes import router  # noqa: PLC0415
+        from plugins.pubchem_enrichment.api.routes import router
 
         return router
 
@@ -129,14 +129,14 @@ class PubChemEnrichmentPlugin:
             logger.warning("pubchem_backfill.missing_context")
             return
 
-        from plugins.pubchem_enrichment.config import PubChemPluginSettings  # noqa: PLC0415
-        from plugins.pubchem_enrichment.infrastructure.pubchem_client import (  # noqa: PLC0415
+        from plugins.pubchem_enrichment.config import PubChemPluginSettings
+        from plugins.pubchem_enrichment.infrastructure.pubchem_client import (
             PubChemClient,
         )
-        from plugins.pubchem_enrichment.storage.enrichment_store import (  # noqa: PLC0415
+        from plugins.pubchem_enrichment.storage.enrichment_store import (
             PubChemEnrichmentStore,
         )
-        from plugins.pubchem_enrichment.use_cases.enrich_compounds import (  # noqa: PLC0415
+        from plugins.pubchem_enrichment.use_cases.enrich_compounds import (
             enrich_compounds_for_page,
         )
 

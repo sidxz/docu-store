@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi.testclient import TestClient
 from returns.result import Failure, Success
+from sentinel_auth.authz_middleware import AuthzMiddleware
 
 from application.dtos.artifact_dtos import ArtifactResponse, CreateArtifactRequest
 from application.dtos.errors import AppError
@@ -23,7 +24,6 @@ from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.mime_type import MimeType
 from interfaces.api.main import app
 from interfaces.dependencies import get_auth, get_container
-from sentinel_auth.authz_middleware import AuthzMiddleware
 from tests.fakes.fake_auth import FakeAuth
 
 
@@ -39,10 +39,20 @@ class FakeArtifactReadModel(ArtifactReadModel):
     def __init__(self, artifacts: dict[UUID, ArtifactResponse]) -> None:
         self._artifacts = artifacts
 
-    async def get_artifact_by_id(self, artifact_id: UUID, workspace_id: UUID | None = None) -> ArtifactResponse | None:
+    async def get_artifact_by_id(
+        self, artifact_id: UUID, workspace_id: UUID | None = None
+    ) -> ArtifactResponse | None:
         return self._artifacts.get(artifact_id)
 
-    async def list_artifacts(self, workspace_id: UUID | None = None, skip: int = 0, limit: int = 100, allowed_artifact_ids: list[UUID] | None = None, sort_by: str = "updated_at", sort_order: int = -1) -> list[ArtifactResponse]:
+    async def list_artifacts(
+        self,
+        workspace_id: UUID | None = None,
+        skip: int = 0,
+        limit: int = 100,
+        allowed_artifact_ids: list[UUID] | None = None,
+        sort_by: str = "updated_at",
+        sort_order: int = -1,
+    ) -> list[ArtifactResponse]:
         artifacts = list(self._artifacts.values())
         return artifacts[skip : skip + limit]
 
@@ -51,16 +61,22 @@ class FakePageReadModel(PageReadModel):
     def __init__(self, pages: dict[UUID, PageResponse]) -> None:
         self._pages = pages
 
-    async def get_page_by_id(self, page_id: UUID, workspace_id: UUID | None = None) -> PageResponse | None:
+    async def get_page_by_id(
+        self, page_id: UUID, workspace_id: UUID | None = None
+    ) -> PageResponse | None:
         return self._pages.get(page_id)
 
-    async def get_pages_by_id(self, page_ids: list[UUID], workspace_id: UUID | None = None) -> list[PageResponse]:
+    async def get_pages_by_id(
+        self, page_ids: list[UUID], workspace_id: UUID | None = None
+    ) -> list[PageResponse]:
         return [self._pages[pid] for pid in page_ids if pid in self._pages]
 
     async def count_pages_with_summaries(self, artifact_id: UUID) -> int:
         return 0
 
-    async def get_pages_by_artifact_ids(self, artifact_ids: list[UUID], workspace_id: UUID | None = None) -> list[PageResponse]:
+    async def get_pages_by_artifact_ids(
+        self, artifact_ids: list[UUID], workspace_id: UUID | None = None
+    ) -> list[PageResponse]:
         return [p for p in self._pages.values() if p.artifact_id in artifact_ids]
 
 
@@ -169,10 +185,12 @@ class TestArtifactRoutes:
         )
         error_result = Failure(AppError("validation", "bad payload"))
         use_case = FakeUseCase(error_result)
-        client = make_client({
-            UpdateTitleMentionUseCase: use_case,
-            ArtifactReadModel: read_model,
-        })
+        client = make_client(
+            {
+                UpdateTitleMentionUseCase: use_case,
+                ArtifactReadModel: read_model,
+            }
+        )
 
         response = client.patch(
             f"/artifacts/{artifact_id}/title_mention",
@@ -258,10 +276,12 @@ class TestPageRoutes:
             },
         )
         use_case = FakeUseCase(Success(None))
-        client = make_client({
-            DeletePageUseCase: use_case,
-            PageReadModel: read_model,
-        })
+        client = make_client(
+            {
+                DeletePageUseCase: use_case,
+                PageReadModel: read_model,
+            }
+        )
 
         response = client.delete(f"/pages/{page_id}")
 

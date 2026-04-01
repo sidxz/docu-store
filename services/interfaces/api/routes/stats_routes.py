@@ -371,7 +371,8 @@ async def get_search_quality_stats(
 
     analytics = container[AnalyticsReadModel]
     return await analytics.get_search_quality(
-        _period_to_days(period), workspace_id=auth.workspace_id,
+        _period_to_days(period),
+        workspace_id=auth.workspace_id,
     )
 
 
@@ -387,7 +388,8 @@ async def get_grounding_stats(
 
     analytics = container[AnalyticsReadModel]
     return await analytics.get_grounding_stats(
-        _period_to_days(period), workspace_id=auth.workspace_id,
+        _period_to_days(period),
+        workspace_id=auth.workspace_id,
     )
 
 
@@ -403,7 +405,8 @@ async def get_knowledge_gaps(
 
     analytics = container[AnalyticsReadModel]
     return await analytics.get_knowledge_gaps(
-        _period_to_days(period), workspace_id=auth.workspace_id,
+        _period_to_days(period),
+        workspace_id=auth.workspace_id,
     )
 
 
@@ -419,5 +422,6 @@ async def get_citation_frequency(
 
     analytics = container[AnalyticsReadModel]
     return await analytics.get_citation_frequency(
-        _period_to_days(period), workspace_id=auth.workspace_id,
+        _period_to_days(period),
+        workspace_id=auth.workspace_id,
     )

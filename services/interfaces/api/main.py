@@ -1,5 +1,6 @@
 """Main FastAPI application."""
 
+import contextlib
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -14,6 +15,7 @@ from interfaces.api.routes.artifact_routes import router as artifact_router
 from interfaces.api.routes.browse_routes import router as browse_router
 from interfaces.api.routes.chat_routes import router as chat_router
 from interfaces.api.routes.dashboard_routes import router as dashboard_router
+from interfaces.api.routes.health_routes import router as health_router
 from interfaces.api.routes.page_routes import router as page_router
 from interfaces.api.routes.search_routes import router as search_router
 from interfaces.api.routes.stats_routes import router as stats_router
@@ -111,11 +113,84 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.warning("qdrant_initialization_failed", error=str(e))
             # Don't fail startup - embedding features will just be unavailable
 
+        # Ensure heartbeat indexes and start API heartbeat reporter
+        import asyncio
+
+        from application.dtos.health_dtos import ModelStatus
+        from application.ports.worker_heartbeat_store import WorkerHeartbeatStore
+        from infrastructure.health.heartbeat_reader import MongoHeartbeatReader
+        from infrastructure.health.heartbeat_reporter import HeartbeatReporter
+
+        heartbeat_task = None
+        try:
+            # Ensure TTL index
+            heartbeat_reader = container[WorkerHeartbeatStore]
+            if isinstance(heartbeat_reader, MongoHeartbeatReader):
+                await heartbeat_reader.ensure_indexes()
+
+            # Resolve models from container (safe even if warm-up failed above)
+            _hb_embedding = container[EmbeddingGenerator]
+            _hb_chemberta = container[ChemBertaEmbeddingGenerator]
+            _hb_reranker = container[Reranker]
+
+            # Model info providers for the API process
+            async def _check_text_embedding() -> ModelStatus:
+                info = await _hb_embedding.get_model_info()
+                return ModelStatus(
+                    name="Text Embedding",
+                    loaded=True,
+                    device=str(info.get("device", "unknown")),
+                    model_name=str(info.get("model_name", "unknown")),
+                    inference_ok=True,
+                )
+
+            async def _check_chemberta() -> ModelStatus:
+                info = await _hb_chemberta.get_model_info()
+                return ModelStatus(
+                    name="SMILES Embedding (ChemBERTa)",
+                    loaded=True,
+                    device=str(info.get("device", "unknown")),
+                    model_name=str(info.get("model_name", "unknown")),
+                    inference_ok=True,
+                )
+
+            async def _check_reranker() -> ModelStatus:
+                if not settings.reranker_enabled or _hb_reranker is None:
+                    return ModelStatus(
+                        name="Reranker", loaded=False, device="none", model_name="disabled"
+                    )
+                return ModelStatus(
+                    name="Reranker",
+                    loaded=getattr(_hb_reranker, "_model", None) is not None,
+                    device=str(getattr(_hb_reranker, "device", settings.reranker_device)),
+                    model_name=str(
+                        getattr(_hb_reranker, "model_name", settings.reranker_model_name)
+                    ),
+                    inference_ok=True,
+                )
+
+            reporter = HeartbeatReporter(
+                mongo_uri=settings.mongo_uri,
+                mongo_db=settings.mongo_db,
+                worker_type="api_server",
+                worker_name="API Server",
+                interval_seconds=settings.worker_heartbeat_interval_seconds,
+                model_info_providers=[_check_text_embedding, _check_chemberta, _check_reranker],
+            )
+            heartbeat_task = asyncio.create_task(reporter.run_forever())
+            logger.info("api_heartbeat_reporter_started")
+        except Exception:
+            logger.warning("api_heartbeat_reporter_failed", exc_info=True)
+
         logger.info("app_ready")
 
         yield
 
         # Cleanup
+        if heartbeat_task is not None:
+            heartbeat_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await heartbeat_task
         logger.info("app_shutting_down")
         logger.info("app_stopped")
 
@@ -154,6 +229,7 @@ def create_app() -> FastAPI:
     app.include_router(browse_router)
     app.include_router(chat_router)
     app.include_router(dashboard_router)
+    app.include_router(health_router)
     app.include_router(page_router)
     app.include_router(search_router)
     app.include_router(stats_router)

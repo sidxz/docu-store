@@ -11,7 +11,6 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-
 from uuid import NAMESPACE_URL, uuid5
 
 import structlog
@@ -105,7 +104,7 @@ async def main() -> None:
                     points=points_to_update,
                 )
                 total_points_updated += len(points_to_update)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 errors += 1
                 logger.warning(
                     "sparse_update_failed",

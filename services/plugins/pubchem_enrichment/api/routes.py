@@ -14,7 +14,7 @@ router = APIRouter()
 
 def _get_collection() -> Any:
     """Get the pubchem_enrichments MongoDB collection."""
-    from motor.motor_asyncio import AsyncIOMotorClient  # noqa: PLC0415
+    from motor.motor_asyncio import AsyncIOMotorClient
 
     client = AsyncIOMotorClient(settings.mongo_uri)
     db = client[settings.mongo_db]

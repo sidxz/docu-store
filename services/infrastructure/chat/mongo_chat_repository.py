@@ -56,7 +56,8 @@ class MongoChatRepository:
         doc = _conversation_to_doc(conversation)
         await self._conversations.insert_one(doc)
         log.debug(
-            "chat.repo.conversation_created", conversation_id=str(conversation.conversation_id),
+            "chat.repo.conversation_created",
+            conversation_id=str(conversation.conversation_id),
         )
         return conversation
 

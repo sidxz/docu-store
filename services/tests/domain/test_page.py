@@ -83,10 +83,7 @@ class TestPageCompoundMentions:
         sample_page.update_compound_mentions([sample_compound_mention])
         assert len(sample_page.compound_mentions) == 1
         assert sample_page.compound_mentions[0].smiles == sample_compound_mention.smiles
-        assert (
-            sample_page.compound_mentions[0].extracted_id
-            == sample_compound_mention.extracted_id
-        )
+        assert sample_page.compound_mentions[0].extracted_id == sample_compound_mention.extracted_id
 
     def test_add_multiple_compound_mentions(self, sample_page: Page) -> None:
         """Test adding multiple compound mentions at once."""
@@ -283,7 +280,6 @@ class TestPageSummaryCandidate:
         sample_page.delete()
         with pytest.raises(ValueError, match="Cannot update summary candidate on a deleted page"):
             sample_page.update_summary_candidate(sample_summary_candidate)
-
 
 
 class TestPageDeletion:
@@ -504,7 +500,9 @@ class TestPageEventEnrichment:
         artifact_id = uuid4()
         workspace_id = uuid4()
         page = Page.create(
-            name="Test", artifact_id=artifact_id, workspace_id=workspace_id,
+            name="Test",
+            artifact_id=artifact_id,
+            workspace_id=workspace_id,
         )
         list(page.collect_events())  # drain Created
 
@@ -527,7 +525,9 @@ class TestPageEventEnrichment:
         artifact_id = uuid4()
         workspace_id = uuid4()
         page = Page.create(
-            name="Test", artifact_id=artifact_id, workspace_id=workspace_id,
+            name="Test",
+            artifact_id=artifact_id,
+            workspace_id=workspace_id,
         )
         list(page.collect_events())
 
@@ -539,7 +539,9 @@ class TestPageEventEnrichment:
     def test_tag_mentions_updated_carries_workspace_id(self) -> None:
         workspace_id = uuid4()
         page = Page.create(
-            name="Test", artifact_id=uuid4(), workspace_id=workspace_id,
+            name="Test",
+            artifact_id=uuid4(),
+            workspace_id=workspace_id,
         )
         list(page.collect_events())
 

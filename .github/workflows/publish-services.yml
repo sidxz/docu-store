@@ -30,6 +30,17 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
         run: echo "VERSION=${REF_NAME#services-v}" >> "$GITHUB_OUTPUT"
 
+      - name: Verify version matches pyproject.toml
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          TAG_VERSION="${REF_NAME#services-v}"
+          FILE_VERSION=$(grep -m1 '^version' services/pyproject.toml | sed 's/.*"\(.*\)".*/\1/')
+          if [ "$TAG_VERSION" != "$FILE_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) does not match pyproject.toml ($FILE_VERSION)"
+            exit 1
+          fi
+
       - uses: docker/build-push-action@v6
         with:
           context: services/

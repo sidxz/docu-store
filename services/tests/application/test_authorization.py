@@ -23,8 +23,8 @@ from application.use_cases.page_use_cases import (
 from domain.aggregates.artifact import Artifact
 from domain.aggregates.page import Page
 from domain.value_objects.artifact_type import ArtifactType
-from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.mime_type import MimeType
+from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.text_mention import TextMention
 from domain.value_objects.title_mention import TitleMention
 from tests.fakes.fake_auth import FakeAuth

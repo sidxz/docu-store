@@ -5,11 +5,9 @@ from __future__ import annotations
 import pytest
 
 from infrastructure.chemistry.smiles_detector import (
-    DetectedSmiles,
     detect_smiles,
     infer_smiles_search_mode,
 )
-
 
 # ---------------------------------------------------------------------------
 # Stub SmilesValidator (avoids RDKit dependency in unit tests)
@@ -43,7 +41,7 @@ class _StubValidator:
         return self.KNOWN.get(smiles)
 
 
-@pytest.fixture()
+@pytest.fixture
 def validator() -> _StubValidator:
     return _StubValidator()
 

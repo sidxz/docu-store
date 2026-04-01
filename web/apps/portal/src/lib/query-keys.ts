@@ -88,6 +88,10 @@ export const queryKeys = {
     messages: (conversationId: string) =>
       [...queryKeys.chat.all, conversationId, "messages"] as const,
   },
+  health: {
+    all: ["health"] as const,
+    detailed: () => [...queryKeys.health.all, "detailed"] as const,
+  },
   browse: {
     all: ["browse"] as const,
     categories: () => [...queryKeys.browse.all, "categories"] as const,

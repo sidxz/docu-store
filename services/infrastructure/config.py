@@ -105,6 +105,18 @@ class Settings(BaseSettings):
         description="Max concurrent LLM activities. Ollama: 1-2, Cloud API: 5-10.",
     )
 
+    # Worker Heartbeat
+    worker_heartbeat_interval_seconds: int = Field(
+        default=30,
+        validation_alias="WORKER_HEARTBEAT_INTERVAL_SECONDS",
+        description="How often each worker writes a heartbeat to MongoDB (seconds).",
+    )
+    worker_heartbeat_stale_seconds: int = Field(
+        default=90,
+        validation_alias="WORKER_HEARTBEAT_STALE_SECONDS",
+        description="Heartbeats older than this are considered stale/offline.",
+    )
+
     # Qdrant (Vector Store)
     qdrant_url: str = Field(
         default="http://localhost:6333",

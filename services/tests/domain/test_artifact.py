@@ -268,6 +268,7 @@ class TestArtifactTagMentions:
     @staticmethod
     def _make_tag_mentions():
         from domain.value_objects.tag_mention import TagMention
+
         return [
             TagMention(tag="Aspirin", entity_type="compound_name", model_name="test"),
             TagMention(tag="EGFR", entity_type="target", model_name="test"),
@@ -287,12 +288,13 @@ class TestArtifactTagMentions:
         sample_artifact.update_tag_mentions([])
         assert sample_artifact.tag_mentions == []
 
-    def test_update_tag_mentions_raises_on_deleted_artifact(self, sample_artifact: Artifact) -> None:
+    def test_update_tag_mentions_raises_on_deleted_artifact(
+        self, sample_artifact: Artifact
+    ) -> None:
         """Test that updating tag mentions on deleted artifact raises error."""
         sample_artifact.delete()
         with pytest.raises(ValueError, match="Cannot update tag mentions on a deleted artifact"):
             sample_artifact.update_tag_mentions(self._make_tag_mentions())
-
 
 
 class TestArtifactDeletion:
@@ -580,6 +582,7 @@ class TestArtifactInvariants:
         # Tag mentions are now structured TagMention objects
         # Normalization/dedup is handled by the domain service, not the aggregate
         from domain.value_objects.tag_mention import TagMention
+
         tms = [TagMention(tag="chemistry", entity_type="target", model_name="test")]
         artifact.update_tag_mentions(tms)
         assert len(artifact.tag_mentions) == 1
@@ -647,6 +650,7 @@ class TestArtifactInvariants:
         assert artifact.version == initial_version + 1
 
         from domain.value_objects.tag_mention import TagMention
+
         artifact.update_tag_mentions([TagMention(tag="test", entity_type="target", model_name="t")])
         assert artifact.version == initial_version + 2
 

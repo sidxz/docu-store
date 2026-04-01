@@ -38,7 +38,11 @@ ENTITY_TYPE_DISPLAY_NAMES: dict[str, str] = {
 
 
 class MongoReadRepository(
-    PageReadModel, ArtifactReadModel, DashboardReadModel, TagBrowseReadModel, TagDictionaryReadModel,
+    PageReadModel,
+    ArtifactReadModel,
+    DashboardReadModel,
+    TagBrowseReadModel,
+    TagDictionaryReadModel,
 ):
     def __init__(self, client: AsyncIOMotorClient, settings: Settings) -> None:
         self.client = client
@@ -797,7 +801,8 @@ class MongoReadRepository(
 
         cursor = (
             self.tag_dictionary.find(
-                match, {"tag": 1, "entity_type": 1, "artifact_count": 1, "_id": 0},
+                match,
+                {"tag": 1, "entity_type": 1, "artifact_count": 1, "_id": 0},
             )
             .sort("artifact_count", -1)
             .limit(limit)

@@ -166,7 +166,11 @@ class QuestionAnalysisNode:
 
     async def _run_smiles_resolution(self, question: str) -> SmilesContext | None:
         """Detect SMILES in the question and resolve against the compound store."""
-        if not self._smiles_validator or not self._smiles_search or not settings.chat_smiles_resolution_enabled:
+        if (
+            not self._smiles_validator
+            or not self._smiles_search
+            or not settings.chat_smiles_resolution_enabled
+        ):
             return None
 
         from application.dtos.smiles_embedding_dtos import CompoundSearchRequest

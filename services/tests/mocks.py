@@ -16,7 +16,6 @@ from domain.exceptions import AggregateNotFoundError
 from domain.value_objects.text_chunk import TextChunk
 from domain.value_objects.text_embedding import TextEmbedding
 
-
 # ---------------------------------------------------------------------------
 # Repository mocks
 # ---------------------------------------------------------------------------
@@ -196,7 +195,14 @@ class MockVectorStore:
         allowed_artifact_ids: list[UUID] | None = None,
         workspace_id: UUID | None = None,
     ) -> list[PageSearchResult]:
-        self.search_calls.append({"limit": limit, "filter": artifact_id_filter, "allowed_artifact_ids": allowed_artifact_ids, "workspace_id": workspace_id})
+        self.search_calls.append(
+            {
+                "limit": limit,
+                "filter": artifact_id_filter,
+                "allowed_artifact_ids": allowed_artifact_ids,
+                "workspace_id": workspace_id,
+            }
+        )
         return self._search_results
 
     async def search_pages_grouped(
@@ -212,7 +218,14 @@ class MockVectorStore:
         tag_match_mode: str = "any",
         group_size: int = 1,
     ) -> list[PageSearchResult]:
-        self.search_calls.append({"limit": limit, "filter": artifact_id_filter, "allowed_artifact_ids": allowed_artifact_ids, "workspace_id": workspace_id})
+        self.search_calls.append(
+            {
+                "limit": limit,
+                "filter": artifact_id_filter,
+                "allowed_artifact_ids": allowed_artifact_ids,
+                "workspace_id": workspace_id,
+            }
+        )
         # Deduplicate by page_id (keep best score) and respect limit
         seen: dict[UUID, PageSearchResult] = {}
         for r in self._search_results:
@@ -235,7 +248,14 @@ class MockVectorStore:
         tag_match_mode: str = "any",
         group_size: int = 1,
     ) -> list[PageSearchResult]:
-        self.search_calls.append({"limit": limit, "filter": artifact_id_filter, "allowed_artifact_ids": allowed_artifact_ids, "workspace_id": workspace_id})
+        self.search_calls.append(
+            {
+                "limit": limit,
+                "filter": artifact_id_filter,
+                "allowed_artifact_ids": allowed_artifact_ids,
+                "workspace_id": workspace_id,
+            }
+        )
         return self._search_results
 
     async def set_page_payload(self, page_id: UUID, payload: dict) -> None:
@@ -266,7 +286,9 @@ class MockCompoundVectorStore:
         embeddings: list[TextEmbedding],
         workspace_id: UUID | None = None,
     ) -> None:
-        self.upsert_calls.append({"page_id": page_id, "count": len(embeddings), "workspace_id": workspace_id})
+        self.upsert_calls.append(
+            {"page_id": page_id, "count": len(embeddings), "workspace_id": workspace_id}
+        )
 
     async def delete_compound_embeddings_for_page(self, page_id: UUID) -> None:
         pass
@@ -462,7 +484,8 @@ class MockPageReadModel:
         if self._summary_count > 0:
             return self._summary_count
         return sum(
-            1 for p in self._pages.values()
+            1
+            for p in self._pages.values()
             if getattr(p, "artifact_id", None) == str(artifact_id)
             and getattr(p, "summary_candidate", None)
         )
@@ -500,13 +523,15 @@ class MockPermissionRegistrar:
         owner_id: UUID,
         visibility: str = "workspace",
     ) -> None:
-        self.register_calls.append({
-            "resource_type": resource_type,
-            "resource_id": resource_id,
-            "workspace_id": workspace_id,
-            "owner_id": owner_id,
-            "visibility": visibility,
-        })
+        self.register_calls.append(
+            {
+                "resource_type": resource_type,
+                "resource_id": resource_id,
+                "workspace_id": workspace_id,
+                "owner_id": owner_id,
+                "visibility": visibility,
+            }
+        )
 
 
 class MockWorkflowOrchestrator:
@@ -566,7 +591,9 @@ class MockWorkflowOrchestrator:
         self.artifact_tag_aggregation_calls.append(artifact_id)
 
     async def start_doc_metadata_extraction_workflow(
-        self, artifact_id: UUID, page_id: UUID,
+        self,
+        artifact_id: UUID,
+        page_id: UUID,
     ) -> None:
         if self.raise_on_call:
             raise self.raise_on_call

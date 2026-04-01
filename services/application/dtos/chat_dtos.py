@@ -50,7 +50,9 @@ class AgentEvent(BaseModel):
     query_context_reformulated: str | None = None
     # SMILES detection + resolution (emitted with query_context event)
     query_context_smiles: list[str] | None = None  # canonical SMILES detected
-    query_context_smiles_resolved: list[dict] | None = None  # [{canonical_smiles, extracted_ids, mode}]
+    query_context_smiles_resolved: list[dict] | None = (
+        None  # [{canonical_smiles, extracted_ids, mode}]
+    )
 
 
 # --- Source Citations ---
@@ -100,7 +102,9 @@ class QueryContextDTO(BaseModel):
     reformulated_query: str = ""
     grounded: bool = False
     smiles_detected: list[str] = Field(default_factory=list)  # canonical SMILES found
-    smiles_resolved: list[dict] = Field(default_factory=list)  # [{canonical_smiles, extracted_ids, mode}]
+    smiles_resolved: list[dict] = Field(
+        default_factory=list
+    )  # [{canonical_smiles, extracted_ids, mode}]
 
 
 class ThinkingBlockDTO(BaseModel):

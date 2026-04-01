@@ -88,9 +88,7 @@ class TestPageMapper:
         response = PageMapper.to_page_response(sample_page)
         assert len(response.compound_mentions) == 1
         assert response.compound_mentions[0].smiles == sample_compound_mention.smiles
-        assert (
-            response.compound_mentions[0].extracted_id == sample_compound_mention.extracted_id
-        )
+        assert response.compound_mentions[0].extracted_id == sample_compound_mention.extracted_id
 
     def test_map_page_with_tag_mentions(self, sample_page, sample_tag_mention) -> None:
         """Test mapping page with tag mentions."""

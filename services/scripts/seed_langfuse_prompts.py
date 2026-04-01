@@ -17,12 +17,7 @@ from pathlib import Path
 
 import yaml
 
-PROMPTS_DIR = (
-    Path(__file__).resolve().parents[1]
-    / "infrastructure"
-    / "llm"
-    / "default_prompts"
-)
+PROMPTS_DIR = Path(__file__).resolve().parents[1] / "infrastructure" / "llm" / "default_prompts"
 
 LANGFUSE_HOST = "http://localhost:3000"
 LANGFUSE_PUBLIC_KEY = "pk-lf-docu-store-dev"
@@ -40,7 +35,7 @@ def _wait_for_langfuse(client: object, max_retries: int = 30) -> None:
             client.auth_check()  # type: ignore[attr-defined]
             print("✅ Langfuse is ready")
             return
-        except Exception:  # noqa: BLE001
+        except Exception:
             print(f"   Waiting for Langfuse... ({attempt}/{max_retries})")
             time.sleep(3)
     print("❌ Langfuse did not become ready in time", file=sys.stderr)
@@ -49,7 +44,7 @@ def _wait_for_langfuse(client: object, max_retries: int = 30) -> None:
 
 def seed() -> None:
     try:
-        from langfuse import Langfuse  # noqa: PLC0415
+        from langfuse import Langfuse
     except ImportError:
         print("❌ langfuse package not installed — run `uv sync`", file=sys.stderr)
         sys.exit(1)
@@ -82,7 +77,7 @@ def seed() -> None:
                 type="text",
             )
             print(f"✅ Seeded prompt: {name}")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             # create_prompt raises if the exact content already exists in some SDK versions;
             # on a fresh DB this should always succeed.
             print(f"⚠️  Skipped '{name}': {exc}")

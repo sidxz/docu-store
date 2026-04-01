@@ -106,10 +106,21 @@ async def run() -> None:
         max_concurrent_activities=settings.temporal_max_concurrent_llm_activities,
     )
 
+    # Heartbeat reporter — no local ML models, just reports GPU/system info
+    from infrastructure.health.heartbeat_reporter import HeartbeatReporter
+
+    reporter = HeartbeatReporter(
+        mongo_uri=settings.mongo_uri,
+        mongo_db=settings.mongo_db,
+        worker_type="temporal_llm",
+        worker_name="Temporal LLM Worker",
+        interval_seconds=settings.worker_heartbeat_interval_seconds,
+    )
+
     logger.info("temporal_llm_worker_started")
 
     try:
-        await worker.run()
+        await asyncio.gather(worker.run(), reporter.run_forever())
     except KeyboardInterrupt:
         logger.info("temporal_llm_worker_interrupted")
     except Exception:

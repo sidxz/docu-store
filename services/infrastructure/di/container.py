@@ -637,6 +637,46 @@ def create_container() -> Container:
         workflow_orchestrator=c[WorkflowOrchestrator],
     )
 
+    # Bulk re-embed (admin action)
+    from application.workflow_use_cases.trigger_bulk_reembed_use_case import (
+        TriggerBulkReEmbedUseCase,
+    )
+
+    container[TriggerBulkReEmbedUseCase] = lambda c: TriggerBulkReEmbedUseCase(
+        artifact_read_model=c[ArtifactReadModel],
+        workflow_orchestrator=c[WorkflowOrchestrator],
+    )
+
+    # Worker heartbeat store (infrastructure → port)
+    from application.ports.worker_heartbeat_store import WorkerHeartbeatStore
+    from infrastructure.health.heartbeat_reader import MongoHeartbeatReader
+
+    container[WorkerHeartbeatStore] = lambda c: MongoHeartbeatReader(
+        client=c[AsyncIOMotorClient],
+        db_name=settings.mongo_db,
+        stale_seconds=settings.worker_heartbeat_stale_seconds,
+    )
+
+    # System health checker (infrastructure → port)
+    from application.ports.system_health_checker import SystemHealthChecker
+    from application.use_cases.system_health_use_case import GetSystemHealthUseCase
+    from infrastructure.health.health_checker import InfrastructureHealthChecker
+
+    container[SystemHealthChecker] = lambda c: InfrastructureHealthChecker(
+        mongo_client=c[AsyncIOMotorClient],
+        vector_store=c[VectorStore],
+        compound_vector_store=c[CompoundVectorStore],
+        summary_vector_store=c[SummaryVectorStore],
+        embedding_generator=c[EmbeddingGenerator],
+        chemberta_generator=c[ChemBertaEmbeddingGenerator],
+        reranker=c[Reranker],
+        heartbeat_store=c[WorkerHeartbeatStore],
+        settings=settings,
+    )
+    container[GetSystemHealthUseCase] = lambda c: GetSystemHealthUseCase(
+        health_checker=c[SystemHealthChecker],
+    )
+
     # Summary Embedding Use Cases
     container[EmbedPageSummaryUseCase] = lambda c: EmbedPageSummaryUseCase(
         page_repository=c[PageRepository],

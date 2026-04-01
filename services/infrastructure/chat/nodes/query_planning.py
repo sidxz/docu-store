@@ -130,11 +130,7 @@ class QueryPlanningNode:
                 resolved=[c.canonical_smiles for c in smiles_ctx.resolved],
                 unresolved=smiles_ctx.unresolved,
                 mode=smiles_ctx.mode,
-                injected_ids=[
-                    ext_id
-                    for c in smiles_ctx.resolved
-                    for ext_id in c.extracted_ids
-                ],
+                injected_ids=[ext_id for c in smiles_ctx.resolved for ext_id in c.extracted_ids],
             )
 
         # Rewrite reformulated_query and sub_queries to use compound names
@@ -143,11 +139,11 @@ class QueryPlanningNode:
             from infrastructure.chat.utils import replace_smiles_with_names
 
             rewritten_query = replace_smiles_with_names(
-                llm_plan.reformulated_query, smiles_ctx,
+                llm_plan.reformulated_query,
+                smiles_ctx,
             )
             rewritten_subs = [
-                replace_smiles_with_names(sq, smiles_ctx)
-                for sq in llm_plan.sub_queries
+                replace_smiles_with_names(sq, smiles_ctx) for sq in llm_plan.sub_queries
             ]
             if rewritten_query != llm_plan.reformulated_query:
                 log.info(
@@ -225,7 +221,11 @@ class QueryPlanningNode:
 
     async def _run_smiles_resolution(self, question: str) -> SmilesContext | None:
         """Detect SMILES in the question and resolve against the compound store."""
-        if not self._smiles_validator or not self._smiles_search or not settings.chat_smiles_resolution_enabled:
+        if (
+            not self._smiles_validator
+            or not self._smiles_search
+            or not settings.chat_smiles_resolution_enabled
+        ):
             log.warning(
                 "chat.planning.smiles_resolution_skipped",
                 has_validator=bool(self._smiles_validator),

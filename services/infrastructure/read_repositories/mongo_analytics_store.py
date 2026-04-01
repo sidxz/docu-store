@@ -28,7 +28,10 @@ class MongoAnalyticsStore:
     """Aggregation queries over chat_messages and user_activity collections."""
 
     def __init__(
-        self, client: AsyncIOMotorClient, db_name: str, artifacts_collection_name: str,
+        self,
+        client: AsyncIOMotorClient,
+        db_name: str,
+        artifacts_collection_name: str,
     ) -> None:
         self._db = client[db_name]
         self._artifacts_collection_name = artifacts_collection_name

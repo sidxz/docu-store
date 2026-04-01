@@ -5,7 +5,6 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from returns.result import Success
 
 from application.dtos.workflow_dtos import WorkflowStartedResponse
 from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
@@ -41,7 +40,6 @@ from tests.mocks import (
 
 
 class TestTriggerEmbeddingUseCase:
-
     @pytest.mark.asyncio
     async def test_starts_workflow_and_returns_response(self) -> None:
         orchestrator = MockWorkflowOrchestrator()
@@ -78,7 +76,6 @@ class TestTriggerEmbeddingUseCase:
 
 
 class TestTriggerCompoundExtractionUseCase:
-
     @pytest.mark.asyncio
     async def test_starts_workflow_and_returns_response(self) -> None:
         orchestrator = MockWorkflowOrchestrator()
@@ -102,7 +99,6 @@ class TestTriggerCompoundExtractionUseCase:
 
 
 class TestTriggerSmilesEmbeddingUseCase:
-
     @pytest.mark.asyncio
     async def test_starts_workflow_and_returns_response(self) -> None:
         orchestrator = MockWorkflowOrchestrator()
@@ -126,7 +122,6 @@ class TestTriggerSmilesEmbeddingUseCase:
 
 
 class TestTriggerPageSummarizationUseCase:
-
     @pytest.mark.asyncio
     async def test_starts_workflow_and_returns_response(self) -> None:
         orchestrator = MockWorkflowOrchestrator()
@@ -150,7 +145,6 @@ class TestTriggerPageSummarizationUseCase:
 
 
 class TestLogArtifactSampleUseCase:
-
     @pytest.mark.asyncio
     async def test_starts_workflow_and_returns_response(self) -> None:
         orchestrator = MockWorkflowOrchestrator()
@@ -191,7 +185,9 @@ class TestLogArtifactSampleUseCase:
 
         await use_case.execute(artifact_id=artifact_id, storage_location="/bucket/key/doc.pdf")
 
-        assert orchestrator.artifact_processing_calls[0]["storage_location"] == "/bucket/key/doc.pdf"
+        assert (
+            orchestrator.artifact_processing_calls[0]["storage_location"] == "/bucket/key/doc.pdf"
+        )
 
 
 # ============================================================================
@@ -220,7 +216,6 @@ def _make_artifact_with_pages(n_pages: int = 3) -> tuple[Artifact, list[Page]]:
 
 
 class TestTriggerArtifactTagAggregationUseCase:
-
     @pytest.mark.asyncio
     async def test_starts_workflow_with_artifact_id(self) -> None:
         orchestrator = MockWorkflowOrchestrator()
@@ -258,7 +253,6 @@ class TestTriggerArtifactTagAggregationUseCase:
 
 
 class TestTriggerArtifactSummarizationUseCase:
-
     @pytest.mark.asyncio
     async def test_triggers_when_all_pages_summarized(self) -> None:
         artifact, _pages = _make_artifact_with_pages(3)
@@ -335,7 +329,6 @@ class TestTriggerArtifactSummarizationUseCase:
 
 
 class TestTriggerDocMetadataExtractionUseCase:
-
     @pytest.mark.asyncio
     async def test_starts_workflow_for_page_zero(self) -> None:
         artifact_id = uuid4()
@@ -389,7 +382,8 @@ class TestTriggerDocMetadataExtractionUseCase:
         )
 
         result = await use_case.execute(
-            page_id=page.id, artifact_id=override_artifact_id,
+            page_id=page.id,
+            artifact_id=override_artifact_id,
         )
 
         assert result is not None

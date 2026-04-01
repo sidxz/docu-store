@@ -119,7 +119,9 @@ class ContextAssemblyNode:
                 continue
 
             # Bioactivity and structure results always HIGH (deterministic structured data)
-            if r.query_source.startswith("tool_bioactivity:") or r.query_source.startswith("tool_structure:"):
+            if r.query_source.startswith("tool_bioactivity:") or r.query_source.startswith(
+                "tool_structure:"
+            ):
                 high.append(r)
                 continue
 

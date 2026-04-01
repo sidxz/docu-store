@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import Any
 from urllib.parse import quote
 
 import structlog
@@ -55,7 +54,7 @@ class PubChemClient:
     async def lookup_smiles(self, smiles: str) -> PubChemCompoundInfo:
         """Look up a single SMILES in PubChem and return compound info."""
         try:
-            import httpx  # noqa: PLC0415
+            import httpx
         except ImportError:
             return PubChemCompoundInfo(
                 canonical_smiles=smiles,

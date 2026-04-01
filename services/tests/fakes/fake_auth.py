@@ -23,45 +23,67 @@ class FakeAuth:
 
     def has_role(self, minimum_role: str) -> bool:
         return _ROLE_HIERARCHY.get(self.workspace_role, -1) >= _ROLE_HIERARCHY.get(
-            minimum_role, 99,
+            minimum_role,
+            99,
         )
 
     async def can(
-        self, resource_type: str, resource_id: UUID, action: str,
+        self,
+        resource_type: str,
+        resource_id: UUID,
+        action: str,
     ) -> bool:
         """Return True by default in tests (full access)."""
         return True
 
     async def accessible(
-        self, resource_type: str, action: str, limit: int | None = None,
+        self,
+        resource_type: str,
+        action: str,
+        limit: int | None = None,
     ) -> tuple[list[UUID], bool]:
         """Return full access by default in tests."""
         return ([], True)
 
     async def share(
-        self, resource_type: str, resource_id: UUID,
-        grantee_type: str, grantee_id: UUID, permission: str = "view",
+        self,
+        resource_type: str,
+        resource_id: UUID,
+        grantee_type: str,
+        grantee_id: UUID,
+        permission: str = "view",
     ) -> dict:
         return {"status": "ok"}
 
     async def unshare(
-        self, resource_type: str, resource_id: UUID,
-        grantee_type: str, grantee_id: UUID, permission: str = "view",
+        self,
+        resource_type: str,
+        resource_id: UUID,
+        grantee_type: str,
+        grantee_id: UUID,
+        permission: str = "view",
     ) -> dict:
         return {"status": "ok"}
 
     async def update_visibility(
-        self, resource_type: str, resource_id: UUID, visibility: str,
+        self,
+        resource_type: str,
+        resource_id: UUID,
+        visibility: str,
     ) -> dict:
         return {"status": "ok"}
 
     async def get_resource_acl(
-        self, resource_type: str, resource_id: UUID,
+        self,
+        resource_type: str,
+        resource_id: UUID,
     ) -> dict:
         return {"id": str(uuid4()), "visibility": "workspace", "shares": []}
 
     async def get_enriched_resource_acl(
-        self, resource_type: str, resource_id: UUID,
+        self,
+        resource_type: str,
+        resource_id: UUID,
     ) -> dict:
         return {
             "id": str(uuid4()),
@@ -73,7 +95,9 @@ class FakeAuth:
         }
 
     async def search_members(
-        self, query: str | None = None, limit: int | None = None,
+        self,
+        query: str | None = None,
+        limit: int | None = None,
     ) -> list[dict]:
         return []
 

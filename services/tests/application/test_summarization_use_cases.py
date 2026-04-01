@@ -71,7 +71,6 @@ def _setup(
 
 
 class TestSummarizePageUseCase:
-
     @pytest.mark.asyncio
     async def test_hybrid_mode_when_long_text_and_image(self) -> None:
         use_case, page, page_repo = _setup(text=_LONG_TEXT, image_exists=True)

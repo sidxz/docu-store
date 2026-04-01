@@ -65,7 +65,6 @@ def _make_use_case(
 
 
 class TestExtractCompoundMentionsUseCase:
-
     @pytest.mark.asyncio
     async def test_success_with_valid_compounds(self) -> None:
         results = [
@@ -107,7 +106,9 @@ class TestExtractCompoundMentionsUseCase:
 
     @pytest.mark.asyncio
     async def test_invalid_smiles_stored_with_flag(self) -> None:
-        results = [CserCompoundResult(smiles="invalid-smiles", label_text="X", match_confidence=0.5)]
+        results = [
+            CserCompoundResult(smiles="invalid-smiles", label_text="X", match_confidence=0.5)
+        ]
         use_case, page, _, _, _ = _make_use_case(cser_results=results, valid=False)
 
         result = await use_case.execute(page.id)

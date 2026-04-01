@@ -302,6 +302,25 @@ async def trigger_doc_metadata_extraction(
     return WorkflowStartedResponse(workflow_id=f"doc-metadata-{artifact_id}")
 
 
+@router.post("/{artifact_id}/reembed", status_code=status.HTTP_202_ACCEPTED)
+async def trigger_artifact_reembed(
+    artifact_id: UUID,
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> WorkflowStartedResponse:
+    """Trigger batch re-embedding for all pages of an artifact (non-blocking).
+
+    Re-embeds every page with full contextual prefixes (title, tags, summary)
+    in a single batched workflow. Useful after fixing GPU/driver issues or
+    updating embedding models.
+    """
+    await require_workspace_artifact(artifact_id, auth, container)
+    await require_artifact_permission(artifact_id, auth, "edit")
+    orchestrator = container[WorkflowOrchestrator]
+    await orchestrator.start_batch_reembed_workflow(artifact_id=artifact_id)
+    return WorkflowStartedResponse(workflow_id=f"batch-reembed-{artifact_id}")
+
+
 @router.get("/{artifact_id}/summary", status_code=status.HTTP_200_OK)
 async def get_artifact_summary(
     artifact_id: UUID,

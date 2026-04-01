@@ -85,7 +85,7 @@ def main() -> None:
             blob_store.put_stream(thumb_key, thumb_buf, mime_type="image/jpeg")
             created += 1
             print(f"  Created: {thumb_key}")
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             failed += 1
             print(f"  FAILED: {png_key} — {e}")
 

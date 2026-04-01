@@ -139,13 +139,17 @@ class TestBioactivityReducer:
         """Bioactivity with matching compound is folded into compound's params."""
         tags = [
             _tm("LG-0019310", "compound_name"),
-            _tm("hERG IC50>30µM", "bioactivity", {
-                "entity_type": "bioactivity",
-                "compound_name": "LG-0019310",
-                "assay_type": "IC50",
-                "value": ">30",
-                "unit": "µM",
-            }),
+            _tm(
+                "hERG IC50>30µM",
+                "bioactivity",
+                {
+                    "entity_type": "bioactivity",
+                    "compound_name": "LG-0019310",
+                    "assay_type": "IC50",
+                    "value": ">30",
+                    "unit": "µM",
+                },
+            ),
         ]
         result = associate_bioactivities(tags)
 
@@ -162,20 +166,28 @@ class TestBioactivityReducer:
         """Multiple bioactivities for one compound all get collected."""
         tags = [
             _tm("Aspirin", "compound_name"),
-            _tm("IC50 = 5nM", "bioactivity", {
-                "entity_type": "bioactivity",
-                "compound_name": "Aspirin",
-                "assay_type": "IC50",
-                "value": "5",
-                "unit": "nM",
-            }),
-            _tm("MIC 2µg/mL", "bioactivity", {
-                "entity_type": "bioactivity",
-                "compound_name": "Aspirin",
-                "assay_type": "MIC",
-                "value": "2",
-                "unit": "µg/mL",
-            }),
+            _tm(
+                "IC50 = 5nM",
+                "bioactivity",
+                {
+                    "entity_type": "bioactivity",
+                    "compound_name": "Aspirin",
+                    "assay_type": "IC50",
+                    "value": "5",
+                    "unit": "nM",
+                },
+            ),
+            _tm(
+                "MIC 2µg/mL",
+                "bioactivity",
+                {
+                    "entity_type": "bioactivity",
+                    "compound_name": "Aspirin",
+                    "assay_type": "MIC",
+                    "value": "2",
+                    "unit": "µg/mL",
+                },
+            ),
         ]
         result = associate_bioactivities(tags)
 
@@ -189,12 +201,16 @@ class TestBioactivityReducer:
         """Bioactivity without compound_name is dropped."""
         tags = [
             _tm("Aspirin", "compound_name"),
-            _tm("IC50 = 5nM", "bioactivity", {
-                "entity_type": "bioactivity",
-                "assay_type": "IC50",
-                "value": "5",
-                "unit": "nM",
-            }),
+            _tm(
+                "IC50 = 5nM",
+                "bioactivity",
+                {
+                    "entity_type": "bioactivity",
+                    "assay_type": "IC50",
+                    "value": "5",
+                    "unit": "nM",
+                },
+            ),
         ]
         result = associate_bioactivities(tags)
 
@@ -206,13 +222,17 @@ class TestBioactivityReducer:
         """Bioactivity referencing a compound not in the tag list is dropped."""
         tags = [
             _tm("Aspirin", "compound_name"),
-            _tm("IC50 = 5nM", "bioactivity", {
-                "entity_type": "bioactivity",
-                "compound_name": "Ibuprofen",
-                "assay_type": "IC50",
-                "value": "5",
-                "unit": "nM",
-            }),
+            _tm(
+                "IC50 = 5nM",
+                "bioactivity",
+                {
+                    "entity_type": "bioactivity",
+                    "compound_name": "Ibuprofen",
+                    "assay_type": "IC50",
+                    "value": "5",
+                    "unit": "nM",
+                },
+            ),
         ]
         result = associate_bioactivities(tags)
 
@@ -224,13 +244,17 @@ class TestBioactivityReducer:
         """Compound name matching is case-insensitive and ignores spaces."""
         tags = [
             _tm("LG-0019310", "compound_name"),
-            _tm("IC50>30µM", "bioactivity", {
-                "entity_type": "bioactivity",
-                "compound_name": "lg-0019310",
-                "assay_type": "IC50",
-                "value": ">30",
-                "unit": "µM",
-            }),
+            _tm(
+                "IC50>30µM",
+                "bioactivity",
+                {
+                    "entity_type": "bioactivity",
+                    "compound_name": "lg-0019310",
+                    "assay_type": "IC50",
+                    "value": ">30",
+                    "unit": "µM",
+                },
+            ),
         ]
         result = associate_bioactivities(tags)
 
@@ -273,15 +297,20 @@ class TestTagMentionAggregator:
         page1_tags = [_tm("EGFR", "target", {"entity_type": "target"})]
         page2_tags = [
             TagMention(
-                tag="EGFR", entity_type="target", confidence=0.99,
-                date_extracted=datetime.now(UTC), model_name="test",
+                tag="EGFR",
+                entity_type="target",
+                confidence=0.99,
+                date_extracted=datetime.now(UTC),
+                model_name="test",
                 additional_model_params={"entity_type": "target"},
             ),
         ]
-        result = aggregate_tag_mentions([
-            _page_data(page1_tags, 0),
-            _page_data(page2_tags, 1),
-        ])
+        result = aggregate_tag_mentions(
+            [
+                _page_data(page1_tags, 0),
+                _page_data(page2_tags, 1),
+            ]
+        )
 
         assert len(result) == 1
         assert result[0].tag == "EGFR"
@@ -293,14 +322,19 @@ class TestTagMentionAggregator:
         page1_tags = [_tm("EGFR", "target")]
         page2_tags = [
             TagMention(
-                tag="EGFR", entity_type="target", confidence=0.99,
-                date_extracted=datetime.now(UTC), model_name="test",
+                tag="EGFR",
+                entity_type="target",
+                confidence=0.99,
+                date_extracted=datetime.now(UTC),
+                model_name="test",
             ),
         ]
-        result = aggregate_tag_mentions([
-            (pid1, 0, page1_tags),
-            (pid2, 2, page2_tags),
-        ])
+        result = aggregate_tag_mentions(
+            [
+                (pid1, 0, page1_tags),
+                (pid2, 2, page2_tags),
+            ]
+        )
 
         assert len(result) == 1
         tag = result[0]
@@ -314,18 +348,41 @@ class TestTagMentionAggregator:
 
     def test_compound_bioactivities_merged_across_pages(self) -> None:
         """Same compound on two pages with different bioactivities → merged."""
-        page1_tags = [_tm("Aspirin", "compound_name", {
-            "entity_type": "compound_name",
-            "bioactivities": [{"assay_type": "IC50", "value": "5", "unit": "nM", "raw_text": "IC50 5nM"}],
-        })]
-        page2_tags = [_tm("Aspirin", "compound_name", {
-            "entity_type": "compound_name",
-            "bioactivities": [{"assay_type": "MIC", "value": "2", "unit": "µg/mL", "raw_text": "MIC 2µg/mL"}],
-        })]
-        result = aggregate_tag_mentions([
-            _page_data(page1_tags, 0),
-            _page_data(page2_tags, 1),
-        ])
+        page1_tags = [
+            _tm(
+                "Aspirin",
+                "compound_name",
+                {
+                    "entity_type": "compound_name",
+                    "bioactivities": [
+                        {"assay_type": "IC50", "value": "5", "unit": "nM", "raw_text": "IC50 5nM"}
+                    ],
+                },
+            )
+        ]
+        page2_tags = [
+            _tm(
+                "Aspirin",
+                "compound_name",
+                {
+                    "entity_type": "compound_name",
+                    "bioactivities": [
+                        {
+                            "assay_type": "MIC",
+                            "value": "2",
+                            "unit": "µg/mL",
+                            "raw_text": "MIC 2µg/mL",
+                        }
+                    ],
+                },
+            )
+        ]
+        result = aggregate_tag_mentions(
+            [
+                _page_data(page1_tags, 0),
+                _page_data(page2_tags, 1),
+            ]
+        )
 
         assert len(result) == 1
         activities = result[0].additional_model_params["bioactivities"]
@@ -336,18 +393,32 @@ class TestTagMentionAggregator:
     def test_duplicate_bioactivities_deduped(self) -> None:
         """Same bioactivity on two pages → kept once."""
         bio = {"assay_type": "IC50", "value": "5", "unit": "nM", "raw_text": "IC50 5nM"}
-        page1_tags = [_tm("Aspirin", "compound_name", {
-            "entity_type": "compound_name",
-            "bioactivities": [bio],
-        })]
-        page2_tags = [_tm("Aspirin", "compound_name", {
-            "entity_type": "compound_name",
-            "bioactivities": [bio],
-        })]
-        result = aggregate_tag_mentions([
-            _page_data(page1_tags, 0),
-            _page_data(page2_tags, 1),
-        ])
+        page1_tags = [
+            _tm(
+                "Aspirin",
+                "compound_name",
+                {
+                    "entity_type": "compound_name",
+                    "bioactivities": [bio],
+                },
+            )
+        ]
+        page2_tags = [
+            _tm(
+                "Aspirin",
+                "compound_name",
+                {
+                    "entity_type": "compound_name",
+                    "bioactivities": [bio],
+                },
+            )
+        ]
+        result = aggregate_tag_mentions(
+            [
+                _page_data(page1_tags, 0),
+                _page_data(page2_tags, 1),
+            ]
+        )
 
         activities = result[0].additional_model_params["bioactivities"]
         assert len(activities) == 1
@@ -356,10 +427,12 @@ class TestTagMentionAggregator:
         """Same tag with different casing → one entry."""
         page1_tags = [_tm("EGFR", "target")]
         page2_tags = [_tm("egfr", "target")]
-        result = aggregate_tag_mentions([
-            _page_data(page1_tags, 0),
-            _page_data(page2_tags, 1),
-        ])
+        result = aggregate_tag_mentions(
+            [
+                _page_data(page1_tags, 0),
+                _page_data(page2_tags, 1),
+            ]
+        )
 
         assert len(result) == 1
 
@@ -373,23 +446,44 @@ class TestTagMentionAggregator:
     def test_empty_pages(self) -> None:
         """Empty input returns empty."""
         assert aggregate_tag_mentions([]) == []
-        assert aggregate_tag_mentions([
-            _page_data([], 0),
-            _page_data([], 1),
-        ]) == []
+        assert (
+            aggregate_tag_mentions(
+                [
+                    _page_data([], 0),
+                    _page_data([], 1),
+                ]
+            )
+            == []
+        )
 
     def test_synonyms_merged(self) -> None:
         """Synonyms from multiple pages are merged."""
-        page1_tags = [_tm("Aspirin", "compound_name", {
-            "entity_type": "compound_name", "synonyms": "ASA",
-        })]
-        page2_tags = [_tm("Aspirin", "compound_name", {
-            "entity_type": "compound_name", "synonyms": "acetylsalicylic acid",
-        })]
-        result = aggregate_tag_mentions([
-            _page_data(page1_tags, 0),
-            _page_data(page2_tags, 1),
-        ])
+        page1_tags = [
+            _tm(
+                "Aspirin",
+                "compound_name",
+                {
+                    "entity_type": "compound_name",
+                    "synonyms": "ASA",
+                },
+            )
+        ]
+        page2_tags = [
+            _tm(
+                "Aspirin",
+                "compound_name",
+                {
+                    "entity_type": "compound_name",
+                    "synonyms": "acetylsalicylic acid",
+                },
+            )
+        ]
+        result = aggregate_tag_mentions(
+            [
+                _page_data(page1_tags, 0),
+                _page_data(page2_tags, 1),
+            ]
+        )
 
         synonyms = result[0].additional_model_params["synonyms"]
         assert "ASA" in synonyms

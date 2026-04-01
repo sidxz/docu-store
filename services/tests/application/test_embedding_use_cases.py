@@ -8,14 +8,14 @@ import pytest
 from returns.result import Failure, Success
 
 from application.dtos.embedding_dtos import SearchRequest
+from application.ports.vector_store import PageSearchResult
 from application.use_cases.embedding_use_cases import (
     GeneratePageEmbeddingUseCase,
     SearchSimilarPagesUseCase,
 )
-from application.ports.vector_store import PageSearchResult
 from domain.aggregates.page import Page
-from domain.value_objects.text_mention import TextMention
 from domain.value_objects.embedding_metadata import EmbeddingMetadata
+from domain.value_objects.text_mention import TextMention
 from tests.mocks import (
     MockArtifactReadModel,
     MockEmbeddingGenerator,
@@ -37,6 +37,7 @@ def _page_with_embedding(text: str) -> Page:
     page = _page_with_text(text)
     emb = make_embedding()
     from datetime import UTC, datetime
+
     meta = EmbeddingMetadata(
         embedding_id=emb.embedding_id,
         model_name=emb.model_name,
@@ -49,7 +50,6 @@ def _page_with_embedding(text: str) -> Page:
 
 
 class TestGeneratePageEmbeddingUseCase:
-
     @pytest.mark.asyncio
     async def test_success_generates_and_stores_chunks(self) -> None:
         page = _page_with_text("A" * 200)
@@ -168,7 +168,6 @@ class TestGeneratePageEmbeddingUseCase:
 
 
 class TestSearchSimilarPagesUseCase:
-
     def _make_search_result(self, page_id, artifact_id, score=0.9) -> PageSearchResult:
         return PageSearchResult(
             page_id=page_id,
@@ -205,7 +204,10 @@ class TestSearchSimilarPagesUseCase:
     @pytest.mark.asyncio
     async def test_empty_results_returns_empty_response(self) -> None:
         use_case = SearchSimilarPagesUseCase(
-            MockEmbeddingGenerator(), MockVectorStore(), MockPageReadModel(), MockArtifactReadModel()
+            MockEmbeddingGenerator(),
+            MockVectorStore(),
+            MockPageReadModel(),
+            MockArtifactReadModel(),
         )
         result = await use_case.execute(SearchRequest(query_text="nothing here"))
 
@@ -220,6 +222,7 @@ class TestSearchSimilarPagesUseCase:
 
         # Build a fake PageResponse-like object with text_mention
         from types import SimpleNamespace
+
         fake_page = SimpleNamespace(
             page_id=page_id,
             text_mention=SimpleNamespace(text="Page text preview"),
@@ -274,8 +277,10 @@ class TestSearchSimilarPagesUseCase:
     async def test_respects_limit(self) -> None:
         page_ids = [uuid4() for _ in range(5)]
         artifact_id = uuid4()
-        results = [self._make_search_result(pid, artifact_id, score=0.9 - i * 0.1)
-                   for i, pid in enumerate(page_ids)]
+        results = [
+            self._make_search_result(pid, artifact_id, score=0.9 - i * 0.1)
+            for i, pid in enumerate(page_ids)
+        ]
 
         vector_store = MockVectorStore(search_results=results)
         use_case = SearchSimilarPagesUseCase(

@@ -44,11 +44,12 @@ def _page_with_compounds(compounds: list[CompoundMention]) -> Page:
 
 
 class TestEmbedCompoundSmilesUseCase:
-
     @pytest.mark.asyncio
     async def test_success_embeds_valid_compounds(self) -> None:
-        compounds = [_make_valid_compound("c1ccccc1", "c1ccccc1"),
-                     _make_valid_compound("CCO", "CCO")]
+        compounds = [
+            _make_valid_compound("c1ccccc1", "c1ccccc1"),
+            _make_valid_compound("CCO", "CCO"),
+        ]
         page = _page_with_compounds(compounds)
 
         repo = MockPageRepository()
@@ -111,7 +112,9 @@ class TestEmbedCompoundSmilesUseCase:
         repo = MockPageRepository()
         repo.pages[page.id] = page
 
-        use_case = EmbedCompoundSmilesUseCase(repo, MockEmbeddingGenerator(), MockCompoundVectorStore())
+        use_case = EmbedCompoundSmilesUseCase(
+            repo, MockEmbeddingGenerator(), MockCompoundVectorStore()
+        )
         result = await use_case.execute(page.id)
 
         assert isinstance(result, Success)
