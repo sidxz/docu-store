@@ -410,6 +410,66 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
                 error=str(e),
             )
 
+    async def start_batch_reembed_smiles_workflow(
+        self,
+        artifact_id: UUID,
+    ) -> None:
+        """Start the batch SMILES re-embed workflow for an artifact."""
+        await self._ensure_client()
+
+        from temporalio.common import WorkflowIDReusePolicy
+
+        workflow_id = f"batch-reembed-smiles-{artifact_id}"
+
+        try:
+            await self._client.start_workflow(
+                "BatchReEmbedSmilesWorkflow",
+                str(artifact_id),
+                id=workflow_id,
+                task_queue="artifact_processing",
+                id_reuse_policy=WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+            )
+            logger.info(
+                "batch_reembed_smiles_workflow_started",
+                artifact_id=str(artifact_id),
+            )
+        except Exception as e:
+            logger.exception(
+                "failed_to_start_batch_reembed_smiles_workflow",
+                artifact_id=str(artifact_id),
+                error=str(e),
+            )
+
+    async def start_batch_reembed_summaries_workflow(
+        self,
+        artifact_id: UUID,
+    ) -> None:
+        """Start the batch summaries re-embed workflow for an artifact."""
+        await self._ensure_client()
+
+        from temporalio.common import WorkflowIDReusePolicy
+
+        workflow_id = f"batch-reembed-summaries-{artifact_id}"
+
+        try:
+            await self._client.start_workflow(
+                "BatchReEmbedSummariesWorkflow",
+                str(artifact_id),
+                id=workflow_id,
+                task_queue="artifact_processing",
+                id_reuse_policy=WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+            )
+            logger.info(
+                "batch_reembed_summaries_workflow_started",
+                artifact_id=str(artifact_id),
+            )
+        except Exception as e:
+            logger.exception(
+                "failed_to_start_batch_reembed_summaries_workflow",
+                artifact_id=str(artifact_id),
+                error=str(e),
+            )
+
     async def get_page_workflow_statuses(
         self,
         page_id: UUID,

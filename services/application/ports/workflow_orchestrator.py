@@ -216,6 +216,36 @@ class WorkflowOrchestrator(Protocol):
         ...
 
     @abstractmethod
+    async def start_batch_reembed_smiles_workflow(
+        self,
+        artifact_id: UUID,
+    ) -> None:
+        """Start the batch SMILES re-embed workflow for an artifact.
+
+        Re-embeds all compound SMILES vectors for every page of the artifact.
+
+        Args:
+            artifact_id: Unique identifier of the artifact.
+
+        """
+        ...
+
+    @abstractmethod
+    async def start_batch_reembed_summaries_workflow(
+        self,
+        artifact_id: UUID,
+    ) -> None:
+        """Start the batch summaries re-embed workflow for an artifact.
+
+        Re-embeds all page summaries and the artifact summary.
+
+        Args:
+            artifact_id: Unique identifier of the artifact.
+
+        """
+        ...
+
+    @abstractmethod
     async def get_page_workflow_statuses(
         self,
         page_id: UUID,

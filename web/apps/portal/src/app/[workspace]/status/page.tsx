@@ -30,6 +30,8 @@ import { queryKeys } from "@/lib/query-keys";
 import {
   useDetailedHealth,
   useReembedAll,
+  ALL_REEMBED_TARGETS,
+  type ReEmbedTarget,
   type ServiceStatus,
   type ModelStatus,
   type GpuDevice,
@@ -398,6 +400,127 @@ function LoadingSkeleton() {
 }
 
 // ---------------------------------------------------------------------------
+// Re-embed Admin Action
+// ---------------------------------------------------------------------------
+
+const REEMBED_LABELS: Record<ReEmbedTarget, string> = {
+  text: "Text Embeddings",
+  smiles: "SMILES Embeddings",
+  summaries: "Summary Embeddings",
+};
+
+function ReEmbedSection() {
+  const reembedAll = useReembedAll();
+  const [selected, setSelected] = useState<Set<ReEmbedTarget>>(
+    () => new Set(ALL_REEMBED_TARGETS),
+  );
+
+  const toggle = (t: ReEmbedTarget) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(t)) next.delete(t);
+      else next.add(t);
+      return next;
+    });
+
+  const allSelected = selected.size === ALL_REEMBED_TARGETS.length;
+
+  const toggleAll = () =>
+    setSelected(
+      allSelected ? new Set() : new Set(ALL_REEMBED_TARGETS),
+    );
+
+  return (
+    <Card>
+      <CardHeader title="Admin Actions" />
+      <div className="space-y-3">
+        <div className="rounded-lg border border-border-default bg-surface-sunken/30 p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
+              <Layers className="h-4.5 w-4.5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-text-primary">
+                Re-embed Documents
+              </p>
+              <p className="text-xs text-text-muted">
+                Triggers batch re-embedding for every artifact. Select which
+                vector collections to rebuild.
+              </p>
+            </div>
+          </div>
+
+          {/* Collection selector */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleAll}
+              className="rounded-md border border-border-default px-2.5 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-surface-sunken"
+            >
+              {allSelected ? "Deselect All" : "Select All"}
+            </button>
+            <span className="text-text-muted/40">|</span>
+            {ALL_REEMBED_TARGETS.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => toggle(t)}
+                className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                  selected.has(t)
+                    ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                    : "border-border-default text-text-muted hover:bg-surface-sunken"
+                }`}
+              >
+                {selected.has(t) && (
+                  <Check className="mr-1 inline-block h-3 w-3" />
+                )}
+                {REEMBED_LABELS[t]}
+              </button>
+            ))}
+          </div>
+
+          {/* Trigger button */}
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              onClick={() => reembedAll.mutate([...selected])}
+              disabled={reembedAll.isPending || selected.size === 0}
+              className="shrink-0 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-500/20 disabled:opacity-50 dark:text-amber-400"
+            >
+              {reembedAll.isPending ? "Triggering..." : "Trigger Re-embed"}
+            </button>
+          </div>
+        </div>
+
+        {reembedAll.isSuccess && (
+          <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3">
+            <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+              Started {reembedAll.data.triggered} re-embed workflow
+              {reembedAll.data.triggered !== 1 ? "s" : ""} for{" "}
+              {reembedAll.data.targets
+                .map((t) => REEMBED_LABELS[t])
+                .join(", ")}
+              .
+            </p>
+          </div>
+        )}
+
+        {reembedAll.isError && (
+          <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3">
+            <p className="text-xs font-medium text-ds-error">
+              Failed to trigger re-embed:{" "}
+              {reembedAll.error instanceof Error
+                ? reembedAll.error.message
+                : "Unknown error"}
+            </p>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -408,7 +531,6 @@ export default function StatusPage() {
   const [copied, setCopied] = useState(false);
 
   const { data, isLoading, error, dataUpdatedAt } = useDetailedHealth(refreshInterval);
-  const reembedAll = useReembedAll();
 
   const handleRefresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.health.all });
@@ -481,8 +603,13 @@ export default function StatusPage() {
         title="System Status"
         subtitle="Infrastructure health, GPU status, and service connectivity"
         badge={
-          <span className="rounded bg-surface-sunken px-2 py-0.5 text-xs font-medium text-text-muted">
-            v{data.system.app_version}
+          <span className="flex items-center gap-1.5 text-xs font-medium text-text-muted">
+            <span className="rounded bg-surface-sunken px-2 py-0.5">
+              BE v{data.system.app_version}
+            </span>
+            <span className="rounded bg-surface-sunken px-2 py-0.5">
+              FE v{process.env.APP_VERSION ?? "dev"}
+            </span>
           </span>
         }
         actions={
@@ -521,12 +648,18 @@ export default function StatusPage() {
       <OverallBanner status={data.overall_status} />
 
       {/* ---- System Info Cards ---- */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
           icon={Server}
-          label="App Version"
+          label="BE Version"
           value={data.system.app_version}
           accentColor="bg-blue-500/10"
+        />
+        <StatCard
+          icon={Layers}
+          label="FE Version"
+          value={process.env.APP_VERSION ?? "dev"}
+          accentColor="bg-indigo-500/10"
         />
         <StatCard
           icon={MonitorCog}
@@ -596,56 +729,7 @@ export default function StatusPage() {
 
       {/* ---- Admin Actions ---- */}
       <div className="mt-6">
-        <Card>
-          <CardHeader title="Admin Actions" />
-          <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-lg border border-border-default bg-surface-sunken/30 p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10">
-                  <Layers className="h-4.5 w-4.5 text-amber-600 dark:text-amber-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-text-primary">
-                    Re-embed All Documents
-                  </p>
-                  <p className="text-xs text-text-muted">
-                    Triggers batch re-embedding for every artifact with full
-                    contextual prefixes. Use after fixing GPU issues or updating
-                    models.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => reembedAll.mutate()}
-                disabled={reembedAll.isPending}
-                className="shrink-0 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-500/20 disabled:opacity-50 dark:text-amber-400"
-              >
-                {reembedAll.isPending ? "Triggering..." : "Trigger Re-embed"}
-              </button>
-            </div>
-
-            {reembedAll.isSuccess && (
-              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3">
-                <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                  Started {reembedAll.data.triggered} re-embed workflow
-                  {reembedAll.data.triggered !== 1 ? "s" : ""}.
-                </p>
-              </div>
-            )}
-
-            {reembedAll.isError && (
-              <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3">
-                <p className="text-xs font-medium text-ds-error">
-                  Failed to trigger re-embed:{" "}
-                  {reembedAll.error instanceof Error
-                    ? reembedAll.error.message
-                    : "Unknown error"}
-                </p>
-              </div>
-            )}
-          </div>
-        </Card>
+        <ReEmbedSection />
       </div>
 
       {/* ---- Footer: last checked ---- */}

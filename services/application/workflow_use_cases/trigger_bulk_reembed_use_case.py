@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import structlog
 
-from application.dtos.health_dtos import BulkWorkflowResponse
+from application.dtos.health_dtos import ALL_REEMBED_TARGETS, BulkWorkflowResponse, ReEmbedTarget
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -16,13 +16,20 @@ if TYPE_CHECKING:
 
 log = structlog.get_logger(__name__)
 
+# Maps target name → (orchestrator method name, workflow ID prefix)
+_TARGET_DISPATCH: dict[ReEmbedTarget, tuple[str, str]] = {
+    "text": ("start_batch_reembed_workflow", "batch-reembed"),
+    "smiles": ("start_batch_reembed_smiles_workflow", "batch-reembed-smiles"),
+    "summaries": ("start_batch_reembed_summaries_workflow", "batch-reembed-summaries"),
+}
+
 
 class TriggerBulkReEmbedUseCase:
     """Start batch re-embed workflows for every artifact in a workspace.
 
-    Iterates all artifacts and starts a BatchReEmbedArtifactPagesWorkflow
-    for each. Failures on individual artifacts are logged and skipped
-    so that one broken artifact does not block the rest.
+    Accepts a list of targets to control which collections are re-embedded.
+    Each target starts a separate Temporal workflow per artifact so they
+    run in parallel.
     """
 
     def __init__(
@@ -33,7 +40,13 @@ class TriggerBulkReEmbedUseCase:
         self._artifact_read_model = artifact_read_model
         self._workflow_orchestrator = workflow_orchestrator
 
-    async def execute(self, workspace_id: UUID) -> BulkWorkflowResponse:
+    async def execute(
+        self,
+        workspace_id: UUID,
+        targets: list[ReEmbedTarget] | None = None,
+    ) -> BulkWorkflowResponse:
+        effective_targets = targets or list(ALL_REEMBED_TARGETS)
+
         artifacts = await self._artifact_read_model.list_artifacts(
             workspace_id=workspace_id,
             limit=10_000,
@@ -41,24 +54,28 @@ class TriggerBulkReEmbedUseCase:
 
         workflow_ids: list[str] = []
         for artifact in artifacts:
-            try:
-                await self._workflow_orchestrator.start_batch_reembed_workflow(
-                    artifact_id=artifact.id,
-                )
-                workflow_ids.append(f"batch-reembed-{artifact.id}")
-            except Exception:
-                log.warning(
-                    "trigger_bulk_reembed.artifact_failed",
-                    artifact_id=str(artifact.id),
-                )
+            for target in effective_targets:
+                method_name, wf_prefix = _TARGET_DISPATCH[target]
+                try:
+                    method = getattr(self._workflow_orchestrator, method_name)
+                    await method(artifact_id=artifact.id)
+                    workflow_ids.append(f"{wf_prefix}-{artifact.id}")
+                except Exception:
+                    log.warning(
+                        "trigger_bulk_reembed.artifact_failed",
+                        artifact_id=str(artifact.id),
+                        target=target,
+                    )
 
         log.info(
             "trigger_bulk_reembed.completed",
             total=len(workflow_ids),
+            targets=effective_targets,
             workspace_id=str(workspace_id),
         )
 
         return BulkWorkflowResponse(
             triggered=len(workflow_ids),
             workflow_ids=workflow_ids,
+            targets=effective_targets,
         )

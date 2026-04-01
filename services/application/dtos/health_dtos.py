@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+ReEmbedTarget = Literal["text", "smiles", "summaries"]
+
+ALL_REEMBED_TARGETS: list[ReEmbedTarget] = ["text", "smiles", "summaries"]
 
 
 class SystemInfo(BaseModel):
@@ -100,8 +104,15 @@ class DetailedHealthResponse(BaseModel):
     checked_at: str  # ISO timestamp
 
 
+class BulkReEmbedRequest(BaseModel):
+    """Request body for selective re-embedding."""
+
+    targets: list[ReEmbedTarget] = Field(default_factory=lambda: list(ALL_REEMBED_TARGETS))
+
+
 class BulkWorkflowResponse(BaseModel):
     """Response for bulk workflow trigger operations."""
 
     triggered: int
     workflow_ids: list[str]
+    targets: list[ReEmbedTarget] = Field(default_factory=list)

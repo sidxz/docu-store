@@ -621,6 +621,8 @@ def create_container() -> Container:
     # Batch re-embed use cases
     from application.use_cases.batch_reembed_use_cases import (
         BatchReEmbedArtifactPagesUseCase,
+        BatchReEmbedSmilesUseCase,
+        BatchReEmbedSummariesUseCase,
     )
     from application.workflow_use_cases.trigger_batch_reembed_use_case import (
         TriggerBatchReEmbedUseCase,
@@ -632,6 +634,18 @@ def create_container() -> Container:
         embedding_generator=c[EmbeddingGenerator],
         vector_store=c[VectorStore],
         text_chunker=c[TextChunker],
+    )
+    container[BatchReEmbedSmilesUseCase] = lambda c: BatchReEmbedSmilesUseCase(
+        artifact_repository=c[ArtifactRepository],
+        page_repository=c[PageRepository],
+        smiles_embedding_generator=c[ChemBertaEmbeddingGenerator],
+        compound_vector_store=c[CompoundVectorStore],
+    )
+    container[BatchReEmbedSummariesUseCase] = lambda c: BatchReEmbedSummariesUseCase(
+        artifact_repository=c[ArtifactRepository],
+        page_repository=c[PageRepository],
+        embedding_generator=c[EmbeddingGenerator],
+        summary_vector_store=c[SummaryVectorStore],
     )
     container[TriggerBatchReEmbedUseCase] = lambda c: TriggerBatchReEmbedUseCase(
         workflow_orchestrator=c[WorkflowOrchestrator],

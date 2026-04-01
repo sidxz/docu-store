@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from lagom import Container
 from sentinel_auth import RequestAuth
 
-from application.dtos.health_dtos import BulkWorkflowResponse, DetailedHealthResponse
+from application.dtos.health_dtos import BulkReEmbedRequest, BulkWorkflowResponse, DetailedHealthResponse
 from application.use_cases.system_health_use_case import GetSystemHealthUseCase
 from application.workflow_use_cases.trigger_bulk_reembed_use_case import TriggerBulkReEmbedUseCase
 from interfaces.dependencies import get_auth, get_container
@@ -48,13 +48,13 @@ async def get_detailed_health(
 async def trigger_reembed_all(
     container: Annotated[Container, Depends(get_container)],
     auth: Annotated[RequestAuth, Depends(get_auth)],
+    body: BulkReEmbedRequest | None = None,
 ) -> BulkWorkflowResponse:
     """Trigger batch re-embedding for ALL artifacts (admin only).
 
-    Starts a BatchReEmbedArtifactPagesWorkflow for every artifact in the
-    workspace. Each workflow re-embeds all pages with full contextual
-    prefixes. Useful after fixing GPU/driver issues, updating embedding
-    models, or changing enrichment config.
+    Accepts an optional request body with ``targets`` to select which
+    vector collections to re-embed.  When omitted, all collections
+    (text, smiles, summaries) are re-embedded.
     """
     if not auth.is_admin:
         raise HTTPException(
@@ -62,5 +62,6 @@ async def trigger_reembed_all(
             detail="Admin access required",
         )
 
+    targets = body.targets if body else None
     use_case = container[TriggerBulkReEmbedUseCase]
-    return await use_case.execute(workspace_id=auth.workspace_id)
+    return await use_case.execute(workspace_id=auth.workspace_id, targets=targets)

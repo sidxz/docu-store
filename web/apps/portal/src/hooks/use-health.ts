@@ -97,9 +97,18 @@ export interface DetailedHealthResponse {
 
 // ---------- Admin action types ----------
 
+export type ReEmbedTarget = "text" | "smiles" | "summaries";
+
+export const ALL_REEMBED_TARGETS: ReEmbedTarget[] = [
+  "text",
+  "smiles",
+  "summaries",
+];
+
 export interface BulkWorkflowResponse {
   triggered: number;
   workflow_ids: string[];
+  targets: ReEmbedTarget[];
 }
 
 // ---------- Hooks ----------
@@ -115,9 +124,11 @@ export function useDetailedHealth(refetchInterval: number | false = 30_000) {
 
 export function useReembedAll() {
   return useMutation({
-    mutationFn: () =>
+    mutationFn: (targets?: ReEmbedTarget[]) =>
       authFetchJson<BulkWorkflowResponse>("/system/reembed-all", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targets: targets ?? ALL_REEMBED_TARGETS }),
       }),
   });
 }
