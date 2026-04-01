@@ -114,11 +114,11 @@ preflight() {
 
 # ── Interactive component picker ──────────────────────────────
 pick_component() {
-  echo -e "  Which component to release?"
-  echo -e "    ${BOLD}1)${NC} services (BE)"
-  echo -e "    ${BOLD}2)${NC} web (FE)"
-  echo -e "    ${BOLD}3)${NC} cli"
-  echo ""
+  echo -e "  Which component to release?" >&2
+  echo -e "    ${BOLD}1)${NC} services (BE)" >&2
+  echo -e "    ${BOLD}2)${NC} web (FE)" >&2
+  echo -e "    ${BOLD}3)${NC} cli" >&2
+  echo "" >&2
   read -rp "  Choice [1/2/3]: " choice
   case "$choice" in
     1) echo "services" ;;
@@ -136,11 +136,11 @@ pick_bump() {
   v_minor=$(bump_version "$cur" minor)
   v_patch=$(bump_version "$cur" patch)
 
-  echo -e "  Current version: ${BOLD}$cur${NC}"
-  echo -e "    ${BOLD}1)${NC} patch  → $v_patch"
-  echo -e "    ${BOLD}2)${NC} minor  → $v_minor"
-  echo -e "    ${BOLD}3)${NC} major  → $v_major"
-  echo ""
+  echo -e "  Current version: ${BOLD}$cur${NC}" >&2
+  echo -e "    ${BOLD}1)${NC} patch  → $v_patch" >&2
+  echo -e "    ${BOLD}2)${NC} minor  → $v_minor" >&2
+  echo -e "    ${BOLD}3)${NC} major  → $v_major" >&2
+  echo "" >&2
   read -rp "  Bump type [1/2/3]: " choice
   case "$choice" in
     1) echo "patch" ;;
