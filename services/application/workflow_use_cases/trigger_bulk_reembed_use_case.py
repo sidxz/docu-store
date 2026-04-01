@@ -58,12 +58,12 @@ class TriggerBulkReEmbedUseCase:
                 method_name, wf_prefix = _TARGET_DISPATCH[target]
                 try:
                     method = getattr(self._workflow_orchestrator, method_name)
-                    await method(artifact_id=artifact.id)
-                    workflow_ids.append(f"{wf_prefix}-{artifact.id}")
+                    await method(artifact_id=artifact.artifact_id)
+                    workflow_ids.append(f"{wf_prefix}-{artifact.artifact_id}")
                 except Exception:
                     log.warning(
                         "trigger_bulk_reembed.artifact_failed",
-                        artifact_id=str(artifact.id),
+                        artifact_id=str(artifact.artifact_id),
                         target=target,
                     )
 

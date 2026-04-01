@@ -7,6 +7,7 @@ Used by both the health checker (API process) and the heartbeat reporter
 from __future__ import annotations
 
 import importlib.metadata
+from pathlib import Path
 import platform
 import socket
 import sys
@@ -20,6 +21,24 @@ from application.dtos.health_dtos import GpuDevice, GpuInfo, SystemInfo
 logger = structlog.get_logger()
 
 
+def _get_app_version() -> str:
+    """Read the version from pyproject.toml (source of truth), falling back to installed metadata."""
+    # pyproject.toml lives at the services/ root, one level above infrastructure/
+    pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
+    if pyproject.is_file():
+        for line in pyproject.read_text().splitlines():
+            stripped = line.strip()
+            if stripped.startswith("version"):
+                # version = "0.2.1"
+                _, _, value = stripped.partition("=")
+                return value.strip().strip('"').strip("'")
+
+    try:
+        return importlib.metadata.version("docu-store")
+    except importlib.metadata.PackageNotFoundError:
+        return "0.0.0-dev"
+
+
 def get_system_info(start_time: float, now: datetime | None = None) -> SystemInfo:
     """Collect system information for this process.
 
@@ -31,10 +50,7 @@ def get_system_info(start_time: float, now: datetime | None = None) -> SystemInf
     if now is None:
         now = datetime.now(tz=UTC)
 
-    try:
-        app_version = importlib.metadata.version("docu-store")
-    except importlib.metadata.PackageNotFoundError:
-        app_version = "0.1.0-dev"
+    app_version = _get_app_version()
 
     return SystemInfo(
         app_version=app_version,
