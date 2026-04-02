@@ -26,11 +26,14 @@ WORKDIR /app
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Deps layer — cached until pyproject.toml or uv.lock changes
-COPY pyproject.toml uv.lock ./
+# Deps layer — only re-runs when actual dependencies change (not version bumps)
+COPY uv.lock ./
+COPY pyproject.toml ./tmp_pyproject.toml
+RUN sed '/^version *=/d' ./tmp_pyproject.toml > ./pyproject.toml && rm ./tmp_pyproject.toml
 RUN uv sync --no-dev --no-install-project --frozen
 
-# Application code
+# Restore real pyproject.toml (with version) + application code
+COPY pyproject.toml ./
 COPY application/ application/
 COPY domain/ domain/
 COPY infrastructure/ infrastructure/
