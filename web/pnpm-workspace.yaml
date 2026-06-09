@@ -1,3 +1,19 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# pnpm 10+ reads these settings from here, not from .npmrc.
+# shamefullyHoist puts transitive deps (openapi-fetch, @rdkit/rdkit) in the root
+# node_modules so the portal app and its postinstall wasm-copy script can resolve
+# them without declaring each as a direct dependency.
+shamefullyHoist: true
+strictPeerDependencies: false
+
+# pnpm 10+ blocks dependency build scripts until a decision is recorded here, and
+# exits 1 (ERR_PNPM_IGNORED_BUILDS) while any stay undecided — which would break
+# the Docker build and `pnpm -r lint`. Neither needs to run: sharp loads its
+# prebuilt @img/sharp-* binary at runtime, and core-js' script only prints a
+# funding notice. Both are denied (false) to record the decision.
+allowBuilds:
+  core-js: false
+  sharp: false

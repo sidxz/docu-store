@@ -18,6 +18,7 @@
   },
   "devDependencies": {
     "@docu-store/tsconfig": "workspace:*",
+    "@types/node": "^22.0.0",
     "openapi-typescript": "^7.13.0",
     "typescript": "^5.9.3"
   }

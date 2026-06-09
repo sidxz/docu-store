@@ -37,6 +37,10 @@ export function getAuthzClient(config?: AppConfig): SentinelAuthz {
 
     _client = new SentinelAuthz({
       sentinelUrl,
+      // Required since Sentinel 0.11.0: the browser no longer mints authz tokens
+      // directly. It POSTs to this same-origin route, which forwards to Sentinel's
+      // /authz/resolve with the service key. See app/api/auth/mint/route.ts.
+      mintEndpoint: "/api/auth/mint",
       storage: new AuthzLocalStorageStore(),
       idps: {
         google: IdpConfigs.google(googleClientId),

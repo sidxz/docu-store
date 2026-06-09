@@ -781,7 +781,7 @@ requires-dist = [
     { name = "rdkit", specifier = ">=2025.9.5" },
     { name = "returns", specifier = ">=0.26.0" },
     { name = "sentence-transformers", specifier = ">=3.3.0" },
-    { name = "sentinel-auth-sdk" },
+    { name = "sentinel-auth-sdk", specifier = ">=0.11.0" },
     { name = "structflo-cser", specifier = ">=0.2.0" },
     { name = "structflo-ner", specifier = ">=0.3.0" },
     { name = "structlog", specifier = ">=25.5.0" },
@@ -4478,7 +4478,7 @@ wheels = [
 
 [[package]]
 name = "sentinel-auth-sdk"
-version = "0.10.2"
+version = "0.11.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cryptography" },
@@ -4488,9 +4488,9 @@ dependencies = [
     { name = "pyjwt", extra = ["crypto"] },
     { name = "starlette" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/73/08/ba44b8667bbeb770fb1efec4846ef0728fe5a096971ceb6ad4b30d7b8b89/sentinel_auth_sdk-0.10.2.tar.gz", hash = "sha256:8f15103d5086cd3f17c989b112cd73dea0508e1e062ccb75c18428ac0695b550", size = 21788, upload-time = "2026-03-20T21:18:43.949Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7e/1f/06dfeed2ddd349a65044e1760b92c3ba2e58ef2460144fc3cef53dff888f/sentinel_auth_sdk-0.11.0.tar.gz", hash = "sha256:6fe66bd78120bb64ce5613efd9f1214944ad46424fb83ad2508af0634cd4ed2b", size = 24664, upload-time = "2026-05-30T03:34:10.892Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/15/65/eb103c63949716ec931362c645cf43ca9534b2427ea203e66145e5092bf5/sentinel_auth_sdk-0.10.2-py3-none-any.whl", hash = "sha256:d3c3c073f264367906f9392f3fca3231bf0f3ba4d97e68cf1bfdf93c52b95d4a", size = 20404, upload-time = "2026-03-20T21:18:42.617Z" },
+    { url = "https://files.pythonhosted.org/packages/82/37/bb7fbb55f01afa94c84c419cbdccd16fc3de9e0373f2bfcd5530eff641a4/sentinel_auth_sdk-0.11.0-py3-none-any.whl", hash = "sha256:946c24e3dd8cd99063f4ca88b235cfa0595d62d812ac40c5644126ff5f01b680", size = 21693, upload-time = "2026-05-30T03:34:09.679Z" },
 ]
 
 [[package]]

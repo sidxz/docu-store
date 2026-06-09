@@ -5,7 +5,7 @@ import {
   type Credentials,
 } from "../auth/credentials.js";
 import { refreshGoogleToken } from "../auth/google.js";
-import { resolve, SentinelError } from "../auth/sentinel.js";
+import { mint, SentinelError } from "../auth/sentinel.js";
 import { loadConfig } from "../utils/config.js";
 import * as log from "../utils/logger.js";
 
@@ -70,8 +70,8 @@ export async function getAuthCredentials(): Promise<Credentials> {
   const config = loadConfig();
 
   try {
-    const result = await resolve(
-      config.sentinel_url,
+    const result = await mint(
+      config.api_url,
       creds.idp_token,
       creds.provider,
       creds.workspace_id,

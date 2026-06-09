@@ -3,7 +3,7 @@ import { stdin, stdout } from "node:process";
 import { loadConfig } from "../utils/config.js";
 import { saveCredentials, type Credentials } from "../auth/credentials.js";
 import { startOAuthFlow } from "../auth/oauth-server.js";
-import { resolve, type SentinelWorkspace } from "../auth/sentinel.js";
+import { mint, resolve, type SentinelWorkspace } from "../auth/sentinel.js";
 import * as log from "../utils/logger.js";
 
 interface LoginOptions {
@@ -64,9 +64,9 @@ export async function loginCommand(opts: LoginOptions): Promise<void> {
     selectedWorkspace = await promptWorkspaceSelection(initial.workspaces);
   }
 
-  // Step 3: Resolve with workspace to get authz token
-  const result = await resolve(
-    sentinelUrl,
+  // Step 3: Mint the authz token via the backend (service key stays server-side)
+  const result = await mint(
+    config.api_url,
     idpToken,
     opts.provider,
     selectedWorkspace.id,

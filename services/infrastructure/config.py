@@ -421,6 +421,17 @@ class Settings(BaseSettings):
         default="https://www.googleapis.com/oauth2/v3/certs",
         validation_alias="SENTINEL_IDP_JWKS_URL",
     )
+    # Required since Sentinel 0.11.0 (authz mode): the IdP token's `aud` must
+    # equal your OAuth client_id, else a token minted for any other client of
+    # the same IdP would authenticate. Without it, Sentinel(...) raises ValueError.
+    sentinel_idp_audience: str = Field(
+        default="",
+        validation_alias="SENTINEL_IDP_AUDIENCE",
+    )
+    sentinel_idp_issuer: str = Field(
+        default="https://accounts.google.com",
+        validation_alias="SENTINEL_IDP_ISSUER",
+    )
     sentinel_cache_ttl: float = Field(
         default=120,
         validation_alias="SENTINEL_CACHE_TTL",

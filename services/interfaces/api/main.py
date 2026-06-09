@@ -12,6 +12,7 @@ from infrastructure.auth import sentinel
 from infrastructure.config import settings
 from infrastructure.logging import setup_logging
 from interfaces.api.routes.artifact_routes import router as artifact_router
+from interfaces.api.routes.auth_routes import router as auth_router
 from interfaces.api.routes.browse_routes import router as browse_router
 from interfaces.api.routes.chat_routes import router as chat_router
 from interfaces.api.routes.dashboard_routes import router as dashboard_router
@@ -213,7 +214,12 @@ def create_app() -> FastAPI:
     # NOTE: Starlette middleware is LIFO — last added runs first.
     # Sentinel must be added BEFORE CORS so that CORS runs first and adds
     # Access-Control-Allow-* headers to ALL responses, including 401s.
-    sentinel.protect(app, exclude_paths=["/health", "/docs", "/openapi.json", "/search/health"])
+    # /auth/mint is the pre-auth credential-issuance step (CLI token minting) —
+    # it must NOT require an authz token, so it is excluded from the middleware.
+    sentinel.protect(
+        app,
+        exclude_paths=["/health", "/docs", "/openapi.json", "/search/health", "/auth/mint"],
+    )
 
     # CORS middleware — added last so it runs first (wraps everything, including auth errors)
     app.add_middleware(
@@ -226,6 +232,7 @@ def create_app() -> FastAPI:
 
     # Include routers
     app.include_router(artifact_router)
+    app.include_router(auth_router)
     app.include_router(browse_router)
     app.include_router(chat_router)
     app.include_router(dashboard_router)
