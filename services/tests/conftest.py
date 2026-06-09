@@ -2,6 +2,15 @@
 
 from __future__ import annotations
 
+import os
+
+# Sentinel 0.11.0 validates authz config when the client is constructed, which
+# happens at import time in infrastructure/auth.py (pulled in by the API app during
+# test collection). Seed dummy values so the import does not raise; real values are
+# supplied by the environment in actual deployments.
+os.environ.setdefault("SENTINEL_SERVICE_KEY", "test-dummy-key")
+os.environ.setdefault("SENTINEL_IDP_AUDIENCE", "test-client-id")
+
 from uuid import UUID, uuid4
 
 import pytest
