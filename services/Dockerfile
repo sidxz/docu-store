@@ -29,7 +29,10 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 # Deps layer — only re-runs when actual dependencies change (not version bumps)
 COPY uv.lock ./
 COPY pyproject.toml ./tmp_pyproject.toml
-RUN sed '/^version *=/d' ./tmp_pyproject.toml > ./pyproject.toml && rm ./tmp_pyproject.toml
+# Pin a placeholder version (instead of deleting the line) so the stripped file
+# is identical across version bumps — keeping the deps layer cached — while still
+# satisfying uv, which now requires project.version to be set or dynamic.
+RUN sed 's/^version *=.*/version = "0.0.0"/' ./tmp_pyproject.toml > ./pyproject.toml && rm ./tmp_pyproject.toml
 RUN uv sync --no-dev --no-install-project --frozen
 
 # Restore real pyproject.toml (with version) + application code
