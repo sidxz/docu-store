@@ -41,81 +41,59 @@ def _make_langfuse_callback_handler(settings: Settings) -> Any | None:
         return handler
 
 
+def _resolve_api_key(provider: str, settings: Settings) -> str | None:
+    """Pick the per-provider API key, falling back to the generic LLM_API_KEY."""
+    if provider == "openai":
+        return settings.openai_api_key or settings.llm_api_key
+    if provider == "anthropic":
+        return settings.anthropic_api_key or settings.llm_api_key
+    if provider == "gemini":
+        return settings.google_api_key or settings.llm_api_key
+    return None  # ollama — no key
+
+
 def create_llm_client(settings: Settings) -> LLMClientPort:
     """Instantiate the LLM adapter selected by LLM_PROVIDER in config."""
+    from infrastructure.llm.adapters.langchain_llm_client import LangChainLLMClient
+
     provider = settings.llm_provider
-
-    if provider == "ollama":
-        from infrastructure.llm.adapters.ollama_client import OllamaLLMClient
-
-        log.info("llm.factory", provider="ollama", model=settings.llm_model_name)
-        return OllamaLLMClient(
-            model_name=settings.llm_model_name,
-            base_url=settings.llm_base_url,
-            temperature=settings.llm_temperature,
-            langfuse_handler=_make_langfuse_callback_handler(settings),
-        )
-
-    if provider == "openai":
-        from infrastructure.llm.adapters.openai_client import OpenAILLMClient
-
-        if not settings.llm_api_key and not settings.openai_api_key:
-            msg = "LLM_API_KEY or OPENAI_API_KEY must be set when LLM_PROVIDER=openai"
-            raise ValueError(msg)
-        log.info("llm.factory", provider="openai", model=settings.llm_model_name)
-        return OpenAILLMClient(
-            model_name=settings.llm_model_name,
-            api_key=settings.llm_api_key or settings.openai_api_key,
-            temperature=settings.llm_temperature,
-            langfuse_handler=_make_langfuse_callback_handler(settings),
-        )
-
-    msg = f"Unsupported LLM_PROVIDER: {provider!r}. Valid options: ollama, openai"
-    raise ValueError(msg)
+    log.info("llm.factory", provider=provider, model=settings.llm_model_name)
+    return LangChainLLMClient(
+        provider=provider,
+        model_name=settings.llm_model_name,
+        temperature=settings.llm_temperature,
+        api_key=_resolve_api_key(provider, settings),
+        base_url=settings.llm_base_url,
+        reasoning=settings.llm_reasoning,
+        allow_cloud=settings.allow_cloud_llm,
+        langfuse_handler=_make_langfuse_callback_handler(settings),
+    )
 
 
 def create_chat_llm_client(settings: Settings) -> LLMClientPort:
-    """Instantiate a separate LLM client for chat, with fallback to batch LLM settings."""
-    # Build effective settings by falling back to batch LLM values
-    effective_provider = settings.chat_llm_provider or settings.llm_provider
-    effective_model = settings.chat_llm_model_name or settings.llm_model_name
-    effective_base_url = settings.chat_llm_base_url or settings.llm_base_url
-    effective_api_key = settings.chat_llm_api_key or settings.llm_api_key
-    effective_temperature = settings.chat_llm_temperature
+    """Instantiate a chat LLM client, falling back to batch LLM settings."""
+    from infrastructure.llm.adapters.langchain_llm_client import LangChainLLMClient
 
-    log.info(
-        "llm.factory.chat",
-        provider=effective_provider,
-        model=effective_model,
-        temperature=effective_temperature,
+    provider = settings.chat_llm_provider or settings.llm_provider
+    model = settings.chat_llm_model_name or settings.llm_model_name
+    base_url = settings.chat_llm_base_url or settings.llm_base_url
+    # Chat key: explicit chat key → per-provider key → generic.
+    api_key = (
+        None
+        if provider == "ollama"
+        else (settings.chat_llm_api_key or _resolve_api_key(provider, settings))
     )
-
-    if effective_provider == "ollama":
-        from infrastructure.llm.adapters.ollama_client import OllamaLLMClient
-
-        return OllamaLLMClient(
-            model_name=effective_model,
-            base_url=effective_base_url,
-            temperature=effective_temperature,
-            langfuse_handler=_make_langfuse_callback_handler(settings),
-        )
-
-    if effective_provider == "openai":
-        from infrastructure.llm.adapters.openai_client import OpenAILLMClient
-
-        api_key = effective_api_key or settings.openai_api_key
-        if not api_key:
-            msg = "CHAT_LLM_API_KEY or OPENAI_API_KEY must be set when CHAT_LLM_PROVIDER=openai"
-            raise ValueError(msg)
-        return OpenAILLMClient(
-            model_name=effective_model,
-            api_key=api_key,
-            temperature=effective_temperature,
-            langfuse_handler=_make_langfuse_callback_handler(settings),
-        )
-
-    msg = f"Unsupported CHAT_LLM_PROVIDER: {effective_provider!r}. Valid options: ollama, openai"
-    raise ValueError(msg)
+    log.info("llm.factory.chat", provider=provider, model=model)
+    return LangChainLLMClient(
+        provider=provider,
+        model_name=model,
+        temperature=settings.chat_llm_temperature,
+        api_key=api_key,
+        base_url=base_url,
+        reasoning=settings.chat_llm_reasoning,
+        allow_cloud=settings.allow_cloud_llm,
+        langfuse_handler=_make_langfuse_callback_handler(settings),
+    )
 
 
 def create_tool_calling_llm_client(settings: Settings) -> ToolCallingLLMPort:
