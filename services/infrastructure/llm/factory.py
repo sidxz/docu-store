@@ -57,12 +57,16 @@ def create_llm_client(settings: Settings) -> LLMClientPort:
     from infrastructure.llm.adapters.langchain_llm_client import LangChainLLMClient
 
     provider = settings.llm_provider
+    api_key = _resolve_api_key(provider, settings)
+    if provider != "ollama" and not api_key:
+        msg = f"No API key configured for cloud provider {provider!r}. Set the provider's API key or LLM_API_KEY."
+        raise ValueError(msg)
     log.info("llm.factory", provider=provider, model=settings.llm_model_name)
     return LangChainLLMClient(
         provider=provider,
         model_name=settings.llm_model_name,
         temperature=settings.llm_temperature,
-        api_key=_resolve_api_key(provider, settings),
+        api_key=api_key,
         base_url=settings.llm_base_url,
         reasoning=settings.llm_reasoning,
         allow_cloud=settings.allow_cloud_llm,
@@ -83,6 +87,9 @@ def create_chat_llm_client(settings: Settings) -> LLMClientPort:
         if provider == "ollama"
         else (settings.chat_llm_api_key or _resolve_api_key(provider, settings))
     )
+    if provider != "ollama" and not api_key:
+        msg = f"No API key configured for cloud chat provider {provider!r}. Set CHAT_LLM_API_KEY or the provider's API key or LLM_API_KEY."
+        raise ValueError(msg)
     log.info("llm.factory.chat", provider=provider, model=model)
     return LangChainLLMClient(
         provider=provider,

@@ -63,3 +63,15 @@ def test_create_chat_llm_client_overrides_provider() -> None:
     assert client._provider == "openai"
     assert client._model_name == "gpt-5"
     assert client._api_key == "sk"
+
+
+def test_create_llm_client_raises_when_cloud_key_missing() -> None:
+    with pytest.raises(ValueError, match="API key"):
+        factory.create_llm_client(_settings(llm_provider="anthropic"))
+
+
+def test_resolve_api_key_uses_generic_llm_api_key_fallback() -> None:
+    client = factory.create_llm_client(
+        _settings(llm_provider="openai", openai_api_key=None, llm_api_key="generic-key"),
+    )
+    assert client._api_key == "generic-key"
