@@ -89,8 +89,8 @@ def _parse_react_response(text: str) -> ToolCallResult:
     )
 
 
-class NativeToolCallingAdapter:
-    """Uses LangChain's native bind_tools() for providers that support it (OpenAI)."""
+class _BaseToolCallingAdapter:
+    """Shared init and lazy model construction for both tool-calling adapters."""
 
     def __init__(
         self,
@@ -99,6 +99,8 @@ class NativeToolCallingAdapter:
         api_key: str | None = None,
         base_url: str = "http://localhost:11434",
         temperature: float = 0.3,
+        reasoning: str | None = None,
+        allow_cloud: bool = True,
         langfuse_handler: Any | None = None,
     ) -> None:
         self._provider = provider
@@ -106,28 +108,29 @@ class NativeToolCallingAdapter:
         self._api_key = api_key
         self._base_url = base_url
         self._temperature = temperature
+        self._reasoning = reasoning
+        self._allow_cloud = allow_cloud
         self._langfuse_handler = langfuse_handler
         self._llm: Any | None = None
 
     def _get_llm(self) -> Any:
         if self._llm is None:
-            if self._provider == "openai":
-                from langchain_openai import ChatOpenAI
+            from infrastructure.llm.model_builder import build_chat_model
 
-                self._llm = ChatOpenAI(
-                    model=self._model_name,
-                    api_key=self._api_key,
-                    temperature=self._temperature,
-                )
-            else:
-                from langchain_ollama import ChatOllama
-
-                self._llm = ChatOllama(
-                    model=self._model_name,
-                    base_url=self._base_url,
-                    temperature=self._temperature,
-                )
+            self._llm = build_chat_model(
+                provider=self._provider,
+                model_name=self._model_name,
+                temperature=self._temperature,
+                api_key=self._api_key,
+                base_url=self._base_url,
+                reasoning=self._reasoning,
+                allow_cloud=self._allow_cloud,
+            )
         return self._llm
+
+
+class NativeToolCallingAdapter(_BaseToolCallingAdapter):
+    """Uses LangChain's native bind_tools() for providers that support it."""
 
     @property
     def supports_native_tools(self) -> bool:
@@ -217,45 +220,8 @@ class NativeToolCallingAdapter:
         return ToolCallResult(content=str(response.content))
 
 
-class ReactToolCallingAdapter:
-    """Text-based ReAct parsing for models without native tool calling (Ollama/gemma3)."""
-
-    def __init__(
-        self,
-        provider: str,
-        model_name: str,
-        api_key: str | None = None,
-        base_url: str = "http://localhost:11434",
-        temperature: float = 0.3,
-        langfuse_handler: Any | None = None,
-    ) -> None:
-        self._provider = provider
-        self._model_name = model_name
-        self._api_key = api_key
-        self._base_url = base_url
-        self._temperature = temperature
-        self._langfuse_handler = langfuse_handler
-        self._llm: Any | None = None
-
-    def _get_llm(self) -> Any:
-        if self._llm is None:
-            if self._provider == "openai":
-                from langchain_openai import ChatOpenAI
-
-                self._llm = ChatOpenAI(
-                    model=self._model_name,
-                    api_key=self._api_key,
-                    temperature=self._temperature,
-                )
-            else:
-                from langchain_ollama import ChatOllama
-
-                self._llm = ChatOllama(
-                    model=self._model_name,
-                    base_url=self._base_url,
-                    temperature=self._temperature,
-                )
-        return self._llm
+class ReactToolCallingAdapter(_BaseToolCallingAdapter):
+    """Text-based ReAct parsing — explicit opt-in for models without native tool calling."""
 
     @property
     def supports_native_tools(self) -> bool:

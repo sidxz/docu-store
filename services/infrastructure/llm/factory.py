@@ -119,11 +119,17 @@ def create_tool_calling_llm_client(settings: Settings) -> ToolCallingLLMPort:
     effective_provider = settings.chat_llm_provider or settings.llm_provider
     effective_model = settings.chat_llm_model_name or settings.llm_model_name
     effective_base_url = settings.chat_llm_base_url or settings.llm_base_url
-    effective_api_key = settings.chat_llm_api_key or settings.llm_api_key or settings.openai_api_key
+    effective_api_key = (
+        None
+        if effective_provider == "ollama"
+        else (settings.chat_llm_api_key or _resolve_api_key(effective_provider, settings))
+    )
     effective_temperature = settings.chat_llm_temperature
     mode = settings.chat_agent_tool_calling_mode
 
-    use_native = mode == "native" or (mode == "auto" and effective_provider == "openai")
+    # Native tool calling for all providers (modern Ollama models support it).
+    # ReAct is an explicit opt-in for old local models that lack native tools.
+    use_native = mode != "react"
 
     log.info(
         "llm.factory.tool_calling",
@@ -142,6 +148,8 @@ def create_tool_calling_llm_client(settings: Settings) -> ToolCallingLLMPort:
             api_key=effective_api_key,
             base_url=effective_base_url,
             temperature=effective_temperature,
+            reasoning=settings.chat_llm_reasoning,
+            allow_cloud=settings.allow_cloud_llm,
             langfuse_handler=langfuse_handler,
         )
 
@@ -151,6 +159,8 @@ def create_tool_calling_llm_client(settings: Settings) -> ToolCallingLLMPort:
         api_key=effective_api_key,
         base_url=effective_base_url,
         temperature=effective_temperature,
+        reasoning=settings.chat_llm_reasoning,
+        allow_cloud=settings.allow_cloud_llm,
         langfuse_handler=langfuse_handler,
     )
 
