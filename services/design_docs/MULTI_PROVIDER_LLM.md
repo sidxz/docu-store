@@ -94,9 +94,11 @@ per-provider kwargs builder:
 - **Structured output:** new port method `complete_structured(prompt, schema, ...)`.
   Default method `function_calling` (portable common denominator; Gemma 4
   supports it); `json_schema` available for Ollama-native.
-- **Reasoning:** optional `reasoning` keyword on `complete`/`stream`; adapter
-  translates per provider. Reasoning content captured (logged + available on the
-  result); streaming it into the chat SSE is part of Phase 3 adoption.
+- **Reasoning:** configured at construction from `llm_reasoning` /
+  `chat_llm_reasoning`; `build_chat_model` translates the effort to
+  provider-specific constructor kwargs (safe/documented, unlike per-call
+  `.bind()`). Dynamic per-mode switching + streaming reasoning into the chat SSE
+  is Phase 3 adoption. `complete`/`stream` signatures stay unchanged.
 - **Vision:** already implemented via content blocks; this change makes it work
   for all providers rather than only the active one.
 
@@ -114,10 +116,11 @@ per-provider kwargs builder:
 
 ### 4.5 Port changes
 
-`application/ports/llm_client.py` (backward-compatible — new optional kwargs /
-methods only):
+`application/ports/llm_client.py` (backward-compatible — one new method only):
 - `+ complete_structured(prompt, schema, *, system_prompt=None) -> dict`
-- `+ reasoning: <effort> | None = None` keyword on `complete` / `stream`
+
+Reasoning needs no port change — it's configured at construction (§4.3), so
+`complete`/`stream` signatures and all existing call sites are untouched.
 
 ## 5. File changes
 
