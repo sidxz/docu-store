@@ -64,6 +64,7 @@ def build_chat_model(
     Raises:
         ValueError: unknown provider; a cloud provider while ``allow_cloud`` is
             False; or a missing API key for a cloud provider.
+
     """
     if provider not in _PROVIDER_MAP:
         msg = f"Unsupported LLM provider: {provider!r}. Valid: {sorted(_PROVIDER_MAP)}"
