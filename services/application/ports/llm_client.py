@@ -87,6 +87,29 @@ class LLMClientPort(Protocol):
         """
         ...
 
+    async def complete_structured(
+        self,
+        prompt: str,
+        schema: dict,
+        *,
+        system_prompt: str | None = None,
+    ) -> dict:
+        """Return a response constrained to ``schema`` (a JSON Schema dict).
+
+        Args:
+            prompt: The user prompt.
+            schema: JSON Schema describing the required output object.
+            system_prompt: Optional system/instruction prompt.
+
+        Returns:
+            A dict matching ``schema``.
+
+        Raises:
+            RuntimeError: If the LLM call fails.
+
+        """
+        ...
+
     async def get_model_info(self) -> dict[str, str]:
         """Get metadata about the active model.
 

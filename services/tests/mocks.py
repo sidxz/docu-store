@@ -439,6 +439,14 @@ class MockLLMClient:
         self.complete_with_image_calls.append((prompt, image_b64))
         return self._response
 
+    async def complete_structured(
+        self, prompt: str, schema: Any, **kwargs: Any,
+    ) -> dict:
+        if self.raise_on_call:
+            raise self.raise_on_call
+        self.complete_calls.append(prompt)
+        return {"result": self._response}
+
     async def get_model_info(self) -> dict[str, str]:
         return {"provider": "mock", "model_name": "mock-model"}
 
