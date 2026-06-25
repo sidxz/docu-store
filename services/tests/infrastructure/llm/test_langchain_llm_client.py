@@ -36,6 +36,7 @@ class _FakeChatModel:
 
     def with_structured_output(self, schema, method=None):  # noqa: ANN001, ARG002
         self.structured_schema = schema
+        self.structured_method = method
         return _FakeStructured()
 
 
@@ -59,6 +60,7 @@ async def test_complete_passes_system_prompt() -> None:
     await client.complete("q", system_prompt="be terse")
     # System message first, human message second.
     assert len(fake.last_messages) == 2
+    assert type(fake.last_messages[0]).__name__ == "SystemMessage"
 
 
 @pytest.mark.asyncio
@@ -74,6 +76,7 @@ async def test_complete_structured_returns_dict() -> None:
     out = await client.complete_structured("extract", {"type": "object"})
     assert out == {"name": "acetone", "formula": "C3H6O"}
     assert fake.structured_schema == {"type": "object"}
+    assert fake.structured_method == "function_calling"
 
 
 @pytest.mark.asyncio
