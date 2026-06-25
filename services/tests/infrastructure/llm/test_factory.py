@@ -75,3 +75,22 @@ def test_resolve_api_key_uses_generic_llm_api_key_fallback() -> None:
         _settings(llm_provider="openai", openai_api_key=None, llm_api_key="generic-key"),
     )
     assert client._api_key == "generic-key"
+
+
+def test_create_llm_client_refuses_cloud_when_disabled() -> None:
+    with pytest.raises(ValueError, match="disabled"):
+        factory.create_llm_client(
+            _settings(llm_provider="anthropic", anthropic_api_key="k", allow_cloud_llm=False),
+        )
+
+
+def test_create_chat_llm_client_refuses_cloud_when_disabled() -> None:
+    with pytest.raises(ValueError, match="disabled"):
+        factory.create_chat_llm_client(
+            _settings(chat_llm_provider="openai", openai_api_key="k", allow_cloud_llm=False),
+        )
+
+
+def test_ollama_allowed_when_cloud_disabled() -> None:
+    client = factory.create_llm_client(_settings(allow_cloud_llm=False))
+    assert client._provider == "ollama"

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from infrastructure.llm import factory
 from infrastructure.llm.adapters.tool_calling_adapter import (
     NativeToolCallingAdapter,
@@ -55,3 +57,10 @@ def test_native_for_anthropic_under_auto() -> None:
     )
     assert isinstance(adapter, NativeToolCallingAdapter)
     assert adapter._provider == "anthropic"
+
+
+def test_tool_calling_refuses_cloud_when_disabled() -> None:
+    with pytest.raises(ValueError, match="disabled"):
+        factory.create_tool_calling_llm_client(
+            _settings(chat_llm_provider="anthropic", anthropic_api_key="k", allow_cloud_llm=False),
+        )

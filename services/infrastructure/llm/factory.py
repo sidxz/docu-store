@@ -58,6 +58,9 @@ def create_llm_client(settings: Settings) -> LLMClientPort:
 
     provider = settings.llm_provider
     api_key = _resolve_api_key(provider, settings)
+    if provider != "ollama" and not settings.allow_cloud_llm:
+        msg = f"Cloud LLM provider {provider!r} is disabled (ALLOW_CLOUD_LLM=false)."
+        raise ValueError(msg)
     if provider != "ollama" and not api_key:
         msg = f"No API key configured for cloud provider {provider!r}. Set the provider's API key or LLM_API_KEY."
         raise ValueError(msg)
@@ -87,6 +90,9 @@ def create_chat_llm_client(settings: Settings) -> LLMClientPort:
         if provider == "ollama"
         else (settings.chat_llm_api_key or _resolve_api_key(provider, settings))
     )
+    if provider != "ollama" and not settings.allow_cloud_llm:
+        msg = f"Cloud LLM provider {provider!r} is disabled (ALLOW_CLOUD_LLM=false)."
+        raise ValueError(msg)
     if provider != "ollama" and not api_key:
         msg = f"No API key configured for cloud chat provider {provider!r}. Set CHAT_LLM_API_KEY or the provider's API key or LLM_API_KEY."
         raise ValueError(msg)
@@ -107,9 +113,8 @@ def create_tool_calling_llm_client(settings: Settings) -> ToolCallingLLMPort:
     """Instantiate a tool-calling LLM adapter for the agentic retrieval loop.
 
     Uses the same provider/model as the chat LLM. Mode selection:
-    - "auto": native for OpenAI, react for Ollama
-    - "native": always use bind_tools()
-    - "react": always use ReAct text parsing
+    - "auto"/"native": native bind_tools() for all providers
+    - "react": ReAct text parsing for models without native tool support
     """
     from infrastructure.llm.adapters.tool_calling_adapter import (
         NativeToolCallingAdapter,
@@ -126,6 +131,10 @@ def create_tool_calling_llm_client(settings: Settings) -> ToolCallingLLMPort:
     )
     effective_temperature = settings.chat_llm_temperature
     mode = settings.chat_agent_tool_calling_mode
+
+    if effective_provider != "ollama" and not settings.allow_cloud_llm:
+        msg = f"Cloud LLM provider {effective_provider!r} is disabled (ALLOW_CLOUD_LLM=false)."
+        raise ValueError(msg)
 
     # Native tool calling for all providers (modern Ollama models support it).
     # ReAct is an explicit opt-in for old local models that lack native tools.

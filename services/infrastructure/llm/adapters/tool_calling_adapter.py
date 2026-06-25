@@ -1,6 +1,7 @@
-"""Dual-mode tool-calling adapter: native (OpenAI) + ReAct text-parsing (Ollama).
+"""Dual-mode tool-calling adapter for agentic retrieval.
 
-Wraps the same LangChain ChatOllama/ChatOpenAI instances used elsewhere.
+Native tool calling (via bind_tools) is the default for all providers.
+ReAct text-parsing is an explicit opt-in fallback for models that lack native tool support.
 """
 
 from __future__ import annotations
