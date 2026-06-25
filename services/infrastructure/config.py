@@ -230,9 +230,33 @@ class Settings(BaseSettings):
         default=None,
         validation_alias="OPENAI_API_KEY",
     )
+    anthropic_api_key: str | None = Field(
+        default=None,
+        validation_alias="ANTHROPIC_API_KEY",
+        description="API key for Anthropic (Claude). Used when provider is 'anthropic'.",
+    )
+    google_api_key: str | None = Field(
+        default=None,
+        validation_alias="GOOGLE_API_KEY",
+        description="API key for Google Gemini. Used when provider is 'gemini'.",
+    )
+    allow_cloud_llm: bool = Field(
+        default=True,
+        validation_alias="ALLOW_CLOUD_LLM",
+        description=(
+            "When False, the LLM layer refuses to construct any cloud provider "
+            "(openai/anthropic/gemini) and raises. For confidential / air-gapped "
+            "deployments where only local Ollama is permitted."
+        ),
+    )
+    llm_reasoning: Literal["off", "low", "medium", "high"] = Field(
+        default="off",
+        validation_alias="LLM_REASONING",
+        description="Reasoning/thinking effort for batch LLM. 'off' disables it.",
+    )
 
     # LLM (shared infrastructure — used by summarization and future features)
-    llm_provider: Literal["ollama", "openai", "gemini"] = Field(
+    llm_provider: Literal["ollama", "openai", "anthropic", "gemini"] = Field(
         default="ollama",
         validation_alias="LLM_PROVIDER",
     )
@@ -257,7 +281,7 @@ class Settings(BaseSettings):
     )
 
     # Chat LLM (separate from batch LLM — allows different model/temperature for interactive chat)
-    chat_llm_provider: Literal["ollama", "openai", "gemini"] | None = Field(
+    chat_llm_provider: Literal["ollama", "openai", "anthropic", "gemini"] | None = Field(
         default=None,
         validation_alias="CHAT_LLM_PROVIDER",
         description="LLM provider for chat. Falls back to llm_provider if not set.",
@@ -281,6 +305,11 @@ class Settings(BaseSettings):
         default=0.3,
         validation_alias="CHAT_LLM_TEMPERATURE",
         description="Slightly higher temperature for more conversational chat responses.",
+    )
+    chat_llm_reasoning: Literal["off", "low", "medium", "high"] = Field(
+        default="off",
+        validation_alias="CHAT_LLM_REASONING",
+        description="Reasoning/thinking effort for chat LLM. 'off' disables it.",
     )
 
     # Chat settings
