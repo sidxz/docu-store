@@ -75,8 +75,16 @@ async def test_complete_structured_returns_dict() -> None:
     client, fake = _client()
     out = await client.complete_structured("extract", {"type": "object"})
     assert out == {"name": "acetone", "formula": "C3H6O"}
-    assert fake.structured_schema == {"type": "object"}
+    # Adapter injects a top-level "title" (function_calling requires it).
+    assert fake.structured_schema == {"title": "response", "type": "object"}
     assert fake.structured_method == "function_calling"
+
+
+@pytest.mark.asyncio
+async def test_complete_structured_preserves_existing_title() -> None:
+    client, fake = _client()
+    await client.complete_structured("extract", {"title": "Compound", "type": "object"})
+    assert fake.structured_schema == {"title": "Compound", "type": "object"}
 
 
 @pytest.mark.asyncio

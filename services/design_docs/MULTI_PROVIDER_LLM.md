@@ -190,13 +190,10 @@ guard fails fast at factory; default model now `gemma4:31b`.
 
 **Remaining tasks (for a fresh session):**
 
-1. **`complete_structured` title fix** (ready, ~1 line + test). Live run showed a
-   schema without a top-level `"title"` raises `ValueError: Unsupported function …
-   must have a top-level 'title' key`. In `adapters/langchain_llm_client.py`
-   `complete_structured`, before `with_structured_output`: if `isinstance(schema,
-   dict)` and `"title" not in schema` → `schema = {"title": "response", **schema}`.
-   Unit fake doesn't enforce the rule, so add an assertion that the adapter injects
-   a title (or an Ollama-marked integration test). Do this BEFORE task 2's NER work.
+1. ~~**`complete_structured` title fix**~~ **DONE.** Adapter now injects
+   `{"title": "response", ...}` when a dict schema lacks a top-level title (fixes the
+   `Unsupported function … must have a top-level 'title' key` ValueError). Covered by
+   two unit tests (inject + preserve-existing) in `test_langchain_llm_client.py`.
 2. **Phase 3 adoption** (needs brainstorm→spec→plan): drive `chat_llm_reasoning`
    from chat `quick`/`thinking`/`deep_thinking` modes + surface
    `additional_kwargs.reasoning_content` (currently dropped) into the SSE stream;

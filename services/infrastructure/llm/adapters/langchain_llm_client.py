@@ -145,6 +145,11 @@ class LangChainLLMClient:
         *,
         system_prompt: str | None = None,
     ) -> dict:
+        # function_calling derives the tool name from the schema's top-level "title";
+        # without it LangChain raises "Unsupported function ... must have a top-level
+        # 'title' key". Inject a default so callers needn't carry boilerplate titles.
+        if isinstance(schema, dict) and "title" not in schema:
+            schema = {"title": "response", **schema}
         # function_calling is the portable method across ollama/openai/anthropic/gemini.
         llm = self._get_llm().with_structured_output(schema, method="function_calling")
         result = await llm.ainvoke(
