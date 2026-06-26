@@ -30,6 +30,8 @@ interface ChatState {
   // Chronological thinking blocks (one per LLM thought)
   streamingThinkingBlocks: ThinkingBlock[];
 
+  streamingReasoning: string;
+
   // Structured content blocks (molecules, tables, etc.)
   streamingStructuredBlocks: ContentBlock[];
 
@@ -59,6 +61,7 @@ interface ChatState {
   addStep: (step: AgentStep) => void;
   updateStep: (stepName: string, update: Partial<AgentStep>) => void;
   pushThinkingBlock: (block: ThinkingBlock) => void;
+  appendReasoning: (delta: string) => void;
   addStructuredBlock: (block: ContentBlock) => void;
   setSources: (sources: SourceCitation[]) => void;
   setFinalSources: (sources: SourceCitation[]) => void;
@@ -81,6 +84,7 @@ export const useChatStore = create<ChatState>((set) => ({
   pendingUserMessage: null,
   queuedMessage: null,
   streamingThinkingBlocks: [],
+  streamingReasoning: "",
   streamingStructuredBlocks: [],
   groundingResult: null,
   highlightedCitation: null,
@@ -120,6 +124,7 @@ export const useChatStore = create<ChatState>((set) => ({
       finalSources: null,
       pendingUserMessage: userMessage,
       streamingThinkingBlocks: [],
+      streamingReasoning: "",
       streamingStructuredBlocks: [],
       groundingResult: null,
       stepTimings: [],
@@ -167,6 +172,11 @@ export const useChatStore = create<ChatState>((set) => ({
       streamingThinkingBlocks: [...state.streamingThinkingBlocks, block],
     })),
 
+  appendReasoning: (delta) =>
+    set((state) => ({
+      streamingReasoning: state.streamingReasoning + delta,
+    })),
+
   addStructuredBlock: (block) =>
     set((state) => ({
       streamingStructuredBlocks: [...state.streamingStructuredBlocks, block],
@@ -212,6 +222,7 @@ export const useChatStore = create<ChatState>((set) => ({
       finalSources: null,
       pendingUserMessage: null,
       streamingThinkingBlocks: [],
+      streamingReasoning: "",
       streamingStructuredBlocks: [],
       groundingResult: null,
       highlightedCitation: null,
