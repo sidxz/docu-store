@@ -31,7 +31,8 @@ class LLMClientPort(Protocol):
             The model's text response
 
         Raises:
-            RuntimeError: If the LLM call fails or times out
+            Exception: The underlying provider/LangChain exception propagates if
+                the call fails.
 
         """
         ...
@@ -56,7 +57,8 @@ class LLMClientPort(Protocol):
             String token deltas as they are generated
 
         Raises:
-            RuntimeError: If the LLM call fails or times out
+            Exception: The underlying provider/LangChain exception propagates if
+                the call fails.
 
         """
         ...
@@ -81,8 +83,8 @@ class LLMClientPort(Protocol):
             The model's text response
 
         Raises:
-            RuntimeError: If the LLM call fails or the model doesn't support images
-            NotImplementedError: If the underlying provider doesn't support multimodal
+            Exception: The underlying provider/LangChain exception propagates if
+                the call fails or the model does not support images.
 
         """
         ...
@@ -105,7 +107,8 @@ class LLMClientPort(Protocol):
             A dict matching ``schema``.
 
         Raises:
-            RuntimeError: If the LLM call fails.
+            Exception: The underlying provider/LangChain exception propagates if
+                the call fails.
 
         """
         ...

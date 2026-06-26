@@ -57,9 +57,12 @@ def build_chat_model(
     api_key: str | None = None,
     base_url: str | None = None,
     reasoning: str | None = None,
-    allow_cloud: bool = True,
+    allow_cloud: bool = False,
 ) -> BaseChatModel:
     """Construct a LangChain ``BaseChatModel`` for ``provider``.
+
+    ``allow_cloud`` defaults to False (fail-closed): a caller must opt into
+    cloud providers explicitly, so a forgotten flag can never reach the internet.
 
     Raises:
         ValueError: unknown provider; a cloud provider while ``allow_cloud`` is
@@ -92,6 +95,10 @@ def build_chat_model(
             raise ValueError(msg)
         # Gemini's LangChain integration expects google_api_key.
         kwargs["google_api_key" if provider == "gemini" else "api_key"] = api_key
+
+    if provider == "openai":
+        # Without this, OpenAI streamed responses report zero token usage.
+        kwargs["stream_usage"] = True
 
     reasoning_kw = _reasoning_kwargs(provider, reasoning)
     if provider == "anthropic" and reasoning_kw:

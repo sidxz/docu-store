@@ -101,7 +101,7 @@ class _BaseToolCallingAdapter:
         base_url: str = "http://localhost:11434",
         temperature: float = 0.3,
         reasoning: str | None = None,
-        allow_cloud: bool = True,
+        allow_cloud: bool = False,
         langfuse_handler: Any | None = None,
     ) -> None:
         self._provider = provider

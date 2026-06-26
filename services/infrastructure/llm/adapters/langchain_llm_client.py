@@ -12,6 +12,30 @@ if TYPE_CHECKING:
 
 log = structlog.get_logger(__name__)
 
+# Magic-byte prefixes → MIME, for the data: URLs cloud vision APIs validate.
+_IMAGE_MAGIC = ((b"\x89PNG", "image/png"), (b"\xff\xd8\xff", "image/jpeg"), (b"GIF8", "image/gif"))
+
+
+def _sniff_image_mime(image_b64: str) -> str:
+    """Detect an image's MIME from its base64 header; default to PNG.
+
+    Anthropic/Gemini reject a data: URL whose declared type mismatches the bytes,
+    so we can't hardcode image/png. 24 base64 chars decode to 18 bytes — enough
+    for every magic number below, including WebP's RIFF/WEBP at offset 8.
+    """
+    import base64
+
+    try:
+        head = base64.b64decode(image_b64[:24])
+    except Exception:  # malformed input falls back to the default
+        return "image/png"
+    for magic, mime in _IMAGE_MAGIC:
+        if head.startswith(magic):
+            return mime
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return "image/webp"
+    return "image/png"
+
 
 class LangChainLLMClient:
     """Provider-agnostic ``LLMClientPort`` adapter backed by a LangChain model.
@@ -30,7 +54,7 @@ class LangChainLLMClient:
         api_key: str | None = None,
         base_url: str | None = None,
         reasoning: str | None = None,
-        allow_cloud: bool = True,
+        allow_cloud: bool = False,
         langfuse_handler: Any | None = None,
         chat_model: BaseChatModel | None = None,
     ) -> None:
@@ -78,8 +102,9 @@ class LangChainLLMClient:
 
         content: list[dict] = [{"type": "text", "text": prompt}]
         for img in images_b64:
+            mime = _sniff_image_mime(img)
             content.append(
-                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img}"}},
+                {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{img}"}},
             )
         messages: list = []
         if system_prompt:

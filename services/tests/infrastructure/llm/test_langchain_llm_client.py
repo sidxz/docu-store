@@ -93,6 +93,24 @@ async def test_complete_with_image_returns_content() -> None:
     assert await client.complete_with_image("describe", "aGVsbG8=") == "caption"
 
 
+def test_image_messages_sniffs_jpeg_mime() -> None:
+    import base64
+
+    jpeg_b64 = base64.b64encode(b"\xff\xd8\xff\xe0" + b"\x00" * 20).decode()
+    messages = LangChainLLMClient._image_messages("describe", [jpeg_b64], None)
+    url = messages[0].content[1]["image_url"]["url"]
+    assert url.startswith("data:image/jpeg;base64,")
+
+
+def test_image_messages_defaults_to_png() -> None:
+    import base64
+
+    png_b64 = base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"\x00" * 16).decode()
+    messages = LangChainLLMClient._image_messages("describe", [png_b64], None)
+    url = messages[0].content[1]["image_url"]["url"]
+    assert url.startswith("data:image/png;base64,")
+
+
 @pytest.mark.asyncio
 async def test_get_model_info_reports_provider() -> None:
     client, _ = _client()
