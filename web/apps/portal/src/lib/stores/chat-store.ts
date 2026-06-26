@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type { AgentEvent, AgentStep, ContentBlock, GroundingStatus, SourceCitation, ThinkingBlock } from "@docu-store/types";
 import { trackEvent } from "@/lib/analytics";
 
@@ -12,6 +13,9 @@ interface StepTiming {
 }
 
 export type ChatMode = "quick" | "thinking" | "deep_thinking";
+
+export type ReasoningLevel = "off" | "low" | "medium" | "high";
+export type ReasoningDefaults = { synthesis: ReasoningLevel; retrieval: ReasoningLevel; base: ReasoningLevel };
 
 interface ChatState {
   // Pipeline mode
@@ -51,6 +55,13 @@ interface ChatState {
   rawEvents: AgentEvent[];
   doneEvent: AgentEvent | null;
 
+  // Reasoning
+  reasoningDefaults: ReasoningDefaults;
+  synthesisOverride: "on" | "off" | null;
+  setReasoningDefault: (lane: keyof ReasoningDefaults, level: ReasoningLevel) => void;
+  setSynthesisOverride: (v: "on" | "off" | null) => void;
+  effectiveReasoning: () => ReasoningDefaults;
+
   // Actions
   setChatMode: (mode: ChatMode) => void;
   highlightCitation: (index: number, messageId?: string) => void;
@@ -74,7 +85,9 @@ interface ChatState {
 
 let highlightTimer: ReturnType<typeof setTimeout> | null = null;
 
-export const useChatStore = create<ChatState>((set) => ({
+export const useChatStore = create<ChatState>()(
+  persist(
+    (set, get) => ({
   chatMode: "thinking" as ChatMode,
   isStreaming: false,
   streamingContent: "",
@@ -92,6 +105,21 @@ export const useChatStore = create<ChatState>((set) => ({
   stepTimings: [],
   rawEvents: [],
   doneEvent: null,
+
+  reasoningDefaults: { synthesis: "off", retrieval: "off", base: "off" },
+  synthesisOverride: null,
+
+  setReasoningDefault: (lane, level) =>
+    set((state) => ({ reasoningDefaults: { ...state.reasoningDefaults, [lane]: level } })),
+  setSynthesisOverride: (v) => set({ synthesisOverride: v }),
+  effectiveReasoning: () => {
+    const { reasoningDefaults, synthesisOverride } = get();
+    let synthesis = reasoningDefaults.synthesis;
+    if (synthesisOverride === "off") synthesis = "off";
+    else if (synthesisOverride === "on")
+      synthesis = reasoningDefaults.synthesis === "off" ? "medium" : reasoningDefaults.synthesis;
+    return { ...reasoningDefaults, synthesis };
+  },
 
   setChatMode: (mode) => {
     trackEvent("chat_mode_changed", { mode });
@@ -231,4 +259,11 @@ export const useChatStore = create<ChatState>((set) => ({
       rawEvents: [],
       doneEvent: null,
     }),
-}));
+    }),
+    {
+      name: "docu-store-chat-reasoning",
+      storage: createJSONStorage(() => localStorage),
+      partialize: (s) => ({ reasoningDefaults: s.reasoningDefaults }),
+    },
+  ),
+);
