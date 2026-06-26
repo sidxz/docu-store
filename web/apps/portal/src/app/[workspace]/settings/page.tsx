@@ -6,6 +6,7 @@ import { SelectButton } from "primereact/selectbutton";
 
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader } from "@/components/ui/Card";
+import { ReasoningSettings } from "@/components/chat/ReasoningSettings";
 import { useThemeStore } from "@/lib/stores/theme-store";
 import { useScopeStore } from "@/lib/stores/scope-store";
 import { useDevModeStore } from "@/lib/stores/dev-mode-store";
@@ -83,6 +84,9 @@ export default function SettingsPage() {
             )}
           />
         </Card>
+
+        {/* Reasoning */}
+        <ReasoningSettings />
 
         {/* Default Visibility */}
         <Card>
