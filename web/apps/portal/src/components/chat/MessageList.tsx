@@ -29,6 +29,7 @@ export function MessageList({
   const finalSources = useChatStore((s) => s.finalSources);
   const groundingResult = useChatStore((s) => s.groundingResult);
   const streamingStructuredBlocks = useChatStore((s) => s.streamingStructuredBlocks);
+  const streamingReasoning = useChatStore((s) => s.streamingReasoning);
   const doneEvent = useChatStore((s) => s.doneEvent);
 
   // Determine if the API data already includes the response we just streamed.
@@ -97,6 +98,7 @@ export function MessageList({
               retry_count: 0,
               grounding_is_grounded: groundingResult?.is_grounded ?? null,
               grounding_confidence: groundingResult?.confidence ?? null,
+              reasoning_content: streamingReasoning || undefined,
             },
             structured_content: streamingStructuredBlocks.length > 0 ? streamingStructuredBlocks : null,
             token_usage: null,

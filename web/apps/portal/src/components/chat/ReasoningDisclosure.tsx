@@ -21,6 +21,7 @@ export function ReasoningDisclosure({ reasoning, isStreaming }: ReasoningDisclos
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
         aria-expanded={open}
+        aria-controls="reasoning-panel"
       >
         <Brain className="h-3.5 w-3.5 text-feature-search" />
         <span className="font-medium">Reasoning</span>
@@ -30,7 +31,7 @@ export function ReasoningDisclosure({ reasoning, isStreaming }: ReasoningDisclos
         </span>
       </button>
       {open && (
-        <div className="border-t border-border-subtle px-3 py-2 prose prose-sm dark:prose-invert max-w-none text-text-secondary">
+        <div id="reasoning-panel" className="border-t border-border-subtle px-3 py-2 prose prose-sm dark:prose-invert max-w-none text-text-secondary">
           <MarkdownRenderer content={reasoning} />
         </div>
       )}

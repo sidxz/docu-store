@@ -21,7 +21,7 @@ interface ChatMessageProps {
 export function ChatMessage({ message, workspace, isStreaming, onFeedback }: ChatMessageProps) {
   const isUser = message.role === "user";
   const devMode = useDevModeStore((s) => s.enabled);
-  const { rawEvents, groundingResult, streamingReasoning } = useChatStore();
+  const { rawEvents, groundingResult } = useChatStore();
   const { trackEvent } = useAnalytics();
   const [feedbackGiven, setFeedbackGiven] = useState<"positive" | "negative" | null>(null);
   const [copied, setCopied] = useState(false);
@@ -68,14 +68,9 @@ export function ChatMessage({ message, workspace, isStreaming, onFeedback }: Cha
         )}
 
         {/* Model reasoning disclosure (assistant only) */}
-        {!isUser && (() => {
-          const reasoning = isStreaming
-            ? streamingReasoning
-            : (message.agent_trace?.reasoning_content ?? "");
-          return reasoning ? (
-            <ReasoningDisclosure reasoning={reasoning} isStreaming={isStreaming} />
-          ) : null;
-        })()}
+        {!isUser && message.agent_trace?.reasoning_content && (
+          <ReasoningDisclosure reasoning={message.agent_trace.reasoning_content} isStreaming={isStreaming} />
+        )}
 
         {/* Message body */}
         <div
