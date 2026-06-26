@@ -172,3 +172,52 @@ Reasoning needs no port change — it's configured at construction (§4.3), so
 Cloud packages are *installed* but never *contacted* unless selected (no network
 at import) — acceptable for air-gapped installs. If installs must be lean, make
 them optional extras instead; deferred unless requested.
+
+## 10. Implementation status & handoff (2026-06-26)
+
+**Branch:** `update-2` (commits `73b3034..4ce82ea`, ~13 ahead of `main`, kept
+as-is — not pushed/merged). Suite green (349). New code lint-clean.
+
+**Landed (Phases 1–2):** single `LangChainLLMClient` + `build_chat_model` (cloud
+guard); factory rewired, old Ollama/OpenAI adapters deleted; providers
+ollama/openai/anthropic/gemini; native tool calling default (ReAct = explicit
+`react` opt-in); `complete_structured`; reasoning-at-construction; `ALLOW_CLOUD_LLM`
+guard fails fast at factory; default model now `gemma4:31b`.
+
+**Live-verified against `gemma4:31b`** (Ollama @ localhost:11434): `complete`,
+`stream`, `complete_structured` (titled schema), native tool calling, `reasoning`
+(no #33041 leak), and the cloud guard / fail-fast — all PASS.
+
+**Remaining tasks (for a fresh session):**
+
+1. **`complete_structured` title fix** (ready, ~1 line + test). Live run showed a
+   schema without a top-level `"title"` raises `ValueError: Unsupported function …
+   must have a top-level 'title' key`. In `adapters/langchain_llm_client.py`
+   `complete_structured`, before `with_structured_output`: if `isinstance(schema,
+   dict)` and `"title" not in schema` → `schema = {"title": "response", **schema}`.
+   Unit fake doesn't enforce the rule, so add an assertion that the adapter injects
+   a title (or an Ollama-marked integration test). Do this BEFORE task 2's NER work.
+2. **Phase 3 adoption** (needs brainstorm→spec→plan): drive `chat_llm_reasoning`
+   from chat `quick`/`thinking`/`deep_thinking` modes + surface
+   `additional_kwargs.reasoning_content` (currently dropped) into the SSE stream;
+   migrate NER (`infrastructure/ner/`) + doc-metadata extraction to
+   `complete_structured` (depends on #1).
+3. **Deferred Minors** — full list in the SDD ledger `.superpowers/sdd/progress.md`:
+   image MIME hardcoded `image/png` (cloud vision w/ non-PNG errors on
+   Anthropic/Gemini); LLM errors not wrapped to `RuntimeError` per port docstrings;
+   OpenAI builder missing `stream_usage=True` (stream usage logs zeros);
+   `_BaseToolCallingAdapter` lacks `@abstractmethod`; `test_config_llm.py` no env
+   isolation; `build_chat_model(allow_cloud=True)` fail-open default; assorted
+   coverage gaps.
+4. **Not yet live-tested:** the ReAct fallback path (`mode=react`, for gemma3/older);
+   cloud-provider reasoning kwargs (Claude `thinking` / Gemini `thinking_budget` /
+   OpenAI `reasoning_effort`) — no cloud keys were used. Note `langchain-core`
+   resolved to **1.4.8**, not the 1.2.9 floor.
+5. **Branch integration** — decide push+PR vs merge to `main`.
+6. **Out of scope (flagged):** `evaluation/judge.py` builds cloud SDKs directly,
+   ungoverned by `ALLOW_CLOUD_LLM` (offline harness; matters only for truly
+   air-gapped installs).
+
+**Pointers:** plan `docs/superpowers/plans/2026-06-25-multi-provider-llm.md`
+(gitignored); SDD ledger `.superpowers/sdd/progress.md` (gitignored, per-task
+status + minors).
