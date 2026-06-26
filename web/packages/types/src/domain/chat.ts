@@ -52,6 +52,7 @@ export interface ThinkingBlock {
 export interface AgentTrace {
   steps: AgentStep[];
   thinking_blocks?: ThinkingBlock[];
+  reasoning_content?: string;
   total_duration_ms: number | null;
   retry_count: number;
   grounding_is_grounded: boolean | null;
@@ -100,6 +101,7 @@ export interface AgentEvent {
     | "step_completed"
     | "retrieval_results"
     | "token"
+    | "reasoning_token"
     | "structured_block"
     | "grounding_result"
     | "done"
