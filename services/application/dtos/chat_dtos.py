@@ -136,6 +136,7 @@ class AgentTraceDTO(BaseModel):
 
     steps: list[AgentStepDTO] = Field(default_factory=list)
     thinking_blocks: list[ThinkingBlockDTO] = Field(default_factory=list)
+    reasoning_content: str | None = None  # model native chain-of-thought (thinking modes)
     total_duration_ms: int | None = None
     retry_count: int = 0
     grounding_is_grounded: bool | None = None

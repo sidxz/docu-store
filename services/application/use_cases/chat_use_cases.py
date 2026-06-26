@@ -243,6 +243,7 @@ class SendMessageUseCase:
         grounding_confidence: float | None = None
         query_context: QueryContextDTO | None = None
         structured_blocks: list[ContentBlockDTO] = []
+        reasoning_parts: list[str] = []
 
         async for event in self._agent.run(
             message=message,
@@ -254,6 +255,8 @@ class SendMessageUseCase:
         ):
             if event.type == "token":
                 draft_answer += event.delta or ""
+            elif event.type == "reasoning_token":
+                reasoning_parts.append(event.delta or "")
             elif event.type == "step_started" and event.step:
                 trace_steps[event.step] = AgentStepDTO(
                     step=event.step,
@@ -324,6 +327,7 @@ class SendMessageUseCase:
             agent_trace = AgentTraceDTO(
                 steps=list(trace_steps.values()),
                 thinking_blocks=thinking_blocks,
+                reasoning_content="".join(reasoning_parts) or None,
                 total_duration_ms=final_event.duration_ms if final_event else None,
                 retry_count=0,
                 grounding_is_grounded=grounding_is_grounded,
