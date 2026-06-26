@@ -8,6 +8,7 @@ import { useChatStore } from "@/lib/stores/chat-store";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { AgentThinkingPanel } from "./AgentThinkingPanel";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import { ReasoningDisclosure } from "./ReasoningDisclosure";
 import { RichContentRenderer } from "./RichContentRenderer";
 
 interface ChatMessageProps {
@@ -20,7 +21,7 @@ interface ChatMessageProps {
 export function ChatMessage({ message, workspace, isStreaming, onFeedback }: ChatMessageProps) {
   const isUser = message.role === "user";
   const devMode = useDevModeStore((s) => s.enabled);
-  const { rawEvents, groundingResult } = useChatStore();
+  const { rawEvents, groundingResult, streamingReasoning } = useChatStore();
   const { trackEvent } = useAnalytics();
   const [feedbackGiven, setFeedbackGiven] = useState<"positive" | "negative" | null>(null);
   const [copied, setCopied] = useState(false);
@@ -65,6 +66,16 @@ export function ChatMessage({ message, workspace, isStreaming, onFeedback }: Cha
             isStreaming={isStreaming}
           />
         )}
+
+        {/* Model reasoning disclosure (assistant only) */}
+        {!isUser && (() => {
+          const reasoning = isStreaming
+            ? streamingReasoning
+            : (message.agent_trace?.reasoning_content ?? "");
+          return reasoning ? (
+            <ReasoningDisclosure reasoning={reasoning} isStreaming={isStreaming} />
+          ) : null;
+        })()}
 
         {/* Message body */}
         <div
