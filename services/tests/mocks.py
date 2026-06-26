@@ -447,6 +447,18 @@ class MockLLMClient:
         self.complete_calls.append(prompt)
         return {"result": self._response}
 
+    async def stream(self, prompt: str, **kwargs: Any) -> Any:
+        if self.raise_on_call:
+            raise self.raise_on_call
+        self.complete_calls.append(prompt)
+        yield self._response
+
+    async def stream_with_reasoning(self, prompt: str, **kwargs: Any) -> Any:
+        if self.raise_on_call:
+            raise self.raise_on_call
+        self.complete_calls.append(prompt)
+        yield ("content", self._response)
+
     async def get_model_info(self) -> dict[str, str]:
         return {"provider": "mock", "model_name": "mock-model"}
 

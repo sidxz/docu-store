@@ -8,6 +8,7 @@ from infrastructure.llm.adapters.langchain_llm_client import LangChainLLMClient
 class _FakeAIMessage:
     def __init__(self, content: str) -> None:
         self.content = content
+        self.additional_kwargs: dict = {}
         self.usage_metadata = {"input_tokens": 3, "output_tokens": 5}
         self.response_metadata: dict = {}
 
@@ -117,3 +118,52 @@ async def test_get_model_info_reports_provider() -> None:
     info = await client.get_model_info()
     assert info["provider"] == "ollama"
     assert info["model_name"] == "gemma4:27b"
+
+
+# ---------------------------------------------------------------------------
+# stream_with_reasoning tests
+# ---------------------------------------------------------------------------
+
+
+class _ReasoningChunk:
+    def __init__(self, content="", reasoning=None):
+        self.content = content
+        self.additional_kwargs = {"reasoning_content": reasoning} if reasoning else {}
+        self.usage_metadata = {"input_tokens": 1, "output_tokens": 1}
+        self.response_metadata: dict = {}
+
+
+class _ReasoningChatModel:
+    async def astream(self, messages, config=None):  # noqa: ANN001, ARG002
+        yield _ReasoningChunk(reasoning="think A")
+        yield _ReasoningChunk(reasoning="think B")
+        yield _ReasoningChunk(content="answer ")
+        yield _ReasoningChunk(content="text")
+
+    def bind(self, **kwargs):  # noqa: ANN003
+        return self
+
+
+def _reasoning_client():
+    return LangChainLLMClient(
+        provider="ollama", model_name="gemma4:31b", chat_model=_ReasoningChatModel(),
+    )
+
+
+@pytest.mark.asyncio
+async def test_stream_with_reasoning_tags_deltas() -> None:
+    client = _reasoning_client()
+    out = [pair async for pair in client.stream_with_reasoning("q")]
+    assert out == [
+        ("reasoning", "think A"),
+        ("reasoning", "think B"),
+        ("content", "answer "),
+        ("content", "text"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_stream_filters_to_content_only() -> None:
+    client = _reasoning_client()
+    chunks = [c async for c in client.stream("q")]
+    assert "".join(chunks) == "answer text"  # reasoning dropped

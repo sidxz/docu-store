@@ -65,6 +65,24 @@ class LLMClientPort(Protocol):
         # Make this an async generator in the protocol
         yield ""
 
+    def stream_with_reasoning(
+        self,
+        prompt: str,
+        *,
+        system_prompt: str | None = None,
+        temperature: float | None = None,
+        images_b64: list[str] | None = None,
+    ) -> AsyncGenerator[tuple[str, str], None]:
+        """Stream the model output as tagged deltas.
+
+        Yields ``("content", text)`` for answer tokens and ``("reasoning", text)``
+        for the model's native reasoning/chain-of-thought (when reasoning is
+        enabled on the client). Consumers that only want the answer should use
+        ``stream`` instead.
+        """
+        ...
+        yield ("content", "")
+
     async def complete_with_image(
         self,
         prompt: str,

@@ -126,14 +126,14 @@ class LangChainLLMClient:
         record_usage(*extract_usage_from_response(response))
         return str(response.content)
 
-    async def stream(
+    async def stream_with_reasoning(
         self,
         prompt: str,
         *,
         system_prompt: str | None = None,
         temperature: float | None = None,
         images_b64: list[str] | None = None,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[tuple[str, str], None]:
         llm = self._get_llm()
         if temperature is not None:
             llm = llm.bind(temperature=temperature)
@@ -145,10 +145,30 @@ class LangChainLLMClient:
         last_chunk = None
         async for chunk in llm.astream(messages, config=self._config()):
             last_chunk = chunk
+            reasoning = chunk.additional_kwargs.get("reasoning_content")
+            if reasoning:
+                yield ("reasoning", str(reasoning))
             if chunk.content:
-                yield str(chunk.content)
+                yield ("content", str(chunk.content))
         if last_chunk is not None:
             record_usage(*extract_usage_from_response(last_chunk))
+
+    async def stream(
+        self,
+        prompt: str,
+        *,
+        system_prompt: str | None = None,
+        temperature: float | None = None,
+        images_b64: list[str] | None = None,
+    ) -> AsyncGenerator[str, None]:
+        async for kind, text in self.stream_with_reasoning(
+            prompt,
+            system_prompt=system_prompt,
+            temperature=temperature,
+            images_b64=images_b64,
+        ):
+            if kind == "content":
+                yield text
 
     async def complete_with_image(
         self,
