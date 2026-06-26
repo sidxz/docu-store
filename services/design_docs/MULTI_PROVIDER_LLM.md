@@ -202,11 +202,19 @@ guard fails fast at factory; default model now `gemma4:31b`.
      no app-side text parsing to replace. Migrating would mean reimplementing a
      domain-tuned extractor with a hand-rolled 15-class schema (quality risk),
      not a cleanup. Left as-is.
-   - **Pending (real feature, needs brainstorm→spec→plan):** drive
-     `chat_llm_reasoning` from chat `quick`/`thinking`/`deep_thinking` modes +
-     surface `additional_kwargs.reasoning_content` (dropped in `stream()`) into
-     the SSE stream. Touches the `stream()` contract (port + 3 nodes + 2 agents),
-     per-mode client construction (singleton today), and the frontend.
+   - ~~per-mode reasoning~~ **DONE** (commit `88d2163`): per-lane reasoning knobs
+     `CHAT_LLM_REASONING` (base/quick) / `CHAT_SYNTHESIS_REASONING` (thinking+deep
+     generation) / `CHAT_RETRIEVAL_REASONING` (agentic loop). New knobs default
+     `None`→inherit base, so no behavior change. Container builds a distinct
+     `chat_synthesis_llm_client`; the three thinking-generation nodes route to it.
+     Limitations: deep_thinking shares thinking's nodes (reason identically);
+     Ollama reasoning is on/off only.
+   - **Pending (still needs spec + frontend): surface reasoning to the UI.** Route
+     `additional_kwargs.reasoning_content` (dropped in `stream()`) into the SSE
+     stream — reuse the existing `thinking_content` channel (`chat_dtos.py:32`).
+     Touches the `stream()` contract (port + 3 node call sites + 2 agents) + FE
+     rendering. Flag: vocabulary collision — model "reasoning" vs the agent's
+     "thinking mode"/`thinking_content` trace; decide user-facing terms.
 3. ~~**Deferred Minors**~~ **DONE** (commit `112e1a8`), except one deliberate skip:
    image MIME now sniffed from magic bytes; `stream_usage=True` for OpenAI;
    `build_chat_model` + adapter ctors fail-closed (`allow_cloud=False`);
