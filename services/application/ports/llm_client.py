@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from typing import Protocol
+from typing import Literal, Protocol
 
 
 class LLMClientPort(Protocol):
@@ -65,14 +65,14 @@ class LLMClientPort(Protocol):
         # Make this an async generator in the protocol
         yield ""
 
-    def stream_with_reasoning(
+    async def stream_with_reasoning(
         self,
         prompt: str,
         *,
         system_prompt: str | None = None,
         temperature: float | None = None,
         images_b64: list[str] | None = None,
-    ) -> AsyncGenerator[tuple[str, str], None]:
+    ) -> AsyncGenerator[tuple[Literal["content", "reasoning"], str], None]:
         """Stream the model output as tagged deltas.
 
         Yields ``("content", text)`` for answer tokens and ``("reasoning", text)``

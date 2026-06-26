@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import structlog
 
@@ -133,7 +133,7 @@ class LangChainLLMClient:
         system_prompt: str | None = None,
         temperature: float | None = None,
         images_b64: list[str] | None = None,
-    ) -> AsyncGenerator[tuple[str, str], None]:
+    ) -> AsyncGenerator[tuple[Literal["content", "reasoning"], str], None]:
         llm = self._get_llm()
         if temperature is not None:
             llm = llm.bind(temperature=temperature)
