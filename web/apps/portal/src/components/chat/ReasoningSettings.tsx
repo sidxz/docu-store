@@ -3,9 +3,10 @@
 import { SelectButton } from "primereact/selectbutton";
 
 import { Card, CardHeader } from "@/components/ui/Card";
-import { useChatStore, type ReasoningLevel } from "@/lib/stores/chat-store";
+import { useChatStore, type ReasoningDefault } from "@/lib/stores/chat-store";
 
-const LEVEL_OPTIONS: { label: string; value: ReasoningLevel }[] = [
+const LEVEL_OPTIONS: { label: string; value: ReasoningDefault }[] = [
+  { label: "Inherit (server default)", value: "inherit" },
   { label: "Off", value: "off" },
   { label: "Low", value: "low" },
   { label: "Medium", value: "medium" },
@@ -37,7 +38,7 @@ export function ReasoningSettings() {
               value={reasoningDefaults[key]}
               options={LEVEL_OPTIONS}
               onChange={(e) => {
-                if (e.value) setReasoningDefault(key, e.value as ReasoningLevel);
+                if (e.value) setReasoningDefault(key, e.value as ReasoningDefault);
               }}
             />
           </div>

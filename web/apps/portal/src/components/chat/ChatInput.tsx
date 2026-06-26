@@ -28,7 +28,7 @@ export function ChatInput({
 
   const reasoningOn =
     synthesisOverride === "on" ||
-    (synthesisOverride === null && reasoningDefaults.synthesis !== "off");
+    (synthesisOverride === null && reasoningDefaults.synthesis !== "off" && reasoningDefaults.synthesis !== "inherit");
 
   const handleSend = useCallback(() => {
     const trimmed = value.trim();

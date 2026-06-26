@@ -15,7 +15,8 @@ interface StepTiming {
 export type ChatMode = "quick" | "thinking" | "deep_thinking";
 
 export type ReasoningLevel = "off" | "low" | "medium" | "high";
-export type ReasoningDefaults = { synthesis: ReasoningLevel; retrieval: ReasoningLevel; base: ReasoningLevel };
+export type ReasoningDefault = "inherit" | ReasoningLevel;
+export type ReasoningDefaults = { synthesis: ReasoningDefault; retrieval: ReasoningDefault; base: ReasoningDefault };
 
 interface ChatState {
   // Pipeline mode
@@ -58,9 +59,9 @@ interface ChatState {
   // Reasoning
   reasoningDefaults: ReasoningDefaults;
   synthesisOverride: "on" | "off" | null;
-  setReasoningDefault: (lane: keyof ReasoningDefaults, level: ReasoningLevel) => void;
+  setReasoningDefault: (lane: keyof ReasoningDefaults, level: ReasoningDefault) => void;
   setSynthesisOverride: (v: "on" | "off" | null) => void;
-  effectiveReasoning: () => ReasoningDefaults;
+  effectiveReasoning: () => Partial<Record<"synthesis" | "retrieval" | "base", ReasoningLevel>>;
 
   // Actions
   setChatMode: (mode: ChatMode) => void;
@@ -106,7 +107,7 @@ export const useChatStore = create<ChatState>()(
   rawEvents: [],
   doneEvent: null,
 
-  reasoningDefaults: { synthesis: "off", retrieval: "off", base: "off" },
+  reasoningDefaults: { synthesis: "inherit", retrieval: "inherit", base: "inherit" },
   synthesisOverride: null,
 
   setReasoningDefault: (lane, level) =>
@@ -114,11 +115,21 @@ export const useChatStore = create<ChatState>()(
   setSynthesisOverride: (v) => set({ synthesisOverride: v }),
   effectiveReasoning: () => {
     const { reasoningDefaults, synthesisOverride } = get();
-    let synthesis = reasoningDefaults.synthesis;
-    if (synthesisOverride === "off") synthesis = "off";
-    else if (synthesisOverride === "on")
-      synthesis = reasoningDefaults.synthesis === "off" ? "medium" : reasoningDefaults.synthesis;
-    return { ...reasoningDefaults, synthesis };
+    // ponytail: omit "inherit" lanes so backend env defaults win
+    const result: Partial<Record<"synthesis" | "retrieval" | "base", ReasoningLevel>> = {};
+    if (reasoningDefaults.retrieval !== "inherit") result.retrieval = reasoningDefaults.retrieval;
+    if (reasoningDefaults.base !== "inherit") result.base = reasoningDefaults.base;
+    if (synthesisOverride === "off") {
+      result.synthesis = "off";
+    } else if (synthesisOverride === "on") {
+      result.synthesis =
+        reasoningDefaults.synthesis === "inherit" || reasoningDefaults.synthesis === "off"
+          ? "medium"
+          : reasoningDefaults.synthesis;
+    } else if (reasoningDefaults.synthesis !== "inherit") {
+      result.synthesis = reasoningDefaults.synthesis;
+    }
+    return result;
   },
 
   setChatMode: (mode) => {
@@ -264,6 +275,7 @@ export const useChatStore = create<ChatState>()(
       name: "docu-store-chat-reasoning",
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({ reasoningDefaults: s.reasoningDefaults }),
+      skipHydration: true,
     },
   ),
 );

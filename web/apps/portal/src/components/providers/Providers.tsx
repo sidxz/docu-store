@@ -8,6 +8,7 @@ import type { SentinelAuthz } from "@sentinel-auth/js";
 
 import { getAuthzClient } from "@/lib/authz-client";
 import { apiClient, setApiBaseUrl } from "@docu-store/api-client";
+import { useChatStore } from "@/lib/stores/chat-store";
 import { authMiddleware } from "@/lib/api-auth-middleware";
 import { getQueryClient } from "@/lib/query-client";
 import {
@@ -45,6 +46,11 @@ export function Providers({ children }: { children: ReactNode }) {
   const middlewareApplied = useRef(false);
   const [mounted, setMounted] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Rehydrate persisted chat settings (skipHydration=true prevents SSR mismatch)
+    useChatStore.persist.rehydrate();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
