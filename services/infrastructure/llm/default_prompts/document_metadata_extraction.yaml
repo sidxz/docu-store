@@ -17,17 +17,8 @@ template: |
   Text from the first page:
   {page_text}
 
-  Respond ONLY with valid JSON (no markdown fences, no explanation):
-  {{
-    "title": "the document title or null",
-    "authors": [
-      {{"name": "Author Name"}}
-    ],
-    "date": "date string as written in the document or null"
-  }}
-
   Rules:
-  - If a field is not present in the text, use null (not an empty string).
+  - If a field is not present in the text, omit it.
   - For authors, include all listed authors/presenters.
   - For date, preserve the original format from the document.
   - Do not invent information not present in the text.

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
@@ -39,6 +38,26 @@ _EXTRACTION_SCHEMA = [
 _CONFIDENCE_THRESHOLD = 0.4  # Minimum to accept without LLM fallback
 _LLM_DEFAULT_CONFIDENCE = 0.7  # Confidence assigned to LLM-extracted fields
 _MAX_CASCADE_PAGES = 3  # Max pages to try before giving up
+
+# JSON schema for the LLM metadata fallback (function-calling structured output).
+# Fields are optional — absent fields are simply omitted from the result dict.
+_LLM_METADATA_SCHEMA = {
+    "title": "document_metadata",
+    "type": "object",
+    "properties": {
+        "title": {"type": "string", "description": "Document or presentation title"},
+        "authors": {
+            "type": "array",
+            "description": "All listed authors/presenters",
+            "items": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+                "required": ["name"],
+            },
+        },
+        "date": {"type": "string", "description": "Date as written in the document"},
+    },
+}
 
 
 @dataclass
@@ -396,18 +415,13 @@ class ExtractDocumentMetadataUseCase:
         )
 
     async def _llm_extract(self, text: str) -> dict | None:
-        """Use LLM to extract metadata when primary methods fail."""
+        """Use LLM structured output to extract metadata when primary methods fail."""
         try:
             prompt = await self.prompt_repository.render_prompt(
                 "document_metadata_extraction",
                 page_text=text[:3000],
             )
-            response = await self.llm_client.complete(prompt)
-            cleaned = response.strip()
-            if cleaned.startswith("```"):
-                cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
-                cleaned = cleaned.removesuffix("```").strip()
-            return json.loads(cleaned)
+            return await self.llm_client.complete_structured(prompt, _LLM_METADATA_SCHEMA)
         except Exception:
             logger.exception("extract_doc_metadata.llm_fallback_failed")
             return None
