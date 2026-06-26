@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { Send, Zap, Brain, Eye } from "lucide-react";
+import { Send, Zap, Brain, Eye, Sparkles } from "lucide-react";
 import { InputTextarea } from "primereact/inputtextarea";
 import { Button } from "primereact/button";
 import { Tooltip } from "primereact/tooltip";
@@ -22,6 +22,13 @@ export function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const chatMode = useChatStore((s) => s.chatMode);
   const setChatMode = useChatStore((s) => s.setChatMode);
+  const synthesisOverride = useChatStore((s) => s.synthesisOverride);
+  const reasoningDefaults = useChatStore((s) => s.reasoningDefaults);
+  const setSynthesisOverride = useChatStore((s) => s.setSynthesisOverride);
+
+  const reasoningOn =
+    synthesisOverride === "on" ||
+    (synthesisOverride === null && reasoningDefaults.synthesis !== "off");
 
   const handleSend = useCallback(() => {
     const trimmed = value.trim();
@@ -49,6 +56,11 @@ export function ChatInput({
     <div className="border-t border-border-default p-4 bg-surface">
       <div className="flex gap-3 items-end max-w-4xl mx-auto">
         <ModeToggle mode={chatMode} onToggle={toggleMode} disabled={disabled} />
+        <ReasoningToggle
+          on={reasoningOn}
+          onToggle={() => setSynthesisOverride(reasoningOn ? "off" : "on")}
+          disabled={disabled}
+        />
         <InputTextarea
           ref={textareaRef}
           value={value}
@@ -100,6 +112,40 @@ const MODE_CONFIG: Record<ChatMode, {
     style: "bg-violet-500/10 border-violet-500/30 text-violet-400 hover:bg-violet-500/20",
   },
 };
+
+function ReasoningToggle({
+  on,
+  onToggle,
+  disabled,
+}: {
+  on: boolean;
+  onToggle: () => void;
+  disabled: boolean;
+}) {
+  const style = on
+    ? "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20"
+    : "bg-surface-elevated border-border-subtle text-text-muted hover:bg-surface-hover hover:text-text-secondary";
+
+  return (
+    <>
+      <Tooltip target=".chat-reasoning-toggle" position="top" />
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={disabled}
+        className={`chat-reasoning-toggle flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
+          transition-all flex-shrink-0 border
+          ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+          ${style}`}
+        data-pr-tooltip={on ? "Reasoning: on — inline chain-of-thought" : "Reasoning: off"}
+        aria-label={`Reasoning ${on ? "on" : "off"}. Click to toggle.`}
+      >
+        <Sparkles className="w-3.5 h-3.5" />
+        <span>Reasoning</span>
+      </button>
+    </>
+  );
+}
 
 function ModeToggle({
   mode,

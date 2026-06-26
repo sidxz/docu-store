@@ -137,11 +137,12 @@ export function useSendMessage(conversationId: string | undefined) {
 
       store.startStreaming(message);
 
+      const reasoning = store.effectiveReasoning();
       const streamStart = performance.now();
       const res = await authFetch(`/chat/${conversationId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, mode }),
+        body: JSON.stringify({ message, mode, reasoning }),
         signal: controller.signal,
       });
 
