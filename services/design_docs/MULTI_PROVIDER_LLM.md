@@ -194,18 +194,27 @@ guard fails fast at factory; default model now `gemma4:31b`.
    `{"title": "response", ...}` when a dict schema lacks a top-level title (fixes the
    `Unsupported function … must have a top-level 'title' key` ValueError). Covered by
    two unit tests (inject + preserve-existing) in `test_langchain_llm_client.py`.
-2. **Phase 3 adoption** (needs brainstorm→spec→plan): drive `chat_llm_reasoning`
-   from chat `quick`/`thinking`/`deep_thinking` modes + surface
-   `additional_kwargs.reasoning_content` (currently dropped) into the SSE stream;
-   migrate NER (`infrastructure/ner/`) + doc-metadata extraction to
-   `complete_structured` (depends on #1).
-3. **Deferred Minors** — full list in the SDD ledger `.superpowers/sdd/progress.md`:
-   image MIME hardcoded `image/png` (cloud vision w/ non-PNG errors on
-   Anthropic/Gemini); LLM errors not wrapped to `RuntimeError` per port docstrings;
-   OpenAI builder missing `stream_usage=True` (stream usage logs zeros);
-   `_BaseToolCallingAdapter` lacks `@abstractmethod`; `test_config_llm.py` no env
-   isolation; `build_chat_model(allow_cloud=True)` fail-open default; assorted
-   coverage gaps.
+2. **Phase 3 adoption** — partially done:
+   - ~~doc-metadata extraction → `complete_structured`~~ **DONE**
+     (`ExtractDocumentMetadataUseCase._llm_extract`; prompt trimmed; +tests).
+   - **NER: WON'T migrate.** `infrastructure/ner/` delegates to the tuned
+     `structflo` library, which owns its own LLM call/prompt/parsing — there is
+     no app-side text parsing to replace. Migrating would mean reimplementing a
+     domain-tuned extractor with a hand-rolled 15-class schema (quality risk),
+     not a cleanup. Left as-is.
+   - **Pending (real feature, needs brainstorm→spec→plan):** drive
+     `chat_llm_reasoning` from chat `quick`/`thinking`/`deep_thinking` modes +
+     surface `additional_kwargs.reasoning_content` (dropped in `stream()`) into
+     the SSE stream. Touches the `stream()` contract (port + 3 nodes + 2 agents),
+     per-mode client construction (singleton today), and the frontend.
+3. ~~**Deferred Minors**~~ **DONE** (commit `112e1a8`), except one deliberate skip:
+   image MIME now sniffed from magic bytes; `stream_usage=True` for OpenAI;
+   `build_chat_model` + adapter ctors fail-closed (`allow_cloud=False`);
+   port docstrings made honest (provider exceptions propagate; nothing catches
+   `RuntimeError`); `test_config_llm` env-isolated.
+   **Skipped:** `_BaseToolCallingAdapter` `@abstractmethod` — adding ABC ceremony
+   for a 2-subclass, same-file private base fixes no bug; reviewer already said
+   "skip now."
 4. **Not yet live-tested:** the ReAct fallback path (`mode=react`, for gemma3/older);
    cloud-provider reasoning kwargs (Claude `thinking` / Gemini `thinking_budget` /
    OpenAI `reasoning_effort`) — no cloud keys were used. Note `langchain-core`
