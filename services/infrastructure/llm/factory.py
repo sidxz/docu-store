@@ -77,8 +77,13 @@ def create_llm_client(settings: Settings) -> LLMClientPort:
     )
 
 
-def create_chat_llm_client(settings: Settings) -> LLMClientPort:
-    """Instantiate a chat LLM client, falling back to batch LLM settings."""
+def create_chat_llm_client(settings: Settings, *, reasoning: str | None = None) -> LLMClientPort:
+    """Instantiate a chat LLM client, falling back to batch LLM settings.
+
+    ``reasoning`` overrides the reasoning effort for this client; when None it
+    uses ``chat_llm_reasoning``. The container passes a resolved value to build
+    the separate thinking-mode synthesis client.
+    """
     from infrastructure.llm.adapters.langchain_llm_client import LangChainLLMClient
 
     provider = settings.chat_llm_provider or settings.llm_provider
@@ -103,7 +108,7 @@ def create_chat_llm_client(settings: Settings) -> LLMClientPort:
         temperature=settings.chat_llm_temperature,
         api_key=api_key,
         base_url=base_url,
-        reasoning=settings.chat_llm_reasoning,
+        reasoning=reasoning if reasoning is not None else settings.chat_llm_reasoning,
         allow_cloud=settings.allow_cloud_llm,
         langfuse_handler=_make_langfuse_callback_handler(settings),
     )
@@ -157,7 +162,7 @@ def create_tool_calling_llm_client(settings: Settings) -> ToolCallingLLMPort:
             api_key=effective_api_key,
             base_url=effective_base_url,
             temperature=effective_temperature,
-            reasoning=settings.chat_llm_reasoning,
+            reasoning=settings.chat_retrieval_reasoning or settings.chat_llm_reasoning,
             allow_cloud=settings.allow_cloud_llm,
             langfuse_handler=langfuse_handler,
         )

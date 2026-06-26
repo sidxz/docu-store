@@ -38,3 +38,10 @@ def test_reasoning_default_off(monkeypatch: pytest.MonkeyPatch) -> None:
     s = _isolated_settings(monkeypatch, "LLM_REASONING", "CHAT_LLM_REASONING")
     assert s.llm_reasoning == "off"
     assert s.chat_llm_reasoning == "off"
+
+
+def test_per_lane_reasoning_defaults_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    # None means "inherit CHAT_LLM_REASONING"; the container resolves it.
+    s = _isolated_settings(monkeypatch, "CHAT_SYNTHESIS_REASONING", "CHAT_RETRIEVAL_REASONING")
+    assert s.chat_synthesis_reasoning is None
+    assert s.chat_retrieval_reasoning is None

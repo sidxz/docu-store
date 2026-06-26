@@ -765,8 +765,15 @@ def create_container() -> Container:
     from infrastructure.chat.thinking_agent import ThinkingAgent
     from infrastructure.chat.tools.retrieval_tools import ToolRegistry
 
-    # Chat LLM client (separate from batch LLM, falls back to same settings)
+    # Chat LLM client (separate from batch LLM, falls back to same settings).
+    # Base/quick client; also drives the shared answer-formatting node.
     chat_llm_client = create_chat_llm_client(settings)
+    # Thinking/deep_thinking answer-generation client — same model, its own
+    # reasoning effort (CHAT_SYNTHESIS_REASONING, inherits CHAT_LLM_REASONING).
+    chat_synthesis_llm_client = create_chat_llm_client(
+        settings,
+        reasoning=settings.chat_synthesis_reasoning or settings.chat_llm_reasoning,
+    )
 
     container[ChatRepository] = lambda c: MongoChatRepository(
         client=c[AsyncIOMotorClient],
@@ -811,7 +818,7 @@ def create_container() -> Container:
 
     # --- Thinking Mode nodes (v2 — agentic retrieval) ---
     container[QueryPlanningNode] = lambda c: QueryPlanningNode(
-        llm_client=chat_llm_client,
+        llm_client=chat_synthesis_llm_client,
         prompt_repository=c[PromptRepositoryPort],
         ner_extractor=c[NERExtractorPort],
         structured_extractor=c[StructuredExtractorPort],
@@ -837,11 +844,11 @@ def create_container() -> Container:
 
     container[ContextAssemblyNode] = lambda _: ContextAssemblyNode()
     container[AdaptiveSynthesisNode] = lambda c: AdaptiveSynthesisNode(
-        llm_client=chat_llm_client,
+        llm_client=chat_synthesis_llm_client,
         prompt_repository=c[PromptRepositoryPort],
     )
     container[InlineVerificationNode] = lambda c: InlineVerificationNode(
-        llm_client=chat_llm_client,
+        llm_client=chat_synthesis_llm_client,
         prompt_repository=c[PromptRepositoryPort],
     )
 

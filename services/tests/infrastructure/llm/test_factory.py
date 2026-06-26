@@ -26,6 +26,8 @@ def _settings(**overrides):
         "chat_llm_api_key": None,
         "chat_llm_temperature": 0.3,
         "chat_llm_reasoning": "off",
+        "chat_synthesis_reasoning": None,
+        "chat_retrieval_reasoning": None,
         "langfuse_public_key": None,
         "langfuse_secret_key": None,
         "langfuse_host": "",
@@ -54,6 +56,17 @@ def test_create_chat_llm_client_falls_back_to_batch() -> None:
     assert isinstance(client, LangChainLLMClient)
     assert client._model_name == "gemma4:27b"  # inherited from batch
     assert client._reasoning == "off"
+
+
+def test_create_chat_llm_client_reasoning_override() -> None:
+    # The container passes a resolved reasoning level for the synthesis client.
+    client = factory.create_chat_llm_client(_settings(chat_llm_reasoning="off"), reasoning="high")
+    assert client._reasoning == "high"
+
+
+def test_create_chat_llm_client_reasoning_defaults_to_base() -> None:
+    client = factory.create_chat_llm_client(_settings(chat_llm_reasoning="medium"))
+    assert client._reasoning == "medium"
 
 
 def test_create_chat_llm_client_overrides_provider() -> None:

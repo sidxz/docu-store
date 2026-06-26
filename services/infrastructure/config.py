@@ -309,7 +309,22 @@ class Settings(BaseSettings):
     chat_llm_reasoning: Literal["off", "low", "medium", "high"] = Field(
         default="off",
         validation_alias="CHAT_LLM_REASONING",
-        description="Reasoning/thinking effort for chat LLM. 'off' disables it.",
+        description="Reasoning effort for the base/quick-mode chat LLM, and the "
+        "inheritance baseline for the synthesis/retrieval knobs. 'off' disables it.",
+    )
+    chat_synthesis_reasoning: Literal["off", "low", "medium", "high"] | None = Field(
+        default=None,
+        validation_alias="CHAT_SYNTHESIS_REASONING",
+        description="Reasoning effort for the thinking/deep_thinking answer-generation "
+        "client (query planning, synthesis, inline verification). None inherits "
+        "CHAT_LLM_REASONING. Note: Ollama reasoning is on/off only — the level matters "
+        "only for cloud providers.",
+    )
+    chat_retrieval_reasoning: Literal["off", "low", "medium", "high"] | None = Field(
+        default=None,
+        validation_alias="CHAT_RETRIEVAL_REASONING",
+        description="Reasoning effort for the agentic-retrieval tool-calling client "
+        "(thinking/deep_thinking). None inherits CHAT_LLM_REASONING.",
     )
 
     # Chat settings

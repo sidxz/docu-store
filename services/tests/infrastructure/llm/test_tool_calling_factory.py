@@ -28,6 +28,8 @@ def _settings(**overrides):
         "chat_llm_api_key": None,
         "chat_llm_temperature": 0.3,
         "chat_llm_reasoning": "off",
+        "chat_synthesis_reasoning": None,
+        "chat_retrieval_reasoning": None,
         "chat_agent_tool_calling_mode": "auto",
         "langfuse_public_key": None,
         "langfuse_secret_key": None,
@@ -57,6 +59,18 @@ def test_native_for_anthropic_under_auto() -> None:
     )
     assert isinstance(adapter, NativeToolCallingAdapter)
     assert adapter._provider == "anthropic"
+
+
+def test_retrieval_reasoning_knob_applied() -> None:
+    adapter = factory.create_tool_calling_llm_client(_settings(chat_retrieval_reasoning="high"))
+    assert adapter._reasoning == "high"
+
+
+def test_retrieval_reasoning_inherits_base_when_unset() -> None:
+    adapter = factory.create_tool_calling_llm_client(
+        _settings(chat_llm_reasoning="medium", chat_retrieval_reasoning=None),
+    )
+    assert adapter._reasoning == "medium"
 
 
 def test_tool_calling_refuses_cloud_when_disabled() -> None:
