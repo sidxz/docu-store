@@ -102,6 +102,7 @@ class _BaseToolCallingAdapter:
         temperature: float = 0.3,
         reasoning: str | None = None,
         allow_cloud: bool = False,
+        lane: str | None = None,
         langfuse_handler: Any | None = None,
     ) -> None:
         self._provider = provider
@@ -111,23 +112,27 @@ class _BaseToolCallingAdapter:
         self._temperature = temperature
         self._reasoning = reasoning
         self._allow_cloud = allow_cloud
+        self._lane = lane
         self._langfuse_handler = langfuse_handler
-        self._llm: Any | None = None
+        self._models: dict[str, Any] = {}
 
     def _get_llm(self) -> Any:
-        if self._llm is None:
-            from infrastructure.llm.model_builder import build_chat_model
+        from infrastructure.llm.model_builder import build_chat_model
+        from infrastructure.llm.reasoning_context import get_lane_override
 
-            self._llm = build_chat_model(
+        level = get_lane_override(self._lane) or self._reasoning
+        key = level or "off"
+        if key not in self._models:
+            self._models[key] = build_chat_model(
                 provider=self._provider,
                 model_name=self._model_name,
                 temperature=self._temperature,
                 api_key=self._api_key,
                 base_url=self._base_url,
-                reasoning=self._reasoning,
+                reasoning=level,
                 allow_cloud=self._allow_cloud,
             )
-        return self._llm
+        return self._models[key]
 
 
 class NativeToolCallingAdapter(_BaseToolCallingAdapter):

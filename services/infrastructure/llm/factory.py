@@ -73,11 +73,12 @@ def create_llm_client(settings: Settings) -> LLMClientPort:
         base_url=settings.llm_base_url,
         reasoning=settings.llm_reasoning,
         allow_cloud=settings.allow_cloud_llm,
+        lane=None,
         langfuse_handler=_make_langfuse_callback_handler(settings),
     )
 
 
-def create_chat_llm_client(settings: Settings, *, reasoning: str | None = None) -> LLMClientPort:
+def create_chat_llm_client(settings: Settings, *, reasoning: str | None = None, lane: str = "base") -> LLMClientPort:
     """Instantiate a chat LLM client, falling back to batch LLM settings.
 
     ``reasoning`` overrides the reasoning effort for this client; when None it
@@ -110,6 +111,7 @@ def create_chat_llm_client(settings: Settings, *, reasoning: str | None = None) 
         base_url=base_url,
         reasoning=reasoning if reasoning is not None else settings.chat_llm_reasoning,
         allow_cloud=settings.allow_cloud_llm,
+        lane=lane,
         langfuse_handler=_make_langfuse_callback_handler(settings),
     )
 
@@ -164,6 +166,7 @@ def create_tool_calling_llm_client(settings: Settings) -> ToolCallingLLMPort:
             temperature=effective_temperature,
             reasoning=settings.chat_retrieval_reasoning or settings.chat_llm_reasoning,
             allow_cloud=settings.allow_cloud_llm,
+            lane="retrieval",
             langfuse_handler=langfuse_handler,
         )
 
@@ -175,6 +178,7 @@ def create_tool_calling_llm_client(settings: Settings) -> ToolCallingLLMPort:
         temperature=effective_temperature,
         reasoning=settings.chat_llm_reasoning,
         allow_cloud=settings.allow_cloud_llm,
+        lane="retrieval",
         langfuse_handler=langfuse_handler,
     )
 

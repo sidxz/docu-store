@@ -78,3 +78,8 @@ def test_tool_calling_refuses_cloud_when_disabled() -> None:
         factory.create_tool_calling_llm_client(
             _settings(chat_llm_provider="anthropic", anthropic_api_key="k", allow_cloud_llm=False),
         )
+
+
+def test_tool_calling_client_is_retrieval_lane() -> None:
+    adapter = factory.create_tool_calling_llm_client(_settings())
+    assert adapter._lane == "retrieval"

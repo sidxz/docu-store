@@ -167,3 +167,53 @@ async def test_stream_filters_to_content_only() -> None:
     client = _reasoning_client()
     chunks = [c async for c in client.stream("q")]
     assert "".join(chunks) == "answer text"  # reasoning dropped
+
+
+# ---------------------------------------------------------------------------
+# Lane-aware override tests (Task 2)
+# ---------------------------------------------------------------------------
+
+
+def test_get_llm_uses_lane_override(monkeypatch) -> None:
+    from infrastructure.llm import reasoning_context
+
+    built: list[str | None] = []
+
+    def fake_build(**kwargs):
+        built.append(kwargs.get("reasoning"))
+        return object()
+
+    monkeypatch.setattr(
+        "infrastructure.llm.model_builder.build_chat_model", fake_build,
+    )
+    client = LangChainLLMClient(
+        provider="ollama", model_name="m", reasoning="off", lane="synthesis",
+    )
+    # No override → env default "off"
+    client._get_llm()
+    assert built == ["off"]
+    # Override for this lane → "high", and cached per level
+    tok = reasoning_context.set_reasoning_override({"synthesis": "high"})
+    try:
+        client._get_llm()
+        client._get_llm()  # second call: cached, no extra build
+    finally:
+        reasoning_context.reset_reasoning_override(tok)
+    assert built == ["off", "high"]  # one build per distinct level
+
+
+def test_get_llm_ignores_override_for_unlaned_client(monkeypatch) -> None:
+    from infrastructure.llm import reasoning_context
+
+    built: list[str | None] = []
+    monkeypatch.setattr(
+        "infrastructure.llm.model_builder.build_chat_model",
+        lambda **kw: built.append(kw.get("reasoning")) or object(),
+    )
+    client = LangChainLLMClient(provider="ollama", model_name="m", reasoning="off", lane=None)
+    tok = reasoning_context.set_reasoning_override({"synthesis": "high", "base": "high"})
+    try:
+        client._get_llm()
+    finally:
+        reasoning_context.reset_reasoning_override(tok)
+    assert built == ["off"]  # batch/unlaned: override never applies

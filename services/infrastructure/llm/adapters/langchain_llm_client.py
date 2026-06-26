@@ -55,6 +55,7 @@ class LangChainLLMClient:
         base_url: str | None = None,
         reasoning: str | None = None,
         allow_cloud: bool = False,
+        lane: str | None = None,
         langfuse_handler: Any | None = None,
         chat_model: BaseChatModel | None = None,
     ) -> None:
@@ -65,23 +66,30 @@ class LangChainLLMClient:
         self._base_url = base_url
         self._reasoning = reasoning
         self._allow_cloud = allow_cloud
+        self._lane = lane
         self._langfuse_handler = langfuse_handler
-        self._llm = chat_model
+        self._injected = chat_model
+        self._models: dict[str, Any] = {}
 
     def _get_llm(self) -> BaseChatModel:
-        if self._llm is None:
-            from infrastructure.llm.model_builder import build_chat_model
+        if self._injected is not None:
+            return self._injected
+        from infrastructure.llm.model_builder import build_chat_model
+        from infrastructure.llm.reasoning_context import get_lane_override
 
-            self._llm = build_chat_model(
+        level = get_lane_override(self._lane) or self._reasoning
+        key = level or "off"
+        if key not in self._models:
+            self._models[key] = build_chat_model(
                 provider=self._provider,
                 model_name=self._model_name,
                 temperature=self._temperature,
                 api_key=self._api_key,
                 base_url=self._base_url,
-                reasoning=self._reasoning,
+                reasoning=level,
                 allow_cloud=self._allow_cloud,
             )
-        return self._llm
+        return self._models[key]
 
     def _config(self) -> dict:
         return {"callbacks": [self._langfuse_handler]} if self._langfuse_handler else {}

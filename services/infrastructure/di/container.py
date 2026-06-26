@@ -773,6 +773,7 @@ def create_container() -> Container:
     chat_synthesis_llm_client = create_chat_llm_client(
         settings,
         reasoning=settings.chat_synthesis_reasoning or settings.chat_llm_reasoning,
+        lane="synthesis",
     )
 
     container[ChatRepository] = lambda c: MongoChatRepository(
