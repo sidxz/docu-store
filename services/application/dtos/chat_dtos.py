@@ -19,6 +19,7 @@ class AgentEvent(BaseModel):
         "step_completed",
         "retrieval_results",
         "token",
+        "reasoning_token",
         "structured_block",
         "grounding_result",
         "query_context",

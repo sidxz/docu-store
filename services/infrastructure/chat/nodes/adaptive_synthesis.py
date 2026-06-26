@@ -132,13 +132,16 @@ class AdaptiveSynthesisNode:
             )
 
         token_count = 0
-        async for token in self._llm.stream(
+        async for kind, text in self._llm.stream_with_reasoning(
             user_prompt,
             system_prompt=system_prompt,
             images_b64=images_b64,
         ):
-            token_count += 1
-            yield ("token", token)
+            if kind == "reasoning":
+                yield ("event", AgentEvent(type="reasoning_token", delta=text))
+            else:
+                token_count += 1
+                yield ("token", text)
 
         if _debug:
             log.info("chat.debug.adaptive_synthesis.done", tokens=token_count)

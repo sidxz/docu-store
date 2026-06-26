@@ -225,6 +225,7 @@ def _map_event_type(event_type: str) -> str:
         "step_completed": "agent_step",
         "retrieval_results": "retrieval_results",
         "token": "token",
+        "reasoning_token": "reasoning_token",
         "structured_block": "structured_block",
         "grounding_result": "grounding_result",
         "query_context": "query_context",
