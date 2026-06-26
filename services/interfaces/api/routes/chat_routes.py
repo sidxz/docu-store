@@ -51,6 +51,11 @@ class SendMessageRequest(BaseModel):
         default=None,
         description="Pipeline mode. 'quick' = 4-step, 'thinking' = 5-stage, 'deep_thinking' = thinking + page images. None = server default.",
     )
+    reasoning: dict[Literal["synthesis", "retrieval", "base"],
+                    Literal["off", "low", "medium", "high"]] | None = Field(
+        default=None,
+        description="Per-lane reasoning override; absent lanes use the server default.",
+    )
 
 
 class FeedbackRequest(BaseModel):
@@ -162,6 +167,7 @@ async def send_message(
                 message=request.message,
                 allowed_artifact_ids=allowed_artifact_ids,
                 mode=request.mode,
+                reasoning=request.reasoning,
             ):
                 if event.type == "step_started":
                     step_count += 1
