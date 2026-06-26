@@ -261,7 +261,7 @@ class Settings(BaseSettings):
         validation_alias="LLM_PROVIDER",
     )
     llm_model_name: str = Field(
-        default="gemma3:27b",
+        default="gemma4:31b",
         validation_alias="LLM_MODEL_NAME",
     )
     llm_base_url: str = Field(
