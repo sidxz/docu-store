@@ -193,6 +193,7 @@ export function useSendMessage(conversationId: string | undefined) {
 
 interface ChatStoreActions {
   appendToken: (delta: string) => void;
+  appendReasoning: (delta: string) => void;
   addStep: (step: AgentStep) => void;
   updateStep: (stepName: string, update: Partial<AgentStep>) => void;
   pushThinkingBlock: (block: ThinkingBlock) => void;
@@ -298,6 +299,12 @@ function handleAgentEvent(
     case "token":
       if (event.delta) {
         store.appendToken(event.delta);
+      }
+      break;
+
+    case "reasoning_token":
+      if (event.delta) {
+        store.appendReasoning(event.delta);
       }
       break;
 
