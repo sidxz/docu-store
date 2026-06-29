@@ -512,11 +512,6 @@ def create_container() -> Container:
     container[ArtifactUploadSaga] = lambda c: ArtifactUploadSaga(
         upload_blob_use_case=c[UploadBlobUseCase],
         create_artifact_use_case=c[CreateArtifactUseCase],
-        create_page_use_case=c[CreatePageUseCase],
-        add_pages_use_case=c[AddPagesUseCase],
-        update_text_mention_use_case=c[UpdateTextMentionUseCase],
-        pdf_service=c[PDFService],
-        blob_store=c[BlobStore],
         permission_registrar=c[PermissionRegistrar],
     )
 

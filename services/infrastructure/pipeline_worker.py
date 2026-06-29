@@ -25,6 +25,7 @@ from application.use_cases.vector_metadata_use_cases import (
     SyncPageTagsToVectorStoreUseCase,
 )
 from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
+from application.workflow_use_cases.trigger_artifact_parse_use_case import TriggerArtifactParseUseCase
 from application.workflow_use_cases.trigger_artifact_summarization_use_case import (
     TriggerArtifactSummarizationUseCase,
 )
@@ -83,6 +84,7 @@ async def run(worker_name: str = "pipeline_worker") -> None:
     app = container[Application]
 
     log_artifact_sample_use_case = container[LogArtifactSampleUseCase]
+    trigger_artifact_parse_use_case = container[TriggerArtifactParseUseCase]
     trigger_compound_extraction_use_case = container[TriggerCompoundExtractionUseCase]
     trigger_smiles_embedding_use_case = container[TriggerSmilesEmbeddingUseCase]
     trigger_page_summarization_use_case = container[TriggerPageSummarizationUseCase]
@@ -187,13 +189,12 @@ async def run(worker_name: str = "pipeline_worker") -> None:
                                     tracking_id=tracking.notification_id,
                                 )
 
-                                await log_artifact_sample_use_case.execute(
-                                    domain_event.originator_id,
-                                    storage_location=domain_event.storage_location,
+                                await trigger_artifact_parse_use_case.execute(
+                                    artifact_id=domain_event.originator_id,
                                 )
 
                                 logger.info(
-                                    "pipeline_workflow_triggered",
+                                    "pipeline_artifact_parse_workflow_triggered",
                                     artifact_id=str(domain_event.originator_id),
                                     tracking_id=tracking.notification_id,
                                 )
