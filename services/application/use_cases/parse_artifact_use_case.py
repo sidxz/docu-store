@@ -62,12 +62,14 @@ class ParseArtifactUseCase:
         for page in parsed.pages:
             self.blob_store.put_stream(
                 f"artifacts/{artifact_id}/pages/{page.index}.png",
-                io.BytesIO(page.png), mime_type="image/png",
+                io.BytesIO(page.png),
+                mime_type="image/png",
             )
             if page.thumb:
                 self.blob_store.put_stream(
                     f"artifacts/{artifact_id}/pages/{page.index}_thumb.jpg",
-                    io.BytesIO(page.thumb), mime_type="image/jpeg",
+                    io.BytesIO(page.thumb),
+                    mime_type="image/jpeg",
                 )
 
         # Persist the structure-only IR blob.
@@ -105,7 +107,7 @@ class ParseArtifactUseCase:
                     log.debug("parse.text_unchanged_skipping", page_id=str(pid))
                     continue
 
-            await self.update_text_mention.execute(
+            text_res = await self.update_text_mention.execute(
                 page_id=pid,
                 text_mention=TextMention(
                     text=seg.text,
@@ -116,6 +118,8 @@ class ParseArtifactUseCase:
                     pipeline_run_id=None,
                 ),
             )
+            if isinstance(text_res, Failure):
+                return text_res
 
         if page_ids:
             add_res = await self.add_pages.execute(artifact_id=artifact_id, page_ids=page_ids)

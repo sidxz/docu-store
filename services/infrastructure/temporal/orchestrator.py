@@ -373,7 +373,6 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
                 artifact_id=str(artifact_id),
                 error=str(e),
             )
-            raise
 
     async def start_batch_reembed_smiles_workflow(
         self,

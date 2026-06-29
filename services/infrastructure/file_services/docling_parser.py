@@ -71,7 +71,9 @@ class DoclingParser(DocumentParser):
 
             opts = PdfPipelineOptions()
             opts.generate_page_images = True
-            opts.images_scale = 2.0  # ~144 DPI
+            # ~288 DPI — near parity with prior 300 DPI PyMuPDF render;
+            # stored page PNGs feed chat page-references and VLM summarization.
+            opts.images_scale = 4.0
             self._converter = DocumentConverter(
                 format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=opts)},
             )

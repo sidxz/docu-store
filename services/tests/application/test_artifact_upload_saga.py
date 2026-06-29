@@ -31,28 +31,23 @@ class FakePermissionRegistrar:
         pass
 
 
-class _ParseSpy:
-    pdf_parse_count: int = 0
-
-
 @pytest.fixture
 def saga_under_test():
     blob = FakeBlobStore()
     artifact_repo = MockArtifactRepository()
     registrar = FakePermissionRegistrar()
-    calls = _ParseSpy()
 
     saga = ArtifactUploadSaga(
         upload_blob_use_case=UploadBlobUseCase(blob_store=blob),
         create_artifact_use_case=CreateArtifactUseCase(artifact_repo),
         permission_registrar=registrar,
     )
-    return saga, calls
+    return saga, artifact_repo
 
 
 @pytest.mark.asyncio
 async def test_saga_uploads_and_creates_artifact_without_parsing(saga_under_test):
-    saga, calls = saga_under_test
+    saga, artifact_repo = saga_under_test
     req = UploadBlobRequest(
         artifact_type=ArtifactType.RESEARCH_ARTICLE,
         filename="x.pdf",
@@ -62,4 +57,4 @@ async def test_saga_uploads_and_creates_artifact_without_parsing(saga_under_test
     assert isinstance(result, Success)
     artifact = result.unwrap()
     assert artifact.pages in (None, [])  # no pages created synchronously
-    assert calls.pdf_parse_count == 0  # saga never parses
+    assert artifact_repo.save_called  # artifact persisted to repo
