@@ -33,6 +33,15 @@ _LABEL_MAP: dict[str, str] = {
 _THUMB_MAX = 400  # px, longest edge
 
 
+def _dataframe_to_rows(df) -> list[list[str]]:
+    """Convert a pandas DataFrame to list[list[str]] rows (header + body).
+
+    Docling tables with no named header get a RangeIndex (int columns).
+    Stringify every cell — header and body — so Block.rows stays list[list[str]].
+    """
+    return [[str(c) for c in df.columns]] + df.astype(str).values.tolist()
+
+
 def _make_thumb(png: bytes) -> bytes | None:
     try:
         from PIL import Image
@@ -112,7 +121,7 @@ class DoclingParser(DocumentParser):
     def _table_rows(self, item, dl_doc) -> list[list[str]]:
         try:
             df = item.export_to_dataframe(doc=dl_doc)
-            return [list(df.columns)] + df.astype(str).values.tolist()
+            return _dataframe_to_rows(df)
         except Exception:
             log.warning("docling_parser.table_export_failed", exc_info=True)
             return []
