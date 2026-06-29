@@ -2,9 +2,10 @@ import io
 from uuid import uuid4
 
 import pytest
-from returns.result import Success
+from returns.result import Failure, Success
 
 from application.dtos.artifact_dtos import CreateArtifactRequest
+from application.dtos.errors import AppError
 from application.dtos.parsed_document import Block, ParsedDocument, ParseResult, RenderedPage
 from application.use_cases.artifact_use_cases import AddPagesUseCase, CreateArtifactUseCase
 from application.use_cases.page_use_cases import CreatePageUseCase, UpdateTextMentionUseCase
@@ -48,6 +49,7 @@ def _build_uc(parsers, blob, page_repo, artifact_repo):
         parsers=parsers,
         blob_store=blob,
         artifact_repository=artifact_repo,
+        page_repository=page_repo,
         create_page_use_case=CreatePageUseCase(page_repo, artifact_repo),
         update_text_mention_use_case=UpdateTextMentionUseCase(page_repo),
         add_pages_use_case=AddPagesUseCase(artifact_repo, page_repo),
@@ -70,12 +72,39 @@ async def test_parse_creates_page_stores_image_and_ir():
 
 @pytest.mark.asyncio
 async def test_parse_is_idempotent_on_retry():
+    """
+    Exercises the create-Failure / existing-page branch:
+    - run 1: creates page, sets text
+    - run 2: create_page returns Failure (already exists), loads page, finds same text → skips update
+    """
     page_repo, artifact_repo, blob = MockPageRepository(), MockArtifactRepository(), FakeBlobStore()
     artifact_id = await _make_artifact(artifact_repo)
     uc = _build_uc({MimeType.PDF: FakeParser()}, blob, page_repo, artifact_repo)
 
     first = await uc.execute(artifact_id)
-    second = await uc.execute(artifact_id)  # simulates Temporal retry
+    assert isinstance(first, Success)
+
+    # Swap in a create_page stub that always returns Failure (simulates "already exists" on retry).
+    class _AlwaysFailCreate:
+        async def execute(self, req):
+            return Failure(AppError("conflict", "already exists"))
+
+    uc.create_page = _AlwaysFailCreate()
+
+    # Spy on update_text_mention to count calls.
+    real_update = uc.update_text_mention
+    update_calls = []
+
+    class _SpyUpdate:
+        async def execute(self, **kwargs):
+            update_calls.append(kwargs)
+            return await real_update.execute(**kwargs)
+
+    uc.update_text_mention = _SpyUpdate()
+
+    second = await uc.execute(artifact_id)
 
     assert isinstance(second, Success)
-    assert first.unwrap() == second.unwrap()  # same deterministic id, no duplicate
+    assert first.unwrap() == second.unwrap()
+    # page_repo already holds the page with the same text from run 1 → skip re-emit
+    assert update_calls == [], f"update_text_mention should not be called on clean retry, got {update_calls}"

@@ -16,6 +16,8 @@ from infrastructure.file_services.segmentation import segment_document
 if TYPE_CHECKING:
     from application.ports.blob_store import BlobStore
     from application.ports.document_parser import DocumentParser
+    from application.ports.repositories.artifact_repository import ArtifactRepository
+    from application.ports.repositories.page_repository import PageRepository
     from application.use_cases.artifact_use_cases import AddPagesUseCase
     from application.use_cases.page_use_cases import CreatePageUseCase, UpdateTextMentionUseCase
     from domain.value_objects.mime_type import MimeType
@@ -34,7 +36,8 @@ class ParseArtifactUseCase:
         self,
         parsers: dict[MimeType, DocumentParser],
         blob_store: BlobStore,
-        artifact_repository,
+        artifact_repository: ArtifactRepository,
+        page_repository: PageRepository,
         create_page_use_case: CreatePageUseCase,
         update_text_mention_use_case: UpdateTextMentionUseCase,
         add_pages_use_case: AddPagesUseCase,
@@ -42,6 +45,7 @@ class ParseArtifactUseCase:
         self.parsers = parsers
         self.blob_store = blob_store
         self.artifact_repository = artifact_repository
+        self.page_repository = page_repository
         self.create_page = create_page_use_case
         self.update_text_mention = update_text_mention_use_case
         self.add_pages = add_pages_use_case
@@ -88,23 +92,34 @@ class ParseArtifactUseCase:
                     page_id=pid,
                 ),
             )
-            # ponytail: idempotent — on retry the page already exists; real repo raises ConcurrencyError
+
+            if not seg.text.strip():
+                continue
+
+            # ponytail: idempotent text-set — fresh page always needs text; on retry (create_res is
+            # Failure meaning page already exists) load and skip if text unchanged, avoiding re-emit
+            # of TextMentionUpdated which would chain expensive LLM summarization/NER downstream.
             if isinstance(create_res, Failure):
-                log.info("parse.page_exists_skipping_create", page_id=str(pid))
-            if seg.text.strip():
-                await self.update_text_mention.execute(
-                    page_id=pid,
-                    text_mention=TextMention(
-                        text=seg.text,
-                        date_extracted=now,
-                        model_name="DoclingParser",
-                        confidence=None,
-                        additional_model_params=None,
-                        pipeline_run_id=None,
-                    ),
-                )
+                existing = self.page_repository.get_by_id(pid)
+                if existing.text_mention is not None and existing.text_mention.text == seg.text:
+                    log.debug("parse.text_unchanged_skipping", page_id=str(pid))
+                    continue
+
+            await self.update_text_mention.execute(
+                page_id=pid,
+                text_mention=TextMention(
+                    text=seg.text,
+                    date_extracted=now,
+                    model_name="DoclingParser",
+                    confidence=None,
+                    additional_model_params=None,
+                    pipeline_run_id=None,
+                ),
+            )
 
         if page_ids:
-            await self.add_pages.execute(artifact_id=artifact_id, page_ids=page_ids)
+            add_res = await self.add_pages.execute(artifact_id=artifact_id, page_ids=page_ids)
+            if isinstance(add_res, Failure):
+                return add_res
 
         return Success(page_ids)
