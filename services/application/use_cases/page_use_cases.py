@@ -66,6 +66,7 @@ class CreatePageUseCase:
             index=request.index,
             workspace_id=auth.workspace_id if auth else None,
             owner_id=auth.user_id if auth else None,
+            page_id=request.page_id,
         )
 
         self.page_repository.save(page)

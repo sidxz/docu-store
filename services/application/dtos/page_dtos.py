@@ -12,6 +12,7 @@ class CreatePageRequest(BaseModel):
     name: str
     artifact_id: UUID
     index: int = 0
+    page_id: UUID | None = None
 
 
 class AddCompoundMentionsRequest(BaseModel):

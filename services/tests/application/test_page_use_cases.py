@@ -210,6 +210,28 @@ class TestUpdateSummaryCandidateUseCase:
         assert error.category == "not_found"
 
 
+class TestCreatePageHonorsExplicitId:
+    """Test that CreatePageUseCase forwards an explicit page_id."""
+
+    @pytest.mark.asyncio
+    async def test_create_page_honors_explicit_page_id(self, sample_artifact) -> None:
+        page_repo = MockArtifactRepository()
+        artifact_repo = MockArtifactRepository()
+        artifact_repo.save(sample_artifact)
+        page_repo = MockPageRepository()
+        pid = uuid4()
+        uc = CreatePageUseCase(page_repo, artifact_repo)
+        req = CreatePageRequest(
+            name="P1",
+            artifact_id=sample_artifact.id,
+            index=0,
+            page_id=pid,
+        )
+        result = await uc.execute(req)
+        assert isinstance(result, Success)
+        assert result.unwrap().page_id == pid
+
+
 class TestDeletePageUseCase:
     """Test DeletePageUseCase."""
 

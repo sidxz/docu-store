@@ -31,8 +31,20 @@ class Page(Aggregate):
         index: int = 0,
         workspace_id: UUID | None = None,
         owner_id: UUID | None = None,
+        page_id: UUID | None = None,
     ) -> Page:
         """Create a new Page aggregate (Factory Method)."""
+        if page_id is not None:
+            # ponytail: explicit id via eventsourcing._create for idempotent/retry-safe creation
+            return cls._create(
+                cls.Created,
+                id=page_id,
+                name=name,
+                artifact_id=artifact_id,
+                index=index,
+                workspace_id=workspace_id,
+                owner_id=owner_id,
+            )
         return cls(
             name=name,
             artifact_id=artifact_id,
