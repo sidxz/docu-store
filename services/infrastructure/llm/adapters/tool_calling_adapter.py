@@ -101,6 +101,7 @@ class _BaseToolCallingAdapter:
         base_url: str = "http://localhost:11434",
         temperature: float = 0.3,
         reasoning: str | None = None,
+        num_ctx: int | None = None,
         allow_cloud: bool = False,
         lane: str | None = None,
         langfuse_handler: Any | None = None,
@@ -111,6 +112,7 @@ class _BaseToolCallingAdapter:
         self._base_url = base_url
         self._temperature = temperature
         self._reasoning = reasoning
+        self._num_ctx = num_ctx
         self._allow_cloud = allow_cloud
         self._lane = lane
         self._langfuse_handler = langfuse_handler
@@ -130,6 +132,7 @@ class _BaseToolCallingAdapter:
                 api_key=self._api_key,
                 base_url=self._base_url,
                 reasoning=level,
+                num_ctx=self._num_ctx,
                 allow_cloud=self._allow_cloud,
             )
         return self._models[key]

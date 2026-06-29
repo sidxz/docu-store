@@ -18,6 +18,7 @@ def _settings(**overrides):
         "llm_base_url": "http://localhost:11434",
         "llm_api_key": None,
         "llm_reasoning": "off",
+        "llm_num_ctx": 32768,
         "openai_api_key": None,
         "anthropic_api_key": None,
         "google_api_key": None,

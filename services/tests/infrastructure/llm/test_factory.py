@@ -16,6 +16,7 @@ def _settings(**overrides):
         "llm_api_key": None,
         "llm_temperature": 0.1,
         "llm_reasoning": "off",
+        "llm_num_ctx": 32768,
         "openai_api_key": None,
         "anthropic_api_key": None,
         "google_api_key": None,

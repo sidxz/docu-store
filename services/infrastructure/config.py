@@ -279,6 +279,14 @@ class Settings(BaseSettings):
         validation_alias="LLM_TEMPERATURE",
         description="Low temperature for deterministic summaries.",
     )
+    llm_num_ctx: int | None = Field(
+        default=32768,
+        validation_alias="LLM_NUM_CTX",
+        description="Ollama context window (num_ctx). Ollama otherwise defaults to the "
+        "model's max context, whose KV cache can exceed VRAM and force slow CPU "
+        "offload (e.g. gemma4:31b loads at 256K → 74GB > 48GB A6000). Ignored for "
+        "cloud providers. None = let Ollama decide.",
+    )
 
     # Chat LLM (separate from batch LLM — allows different model/temperature for interactive chat)
     chat_llm_provider: Literal["ollama", "openai", "anthropic", "gemini"] | None = Field(

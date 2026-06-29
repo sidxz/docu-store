@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Loader2, AlertCircle, Brain, ChevronRight, ChevronDown } from "lucide-react";
+import { Check, Loader2, AlertCircle, ListTree, ChevronRight, ChevronDown } from "lucide-react";
 import type { AgentStep } from "@docu-store/types";
 
 const STEP_LABELS: Record<string, string> = {
@@ -58,7 +58,7 @@ export function AgentStepIndicator({ step, durationMs, devMode }: AgentStepIndic
               onClick={() => setThinkingExpanded(!thinkingExpanded)}
               className="flex items-center gap-0.5 text-[10px] text-accent-text/70 hover:text-accent-text transition-colors"
             >
-              <Brain className="w-3 h-3" />
+              <ListTree className="w-3 h-3" />
               {thinkingExpanded ? (
                 <ChevronDown className="w-3 h-3" />
               ) : (

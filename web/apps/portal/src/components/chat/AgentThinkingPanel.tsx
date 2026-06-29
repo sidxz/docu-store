@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Clock, Brain, Search, Target, FlaskConical, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronRight, Clock, ListTree, Search, Target, FlaskConical, Sparkles } from "lucide-react";
 import type { AgentTrace, AgentStep, ThinkingBlock } from "@docu-store/types";
 import { useDevModeStore } from "@/lib/stores/dev-mode-store";
 import { useChatStore } from "@/lib/stores/chat-store";
@@ -44,8 +44,8 @@ export function AgentThinkingPanel({ trace, isStreaming }: AgentThinkingPanelPro
   const completedCount = steps.filter((s) => s.status === "completed").length;
   const totalMs = trace.total_duration_ms;
   const label = isStreaming
-    ? `Thinking (${completedCount}/${steps.length} steps)...`
-    : `Thinking history (${completedCount} steps${totalMs ? `, ${(totalMs / 1000).toFixed(1)}s` : ""})`;
+    ? `Process (${completedCount}/${steps.length} steps)...`
+    : `Process (${completedCount} steps${totalMs ? `, ${(totalMs / 1000).toFixed(1)}s` : ""})`;
 
   // Resolve thinking blocks: streaming → persisted → fallback from step thinking_content
   const thinkingBlocks = isStreaming
@@ -255,13 +255,13 @@ function ThinkingLog({ blocks }: { blocks: ThinkingBlock[] }) {
         onClick={() => setLogExpanded(!logExpanded)}
         className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-secondary transition-colors mb-1.5"
       >
-        <Brain className="w-3 h-3" />
+        <ListTree className="w-3 h-3" />
         {logExpanded ? (
           <ChevronDown className="w-3 h-3" />
         ) : (
           <ChevronRight className="w-3 h-3" />
         )}
-        <span>Agent thoughts ({blocks.length})</span>
+        <span>Details ({blocks.length})</span>
       </button>
 
       {logExpanded && (

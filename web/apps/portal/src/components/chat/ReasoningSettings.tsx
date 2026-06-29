@@ -14,7 +14,6 @@ const LEVEL_OPTIONS: { label: string; value: ReasoningDefault }[] = [
 ];
 
 const LANES = [
-  { key: "synthesis" as const, label: "Synthesis" },
   { key: "retrieval" as const, label: "Retrieval" },
   { key: "base" as const, label: "Base" },
 ];
@@ -24,11 +23,12 @@ export function ReasoningSettings() {
 
   return (
     <Card>
-      <CardHeader title="Reasoning Defaults" />
+      <CardHeader title="Advanced Reasoning" />
       <p className="mb-4 text-xs text-text-muted">
-        Only synthesis reasoning is shown in chat (the Reasoning panel); retrieval and base affect
-        cost/latency/quality. On local Ollama models reasoning is on/off — levels above &ldquo;off&rdquo; are
-        equivalent; effort levels apply to cloud providers.
+        Synthesis (answer) reasoning is controlled per message in chat via the Reasoning toggle —
+        on by default in Deep Research. These advanced knobs tune the retrieval agent and the
+        base/quick-mode model — they affect cost/latency/quality and aren&rsquo;t shown in chat. On
+        local Ollama reasoning is on/off; effort levels apply to cloud providers.
       </p>
       <div className="space-y-4">
         {LANES.map(({ key, label }) => (

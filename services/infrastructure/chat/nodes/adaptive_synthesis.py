@@ -33,6 +33,24 @@ _SYSTEM_PROMPT_MAP = {
 }
 
 
+def _synthesis_reasoning_on() -> bool:
+    """Whether model reasoning is enabled for the synthesis lane this request.
+
+    Mirrors how the synthesis LLM client resolves its level (per-request
+    override → CHAT_SYNTHESIS_REASONING → CHAT_LLM_REASONING). When on, the
+    model's own chain-of-thought already plans the answer, so the separate
+    planning call is skipped as redundant cost + a duplicate trace block.
+    """
+    from infrastructure.llm.reasoning_context import get_lane_override
+
+    level = (
+        get_lane_override("synthesis")
+        or settings.chat_synthesis_reasoning
+        or settings.chat_llm_reasoning
+    )
+    return bool(level) and level != "off"
+
+
 class AdaptiveSynthesisNode:
     """Generate a grounded answer with query-type-specific prompting."""
 
@@ -83,35 +101,45 @@ class AdaptiveSynthesisNode:
                 " Reference figures, charts, or diagrams visible in the images when relevant."
             )
 
-        # Think-then-answer planning step (small non-streaming call)
-        answer_plan = await self._plan_answer(
-            question,
-            plan,
-            sources_text,
-            context_hints,
-        )
-
-        if _debug:
-            log.info(
-                "chat.debug.adaptive_synthesis.plan",
-                system_key=system_key,
-                context_hints=context_hints,
-                answer_plan_len=len(answer_plan),
-                answer_plan_preview=answer_plan[:300],
+        # Think-then-answer planning (small non-streaming call). Skipped when
+        # model reasoning is on for the synthesis lane — the model's own
+        # chain-of-thought (shown in the Reasoning panel) already plans the
+        # answer, so a separate planning call would be redundant cost and a
+        # duplicate "Answer Planning" block in the Process trace.
+        if _synthesis_reasoning_on():
+            answer_plan = (
+                "Reason step by step: map each source to the part of the question "
+                "it answers, then write the grounded answer."
+            )
+        else:
+            answer_plan = await self._plan_answer(
+                question,
+                plan,
+                sources_text,
+                context_hints,
             )
 
-        # Emit the answer plan as thinking content for the agent trace
-        yield (
-            "event",
-            AgentEvent(
-                type="step_completed",
-                step="synthesis",
-                status="started",
-                output="Answer plan generated",
-                thinking_content=answer_plan,
-                thinking_label="Answer Planning",
-            ),
-        )
+            if _debug:
+                log.info(
+                    "chat.debug.adaptive_synthesis.plan",
+                    system_key=system_key,
+                    context_hints=context_hints,
+                    answer_plan_len=len(answer_plan),
+                    answer_plan_preview=answer_plan[:300],
+                )
+
+            # Emit the answer plan as thinking content for the agent trace
+            yield (
+                "event",
+                AgentEvent(
+                    type="step_completed",
+                    step="synthesis",
+                    status="started",
+                    output="Answer plan generated",
+                    thinking_content=answer_plan,
+                    thinking_label="Answer Planning",
+                ),
+            )
 
         # Build synthesis prompt
         user_prompt = await self._prompts.render_prompt(

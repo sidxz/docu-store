@@ -16,7 +16,22 @@ export type ChatMode = "quick" | "thinking" | "deep_thinking";
 
 export type ReasoningLevel = "off" | "low" | "medium" | "high";
 export type ReasoningDefault = "inherit" | ReasoningLevel;
-export type ReasoningDefaults = { synthesis: ReasoningDefault; retrieval: ReasoningDefault; base: ReasoningDefault };
+// Synthesis reasoning is mode-driven (composer toggle); retrieval/base are advanced knobs.
+export type ReasoningDefaults = { retrieval: ReasoningDefault; base: ReasoningDefault };
+
+// Default model-reasoning state per mode. Quick never reasons; Deep Research does.
+export const MODE_REASONING_DEFAULT: Record<ChatMode, boolean> = {
+  quick: false,
+  thinking: false,
+  deep_thinking: true,
+};
+
+/** Effective reasoning on/off — mode default unless the user explicitly overrode it. */
+export function isReasoningOn(mode: ChatMode, override: "on" | "off" | null): boolean {
+  if (mode === "quick") return false;
+  if (override !== null) return override === "on";
+  return MODE_REASONING_DEFAULT[mode];
+}
 
 interface ChatState {
   // Pipeline mode
@@ -107,34 +122,28 @@ export const useChatStore = create<ChatState>()(
   rawEvents: [],
   doneEvent: null,
 
-  reasoningDefaults: { synthesis: "inherit", retrieval: "inherit", base: "inherit" },
+  reasoningDefaults: { retrieval: "inherit", base: "inherit" },
   synthesisOverride: null,
 
   setReasoningDefault: (lane, level) =>
     set((state) => ({ reasoningDefaults: { ...state.reasoningDefaults, [lane]: level } })),
   setSynthesisOverride: (v) => set({ synthesisOverride: v }),
   effectiveReasoning: () => {
-    const { reasoningDefaults, synthesisOverride } = get();
-    // ponytail: omit "inherit" lanes so backend env defaults win
+    const { chatMode, reasoningDefaults, synthesisOverride } = get();
     const result: Partial<Record<"synthesis" | "retrieval" | "base", ReasoningLevel>> = {};
+    // retrieval/base: advanced knobs — omit "inherit" so backend env defaults win.
     if (reasoningDefaults.retrieval !== "inherit") result.retrieval = reasoningDefaults.retrieval;
     if (reasoningDefaults.base !== "inherit") result.base = reasoningDefaults.base;
-    if (synthesisOverride === "off") {
-      result.synthesis = "off";
-    } else if (synthesisOverride === "on") {
-      result.synthesis =
-        reasoningDefaults.synthesis === "inherit" || reasoningDefaults.synthesis === "off"
-          ? "medium"
-          : reasoningDefaults.synthesis;
-    } else if (reasoningDefaults.synthesis !== "inherit") {
-      result.synthesis = reasoningDefaults.synthesis;
-    }
+    // synthesis: authoritative — always explicit so the UI is the source of truth
+    // (never silently inherits the server env default like the old omit behavior did).
+    result.synthesis = isReasoningOn(chatMode, synthesisOverride) ? "medium" : "off";
     return result;
   },
 
   setChatMode: (mode) => {
     trackEvent("chat_mode_changed", { mode });
-    set({ chatMode: mode });
+    // Reset the per-message reasoning toggle so it follows the new mode's default.
+    set({ chatMode: mode, synthesisOverride: null });
   },
 
   highlightCitation: (index, messageId) => {

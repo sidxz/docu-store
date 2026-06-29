@@ -57,6 +57,7 @@ def build_chat_model(
     api_key: str | None = None,
     base_url: str | None = None,
     reasoning: str | None = None,
+    num_ctx: int | None = None,
     allow_cloud: bool = False,
 ) -> BaseChatModel:
     """Construct a LangChain ``BaseChatModel`` for ``provider``.
@@ -89,6 +90,10 @@ def build_chat_model(
 
     if is_local:
         kwargs["base_url"] = base_url or "http://localhost:11434"
+        # Pin Ollama's context window: it otherwise loads at the model's max,
+        # whose KV cache can overflow VRAM and force slow CPU offload.
+        if num_ctx:
+            kwargs["num_ctx"] = num_ctx
     else:
         if not api_key:
             msg = f"API key required for cloud provider {provider!r}."

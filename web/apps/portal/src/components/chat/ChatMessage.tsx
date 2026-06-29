@@ -97,9 +97,7 @@ export function ChatMessage({ message, workspace, isStreaming, onFeedback }: Cha
               )}
               <div className="prose prose-sm dark:prose-invert max-w-none">
                 <MarkdownRenderer content={message.content} messageId={message.message_id} />
-                {isStreaming && !message.content && (
-                  <span className="inline-block w-2 h-4 bg-text-muted animate-pulse rounded-sm" />
-                )}
+                {isStreaming && !message.content && <ThinkingDots />}
               </div>
               {message.structured_content && message.structured_content.length > 0 && (
                 <div className="mt-3 border-t border-border-subtle pt-3">
@@ -171,6 +169,21 @@ export function ChatMessage({ message, workspace, isStreaming, onFeedback }: Cha
         )}
       </div>
     </div>
+  );
+}
+
+// Animated "assistant is working" indicator — shown after send, before the first
+// answer token arrives (otherwise the empty bubble reads as hung).
+function ThinkingDots() {
+  return (
+    <span className="inline-flex items-center gap-2 text-sm text-text-muted">
+      <span className="flex gap-1">
+        <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce [animation-delay:-300ms]" />
+        <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce [animation-delay:-150ms]" />
+        <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce" />
+      </span>
+      <span className="animate-pulse">Working…</span>
+    </span>
   );
 }
 
