@@ -21,3 +21,8 @@ def test_docling_parses_pdf_into_pages_and_text(tmp_path):
     assert len(result.pages) >= 1
     assert result.pages[0].png  # non-empty PNG bytes
     assert any(b.text.strip() for b in result.document.blocks)
+    # page-index invariant: Docling is 1-based, we must output 0-based
+    assert len(result.pages) == 2
+    assert result.pages[0].index == 0
+    assert result.pages[1].index == 1
+    assert any(b.source_page_index is not None for b in result.document.blocks)

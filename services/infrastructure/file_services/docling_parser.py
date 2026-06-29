@@ -114,6 +114,7 @@ class DoclingParser(DocumentParser):
             df = item.export_to_dataframe(doc=dl_doc)
             return [list(df.columns)] + df.astype(str).values.tolist()
         except Exception:
+            log.warning("docling_parser.table_export_failed", exc_info=True)
             return []
 
     def _page_png(self, dl_doc, page_no: int) -> bytes | None:
@@ -122,6 +123,7 @@ class DoclingParser(DocumentParser):
             # page.image is ImageRef; .pil_image is a property -> Optional[PIL.Image.Image]
             pil_img = page.image.pil_image if page.image else None
             if pil_img is None:
+                log.warning("docling_parser.page_image_missing", page_no=page_no)
                 return None
             out = io.BytesIO()
             pil_img.convert("RGB").save(out, format="PNG")
