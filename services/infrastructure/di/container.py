@@ -46,7 +46,6 @@ from application.use_cases.artifact_use_cases import (
     UpdateTagMentionsUseCase as UpdateArtifactTagMentionsUseCase,
 )
 from application.use_cases.blob_use_cases import UploadBlobUseCase
-from application.use_cases.parse_artifact_use_case import ParseArtifactUseCase
 from application.use_cases.chat_use_cases import (
     CreateConversationUseCase,
     DeleteConversationUseCase,
@@ -72,6 +71,7 @@ from application.use_cases.page_use_cases import (
 from application.use_cases.page_use_cases import (
     UpdateSummaryCandidateUseCase as UpdatePageSummaryCandidateUseCase,
 )
+from application.use_cases.parse_artifact_use_case import ParseArtifactUseCase
 from application.use_cases.search_use_cases import HierarchicalSearchUseCase, SearchSummariesUseCase
 from application.use_cases.smiles_embedding_use_cases import EmbedCompoundSmilesUseCase
 from application.use_cases.smiles_search_use_cases import SearchSimilarCompoundsUseCase
@@ -86,6 +86,9 @@ from application.use_cases.summary_embedding_use_cases import (
 from application.use_cases.vector_metadata_use_cases import (
     SyncArtifactMetadataToVectorStoreUseCase,
     SyncPageTagsToVectorStoreUseCase,
+)
+from application.workflow_use_cases.trigger_artifact_parse_use_case import (
+    TriggerArtifactParseUseCase,
 )
 from application.workflow_use_cases.trigger_artifact_summarization_use_case import (
     TriggerArtifactSummarizationUseCase,
@@ -115,18 +118,15 @@ from application.workflow_use_cases.trigger_page_summary_embedding_use_case impo
 from application.workflow_use_cases.trigger_resource_registration_use_case import (
     TriggerResourceRegistrationUseCase,
 )
-from application.workflow_use_cases.trigger_artifact_parse_use_case import (
-    TriggerArtifactParseUseCase,
-)
 from application.workflow_use_cases.trigger_smiles_embedding_use_case import (
     TriggerSmilesEmbeddingUseCase,
 )
 from domain.value_objects.author_mention import AuthorMention
-from domain.value_objects.mime_type import MimeType
 from domain.value_objects.blob_ref import BlobRef
 from domain.value_objects.compound_mention import CompoundMention
 from domain.value_objects.embedding_metadata import EmbeddingMetadata
 from domain.value_objects.extraction_metadata import ExtractionMetadata
+from domain.value_objects.mime_type import MimeType
 from domain.value_objects.presentation_date import PresentationDate
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention

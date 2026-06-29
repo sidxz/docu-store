@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import structlog
@@ -27,6 +28,7 @@ def create_parse_artifact_activity(use_case: ParseArtifactUseCase) -> Callable[[
             return {"status": "success", "artifact_id": artifact_id, "page_count": len(page_ids)}
         error = result.failure()
         # Raise so Temporal retries on transient failures.
-        raise RuntimeError(f"{error.category}: {error.message}")
+        msg = f"{error.category}: {error.message}"
+        raise RuntimeError(msg)
 
     return parse_artifact_activity

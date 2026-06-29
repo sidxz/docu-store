@@ -14,7 +14,7 @@ class Segment:
 def segment_document(
     document: ParsedDocument,
     pages: list[RenderedPage],
-    mime_type: str,
+    mime_type: str,  # noqa: ARG001 — Phase 2 dispatches on mime_type
 ) -> list[Segment]:
     """Split a parsed document into processing units (Pages).
 
@@ -28,7 +28,4 @@ def segment_document(
     for block in document.blocks:
         by_page.setdefault(block.source_page_index, []).append(block)
 
-    return [
-        Segment(index=p.index, text=linearize_blocks(by_page.get(p.index, [])))
-        for p in pages
-    ]
+    return [Segment(index=p.index, text=linearize_blocks(by_page.get(p.index, []))) for p in pages]

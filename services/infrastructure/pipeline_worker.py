@@ -24,7 +24,9 @@ from application.use_cases.vector_metadata_use_cases import (
     SyncArtifactMetadataToVectorStoreUseCase,
     SyncPageTagsToVectorStoreUseCase,
 )
-from application.workflow_use_cases.trigger_artifact_parse_use_case import TriggerArtifactParseUseCase
+from application.workflow_use_cases.trigger_artifact_parse_use_case import (
+    TriggerArtifactParseUseCase,
+)
 from application.workflow_use_cases.trigger_artifact_summarization_use_case import (
     TriggerArtifactSummarizationUseCase,
 )

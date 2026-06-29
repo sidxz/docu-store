@@ -39,7 +39,7 @@ def _dataframe_to_rows(df) -> list[list[str]]:
     Docling tables with no named header get a RangeIndex (int columns).
     Stringify every cell — header and body — so Block.rows stays list[list[str]].
     """
-    return [[str(c) for c in df.columns]] + df.astype(str).values.tolist()
+    return [[str(c) for c in df.columns], *df.astype(str).values.tolist()]
 
 
 def _make_thumb(png: bytes) -> bytes | None:
@@ -111,7 +111,9 @@ class DoclingParser(DocumentParser):
             page_idx = prov[0].page_no - 1  # convert 1-based to 0-based
 
         if btype == "table":
-            return Block(type="table", rows=self._table_rows(item, dl_doc), source_page_index=page_idx)
+            return Block(
+                type="table", rows=self._table_rows(item, dl_doc), source_page_index=page_idx
+            )
 
         text = getattr(item, "text", "") or ""
         if not text and btype not in ("figure",):

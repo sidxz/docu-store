@@ -22,8 +22,8 @@ from application.use_cases.batch_reembed_use_cases import (
     BatchReEmbedSummariesUseCase,
 )
 from application.use_cases.compound_use_cases import ExtractCompoundMentionsUseCase
-from application.use_cases.parse_artifact_use_case import ParseArtifactUseCase
 from application.use_cases.embedding_use_cases import GeneratePageEmbeddingUseCase
+from application.use_cases.parse_artifact_use_case import ParseArtifactUseCase
 from application.use_cases.smiles_embedding_use_cases import EmbedCompoundSmilesUseCase
 from application.use_cases.summary_embedding_use_cases import (
     EmbedArtifactSummaryUseCase,
@@ -32,7 +32,6 @@ from application.use_cases.summary_embedding_use_cases import (
 from infrastructure.config import settings
 from infrastructure.di.container import create_container
 from infrastructure.logging import setup_logging
-from infrastructure.temporal.activities.parse_activities import create_parse_artifact_activity
 from infrastructure.temporal.activities.batch_reembed_activities import (
     create_batch_reembed_artifact_pages_activity,
 )
@@ -52,6 +51,7 @@ from infrastructure.temporal.activities.embedding_activities import (
 from infrastructure.temporal.activities.ner_activities import (
     create_aggregate_artifact_tags_activity,
 )
+from infrastructure.temporal.activities.parse_activities import create_parse_artifact_activity
 from infrastructure.temporal.activities.smiles_embedding_activities import (
     create_embed_compound_smiles_activity,
 )
@@ -59,7 +59,6 @@ from infrastructure.temporal.activities.summary_embedding_activities import (
     create_embed_artifact_summary_activity,
     create_embed_page_summary_activity,
 )
-from infrastructure.temporal.workflows.parse_workflow import ParseArtifactWorkflow
 from infrastructure.temporal.workflows.batch_reembed_smiles_workflow import (
     BatchReEmbedSmilesWorkflow,
 )
@@ -74,6 +73,7 @@ from infrastructure.temporal.workflows.embedding_workflow import GeneratePageEmb
 from infrastructure.temporal.workflows.ner_workflow import (
     ArtifactTagAggregationWorkflow,
 )
+from infrastructure.temporal.workflows.parse_workflow import ParseArtifactWorkflow
 from infrastructure.temporal.workflows.smiles_embedding_workflow import EmbedCompoundSmilesWorkflow
 from infrastructure.temporal.workflows.summary_embedding_workflow import (
     ArtifactSummaryEmbeddingWorkflow,
