@@ -24,6 +24,9 @@ from application.workflow_use_cases.trigger_embedding_use_case import TriggerEmb
 from application.workflow_use_cases.trigger_page_summarization_use_case import (
     TriggerPageSummarizationUseCase,
 )
+from application.workflow_use_cases.trigger_artifact_parse_use_case import (
+    TriggerArtifactParseUseCase,
+)
 from application.workflow_use_cases.trigger_smiles_embedding_use_case import (
     TriggerSmilesEmbeddingUseCase,
 )
@@ -96,6 +99,20 @@ class TestTriggerCompoundExtractionUseCase:
 
         with pytest.raises(RuntimeError):
             await use_case.execute(page_id=uuid4())
+
+
+class TestTriggerArtifactParseUseCase:
+    @pytest.mark.asyncio
+    async def test_trigger_artifact_parse_starts_workflow(self) -> None:
+        orchestrator = MockWorkflowOrchestrator()
+        uc = TriggerArtifactParseUseCase(orchestrator)
+        artifact_id = uuid4()
+
+        result = await uc.execute(artifact_id=artifact_id)
+
+        assert isinstance(result, WorkflowStartedResponse)
+        assert result.workflow_id == f"artifact-parse-{artifact_id}"
+        assert orchestrator.artifact_parse_calls == [artifact_id]
 
 
 class TestTriggerSmilesEmbeddingUseCase:
