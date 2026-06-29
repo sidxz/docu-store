@@ -24,7 +24,6 @@ from application.use_cases.vector_metadata_use_cases import (
     SyncArtifactMetadataToVectorStoreUseCase,
     SyncPageTagsToVectorStoreUseCase,
 )
-from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
 from application.workflow_use_cases.trigger_artifact_parse_use_case import TriggerArtifactParseUseCase
 from application.workflow_use_cases.trigger_artifact_summarization_use_case import (
     TriggerArtifactSummarizationUseCase,
@@ -83,7 +82,6 @@ async def run(worker_name: str = "pipeline_worker") -> None:
     container = create_container()
     app = container[Application]
 
-    log_artifact_sample_use_case = container[LogArtifactSampleUseCase]
     trigger_artifact_parse_use_case = container[TriggerArtifactParseUseCase]
     trigger_compound_extraction_use_case = container[TriggerCompoundExtractionUseCase]
     trigger_smiles_embedding_use_case = container[TriggerSmilesEmbeddingUseCase]

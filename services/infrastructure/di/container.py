@@ -6,7 +6,6 @@ from eventsourcing.application import Application
 from lagom import Container
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from application.dtos.pdf_dtos import PDFContent
 from application.ports.blob_store import BlobStore
 from application.ports.compound_vector_store import CompoundVectorStore
 from application.ports.cser_service import CserService
@@ -14,7 +13,6 @@ from application.ports.embedding_generator import EmbeddingGenerator
 from application.ports.external_event_publisher import ExternalEventPublisher
 from application.ports.llm_client import LLMClientPort
 from application.ports.ner_extractor import NERExtractorPort
-from application.ports.pdf_service import PDFService
 from application.ports.permission_registrar import PermissionRegistrar
 from application.ports.prompt_repository import PromptRepositoryPort
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
@@ -89,7 +87,6 @@ from application.use_cases.vector_metadata_use_cases import (
     SyncArtifactMetadataToVectorStoreUseCase,
     SyncPageTagsToVectorStoreUseCase,
 )
-from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
 from application.workflow_use_cases.trigger_artifact_summarization_use_case import (
     TriggerArtifactSummarizationUseCase,
 )
@@ -150,7 +147,6 @@ from infrastructure.event_sourced_repositories.artifact_repository import (
 from infrastructure.event_sourced_repositories.page_repository import EventSourcedPageRepository
 from infrastructure.file_services.docling_parser import DoclingParser
 from infrastructure.file_services.font_title_extractor import FontTitleExtractor
-from infrastructure.file_services.py_mu_pfd_service import PyMuPDFService
 from infrastructure.kafka.kafka_external_event_streamer import KafkaExternalEventPublisher
 from infrastructure.kafka.kafka_publisher import KafkaPublisher
 from infrastructure.llm.factory import (
@@ -198,7 +194,6 @@ class DocuStoreApplication(Application):
         transcoder.register(PydanticTranscoding(TextMention))
         transcoder.register(PydanticTranscoding(ExtractionMetadata))
         transcoder.register(PydanticTranscoding(BlobRef))
-        transcoder.register(PydanticTranscoding(PDFContent))
         transcoder.register(PydanticTranscoding(EmbeddingMetadata))
 
 
@@ -325,9 +320,6 @@ def create_container() -> Container:
 
     # Register Docling Parser (document parsing — PDF → structured IR + page images)
     container[DoclingParser] = lambda c: DoclingParser(blob_store=c[BlobStore])
-
-    # Register PDF Service with BlobStore injected
-    container[PDFService] = lambda c: PyMuPDFService(blob_store=c[BlobStore])
 
     # Register CSER Service
     container[CserService] = lambda c: CserPipelineService(blob_store=c[BlobStore])
@@ -591,9 +583,6 @@ def create_container() -> Container:
     )
 
     # Register Workflow Use Cases
-    container[LogArtifactSampleUseCase] = lambda c: LogArtifactSampleUseCase(
-        workflow_orchestrator=c[WorkflowOrchestrator],
-    )
     container[TriggerCompoundExtractionUseCase] = lambda c: TriggerCompoundExtractionUseCase(
         workflow_orchestrator=c[WorkflowOrchestrator],
     )

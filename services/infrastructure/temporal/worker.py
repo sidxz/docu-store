@@ -32,10 +32,6 @@ from application.use_cases.summary_embedding_use_cases import (
 from infrastructure.config import settings
 from infrastructure.di.container import create_container
 from infrastructure.logging import setup_logging
-from infrastructure.temporal.activities.artifact_activities import (
-    log_mime_type_activity,
-    log_storage_location_activity,
-)
 from infrastructure.temporal.activities.parse_activities import create_parse_artifact_activity
 from infrastructure.temporal.activities.batch_reembed_activities import (
     create_batch_reembed_artifact_pages_activity,
@@ -63,7 +59,6 @@ from infrastructure.temporal.activities.summary_embedding_activities import (
     create_embed_artifact_summary_activity,
     create_embed_page_summary_activity,
 )
-from infrastructure.temporal.workflows.artifact_processing import ProcessArtifactWorkflow
 from infrastructure.temporal.workflows.parse_workflow import ParseArtifactWorkflow
 from infrastructure.temporal.workflows.batch_reembed_smiles_workflow import (
     BatchReEmbedSmilesWorkflow,
@@ -163,7 +158,6 @@ async def run() -> None:
         client,
         task_queue="artifact_processing",
         workflows=[
-            ProcessArtifactWorkflow,
             ParseArtifactWorkflow,
             GeneratePageEmbeddingWorkflow,
             ExtractCompoundMentionsWorkflow,
@@ -176,8 +170,6 @@ async def run() -> None:
             BatchReEmbedSummariesWorkflow,
         ],
         activities=[
-            log_mime_type_activity,
-            log_storage_location_activity,
             generate_page_embedding_activity,
             log_embedding_generated_activity,
             extract_compound_mentions_activity,

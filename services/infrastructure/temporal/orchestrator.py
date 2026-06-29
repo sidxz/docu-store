@@ -18,7 +18,6 @@ if TYPE_CHECKING:
 from application.dtos.workflow_dtos import TemporalWorkflowInfo
 from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from infrastructure.config import settings
-from infrastructure.temporal.workflows.artifact_processing import ProcessArtifactWorkflow
 
 logger = structlog.get_logger()
 
@@ -47,65 +46,6 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         if not self._initialized:
             self._client = await Client.connect(settings.temporal_address)
             self._initialized = True
-
-    async def start_artifact_processing_workflow(
-        self,
-        artifact_id: UUID,
-        storage_location: str,
-    ) -> None:
-        """Start a workflow to process an artifact.
-
-        Uses artifact_id as the workflow ID to ensure idempotency:
-        - Same artifact_id always produces same workflow execution
-        - Replaying the same event won't duplicate the workflow
-
-        Args:
-            artifact_id: Unique identifier of the artifact to process
-            storage_location: Path/location where the artifact is stored
-
-        """
-        await self._ensure_client()
-
-        try:
-            # Workflow ID = artifact_id ensures idempotency
-            # (same ID = same workflow, won't create duplicates)
-            workflow_id = str(artifact_id)
-
-            logger.info(
-                "temporal_starting_workflow",
-                workflow_id=workflow_id,
-                artifact_id=str(artifact_id),
-                storage_location=storage_location,
-            )
-
-            # Note: The artifact's mime_type is not available here.
-            # In a real implementation, we'd either:
-            # 1. Query the artifact repository to get mime_type
-            # 2. Include mime_type in the event that triggered this
-            # For now, we'll pass a placeholder
-            # TODO(@sidxz): get mime_type from artifact aggregate (#123)  # noqa: FIX002
-            mime_type = "application/pdf"
-
-            handle = await self._client.start_workflow(
-                ProcessArtifactWorkflow.execute,
-                args=[artifact_id, storage_location, mime_type],
-                id=workflow_id,
-                task_queue="artifact_processing",
-            )
-
-            logger.info(
-                "temporal_workflow_started",
-                workflow_id=workflow_id,
-                run_id=handle.id,
-            )
-
-        except Exception as e:
-            logger.exception(
-                "temporal_workflow_start_failed",
-                artifact_id=str(artifact_id),
-                error=str(e),
-            )
-            raise
 
     async def start_embedding_workflow(
         self,

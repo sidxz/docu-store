@@ -7,7 +7,6 @@ from uuid import uuid4
 import pytest
 
 from application.dtos.workflow_dtos import WorkflowStartedResponse
-from application.workflow_use_cases.log_artifcat_sample_use_case import LogArtifactSampleUseCase
 from application.workflow_use_cases.trigger_artifact_summarization_use_case import (
     TriggerArtifactSummarizationUseCase,
 )
@@ -159,52 +158,6 @@ class TestTriggerPageSummarizationUseCase:
 
         with pytest.raises(RuntimeError):
             await use_case.execute(page_id=uuid4())
-
-
-class TestLogArtifactSampleUseCase:
-    @pytest.mark.asyncio
-    async def test_starts_workflow_and_returns_response(self) -> None:
-        orchestrator = MockWorkflowOrchestrator()
-        use_case = LogArtifactSampleUseCase(orchestrator)
-        artifact_id = uuid4()
-        storage = "/storage/artifact.pdf"
-
-        result = await use_case.execute(artifact_id=artifact_id, storage_location=storage)
-
-        assert isinstance(result, WorkflowStartedResponse)
-        assert result.status == "started"
-        assert result.workflow_id == str(artifact_id)
-        assert len(orchestrator.artifact_processing_calls) == 1
-        call = orchestrator.artifact_processing_calls[0]
-        assert call["artifact_id"] == artifact_id
-        assert call["storage_location"] == storage
-
-    @pytest.mark.asyncio
-    async def test_workflow_id_is_artifact_id_string(self) -> None:
-        artifact_id = uuid4()
-        use_case = LogArtifactSampleUseCase(MockWorkflowOrchestrator())
-        result = await use_case.execute(artifact_id=artifact_id, storage_location="/s/f.pdf")
-        assert result.workflow_id == str(artifact_id)
-
-    @pytest.mark.asyncio
-    async def test_propagates_orchestrator_exception(self) -> None:
-        orchestrator = MockWorkflowOrchestrator(raise_on_call=RuntimeError("Temporal unavailable"))
-        use_case = LogArtifactSampleUseCase(orchestrator)
-
-        with pytest.raises(RuntimeError, match="Temporal unavailable"):
-            await use_case.execute(artifact_id=uuid4(), storage_location="/s/f.pdf")
-
-    @pytest.mark.asyncio
-    async def test_passes_storage_location_to_orchestrator(self) -> None:
-        orchestrator = MockWorkflowOrchestrator()
-        use_case = LogArtifactSampleUseCase(orchestrator)
-        artifact_id = uuid4()
-
-        await use_case.execute(artifact_id=artifact_id, storage_location="/bucket/key/doc.pdf")
-
-        assert (
-            orchestrator.artifact_processing_calls[0]["storage_location"] == "/bucket/key/doc.pdf"
-        )
 
 
 # ============================================================================

@@ -20,24 +20,6 @@ class WorkflowOrchestrator(Protocol):
     """
 
     @abstractmethod
-    async def start_artifact_processing_workflow(
-        self,
-        artifact_id: UUID,
-        storage_location: str,
-    ) -> None:
-        """Start a workflow to process an artifact.
-
-        Args:
-            artifact_id: Unique identifier of the artifact to process
-            storage_location: Path/location where the artifact is stored
-
-        Raises:
-            May raise implementation-specific exceptions on workflow start failure.
-
-        """
-        ...
-
-    @abstractmethod
     async def start_embedding_workflow(
         self,
         page_id: UUID,

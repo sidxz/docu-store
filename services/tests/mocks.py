@@ -559,7 +559,6 @@ class MockWorkflowOrchestrator:
 
     def __init__(self, raise_on_call: Exception | None = None) -> None:
         self.raise_on_call = raise_on_call
-        self.artifact_processing_calls: list[dict] = []
         self.embedding_calls: list[UUID] = []
         self.compound_extraction_calls: list[UUID] = []
         self.smiles_embedding_calls: list[UUID] = []
@@ -571,15 +570,6 @@ class MockWorkflowOrchestrator:
         self.page_summary_embedding_calls: list[UUID] = []
         self.artifact_summary_embedding_calls: list[UUID] = []
         self.artifact_parse_calls: list[UUID] = []
-
-    async def start_artifact_processing_workflow(
-        self, artifact_id: UUID, storage_location: str,
-    ) -> None:
-        if self.raise_on_call:
-            raise self.raise_on_call
-        self.artifact_processing_calls.append(
-            {"artifact_id": artifact_id, "storage_location": storage_location},
-        )
 
     async def start_embedding_workflow(self, page_id: UUID, *, skip_sparse: bool = False) -> None:
         if self.raise_on_call:
