@@ -410,6 +410,31 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
                 error=str(e),
             )
 
+    async def start_artifact_parse_workflow(
+        self,
+        artifact_id: UUID,
+    ) -> None:
+        """Start the durable parse workflow for an artifact."""
+        await self._ensure_client()
+
+        workflow_id = f"artifact-parse-{artifact_id}"
+
+        try:
+            await self._client.start_workflow(
+                "ParseArtifactWorkflow",
+                str(artifact_id),
+                id=workflow_id,
+                task_queue="artifact_processing",
+            )
+            logger.info("artifact_parse_workflow_started", artifact_id=str(artifact_id))
+        except Exception as e:
+            logger.exception(
+                "failed_to_start_artifact_parse_workflow",
+                artifact_id=str(artifact_id),
+                error=str(e),
+            )
+            raise
+
     async def start_batch_reembed_smiles_workflow(
         self,
         artifact_id: UUID,

@@ -570,6 +570,7 @@ class MockWorkflowOrchestrator:
         self.ner_extraction_calls: list[UUID] = []
         self.page_summary_embedding_calls: list[UUID] = []
         self.artifact_summary_embedding_calls: list[UUID] = []
+        self.artifact_parse_calls: list[UUID] = []
 
     async def start_artifact_processing_workflow(
         self, artifact_id: UUID, storage_location: str,
@@ -633,6 +634,11 @@ class MockWorkflowOrchestrator:
         if self.raise_on_call:
             raise self.raise_on_call
         self.artifact_summary_embedding_calls.append(artifact_id)
+
+    async def start_artifact_parse_workflow(self, artifact_id: UUID) -> None:
+        if self.raise_on_call:
+            raise self.raise_on_call
+        self.artifact_parse_calls.append(artifact_id)
 
     async def start_batch_reembed_workflow(self, artifact_id: UUID) -> None:
         if self.raise_on_call:

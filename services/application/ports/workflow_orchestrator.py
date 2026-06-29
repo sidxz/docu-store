@@ -246,6 +246,19 @@ class WorkflowOrchestrator(Protocol):
         ...
 
     @abstractmethod
+    async def start_artifact_parse_workflow(
+        self,
+        artifact_id: UUID,
+    ) -> None:
+        """Start the durable parse workflow for an artifact.
+
+        Args:
+            artifact_id: Unique identifier of the artifact to parse.
+
+        """
+        ...
+
+    @abstractmethod
     async def get_page_workflow_statuses(
         self,
         page_id: UUID,
