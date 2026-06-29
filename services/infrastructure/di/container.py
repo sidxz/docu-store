@@ -48,6 +48,7 @@ from application.use_cases.artifact_use_cases import (
     UpdateTagMentionsUseCase as UpdateArtifactTagMentionsUseCase,
 )
 from application.use_cases.blob_use_cases import UploadBlobUseCase
+from application.use_cases.parse_artifact_use_case import ParseArtifactUseCase
 from application.use_cases.chat_use_cases import (
     CreateConversationUseCase,
     DeleteConversationUseCase,
@@ -117,10 +118,14 @@ from application.workflow_use_cases.trigger_page_summary_embedding_use_case impo
 from application.workflow_use_cases.trigger_resource_registration_use_case import (
     TriggerResourceRegistrationUseCase,
 )
+from application.workflow_use_cases.trigger_artifact_parse_use_case import (
+    TriggerArtifactParseUseCase,
+)
 from application.workflow_use_cases.trigger_smiles_embedding_use_case import (
     TriggerSmilesEmbeddingUseCase,
 )
 from domain.value_objects.author_mention import AuthorMention
+from domain.value_objects.mime_type import MimeType
 from domain.value_objects.blob_ref import BlobRef
 from domain.value_objects.compound_mention import CompoundMention
 from domain.value_objects.embedding_metadata import EmbeddingMetadata
@@ -143,6 +148,7 @@ from infrastructure.event_sourced_repositories.artifact_repository import (
     EventSourcedArtifactRepository,
 )
 from infrastructure.event_sourced_repositories.page_repository import EventSourcedPageRepository
+from infrastructure.file_services.docling_parser import DoclingParser
 from infrastructure.file_services.font_title_extractor import FontTitleExtractor
 from infrastructure.file_services.py_mu_pfd_service import PyMuPDFService
 from infrastructure.kafka.kafka_external_event_streamer import KafkaExternalEventPublisher
@@ -316,6 +322,9 @@ def create_container() -> Container:
     container[TriggerResourceRegistrationUseCase] = lambda c: TriggerResourceRegistrationUseCase(
         permission_registrar=c[PermissionRegistrar],
     )
+
+    # Register Docling Parser (document parsing — PDF → structured IR + page images)
+    container[DoclingParser] = lambda c: DoclingParser(blob_store=c[BlobStore])
 
     # Register PDF Service with BlobStore injected
     container[PDFService] = lambda c: PyMuPDFService(blob_store=c[BlobStore])
@@ -570,6 +579,20 @@ def create_container() -> Container:
         compound_vector_store=c[CompoundVectorStore],
         artifact_read_model=c[ArtifactReadModel],
         smiles_validator=c[SmilesValidator],
+    )
+
+    # Artifact Parse Use Cases
+    container[ParseArtifactUseCase] = lambda c: ParseArtifactUseCase(
+        parsers={MimeType.PDF: c[DoclingParser]},
+        blob_store=c[BlobStore],
+        artifact_repository=c[ArtifactRepository],
+        page_repository=c[PageRepository],
+        create_page_use_case=c[CreatePageUseCase],
+        update_text_mention_use_case=c[UpdateTextMentionUseCase],
+        add_pages_use_case=c[AddPagesUseCase],
+    )
+    container[TriggerArtifactParseUseCase] = lambda c: TriggerArtifactParseUseCase(
+        workflow_orchestrator=c[WorkflowOrchestrator],
     )
 
     # Register Workflow Use Cases
