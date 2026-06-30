@@ -149,6 +149,10 @@ class VectorStore(Protocol):
         tags: list[str] | None = None,
         entity_types: list[str] | None = None,
         tag_match_mode: Literal["any", "all"] = "any",
+        block_types: list[str] | None = None,
+        section: str | None = None,
+        is_table: bool | None = None,
+        is_figure: bool | None = None,
         group_size: int = 1,
     ) -> list[PageSearchResult]:
         """Find pages with server-side dedup by page_id.
@@ -171,6 +175,10 @@ class VectorStore(Protocol):
         tags: list[str] | None = None,
         entity_types: list[str] | None = None,
         tag_match_mode: Literal["any", "all"] = "any",
+        block_types: list[str] | None = None,
+        section: str | None = None,
+        is_table: bool | None = None,
+        is_figure: bool | None = None,
         group_size: int = 1,
     ) -> list[PageSearchResult]:
         """Hybrid search (dense + sparse RRF) with server-side dedup by page_id."""

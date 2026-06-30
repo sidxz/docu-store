@@ -424,6 +424,10 @@ class QdrantStore(VectorStore):
         tags: list[str] | None = None,
         entity_types: list[str] | None = None,
         tag_match_mode: Literal["any", "all", "page_any"] = "any",
+        block_types: list[str] | None = None,
+        section: str | None = None,
+        is_table: bool | None = None,
+        is_figure: bool | None = None,
     ) -> models.Filter | None:
         """Build a combined Qdrant filter from all filter parameters."""
         must_conditions: list[models.Condition] = []
@@ -449,6 +453,27 @@ class QdrantStore(VectorStore):
                 ),
             )
         must_conditions.extend(self._build_tag_conditions(tags, entity_types, tag_match_mode))
+        if block_types:
+            must_conditions.append(
+                models.FieldCondition(
+                    key="block_type", match=models.MatchAny(any=block_types),
+                ),
+            )
+        if section:
+            must_conditions.append(
+                models.FieldCondition(
+                    key="section_path_normalized",
+                    match=models.MatchValue(value=section.lower()),
+                ),
+            )
+        if is_table is not None:
+            must_conditions.append(
+                models.FieldCondition(key="is_table", match=models.MatchValue(value=is_table)),
+            )
+        if is_figure is not None:
+            must_conditions.append(
+                models.FieldCondition(key="is_figure", match=models.MatchValue(value=is_figure)),
+            )
         return models.Filter(must=must_conditions) if must_conditions else None
 
     async def search_similar_pages(
@@ -518,6 +543,10 @@ class QdrantStore(VectorStore):
         tags: list[str] | None = None,
         entity_types: list[str] | None = None,
         tag_match_mode: Literal["any", "all", "page_any"] = "any",
+        block_types: list[str] | None = None,
+        section: str | None = None,
+        is_table: bool | None = None,
+        is_figure: bool | None = None,
         group_size: int = 1,
     ) -> list[PageSearchResult]:
         """Search with server-side deduplication by page_id.
@@ -538,6 +567,10 @@ class QdrantStore(VectorStore):
             tags,
             entity_types,
             tag_match_mode,
+            block_types,
+            section,
+            is_table,
+            is_figure,
         )
 
         try:
@@ -667,6 +700,10 @@ class QdrantStore(VectorStore):
         tags: list[str] | None = None,
         entity_types: list[str] | None = None,
         tag_match_mode: Literal["any", "all", "page_any"] = "any",
+        block_types: list[str] | None = None,
+        section: str | None = None,
+        is_table: bool | None = None,
+        is_figure: bool | None = None,
         group_size: int = 1,
     ) -> list[PageSearchResult]:
         """Hybrid search with server-side dedup by page_id via RRF fusion."""
@@ -678,6 +715,10 @@ class QdrantStore(VectorStore):
             tags,
             entity_types,
             tag_match_mode,
+            block_types,
+            section,
+            is_table,
+            is_figure,
         )
 
         try:

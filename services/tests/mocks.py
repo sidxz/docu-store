@@ -222,6 +222,10 @@ class MockVectorStore:
         tags: list[str] | None = None,
         entity_types: list[str] | None = None,
         tag_match_mode: str = "any",
+        block_types: list[str] | None = None,
+        section: str | None = None,
+        is_table: bool | None = None,
+        is_figure: bool | None = None,
         group_size: int = 1,
     ) -> list[PageSearchResult]:
         self.search_calls.append(
@@ -252,6 +256,10 @@ class MockVectorStore:
         tags: list[str] | None = None,
         entity_types: list[str] | None = None,
         tag_match_mode: str = "any",
+        block_types: list[str] | None = None,
+        section: str | None = None,
+        is_table: bool | None = None,
+        is_figure: bool | None = None,
         group_size: int = 1,
     ) -> list[PageSearchResult]:
         self.search_calls.append(

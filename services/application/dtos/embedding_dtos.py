@@ -53,6 +53,20 @@ class SearchRequest(BaseModel):
         pattern="^(any|all)$",
         description="'any' = match pages with ANY of the tags, 'all' = must have ALL tags.",
     )
+    block_types: list[str] | None = Field(
+        default=None,
+        description="Filter by block type (e.g. 'table', 'figure', 'heading', 'paragraph').",
+    )
+    section: str | None = Field(
+        default=None,
+        description="Filter to chunks under a heading whose text matches (case-insensitive).",
+    )
+    is_table: bool | None = Field(
+        default=None, description="If set, restrict to table (True) or non-table (False) chunks.",
+    )
+    is_figure: bool | None = Field(
+        default=None, description="If set, restrict to figure (True) or non-figure (False) chunks.",
+    )
 
 
 class SearchResultDTO(BaseModel):

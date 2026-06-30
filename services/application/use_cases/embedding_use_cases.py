@@ -369,6 +369,10 @@ class SearchSimilarPagesUseCase:
                 tags=request.tags,
                 entity_types=request.entity_types,
                 tag_match_mode=request.tag_match_mode,
+                block_types=request.block_types,
+                section=request.section,
+                is_table=request.is_table,
+                is_figure=request.is_figure,
             )
 
             # Over-fetch if reranker is available (reranker needs more candidates)
