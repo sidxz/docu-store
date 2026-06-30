@@ -88,6 +88,7 @@ class VectorStore(Protocol):
         chunk_count: int,
         metadata: dict | None = None,
         sparse_embeddings: list[SparseEmbedding] | None = None,
+        chunk_metadata: list[dict] | None = None,
     ) -> None:
         """Store embeddings for multiple chunks of a single page.
 

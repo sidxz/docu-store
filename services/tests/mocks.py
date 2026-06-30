@@ -181,9 +181,15 @@ class MockVectorStore:
         chunk_count: int,
         metadata: dict | None = None,
         sparse_embeddings: list | None = None,
+        chunk_metadata: list[dict] | None = None,
     ) -> None:
         self.upsert_chunk_calls.append(
-            {"page_id": page_id, "embeddings": embeddings, "chunk_count": chunk_count},
+            {
+                "page_id": page_id,
+                "embeddings": embeddings,
+                "chunk_count": chunk_count,
+                "chunk_metadata": chunk_metadata,
+            },
         )
 
     async def search_similar_pages(

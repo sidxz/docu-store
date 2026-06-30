@@ -120,6 +120,10 @@ class QdrantStore(VectorStore):
                 ("tag_normalized", models.PayloadSchemaType.KEYWORD),
                 ("artifact_tag_normalized", models.PayloadSchemaType.KEYWORD),
                 ("entity_types", models.PayloadSchemaType.KEYWORD),
+                ("block_type", models.PayloadSchemaType.KEYWORD),
+                ("section_path_normalized", models.PayloadSchemaType.KEYWORD),
+                ("is_table", models.PayloadSchemaType.BOOL),
+                ("is_figure", models.PayloadSchemaType.BOOL),
             ]:
                 await client.create_payload_index(
                     collection_name=self.collection_name,
@@ -218,6 +222,7 @@ class QdrantStore(VectorStore):
         chunk_count: int,
         metadata: dict | None = None,
         sparse_embeddings: list[SparseEmbedding] | None = None,
+        chunk_metadata: list[dict] | None = None,
     ) -> None:
         """Store embeddings for multiple chunks of a single page.
 
@@ -258,6 +263,8 @@ class QdrantStore(VectorStore):
 
             if metadata:
                 payload.update(metadata)
+            if chunk_metadata and chunk_index < len(chunk_metadata):
+                payload.update(chunk_metadata[chunk_index])
 
             vector: dict = {"dense": embedding.vector}
             if sparse_embeddings and chunk_index < len(sparse_embeddings):
