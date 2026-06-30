@@ -91,3 +91,7 @@ jobs:
           image-ref: docu-store:scan
           severity: CRITICAL
           exit-code: 1
+          # Only fail on CRITICALs that have a fix available — the base image
+          # carries unfixable CRITICALs (Mesa/perl/kernel-headers, will_not_fix)
+          # that would otherwise keep CI permanently red with no actionable path.
+          ignore-unfixed: true
