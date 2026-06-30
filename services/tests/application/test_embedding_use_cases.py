@@ -16,6 +16,7 @@ from application.use_cases.embedding_use_cases import (
 )
 from domain.aggregates.page import Page
 from domain.value_objects.embedding_metadata import EmbeddingMetadata
+from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.text_mention import TextMention
 from tests.mocks import (
     MockArtifactReadModel,
@@ -362,6 +363,39 @@ class TestGeneratePageEmbeddingBlockAware:
         # the table chunk carries is_table + section_path
         assert any(m["is_table"] for m in cm)
         assert any(m.get("section_path") == ["Results"] for m in cm)
+
+    @pytest.mark.asyncio
+    async def test_table_chunk_tags_scoped_to_table_entities(self):
+        page = _page_with_text("Rho is discussed in the intro; the PptT assay is below.")
+        page.update_tag_mentions([
+            TagMention(tag="PptT", entity_type="target"),
+            TagMention(tag="Rho", entity_type="target"),
+        ])
+        repo = MockPageRepository()
+        repo.pages[page.id] = page
+        blocks = [
+            Block(
+                type="table",
+                rows=[["Cmpd", "IC50"], ["X", "5 nM"]],
+                caption="Table 1. PptT inhibition",
+                section_path=["Results"],
+                source_page_index=page.index,
+            ),
+        ]
+        use_case = GeneratePageEmbeddingUseCase(
+            repo,
+            MockEmbeddingGenerator(),
+            MockVectorStore(),
+            MockTextChunker(),
+            blob_store=_IRBlobStore(page.artifact_id, blocks),
+        )
+        vs = use_case.vector_store
+        result = await use_case.execute(page.id)
+        assert isinstance(result, Success)
+        cm = vs.upsert_chunk_calls[-1]["chunk_metadata"]
+        table_meta = next(m for m in cm if m.get("is_table"))
+        assert table_meta["tag_normalized"] == ["pptt"]   # PptT in caption; Rho dropped
+        assert "rho" not in table_meta["tag_normalized"]
 
     @pytest.mark.asyncio
     async def test_falls_back_to_char_chunker_when_no_ir(self):

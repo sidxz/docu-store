@@ -25,7 +25,11 @@ from application.ports.text_chunker import TextChunker
 from application.ports.vector_store import VectorStore
 from domain.exceptions import AggregateNotFoundError
 from domain.value_objects.embedding_metadata import EmbeddingMetadata, EmbeddingType
-from infrastructure.text_chunkers.block_aware_chunker import chunk_blocks, chunk_payload
+from infrastructure.text_chunkers.block_aware_chunker import (
+    chunk_blocks,
+    chunk_payload,
+    scope_table_entities,
+)
 
 logger = structlog.get_logger()
 
@@ -171,6 +175,18 @@ class GeneratePageEmbeddingUseCase:
                 ]
                 raw_chunk_texts = [bc.text for bc in block_chunks]
                 chunk_metadata = [chunk_payload(bc) for bc in block_chunks]
+                # Phase D: scope each TABLE chunk's tags to the entities in the
+                # table's own text/caption/section, overriding the page-wide union
+                # (upsert_metadata below) so a table isn't matched by an unrelated
+                # target mentioned elsewhere on the page.
+                if page.tag_mentions:
+                    candidates = [(tm.tag, tm.entity_type) for tm in page.tag_mentions]
+                    for idx, bc in enumerate(block_chunks):
+                        if bc.is_table:
+                            local = bc.text + " " + " ".join(bc.section_path)
+                            chunk_metadata[idx].update(
+                                scope_table_entities(candidates, local),
+                            )
                 num_chunks = len(raw_chunk_texts)
             else:
                 chunks = self.text_chunker.chunk_text(page.text_mention.text)
