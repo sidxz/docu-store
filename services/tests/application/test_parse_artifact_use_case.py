@@ -165,7 +165,7 @@ async def test_parse_is_idempotent_on_retry():
 
     # Swap in a create_page stub that always returns Failure (simulates "already exists" on retry).
     class _AlwaysFailCreate:
-        async def execute(self, req):
+        async def execute(self, req, **kwargs):
             return Failure(AppError("conflict", "already exists"))
 
     uc.create_page = _AlwaysFailCreate()

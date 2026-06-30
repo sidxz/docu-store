@@ -52,29 +52,27 @@ class TestCreatePageUseCase:
         assert artifact_repo.save_called is True
 
     @pytest.mark.asyncio
-    async def test_create_page_uses_request_workspace_when_no_auth(self, sample_artifact) -> None:
-        """Parse runs in a Temporal activity with no auth — workspace/owner must come
-        from the request (propagated from the artifact)."""
+    async def test_create_page_uses_explicit_args_when_no_auth(self, sample_artifact) -> None:
+        """Parse runs in a Temporal activity with no auth — workspace/owner come from
+        explicit args (the artifact's values), not the request body."""
         page_repo = MockPageRepository()
         artifact_repo = MockArtifactRepository()
         artifact_repo.save(sample_artifact)
         ws, owner = uuid4(), uuid4()
 
         use_case = CreatePageUseCase(page_repo, artifact_repo)
-        request = CreatePageRequest(
-            name="P", artifact_id=sample_artifact.id, index=0, workspace_id=ws, owner_id=owner,
-        )
+        request = CreatePageRequest(name="P", artifact_id=sample_artifact.id, index=0)
 
-        result = await use_case.execute(request)  # no auth
+        result = await use_case.execute(request, workspace_id=ws, owner_id=owner)  # no auth
 
         assert isinstance(result, Success)
         assert result.unwrap().workspace_id == ws
         assert result.unwrap().owner_id == owner
 
     @pytest.mark.asyncio
-    async def test_create_page_ignores_request_workspace_when_authed(self, sample_artifact) -> None:
-        """Cross-tenant guard: an authenticated caller cannot set workspace/owner via the
-        request body — identity always comes from auth."""
+    async def test_create_page_auth_overrides_explicit_workspace_args(self, sample_artifact) -> None:
+        """Cross-tenant guard: when auth is present, the explicit workspace/owner args are
+        ignored — identity always comes from auth, never spoofable input."""
         page_repo = MockPageRepository()
         artifact_repo = MockArtifactRepository()
         artifact_repo.save(sample_artifact)
@@ -82,12 +80,11 @@ class TestCreatePageUseCase:
         attacker_ws, attacker_owner = uuid4(), uuid4()
 
         use_case = CreatePageUseCase(page_repo, artifact_repo)
-        request = CreatePageRequest(
-            name="P", artifact_id=sample_artifact.id, index=0,
-            workspace_id=attacker_ws, owner_id=attacker_owner,
-        )
+        request = CreatePageRequest(name="P", artifact_id=sample_artifact.id, index=0)
 
-        result = await use_case.execute(request, auth=auth)
+        result = await use_case.execute(
+            request, auth=auth, workspace_id=attacker_ws, owner_id=attacker_owner,
+        )
 
         assert isinstance(result, Success)
         page = result.unwrap()
