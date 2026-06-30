@@ -13,7 +13,11 @@ from uuid import UUID
 
 import structlog
 
+from application.dtos.parsed_document import Block, ParsedDocument
+from infrastructure.text_chunkers.block_aware_chunker import chunk_blocks, chunk_payload
+
 if TYPE_CHECKING:
+    from application.ports.blob_store import BlobStore
     from application.ports.compound_vector_store import CompoundVectorStore
     from application.ports.embedding_generator import EmbeddingGenerator
     from application.ports.repositories.artifact_repository import ArtifactRepository
@@ -44,12 +48,14 @@ class BatchReEmbedArtifactPagesUseCase:
         embedding_generator: EmbeddingGenerator,
         vector_store: VectorStore,
         text_chunker: TextChunker,
+        blob_store: BlobStore | None = None,
     ) -> None:
         self.artifact_repository = artifact_repository
         self.page_repository = page_repository
         self.embedding_generator = embedding_generator
         self.vector_store = vector_store
         self.text_chunker = text_chunker
+        self.blob_store = blob_store
 
     @staticmethod
     def _build_chunk_context(
@@ -67,6 +73,24 @@ class BatchReEmbedArtifactPagesUseCase:
         if page.summary_candidate and page.summary_candidate.summary:
             parts.append(f"Summary: {page.summary_candidate.summary[:200]}")
         return " | ".join(parts) + "\n\n" if parts else ""
+
+    def _load_ir_blocks(self, artifact_id: UUID) -> dict[int, list[Block]] | None:
+        """Load the artifact IR once, grouped by page index. None if absent."""
+        if self.blob_store is None:
+            return None
+        key = f"artifacts/{artifact_id}/parsed/document.json"
+        try:
+            if not self.blob_store.exists(key):
+                return None
+            doc = ParsedDocument.model_validate_json(self.blob_store.get_bytes(key))
+        except Exception:
+            logger.warning("batch_reembed.ir_read_failed", artifact_id=str(artifact_id))
+            return None
+        by_page: dict[int, list[Block]] = {}
+        for b in doc.blocks:
+            if b.source_page_index is not None:
+                by_page.setdefault(b.source_page_index, []).append(b)
+        return by_page
 
     def _build_page_metadata(self, page: Page) -> dict:
         """Build Qdrant payload metadata for a page."""
@@ -105,6 +129,9 @@ class BatchReEmbedArtifactPagesUseCase:
         total_pages = 0
         total_chunks = 0
 
+        # Load IR once for the whole artifact (not per page/batch)
+        ir_by_page = self._load_ir_blocks(artifact_id)
+
         # Process pages in batches to bound memory
         for batch_start in range(0, len(artifact.pages), _PAGE_BATCH_SIZE):
             batch_page_ids = artifact.pages[batch_start : batch_start + _PAGE_BATCH_SIZE]
@@ -112,6 +139,7 @@ class BatchReEmbedArtifactPagesUseCase:
                 batch_page_ids,
                 artifact_title,
                 artifact_id,
+                ir_by_page,
             )
             total_pages += pages_processed
             total_chunks += chunks_processed
@@ -135,6 +163,7 @@ class BatchReEmbedArtifactPagesUseCase:
         page_ids: list[UUID],
         artifact_title: str | None,
         artifact_id: UUID,
+        ir_by_page: dict[int, list[Block]] | None,
     ) -> tuple[int, int]:
         """Process a batch of pages: chunk, encode, upsert.
 
@@ -142,8 +171,10 @@ class BatchReEmbedArtifactPagesUseCase:
             (pages_processed, chunks_processed)
 
         """
+        from infrastructure.config import settings as _settings
+
         # Collect all chunks across pages in this batch
-        page_chunk_groups: list[tuple[Page, list]] = []
+        page_chunk_groups: list[tuple[Page, int, list[dict] | None]] = []
         all_contextual_texts: list[str] = []
 
         for page_id in page_ids:
@@ -151,8 +182,20 @@ class BatchReEmbedArtifactPagesUseCase:
             if not page.text_mention or not page.text_mention.text:
                 continue
 
-            chunks = self.text_chunker.chunk_text(page.text_mention.text)
-            from infrastructure.config import settings as _settings
+            page_blocks = (ir_by_page or {}).get(page.index)
+            chunk_metadata: list[dict] | None = None
+            if page_blocks:
+                bchunks = [
+                    bc for bc in chunk_blocks(page_blocks, max_chars=_settings.chunk_size)
+                    if bc.text.strip()
+                ]
+                if bchunks:
+                    raw_texts = [bc.text for bc in bchunks]
+                    chunk_metadata = [chunk_payload(bc) for bc in bchunks]
+                else:
+                    raw_texts = [c.text for c in self.text_chunker.chunk_text(page.text_mention.text)]
+            else:
+                raw_texts = [c.text for c in self.text_chunker.chunk_text(page.text_mention.text)]
 
             context_prefix = (
                 self._build_chunk_context(artifact_title, page)
@@ -160,10 +203,10 @@ class BatchReEmbedArtifactPagesUseCase:
                 else ""
             )
 
-            for chunk in chunks:
-                all_contextual_texts.append(context_prefix + chunk.text)
+            for t in raw_texts:
+                all_contextual_texts.append(context_prefix + t)
 
-            page_chunk_groups.append((page, chunks))
+            page_chunk_groups.append((page, len(raw_texts), chunk_metadata))
 
         if not all_contextual_texts:
             return 0, 0
@@ -175,8 +218,7 @@ class BatchReEmbedArtifactPagesUseCase:
 
         # Distribute embeddings back to pages and upsert per-page
         embedding_offset = 0
-        for page, chunks in page_chunk_groups:
-            page_embedding_count = len(chunks)
+        for page, page_embedding_count, chunk_metadata in page_chunk_groups:
             page_embeddings = embeddings[embedding_offset : embedding_offset + page_embedding_count]
             embedding_offset += page_embedding_count
 
@@ -191,6 +233,7 @@ class BatchReEmbedArtifactPagesUseCase:
                 chunk_count=page_embedding_count,
                 metadata=metadata or None,
                 sparse_embeddings=None,
+                chunk_metadata=chunk_metadata,
             )
 
         return len(page_chunk_groups), len(all_contextual_texts)

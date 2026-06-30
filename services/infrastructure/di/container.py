@@ -642,6 +642,7 @@ def create_container() -> Container:
         embedding_generator=c[EmbeddingGenerator],
         vector_store=c[VectorStore],
         text_chunker=c[TextChunker],
+        blob_store=c[BlobStore],
     )
     container[BatchReEmbedSmilesUseCase] = lambda c: BatchReEmbedSmilesUseCase(
         artifact_repository=c[ArtifactRepository],
