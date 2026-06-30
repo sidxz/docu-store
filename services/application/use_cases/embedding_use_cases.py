@@ -30,6 +30,21 @@ from infrastructure.text_chunkers.block_aware_chunker import chunk_blocks, chunk
 logger = structlog.get_logger()
 
 
+def _rerank_doc_text(page_text: str, metadata: dict | None) -> str:
+    """Prepend section breadcrumb + caption (if any) to the reranker document."""
+    prefix_parts: list[str] = []
+    if metadata:
+        section_path = metadata.get("section_path")
+        if section_path:
+            prefix_parts.append(" > ".join(section_path))
+        caption = metadata.get("caption")
+        if caption:
+            prefix_parts.append(caption)
+    if not prefix_parts:
+        return page_text
+    return " | ".join(prefix_parts) + "\n\n" + page_text
+
+
 class GeneratePageEmbeddingUseCase:
     """Use case for generating and storing page embeddings with chunking.
 
@@ -408,7 +423,8 @@ class SearchSimilarPagesUseCase:
                         text = page.text_mention.text[:2000]
                     if not text.strip():
                         continue  # skip empty pages — cross-encoder returns nan for empty text
-                    rerank_docs.append(RerankDocument(id=str(r.page_id), text=text))
+                    doc_text = _rerank_doc_text(text, r.metadata)
+                    rerank_docs.append(RerankDocument(id=str(r.page_id), text=doc_text))
 
                 reranked = self.reranker.rerank(
                     query=request.query_text,

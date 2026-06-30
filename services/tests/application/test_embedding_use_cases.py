@@ -381,3 +381,20 @@ class TestGeneratePageEmbeddingBlockAware:
         assert isinstance(result, Success)
         assert len(chunker.chunk_calls) == 1  # char chunker WAS used
         assert use_case.vector_store.upsert_chunk_calls[-1]["chunk_metadata"] is None
+
+
+class TestRerankDocText:
+    def test_prefixes_section_and_caption(self):
+        from application.use_cases.embedding_use_cases import _rerank_doc_text
+        text = _rerank_doc_text(
+            page_text="IC50 was 2 nM.",
+            metadata={"section_path": ["Results", "Assay"], "caption": "Table 1: potency"},
+        )
+        assert "Results > Assay" in text
+        assert "Table 1: potency" in text
+        assert "IC50 was 2 nM." in text
+
+    def test_plain_text_when_no_metadata(self):
+        from application.use_cases.embedding_use_cases import _rerank_doc_text
+        assert _rerank_doc_text("body", None) == "body"
+        assert _rerank_doc_text("body", {}) == "body"
