@@ -12,7 +12,9 @@ from domain.value_objects.mime_type import MimeType
 
 # ponytail: mirrors the parser registry in di/container.py. Office formats are
 # converted to PDF in the async parse workflow; add here as parsers land.
-SUPPORTED_UPLOAD_MIME_TYPES = frozenset({MimeType.PDF.value, MimeType.PPTX.value})
+SUPPORTED_UPLOAD_MIME_TYPES = frozenset(
+    {MimeType.PDF.value, MimeType.PPTX.value, MimeType.DOCX.value}
+)
 
 
 class UploadBlobUseCase:

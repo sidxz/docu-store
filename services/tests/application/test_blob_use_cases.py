@@ -31,6 +31,11 @@ def test_upload_accepts_pptx():
     assert isinstance(uc.execute(io.BytesIO(b"d"), _req(MimeType.PPTX.value)), Success)
 
 
+def test_upload_accepts_docx():
+    uc = UploadBlobUseCase(blob_store=FakeBlobStore())
+    assert isinstance(uc.execute(io.BytesIO(b"d"), _req(MimeType.DOCX.value)), Success)
+
+
 def test_upload_rejects_unsupported_mime():
     uc = UploadBlobUseCase(blob_store=FakeBlobStore())
     assert isinstance(uc.execute(io.BytesIO(b"d"), _req("text/plain")), Failure)

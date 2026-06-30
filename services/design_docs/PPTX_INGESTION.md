@@ -142,7 +142,14 @@ An artifact simply has no Pages until parse (including conversion) completes.
 
 ## 9. Non-goals
 
-- DOCX (next slice — same convert-to-PDF mechanism; needs only registry + MIME entries).
+- **Section-aware DOCX segmentation.** DOCX physical-page ingestion is **DONE** via the
+  exact same convert-to-PDF mechanism (added `MimeType.DOCX` to the upload gate + parser
+  registry, `libreoffice-writer` to the image; the converter needed zero changes). The
+  caveat: Word has no inherent pages, so LibreOffice paginates by layout — a 2-section /
+  ~90-paragraph doc renders to 4 arbitrary pages, each becoming a `Page`, so boundaries
+  can split a section. The parent design's intended **section-based** segmentation (parse
+  Docling-native DOCX heading structure to define `Page` boundaries) is **deferred** —
+  add only if real-Word retrieval quality proves it's needed.
 - Native PPTX structure / speaker notes (we parse the rendered PDF, not the XML).
 - First-class structured table/figure objects (the parent design's deferred "(B)" tier).
 

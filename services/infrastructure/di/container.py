@@ -576,8 +576,12 @@ def create_container() -> Container:
 
     # Artifact Parse Use Cases
     container[ParseArtifactUseCase] = lambda c: ParseArtifactUseCase(
-        # PPTX is converted to PDF first (see office_converter), then parsed as PDF.
-        parsers={MimeType.PDF: c[DoclingParser], MimeType.PPTX: c[DoclingParser]},
+        # PPTX/DOCX are converted to PDF first (see office_converter), then parsed as PDF.
+        parsers={
+            MimeType.PDF: c[DoclingParser],
+            MimeType.PPTX: c[DoclingParser],
+            MimeType.DOCX: c[DoclingParser],
+        },
         blob_store=c[BlobStore],
         artifact_repository=c[ArtifactRepository],
         page_repository=c[PageRepository],

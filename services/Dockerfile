@@ -12,8 +12,8 @@ FROM python:3.12-slim
 
 # System deps: librdkafka for confluent-kafka, poppler for pdf2image, wget for healthcheck,
 # libgl1-mesa-glx + libglib2.0-0 for opencv (required by DECIMER/OCSR),
-# libreoffice-impress for PPTX→PDF conversion (ingestion). ponytail: add
-# libreoffice-writer when DOCX ingestion lands — same converter, Writer filter.
+# libreoffice-impress (PPTX) + libreoffice-writer (DOCX) for Office→PDF conversion
+# (ingestion) — same converter, format-specific LibreOffice filters.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       build-essential \
@@ -23,6 +23,7 @@ RUN apt-get update && \
       libgl1 \
       libglib2.0-0 \
       libreoffice-impress \
+      libreoffice-writer \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
