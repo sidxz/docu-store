@@ -60,13 +60,21 @@ class CreatePageUseCase:
         # Ensure artifact exists before creating a page
         self.artifact_repository.get_by_id(request.artifact_id)
 
+        # Authenticated callers: identity comes from auth ONLY, never the request body —
+        # otherwise a user could set workspace_id/owner_id to create a page in another
+        # tenant (cross-tenant IDOR). The parse activity calls with auth=None and supplies
+        # the parent artifact's workspace/owner explicitly via the request.
+        if auth is not None:
+            workspace_id, owner_id = auth.workspace_id, auth.user_id
+        else:
+            workspace_id, owner_id = request.workspace_id, request.owner_id
+
         page = Page.create(
             name=request.name,
             artifact_id=request.artifact_id,
             index=request.index,
-            # Prefer explicit request values (parse activity has no auth); fall back to auth.
-            workspace_id=request.workspace_id or (auth.workspace_id if auth else None),
-            owner_id=request.owner_id or (auth.user_id if auth else None),
+            workspace_id=workspace_id,
+            owner_id=owner_id,
             page_id=request.page_id,
         )
 

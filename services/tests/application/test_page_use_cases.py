@@ -21,6 +21,7 @@ from domain.value_objects.compound_mention import CompoundMention
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.text_mention import TextMention
+from tests.fakes.fake_auth import FakeAuth
 from tests.mocks import MockArtifactRepository, MockPageRepository
 
 
@@ -69,6 +70,29 @@ class TestCreatePageUseCase:
         assert isinstance(result, Success)
         assert result.unwrap().workspace_id == ws
         assert result.unwrap().owner_id == owner
+
+    @pytest.mark.asyncio
+    async def test_create_page_ignores_request_workspace_when_authed(self, sample_artifact) -> None:
+        """Cross-tenant guard: an authenticated caller cannot set workspace/owner via the
+        request body — identity always comes from auth."""
+        page_repo = MockPageRepository()
+        artifact_repo = MockArtifactRepository()
+        artifact_repo.save(sample_artifact)
+        auth = FakeAuth(role="editor")
+        attacker_ws, attacker_owner = uuid4(), uuid4()
+
+        use_case = CreatePageUseCase(page_repo, artifact_repo)
+        request = CreatePageRequest(
+            name="P", artifact_id=sample_artifact.id, index=0,
+            workspace_id=attacker_ws, owner_id=attacker_owner,
+        )
+
+        result = await use_case.execute(request, auth=auth)
+
+        assert isinstance(result, Success)
+        page = result.unwrap()
+        assert page.workspace_id == auth.workspace_id != attacker_ws
+        assert page.owner_id == auth.user_id != attacker_owner
 
     @pytest.mark.asyncio
     async def test_create_page_artifact_not_found(self) -> None:
