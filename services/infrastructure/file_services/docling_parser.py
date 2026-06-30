@@ -5,7 +5,13 @@ from typing import TYPE_CHECKING
 
 import structlog
 
-from application.dtos.parsed_document import Block, ParsedDocument, ParseResult, RenderedPage
+from application.dtos.parsed_document import (
+    Block,
+    ParsedDocument,
+    ParseResult,
+    RenderedPage,
+    assign_section_paths,
+)
 from application.ports.document_parser import DocumentParser
 
 if TYPE_CHECKING:
@@ -90,6 +96,8 @@ class DoclingParser(DocumentParser):
             if block is not None:
                 blocks.append(block)
 
+        assign_section_paths(blocks)
+
         # dl_doc.pages is dict[int, PageItem] keyed by 1-based page number
         pages: list[RenderedPage] = []
         for page_no in sorted(dl_doc.pages):
@@ -102,7 +110,7 @@ class DoclingParser(DocumentParser):
             pages=pages,
         )
 
-    def _to_block(self, item, dl_doc) -> Block | None:
+    def _to_block(self, item, doc) -> Block | None:
         # item.label is a DocItemLabel enum; .value gives the string
         label_val = getattr(item.label, "value", None) if hasattr(item, "label") else None
         btype = _LABEL_MAP.get(str(label_val), "other")
@@ -114,13 +122,36 @@ class DoclingParser(DocumentParser):
 
         if btype == "table":
             return Block(
-                type="table", rows=self._table_rows(item, dl_doc), source_page_index=page_idx
+                type="table",
+                rows=self._table_rows(item, doc),
+                caption=self._caption(item, doc),
+                source_page_index=page_idx,
+            )
+
+        if btype == "figure":
+            return Block(
+                type="figure",
+                caption=self._caption(item, doc),
+                source_page_index=page_idx,
             )
 
         text = getattr(item, "text", "") or ""
-        if not text and btype not in ("figure",):
+        if not text:
             return None
-        return Block(type=btype, text=text, source_page_index=page_idx)
+        level = getattr(item, "level", None) if btype == "heading" else None
+        return Block(type=btype, text=text, level=level, source_page_index=page_idx)
+
+    def _caption(self, item, doc) -> str | None:
+        """Figure/table caption via Docling's caption_text(doc); None if absent."""
+        fn = getattr(item, "caption_text", None)
+        if fn is None:
+            return None
+        try:
+            cap = fn(doc)
+        except Exception:
+            log.warning("docling_parser.caption_failed", exc_info=True)
+            return None
+        return cap or None
 
     def _table_rows(self, item, dl_doc) -> list[list[str]]:
         try:
