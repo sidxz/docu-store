@@ -12,6 +12,8 @@ from application.dtos.embedding_dtos import (
     SearchResultDTO,
 )
 from application.dtos.errors import AppError
+from application.dtos.parsed_document import Block, ParsedDocument
+from application.ports.blob_store import BlobStore
 from application.ports.embedding_generator import EmbeddingGenerator
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.ports.repositories.artifact_repository import ArtifactRepository
@@ -23,6 +25,7 @@ from application.ports.text_chunker import TextChunker
 from application.ports.vector_store import VectorStore
 from domain.exceptions import AggregateNotFoundError
 from domain.value_objects.embedding_metadata import EmbeddingMetadata, EmbeddingType
+from infrastructure.text_chunkers.block_aware_chunker import chunk_blocks, chunk_payload
 
 logger = structlog.get_logger()
 
@@ -46,6 +49,7 @@ class GeneratePageEmbeddingUseCase:
         text_chunker: TextChunker,
         sparse_embedding_generator: SparseEmbeddingGenerator | None = None,
         artifact_repository: ArtifactRepository | None = None,
+        blob_store: BlobStore | None = None,
     ) -> None:
         self.page_repository = page_repository
         self.embedding_generator = embedding_generator
@@ -53,6 +57,7 @@ class GeneratePageEmbeddingUseCase:
         self.text_chunker = text_chunker
         self.sparse_embedding_generator = sparse_embedding_generator
         self.artifact_repository = artifact_repository
+        self.blob_store = blob_store
 
     @staticmethod
     def _build_chunk_context(
@@ -75,6 +80,19 @@ class GeneratePageEmbeddingUseCase:
         if page_summary:
             parts.append(f"Summary: {page_summary[:200]}")
         return " | ".join(parts) + "\n\n" if parts else ""
+
+    def _load_page_blocks(self, artifact_id: UUID, page_index: int) -> list[Block] | None:
+        if self.blob_store is None:
+            return None
+        key = f"artifacts/{artifact_id}/parsed/document.json"
+        try:
+            if not self.blob_store.exists(key):
+                return None
+            doc = ParsedDocument.model_validate_json(self.blob_store.get_bytes(key))
+        except Exception:
+            logger.warning("embedding.ir_read_failed", artifact_id=str(artifact_id))
+            return None
+        return [b for b in doc.blocks if b.source_page_index == page_index]
 
     async def execute(
         self,
@@ -125,22 +143,45 @@ class GeneratePageEmbeddingUseCase:
                 logger.warning("no_text_content", page_id=str(page_id))
                 return Failure(AppError("validation", msg))
 
-            # 4. Chunk the page text
-            chunks = self.text_chunker.chunk_text(page.text_mention.text)
+            # 4. Chunk — block-aware from the IR blob if available, else char fallback.
+            from infrastructure.config import settings as _settings
+
+            page_blocks = self._load_page_blocks(page.artifact_id, page.index)
+            chunk_metadata: list[dict] | None = None
+            if page_blocks:
+                block_chunks = [
+                    bc
+                    for bc in chunk_blocks(page_blocks, max_chars=_settings.chunk_size)
+                    if bc.text.strip()
+                ]
+                raw_chunk_texts = [bc.text for bc in block_chunks]
+                chunk_metadata = [chunk_payload(bc) for bc in block_chunks]
+                num_chunks = len(raw_chunk_texts)
+            else:
+                chunks = self.text_chunker.chunk_text(page.text_mention.text)
+                raw_chunk_texts = [chunk.text for chunk in chunks]
+                num_chunks = len(chunks)
+
+            if not raw_chunk_texts:
+                # block-aware produced nothing usable → char fallback
+                chunks = self.text_chunker.chunk_text(page.text_mention.text)
+                raw_chunk_texts = [chunk.text for chunk in chunks]
+                chunk_metadata = None
+                num_chunks = len(chunks)
+
             logger.info(
                 "text_chunked",
                 page_id=str(page_id),
-                num_chunks=len(chunks),
+                num_chunks=num_chunks,
+                block_aware=chunk_metadata is not None,
                 text_length=len(page.text_mention.text),
             )
 
             # 5. Build contextual chunk texts for embedding
             #    Raw chunk text is used for sparse (exact-term) and display.
             #    Contextual text (with doc title, tags, summary prefix) is used for dense embedding.
-            raw_chunk_texts = [chunk.text for chunk in chunks]
 
             context_prefix = ""
-            from infrastructure.config import settings as _settings
 
             if self.artifact_repository and _settings.embedding_enable_context_enrichment:
                 artifact_title = None
@@ -213,9 +254,10 @@ class GeneratePageEmbeddingUseCase:
                 artifact_id=page.artifact_id,
                 embeddings=embeddings,
                 page_index=page.index,
-                chunk_count=len(chunks),
+                chunk_count=num_chunks,
                 metadata=upsert_metadata or None,
                 sparse_embeddings=sparse_embeddings,
+                chunk_metadata=chunk_metadata,
             )
 
             # 7. Update domain aggregate with metadata (using first embedding as reference)
@@ -236,7 +278,7 @@ class GeneratePageEmbeddingUseCase:
                 "generate_page_embedding_success",
                 page_id=str(page_id),
                 embedding_id=str(first_embedding.embedding_id),
-                chunk_count=len(chunks),
+                chunk_count=num_chunks,
             )
 
             return Success(

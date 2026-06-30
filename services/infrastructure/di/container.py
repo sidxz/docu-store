@@ -446,6 +446,7 @@ def create_container() -> Container:
         text_chunker=c[TextChunker],
         sparse_embedding_generator=c[SparseEmbeddingGenerator],
         artifact_repository=c[ArtifactRepository],
+        blob_store=c[BlobStore],
     )
 
     container[SearchSimilarPagesUseCase] = lambda c: SearchSimilarPagesUseCase(

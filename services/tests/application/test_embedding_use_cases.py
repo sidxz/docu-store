@@ -8,6 +8,7 @@ import pytest
 from returns.result import Failure, Success
 
 from application.dtos.embedding_dtos import SearchRequest
+from application.dtos.parsed_document import Block, ParsedDocument
 from application.ports.vector_store import PageSearchResult
 from application.use_cases.embedding_use_cases import (
     GeneratePageEmbeddingUseCase,
@@ -303,3 +304,80 @@ class TestSearchSimilarPagesUseCase:
 
         assert isinstance(result, Failure)
         assert result.failure().category == "internal_error"
+
+
+class _IRBlobStore:
+    """Blob store exposing only one IR doc for a given artifact."""
+
+    def __init__(self, artifact_id, blocks):
+        self._key = f"artifacts/{artifact_id}/parsed/document.json"
+        self._doc = ParsedDocument(source_mime="application/pdf", blocks=blocks)
+
+    def exists(self, key):
+        return key == self._key
+
+    def get_bytes(self, key):
+        if key != self._key:
+            raise KeyError(key)
+        return self._doc.model_dump_json().encode()
+
+
+class TestGeneratePageEmbeddingBlockAware:
+    @pytest.mark.asyncio
+    async def test_uses_block_chunks_and_metadata_when_ir_present(self):
+        page = _page_with_text("ignored — IR drives chunking")
+        repo = MockPageRepository()
+        repo.pages[page.id] = page
+        blocks = [
+            Block(
+                type="heading",
+                text="Results",
+                level=1,
+                section_path=[],
+                source_page_index=page.index,
+            ),
+            Block(
+                type="table",
+                rows=[["Cmpd", "IC50"], ["X", "5 nM"]],
+                caption="Table 1",
+                section_path=["Results"],
+                source_page_index=page.index,
+            ),
+        ]
+        blob = _IRBlobStore(page.artifact_id, blocks)
+
+        use_case = GeneratePageEmbeddingUseCase(
+            repo,
+            MockEmbeddingGenerator(),
+            MockVectorStore(),
+            MockTextChunker(),
+            blob_store=blob,
+        )
+        vs = use_case.vector_store
+        result = await use_case.execute(page.id)
+        assert isinstance(result, Success)
+        call = vs.upsert_chunk_calls[-1]
+        cm = call["chunk_metadata"]
+        assert cm is not None
+        # the table chunk carries is_table + section_path
+        assert any(m["is_table"] for m in cm)
+        assert any(m.get("section_path") == ["Results"] for m in cm)
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_char_chunker_when_no_ir(self):
+        page = _page_with_text("A" * 200)
+        repo = MockPageRepository()
+        repo.pages[page.id] = page
+        chunker = MockTextChunker(num_chunks=2)
+
+        use_case = GeneratePageEmbeddingUseCase(
+            repo,
+            MockEmbeddingGenerator(),
+            MockVectorStore(),
+            chunker,
+            blob_store=None,  # no IR
+        )
+        result = await use_case.execute(page.id)
+        assert isinstance(result, Success)
+        assert len(chunker.chunk_calls) == 1  # char chunker WAS used
+        assert use_case.vector_store.upsert_chunk_calls[-1]["chunk_metadata"] is None
