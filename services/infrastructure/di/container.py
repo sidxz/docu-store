@@ -13,6 +13,7 @@ from application.ports.embedding_generator import EmbeddingGenerator
 from application.ports.external_event_publisher import ExternalEventPublisher
 from application.ports.llm_client import LLMClientPort
 from application.ports.ner_extractor import NERExtractorPort
+from application.ports.office_converter import OfficeToPdfConverter
 from application.ports.permission_registrar import PermissionRegistrar
 from application.ports.prompt_repository import PromptRepositoryPort
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
@@ -147,6 +148,7 @@ from infrastructure.event_sourced_repositories.artifact_repository import (
 from infrastructure.event_sourced_repositories.page_repository import EventSourcedPageRepository
 from infrastructure.file_services.docling_parser import DoclingParser
 from infrastructure.file_services.font_title_extractor import FontTitleExtractor
+from infrastructure.file_services.libreoffice_converter import LibreOfficeConverter
 from infrastructure.kafka.kafka_external_event_streamer import KafkaExternalEventPublisher
 from infrastructure.kafka.kafka_publisher import KafkaPublisher
 from infrastructure.llm.factory import (
@@ -320,6 +322,9 @@ def create_container() -> Container:
 
     # Register Docling Parser (document parsing — PDF → structured IR + page images)
     container[DoclingParser] = lambda c: DoclingParser(blob_store=c[BlobStore])
+
+    # Register Office→PDF converter (PPTX/DOCX → PDF, so they reuse the PDF pipeline)
+    container[OfficeToPdfConverter] = lambda c: LibreOfficeConverter(blob_store=c[BlobStore])
 
     # Register CSER Service
     container[CserService] = lambda c: CserPipelineService(blob_store=c[BlobStore])
@@ -571,13 +576,15 @@ def create_container() -> Container:
 
     # Artifact Parse Use Cases
     container[ParseArtifactUseCase] = lambda c: ParseArtifactUseCase(
-        parsers={MimeType.PDF: c[DoclingParser]},
+        # PPTX is converted to PDF first (see office_converter), then parsed as PDF.
+        parsers={MimeType.PDF: c[DoclingParser], MimeType.PPTX: c[DoclingParser]},
         blob_store=c[BlobStore],
         artifact_repository=c[ArtifactRepository],
         page_repository=c[PageRepository],
         create_page_use_case=c[CreatePageUseCase],
         update_text_mention_use_case=c[UpdateTextMentionUseCase],
         add_pages_use_case=c[AddPagesUseCase],
+        office_converter=c[OfficeToPdfConverter],
     )
     container[TriggerArtifactParseUseCase] = lambda c: TriggerArtifactParseUseCase(
         workflow_orchestrator=c[WorkflowOrchestrator],

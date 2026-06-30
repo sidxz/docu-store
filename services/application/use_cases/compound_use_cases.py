@@ -8,6 +8,7 @@ from returns.result import Failure, Result, Success
 
 from application.dtos.errors import AppError
 from application.mappers.page_mappers import PageMapper
+from application.use_cases.storage_keys import render_pdf_key
 from domain.exceptions import AggregateNotFoundError, ConcurrencyError, ValidationError
 
 if TYPE_CHECKING:
@@ -89,7 +90,7 @@ class ExtractCompoundMentionsUseCase:
 
             raw_results: list[CserCompoundResult] = (
                 self.cser_service.extract_compounds_from_pdf_page(
-                    storage_key=artifact.storage_location,
+                    storage_key=render_pdf_key(artifact),
                     page_index=page.index,
                 )
             )

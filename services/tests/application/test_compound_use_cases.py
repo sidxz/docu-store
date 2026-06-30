@@ -22,13 +22,13 @@ from tests.mocks import (
 )
 
 
-def _make_artifact() -> Artifact:
+def _make_artifact(mime=MimeType.PDF, storage="/storage/paper.pdf") -> Artifact:
     return Artifact.create(
         source_uri=None,
         source_filename="paper.pdf",
         artifact_type=ArtifactType.RESEARCH_ARTICLE,
-        mime_type=MimeType.PDF,
-        storage_location="/storage/paper.pdf",
+        mime_type=mime,
+        storage_location=storage,
     )
 
 
@@ -41,8 +41,10 @@ def _make_use_case(
     valid=True,
     canonical="C",
     publisher=None,
+    mime=MimeType.PDF,
+    storage="/storage/paper.pdf",
 ):
-    artifact = _make_artifact()
+    artifact = _make_artifact(mime=mime, storage=storage)
     page = _make_page(artifact.id)
 
     artifact_repo = MockArtifactRepository()
@@ -88,6 +90,15 @@ class TestExtractCompoundMentionsUseCase:
 
         assert cser.extract_calls[0]["storage_key"] == artifact.storage_location
         assert cser.extract_calls[0]["page_index"] == page.index
+
+    @pytest.mark.asyncio
+    async def test_pptx_extracts_from_derived_render_pdf(self) -> None:
+        use_case, page, artifact, _, cser = _make_use_case(
+            mime=MimeType.PPTX, storage="/storage/deck.pptx"
+        )
+        await use_case.execute(page.id)
+
+        assert cser.extract_calls[0]["storage_key"] == f"artifacts/{artifact.id}/derived/render.pdf"
 
     @pytest.mark.asyncio
     async def test_skips_results_without_smiles(self) -> None:

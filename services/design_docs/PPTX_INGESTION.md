@@ -117,8 +117,12 @@ or natively-supported path; the use case converts Office formats to PDF first.**
   `brew install --cask libreoffice` (`/Applications/LibreOffice.app/Contents/MacOS/soffice`).
   Unit tests stub the converter port; the live conversion gets one integration test
   gated on `soffice` presence.
-- **Cleanup.** The artifact-delete path should also remove the derived PDF blob (an
-  extra key under `artifacts/{id}/derived/`).
+- **Cleanup.** The derived PDF (`artifacts/{id}/derived/render.pdf`) is *not* specially
+  deleted on artifact removal — and that's deliberate. The existing delete path only
+  removes the source blob by exact key; page images (`pages/*.png`) and the IR blob
+  (`parsed/document.json`) are already orphaned, and the blob store has no prefix-delete.
+  The derived PDF joins that pre-existing orphan set. Proper fix = prefix cleanup of
+  `artifacts/{id}/` — separate concern, out of scope for this slice.
 
 ## 7. Operational status
 

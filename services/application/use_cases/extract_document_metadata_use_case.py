@@ -10,6 +10,7 @@ import structlog
 from returns.result import Failure, Result, Success
 
 from application.dtos.errors import AppError
+from application.use_cases.storage_keys import render_pdf_key
 from domain.value_objects.author_mention import AuthorMention
 from domain.value_objects.presentation_date import PresentationDate
 from domain.value_objects.title_mention import TitleMention
@@ -137,8 +138,9 @@ class ExtractDocumentMetadataUseCase:
             pages_tried = 0
             first_page_text: str | None = None
 
-            # Load PDF once for font-based title extraction across all pages
-            with self.blob_store.get_file(artifact.storage_location) as pdf_path:
+            # Load PDF once for font-based title extraction across all pages.
+            # render_pdf_key == storage_location for PDFs; the derived PDF for PPTX/DOCX.
+            with self.blob_store.get_file(render_pdf_key(artifact)) as pdf_path:
                 for pid in page_ids_to_try:
                     page = self._load_page(pid)
                     if page is None:

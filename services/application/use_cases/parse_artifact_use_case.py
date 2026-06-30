@@ -10,17 +10,19 @@ from returns.result import Failure, Result, Success
 
 from application.dtos.errors import AppError
 from application.dtos.page_dtos import CreatePageRequest
+from application.use_cases.storage_keys import render_pdf_key
+from domain.value_objects.mime_type import MimeType
 from domain.value_objects.text_mention import TextMention
 from infrastructure.file_services.segmentation import segment_document
 
 if TYPE_CHECKING:
     from application.ports.blob_store import BlobStore
     from application.ports.document_parser import DocumentParser
+    from application.ports.office_converter import OfficeToPdfConverter
     from application.ports.repositories.artifact_repository import ArtifactRepository
     from application.ports.repositories.page_repository import PageRepository
     from application.use_cases.artifact_use_cases import AddPagesUseCase
     from application.use_cases.page_use_cases import CreatePageUseCase, UpdateTextMentionUseCase
-    from domain.value_objects.mime_type import MimeType
 
 log = structlog.get_logger(__name__)
 
@@ -41,6 +43,7 @@ class ParseArtifactUseCase:
         create_page_use_case: CreatePageUseCase,
         update_text_mention_use_case: UpdateTextMentionUseCase,
         add_pages_use_case: AddPagesUseCase,
+        office_converter: OfficeToPdfConverter,
     ) -> None:
         self.parsers = parsers
         self.blob_store = blob_store
@@ -49,6 +52,7 @@ class ParseArtifactUseCase:
         self.create_page = create_page_use_case
         self.update_text_mention = update_text_mention_use_case
         self.add_pages = add_pages_use_case
+        self.office_converter = office_converter
 
     async def execute(self, artifact_id: UUID) -> Result[list[UUID], AppError]:
         artifact = self.artifact_repository.get_by_id(artifact_id)  # sync, no await
@@ -56,7 +60,13 @@ class ParseArtifactUseCase:
         if parser is None:
             return Failure(AppError("validation", f"No parser for MIME type: {artifact.mime_type}"))
 
-        parsed = parser.parse(artifact.storage_location)
+        # Office formats (PPTX, …) are rendered to a derived PDF first, then the one
+        # PDF pipeline takes over. render_key == storage_location for native PDFs.
+        render_key = render_pdf_key(artifact)
+        if artifact.mime_type != MimeType.PDF:
+            self.office_converter.convert_to_pdf(artifact.storage_location, render_key)
+
+        parsed = parser.parse(render_key)
 
         # Persist page images (same keys chat already uses).
         for page in parsed.pages:

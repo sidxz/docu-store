@@ -10,6 +10,10 @@ from application.ports.blob_store import BlobStore, StoredBlob
 from domain.exceptions import ValidationError
 from domain.value_objects.mime_type import MimeType
 
+# ponytail: mirrors the parser registry in di/container.py. Office formats are
+# converted to PDF in the async parse workflow; add here as parsers land.
+SUPPORTED_UPLOAD_MIME_TYPES = frozenset({MimeType.PDF.value, MimeType.PPTX.value})
+
 
 class UploadBlobUseCase:
     """Upload a blob and store it."""
@@ -26,8 +30,8 @@ class UploadBlobUseCase:
         cmd: UploadBlobRequest,
     ) -> Result[UploadBlobResponse, AppError]:
         try:
-            # Check MIME type is supported for artifact creation Only PDFs for now
-            if cmd.mime_type != MimeType.PDF.value:
+            # Check MIME type is supported for artifact creation
+            if cmd.mime_type not in SUPPORTED_UPLOAD_MIME_TYPES:
                 return Failure(
                     AppError(
                         "validation",
