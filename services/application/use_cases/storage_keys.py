@@ -19,4 +19,6 @@ def render_pdf_key(artifact: Artifact) -> str:
     """
     if artifact.mime_type == MimeType.PDF:
         return artifact.storage_location
-    return f"artifacts/{artifact.id}/derived/render.pdf"
+    # Domain aggregate exposes .id; the read-model / API DTO exposes .artifact_id.
+    artifact_id = getattr(artifact, "id", None) or artifact.artifact_id
+    return f"artifacts/{artifact_id}/derived/render.pdf"

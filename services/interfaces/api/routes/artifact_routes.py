@@ -1,5 +1,6 @@
 from collections.abc import Container
 from io import BytesIO
+from pathlib import PurePosixPath
 from typing import Annotated
 from uuid import UUID
 
@@ -38,6 +39,7 @@ from application.use_cases.artifact_use_cases import (
 from application.use_cases.artifact_use_cases import (
     UpdateTagMentionsUseCase as UpdateArtifactTagMentionsUseCase,
 )
+from application.use_cases.storage_keys import render_pdf_key
 from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention
@@ -376,24 +378,27 @@ async def stream_artifact_pdf(
     container: Annotated[Container, Depends(get_container)],
     auth: Annotated[RequestAuth, Depends(get_auth)],
 ) -> StreamingResponse:
-    """Stream the source PDF for an artifact.
+    """Stream the PDF rendition of an artifact for in-browser viewing.
 
-    Returns the raw PDF binary from blob storage. The artifact must exist
-    and have a valid storage_location.
+    For native PDFs this is the source blob; for converted Office formats
+    (PPTX/DOCX) it is the derived PDF produced during parsing.
     """
     artifact = await require_workspace_artifact(artifact_id, auth, container)
     await require_artifact_permission(artifact_id, auth, "view")
 
     blob_store = container[BlobStore]
+    pdf_key = render_pdf_key(artifact)
 
-    if not blob_store.exists(artifact.storage_location):
+    if not blob_store.exists(pdf_key):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="PDF file not found in storage",
         )
 
-    pdf_bytes = blob_store.get_bytes(artifact.storage_location)
-    filename = artifact.source_filename or f"{artifact_id}.pdf"
+    pdf_bytes = blob_store.get_bytes(pdf_key)
+    # Always a PDF here — name it .pdf even when the source was .pptx/.docx.
+    stem = PurePosixPath(artifact.source_filename).stem if artifact.source_filename else str(artifact_id)
+    filename = f"{stem}.pdf"
 
     return StreamingResponse(
         BytesIO(pdf_bytes),

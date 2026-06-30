@@ -13,6 +13,7 @@ from sentinel_auth.authz_middleware import AuthzMiddleware
 from application.dtos.artifact_dtos import ArtifactResponse, CreateArtifactRequest
 from application.dtos.errors import AppError
 from application.dtos.page_dtos import AddCompoundMentionsRequest, CreatePageRequest, PageResponse
+from application.ports.blob_store import BlobStore
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.ports.repositories.page_read_models import PageReadModel
 from application.use_cases.artifact_use_cases import (
@@ -168,6 +169,45 @@ class TestArtifactRoutes:
         data = response.json()
         assert len(data) == 1
         assert data[0]["artifact_id"] == str(artifact_id)
+
+    def test_stream_pdf_serves_derived_render_for_pptx(self, make_client) -> None:
+        artifact_id = uuid4()
+        read_model = FakeArtifactReadModel(
+            {
+                artifact_id: ArtifactResponse(
+                    artifact_id=artifact_id,
+                    source_filename="deck.pptx",
+                    artifact_type=ArtifactType.RESEARCH_ARTICLE,
+                    mime_type=MimeType.PPTX,
+                    storage_location=f"artifacts/{artifact_id}/source.pptx",
+                    workspace_id=None,
+                ),
+            },
+        )
+
+        class RecordingBlob:
+            def __init__(self) -> None:
+                self.exists_keys: list[str] = []
+                self.get_keys: list[str] = []
+
+            def exists(self, key: str) -> bool:
+                self.exists_keys.append(key)
+                return True
+
+            def get_bytes(self, key: str) -> bytes:
+                self.get_keys.append(key)
+                return b"%PDF-1.4 fake"
+
+        blob = RecordingBlob()
+        client = make_client({ArtifactReadModel: read_model, BlobStore: blob})
+
+        response = client.get(f"/artifacts/{artifact_id}/pdf")
+
+        assert response.status_code == 200
+        derived = f"artifacts/{artifact_id}/derived/render.pdf"
+        # Serves the converted PDF, never the raw .pptx.
+        assert blob.get_keys == [derived]
+        assert all("source.pptx" not in k for k in blob.exists_keys)
 
     def test_update_title_mention_validation_error(self, make_client) -> None:
         artifact_id = uuid4()
