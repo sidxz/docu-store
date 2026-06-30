@@ -64,8 +64,9 @@ class CreatePageUseCase:
             name=request.name,
             artifact_id=request.artifact_id,
             index=request.index,
-            workspace_id=auth.workspace_id if auth else None,
-            owner_id=auth.user_id if auth else None,
+            # Prefer explicit request values (parse activity has no auth); fall back to auth.
+            workspace_id=request.workspace_id or (auth.workspace_id if auth else None),
+            owner_id=request.owner_id or (auth.user_id if auth else None),
             page_id=request.page_id,
         )
 

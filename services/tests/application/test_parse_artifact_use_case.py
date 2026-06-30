@@ -110,6 +110,32 @@ async def test_parse_pptx_converts_source_then_parses_render_key():
 
 
 @pytest.mark.asyncio
+async def test_parse_propagates_artifact_workspace_and_owner_to_pages():
+    from domain.aggregates.artifact import Artifact
+
+    page_repo, artifact_repo, blob = MockPageRepository(), MockArtifactRepository(), FakeBlobStore()
+    ws, owner = uuid4(), uuid4()
+    artifact = Artifact.create(
+        source_uri=None,
+        source_filename="p.pdf",
+        artifact_type=ArtifactType.RESEARCH_ARTICLE,
+        mime_type=MimeType.PDF,
+        storage_location="artifacts/x/source.pdf",
+        workspace_id=ws,
+        owner_id=owner,
+    )
+    artifact_repo.save(artifact)
+    uc = _build_uc({MimeType.PDF: FakeParser()}, blob, page_repo, artifact_repo)
+
+    result = await uc.execute(artifact.id)
+
+    assert isinstance(result, Success)
+    saved = page_repo.get_by_id(page_id_for(artifact.id, 0))
+    assert saved.workspace_id == ws
+    assert saved.owner_id == owner
+
+
+@pytest.mark.asyncio
 async def test_parse_pdf_does_not_convert_and_parses_source():
     page_repo, artifact_repo, blob = MockPageRepository(), MockArtifactRepository(), FakeBlobStore()
     artifact_id = await _make_artifact(artifact_repo)  # PDF default

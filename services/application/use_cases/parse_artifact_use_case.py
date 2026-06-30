@@ -102,6 +102,10 @@ class ParseArtifactUseCase:
                     artifact_id=artifact_id,
                     index=seg.index,
                     page_id=pid,
+                    # No request auth in the parse activity — carry workspace/owner
+                    # from the artifact so page embeddings are workspace-scoped.
+                    workspace_id=artifact.workspace_id,
+                    owner_id=artifact.owner_id,
                 ),
             )
 

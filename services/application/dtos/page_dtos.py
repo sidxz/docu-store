@@ -13,6 +13,10 @@ class CreatePageRequest(BaseModel):
     artifact_id: UUID
     index: int = 0
     page_id: UUID | None = None
+    # Set by callers without a request auth (e.g. the parse activity) to propagate
+    # the parent artifact's workspace/owner onto the page.
+    workspace_id: UUID | None = None
+    owner_id: UUID | None = None
 
 
 class AddCompoundMentionsRequest(BaseModel):

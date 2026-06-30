@@ -51,6 +51,26 @@ class TestCreatePageUseCase:
         assert artifact_repo.save_called is True
 
     @pytest.mark.asyncio
+    async def test_create_page_uses_request_workspace_when_no_auth(self, sample_artifact) -> None:
+        """Parse runs in a Temporal activity with no auth — workspace/owner must come
+        from the request (propagated from the artifact)."""
+        page_repo = MockPageRepository()
+        artifact_repo = MockArtifactRepository()
+        artifact_repo.save(sample_artifact)
+        ws, owner = uuid4(), uuid4()
+
+        use_case = CreatePageUseCase(page_repo, artifact_repo)
+        request = CreatePageRequest(
+            name="P", artifact_id=sample_artifact.id, index=0, workspace_id=ws, owner_id=owner,
+        )
+
+        result = await use_case.execute(request)  # no auth
+
+        assert isinstance(result, Success)
+        assert result.unwrap().workspace_id == ws
+        assert result.unwrap().owner_id == owner
+
+    @pytest.mark.asyncio
     async def test_create_page_artifact_not_found(self) -> None:
         """Test creating a page when artifact doesn't exist."""
         page_repo = MockPageRepository()
