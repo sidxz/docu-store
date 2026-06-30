@@ -1,7 +1,41 @@
 from application.dtos.parsed_document import Block
 from infrastructure.text_chunkers.block_aware_chunker import (
-    BlockChunk, chunk_blocks, chunk_payload,
+    BlockChunk, chunk_blocks, chunk_payload, scope_table_entities,
 )
+
+
+def test_scope_keeps_local_entity_drops_remote():
+    candidates = [("PptT", "target"), ("Rho", "target"), ("CmpdX", "compound_name")]
+    local = "| Cmpd | IC50 |\n| CmpdX | 5 nM |\n\n*Table 1. PptT inhibition*"
+    out = scope_table_entities(candidates, local)
+    assert out["tag_normalized"] == ["pptt", "cmpdx"]   # PptT (caption) + CmpdX (cell)
+    assert "rho" not in out["tag_normalized"]            # Rho not in the table's own text
+    assert out["entity_types"] == ["compound_name", "target"]
+
+
+def test_scope_word_boundary_not_substring():
+    out = scope_table_entities([("Rho", "target")], "rhodamine staining only")
+    assert out["tag_normalized"] == []                   # 'rho' must not match 'rhodamine'
+
+
+def test_scope_section_heading_contributes():
+    # local_text = table markdown + " " + " ".join(section_path)
+    local = "| Cmpd | IC50 |\n| CmpdX | 5 nM | Rho inhibitors"
+    out = scope_table_entities([("Rho", "target")], local)
+    assert out["tag_normalized"] == ["rho"]
+
+
+def test_scope_empty_when_no_local_match():
+    out = scope_table_entities(
+        [("PptT", "target"), ("Rho", "target")],
+        "| Cmpd | IC50 |\n| CmpdX | 5 nM |",
+    )
+    assert out == {"tags": [], "tag_normalized": [], "entity_types": []}
+
+
+def test_scope_ignores_blank_candidate():
+    out = scope_table_entities([("", "target")], "anything here")
+    assert out["tag_normalized"] == []                   # blank tag never matches
 
 
 def test_chunk_payload_shape():

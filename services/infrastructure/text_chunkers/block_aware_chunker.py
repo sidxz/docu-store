@@ -4,6 +4,7 @@ char split only for a single oversized block.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from application.dtos.parsed_document import Block, _table_to_markdown, linearize_blocks
@@ -123,3 +124,39 @@ def chunk_payload(c: BlockChunk) -> dict:
     if c.caption:
         payload["caption"] = c.caption
     return payload
+
+
+def scope_table_entities(
+    candidates: list[tuple[str, str | None]],
+    local_text: str,
+) -> dict:
+    """Scope a table chunk's entity tags to entities that actually appear in the
+    table's own local text (caption / section / headers / cells), instead of the
+    page-wide NER union. A candidate is kept only if its surface form occurs in
+    local_text on a word boundary (case-insensitive) — so 'rho' does not match
+    'rhodamine'. Returns {tags, tag_normalized, entity_types}; empty lists when
+    nothing matches (precision over recall: a wrong target tag pollutes chat, a
+    missing one degrades to doc-level + vector match). Pure: no IO, no models.
+    """
+    low = local_text.lower()
+    tags: list[str] = []
+    tag_normalized: list[str] = []
+    entity_types: set[str] = set()
+    seen: set[str] = set()
+    for tag, entity_type in candidates:
+        norm = tag.lower()
+        if not norm:
+            continue
+        if not re.search(r"\b" + re.escape(norm) + r"\b", low):
+            continue
+        if norm not in seen:
+            seen.add(norm)
+            tags.append(tag)
+            tag_normalized.append(norm)
+        if entity_type:
+            entity_types.add(entity_type)
+    return {
+        "tags": tags,
+        "tag_normalized": tag_normalized,
+        "entity_types": sorted(entity_types),
+    }
