@@ -8,7 +8,7 @@ import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from infrastructure.auth import sentinel
+from infrastructure.auth import register_service_actions, sentinel
 from infrastructure.config import settings
 from infrastructure.logging import setup_logging
 from interfaces.api.routes.artifact_routes import router as artifact_router
@@ -34,6 +34,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Handle application startup and shutdown."""
     async with sentinel.lifespan(app):
         logger.info("app_starting", env=settings.app_env)
+
+        # Register RBAC action definitions best-effort — never block boot if
+        # Sentinel is slow/down (the SDK ctor-actions path would be fatal).
+        await register_service_actions(sentinel)
 
         # Initialize Qdrant collections on startup
         try:
