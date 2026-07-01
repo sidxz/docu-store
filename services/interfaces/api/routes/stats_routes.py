@@ -154,6 +154,7 @@ async def get_pipeline_stats(
     artifacts = db[settings.mongo_artifacts_collection]
 
     pipeline = [
+        {"$match": {"workspace_id": str(auth.workspace_id)}},
         {
             "$group": {
                 "_id": None,
@@ -245,7 +246,7 @@ async def get_pipeline_stats(
         pages_with_compounds = 0
         pages_with_tags = 0
 
-    total_artifacts = await artifacts.count_documents({})
+    total_artifacts = await artifacts.count_documents({"workspace_id": str(auth.workspace_id)})
 
     logger.info(
         "pipeline_stats_collected",

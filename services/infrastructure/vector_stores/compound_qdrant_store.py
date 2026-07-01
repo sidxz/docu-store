@@ -251,6 +251,10 @@ class CompoundQdrantStore(CompoundVectorStore):
         workspace_id: UUID | None = None,
     ) -> list[CompoundSearchResult]:
         """Find compounds by SMILES structural similarity."""
+        if workspace_id is None:
+            # Fail closed: a tenant-scoped search must never run unfiltered.
+            msg = "workspace_id is required for tenant-scoped compound search"
+            raise ValueError(msg)
         client = await self._get_client()
 
         must_conditions = []
@@ -268,13 +272,12 @@ class CompoundQdrantStore(CompoundVectorStore):
                     match=models.MatchAny(any=[str(aid) for aid in allowed_artifact_ids]),
                 ),
             )
-        if workspace_id:
-            must_conditions.append(
-                models.FieldCondition(
-                    key="workspace_id",
-                    match=models.MatchValue(value=str(workspace_id)),
-                ),
-            )
+        must_conditions.append(
+            models.FieldCondition(
+                key="workspace_id",
+                match=models.MatchValue(value=str(workspace_id)),
+            ),
+        )
         query_filter = models.Filter(must=must_conditions) if must_conditions else None
 
         try:
@@ -326,6 +329,10 @@ class CompoundQdrantStore(CompoundVectorStore):
         Returns results with vectors stashed in metadata['_vector'] for
         subsequent similarity search without re-embedding.
         """
+        if workspace_id is None:
+            # Fail closed: a tenant-scoped lookup must never run unfiltered.
+            msg = "workspace_id is required for tenant-scoped compound lookup"
+            raise ValueError(msg)
         client = await self._get_client()
 
         # Generate normalised variants to handle common mismatches:
@@ -338,13 +345,12 @@ class CompoundQdrantStore(CompoundVectorStore):
                 match=models.MatchAny(any=variants),
             ),
         ]
-        if workspace_id:
-            must_conditions.append(
-                models.FieldCondition(
-                    key="workspace_id",
-                    match=models.MatchValue(value=str(workspace_id)),
-                ),
-            )
+        must_conditions.append(
+            models.FieldCondition(
+                key="workspace_id",
+                match=models.MatchValue(value=str(workspace_id)),
+            ),
+        )
         if allowed_artifact_ids is not None:
             must_conditions.append(
                 models.FieldCondition(

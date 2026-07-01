@@ -430,6 +430,10 @@ class QdrantStore(VectorStore):
         is_figure: bool | None = None,
     ) -> models.Filter | None:
         """Build a combined Qdrant filter from all filter parameters."""
+        if workspace_id is None:
+            # Fail closed: a tenant-scoped search must never run unfiltered.
+            msg = "workspace_id is required for tenant-scoped page search"
+            raise ValueError(msg)
         must_conditions: list[models.Condition] = []
         if artifact_id_filter:
             must_conditions.append(
@@ -445,13 +449,12 @@ class QdrantStore(VectorStore):
                     match=models.MatchAny(any=[str(aid) for aid in allowed_artifact_ids]),
                 ),
             )
-        if workspace_id:
-            must_conditions.append(
-                models.FieldCondition(
-                    key="workspace_id",
-                    match=models.MatchValue(value=str(workspace_id)),
-                ),
-            )
+        must_conditions.append(
+            models.FieldCondition(
+                key="workspace_id",
+                match=models.MatchValue(value=str(workspace_id)),
+            ),
+        )
         must_conditions.extend(self._build_tag_conditions(tags, entity_types, tag_match_mode))
         if block_types:
             must_conditions.append(

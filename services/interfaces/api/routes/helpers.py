@@ -73,10 +73,10 @@ async def require_workspace_artifact(
 ) -> ArtifactResponse:
     """Load artifact from read model, raise 404 if missing or wrong workspace."""
     repo = container[ArtifactReadModel]
-    artifact = await repo.get_artifact_by_id(artifact_id)
-    if artifact is None or (
-        artifact.workspace_id is not None and artifact.workspace_id != auth.workspace_id
-    ):
+    # Scope the query itself: a doc in another workspace (or with no workspace_id)
+    # simply won't match, so it can't leak by knowing the id.
+    artifact = await repo.get_artifact_by_id(artifact_id, workspace_id=auth.workspace_id)
+    if artifact is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found")
     return artifact
 
@@ -111,7 +111,7 @@ async def require_workspace_page(
 ) -> PageResponse:
     """Load page from read model, raise 404 if missing or wrong workspace."""
     repo = container[PageReadModel]
-    page = await repo.get_page_by_id(page_id)
-    if page is None or (page.workspace_id is not None and page.workspace_id != auth.workspace_id):
+    page = await repo.get_page_by_id(page_id, workspace_id=auth.workspace_id)
+    if page is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
     return page

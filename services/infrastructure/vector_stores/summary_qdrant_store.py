@@ -307,6 +307,10 @@ class SummaryQdrantStore(SummaryVectorStore):
         entity_types: list[str] | None = None,
         tag_match_mode: Literal["any", "all", "page_any"] = "any",
     ) -> list[SummarySearchResult]:
+        if workspace_id is None:
+            # Fail closed: a tenant-scoped search must never run unfiltered.
+            msg = "workspace_id is required for tenant-scoped summary search"
+            raise ValueError(msg)
         client = await self._get_client()
 
         # Build filter conditions
@@ -332,13 +336,12 @@ class SummaryQdrantStore(SummaryVectorStore):
                     match=models.MatchAny(any=[str(aid) for aid in allowed_artifact_ids]),
                 ),
             )
-        if workspace_id:
-            must_conditions.append(
-                models.FieldCondition(
-                    key="workspace_id",
-                    match=models.MatchValue(value=str(workspace_id)),
-                ),
-            )
+        must_conditions.append(
+            models.FieldCondition(
+                key="workspace_id",
+                match=models.MatchValue(value=str(workspace_id)),
+            ),
+        )
         must_conditions.extend(self._build_tag_conditions(tags, entity_types, tag_match_mode))
 
         query_filter = models.Filter(must=must_conditions) if must_conditions else None
