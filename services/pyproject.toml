@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "sentinel-auth-sdk>=0.14.0",
+    "sentinel-auth-sdk>=0.14.1",
     "confluent-kafka>=2.13.0",
     "dateparser>=1.2.0",
     "eventsourcing>=9.5.2",

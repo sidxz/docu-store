@@ -961,7 +961,7 @@ wheels = [
 
 [[package]]
 name = "docu-store"
-version = "0.4.0"
+version = "0.4.1"
 source = { virtual = "." }
 dependencies = [
     { name = "confluent-kafka" },
@@ -1052,7 +1052,7 @@ requires-dist = [
     { name = "rdkit", specifier = ">=2025.9.5" },
     { name = "returns", specifier = ">=0.26.0" },
     { name = "sentence-transformers", specifier = ">=3.3.0" },
-    { name = "sentinel-auth-sdk", specifier = ">=0.14.0" },
+    { name = "sentinel-auth-sdk", specifier = ">=0.14.1" },
     { name = "structflo-cser", specifier = ">=0.4.1" },
     { name = "structflo-ner", specifier = ">=0.3.0" },
     { name = "structlog", specifier = ">=25.5.0" },
@@ -5340,7 +5340,7 @@ wheels = [
 
 [[package]]
 name = "sentinel-auth-sdk"
-version = "0.14.0"
+version = "0.14.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cryptography" },
@@ -5350,9 +5350,9 @@ dependencies = [
     { name = "pyjwt", extra = ["crypto"] },
     { name = "starlette" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/84/eb/8d290e509f5f77f9733b499e1df9731bc0e56f87e70e72ed5852fb73f26c/sentinel_auth_sdk-0.14.0.tar.gz", hash = "sha256:64e0317b2408546abd2c8a731a39347dc27a4b3bfc6203bae6004cdc365304ce", size = 29937, upload-time = "2026-06-29T14:13:54.729Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cd/d7/c589857540f351e9091f2d251238ee13e0f7dc6c487c3549da28fc240eab/sentinel_auth_sdk-0.14.1.tar.gz", hash = "sha256:ea243504c9eec76b4b89ffb0bf5dcf6f43c55c9ec712cd5a250974d2bbc8ad67", size = 30158, upload-time = "2026-06-30T16:30:56.124Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d1/74/5148ed24ba3fd7777136160d6e3d9995e9db72fe72cf5e68a6798df703d6/sentinel_auth_sdk-0.14.0-py3-none-any.whl", hash = "sha256:3a97b5b9359ceda190e59936d4595b352366e3227308d065a10e78f2a6b063f6", size = 24544, upload-time = "2026-06-29T14:13:53.495Z" },
+    { url = "https://files.pythonhosted.org/packages/f4/9f/357b5750c5a5f41c64072ee959a9a64bde2340e39d7df15c9ffcd1f36cb9/sentinel_auth_sdk-0.14.1-py3-none-any.whl", hash = "sha256:db43cb382ed2cc261af3df7d967ca24e4512c439bf708b8173d994278560c2de", size = 24611, upload-time = "2026-06-30T16:30:54.936Z" },
 ]
 
 [[package]]
