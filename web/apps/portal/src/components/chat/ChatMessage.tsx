@@ -86,7 +86,11 @@ export function ChatMessage({ message, workspace, isStreaming, onFeedback }: Cha
 
         {/* Model reasoning disclosure (assistant only) */}
         {!isUser && message.agent_trace?.reasoning_content && (
-          <ReasoningDisclosure reasoning={message.agent_trace.reasoning_content} isStreaming={isStreaming} />
+          <ReasoningDisclosure
+            reasoning={message.agent_trace.reasoning_content}
+            isStreaming={isStreaming}
+            steps={message.agent_trace.steps}
+          />
         )}
 
         {/* Message body */}
