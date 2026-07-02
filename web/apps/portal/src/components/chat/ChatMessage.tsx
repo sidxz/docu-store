@@ -8,6 +8,7 @@ import { useChatStore } from "@/lib/stores/chat-store";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { Loader } from "@/components/ai-elements/loader";
 import { Shimmer } from "@/components/ai-elements/shimmer";
+import { Message, MessageContent, MessageActions, MessageAction } from "@/components/ai-elements/message";
 import { AgentThinkingPanel } from "./AgentThinkingPanel";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { ReasoningDisclosure } from "./ReasoningDisclosure";
@@ -46,9 +47,19 @@ export function ChatMessage({ message, workspace, isStreaming, onFeedback }: Cha
     setTimeout(() => setCopied(false), 2000);
   }, [message.content, message.message_id, trackEvent]);
 
+  // Bubble chrome per role, expressed with the SAME group-scoped modifiers
+  // MessageContent's own defaults use (group-[.is-user]:/group-[.is-assistant]:)
+  // so these overrides dedupe cleanly against them instead of racing on
+  // cascade order. ponytail: keeps this a plain string instead of a cn() call
+  // — nothing here conflicts within a single role.
+  const bubbleClassName = isUser
+    ? "group-[.is-user]:rounded-xl group-[.is-user]:rounded-tr-sm group-[.is-user]:bg-primary group-[.is-user]:text-text-inverse"
+    : "group-[.is-assistant]:w-full group-[.is-assistant]:max-w-full group-[.is-assistant]:rounded-xl group-[.is-assistant]:rounded-tl-sm group-[.is-assistant]:border group-[.is-assistant]:border-border-subtle group-[.is-assistant]:bg-surface-elevated group-[.is-assistant]:px-4 group-[.is-assistant]:py-3 group-[.is-assistant]:text-text-primary";
+
   return (
     <div className={`group/msg flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}>
-      {/* Avatar */}
+      {/* Avatar — no MessageAvatar export exists in the vendored AI Elements
+          set (registry drift, see task-2-report.md), so this stays custom. */}
       <div
         className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
           isUser
@@ -60,7 +71,11 @@ export function ChatMessage({ message, workspace, isStreaming, onFeedback }: Cha
       </div>
 
       {/* Content */}
-      <div className={`flex-1 min-w-0 ${isUser ? "text-right" : ""}`}>
+      {/* gap-0: siblings below already carry their own mt-* spacing (and
+          AgentThinkingPanel/ReasoningDisclosure their own mb-2), so Message's
+          default gap-2 would double up. max-w-full overrides Message's
+          default max-w-[95%] to match the original's unconstrained column. */}
+      <Message from={message.role} className="flex-1 min-w-0 max-w-full gap-0">
         {/* Agent thinking panel (assistant only) */}
         {!isUser && message.agent_trace && (
           <AgentThinkingPanel
@@ -75,15 +90,9 @@ export function ChatMessage({ message, workspace, isStreaming, onFeedback }: Cha
         )}
 
         {/* Message body */}
-        <div
-          className={`rounded-xl px-4 py-3 max-w-full ${
-            isUser
-              ? "inline-block bg-primary text-text-inverse rounded-tr-sm"
-              : "bg-surface-elevated text-text-primary rounded-tl-sm border border-border-subtle"
-          }`}
-        >
+        <MessageContent className={bubbleClassName}>
           {isUser ? (
-            <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+            <p className="whitespace-pre-wrap text-right text-sm">{message.content}</p>
           ) : (
             <>
               {/* Grounding indicator — top-right of the reply */}
@@ -108,44 +117,48 @@ export function ChatMessage({ message, workspace, isStreaming, onFeedback }: Cha
               )}
             </>
           )}
-        </div>
+        </MessageContent>
 
         {/* Action bar: feedback + copy (assistant messages, not streaming) */}
         {!isUser && !isStreaming && message.content && onFeedback && (
-          <div className="flex items-center gap-1 mt-1.5 opacity-0 group-hover/msg:opacity-100 transition-opacity">
-            <button
-              type="button"
+          <MessageActions className="mt-1.5 opacity-0 transition-opacity group-hover/msg:opacity-100">
+            <MessageAction
+              label="Thumbs up"
               onClick={() => handleFeedback("positive")}
               disabled={feedbackGiven != null}
-              className={`p-1 rounded hover:bg-surface-hover transition-colors ${feedbackGiven === "positive" ? "text-ds-success" : "text-text-muted"}`}
-              aria-label="Thumbs up"
+              className={`hover:bg-surface-hover ${feedbackGiven === "positive" ? "text-ds-success" : "text-text-muted"}`}
             >
-              <ThumbsUp className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
+              <ThumbsUp className="size-3.5" />
+            </MessageAction>
+            <MessageAction
+              label="Thumbs down"
               onClick={() => handleFeedback("negative")}
               disabled={feedbackGiven != null}
-              className={`p-1 rounded hover:bg-surface-hover transition-colors ${feedbackGiven === "negative" ? "text-ds-error" : "text-text-muted"}`}
-              aria-label="Thumbs down"
+              className={`hover:bg-surface-hover ${feedbackGiven === "negative" ? "text-ds-error" : "text-text-muted"}`}
             >
-              <ThumbsDown className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
+              <ThumbsDown className="size-3.5" />
+            </MessageAction>
+            <MessageAction
+              label="Copy answer"
               onClick={handleCopy}
-              className="p-1 rounded hover:bg-surface-hover transition-colors text-text-muted"
-              aria-label="Copy answer"
+              className="hover:bg-surface-hover text-text-muted"
             >
-              {copied ? <Check className="w-3.5 h-3.5 text-ds-success" /> : <Copy className="w-3.5 h-3.5" />}
-            </button>
-          </div>
+              {copied ? <Check className="size-3.5 text-ds-success" /> : <Copy className="size-3.5" />}
+            </MessageAction>
+          </MessageActions>
         )}
 
-        {/* Token usage — per-message, persisted (visible to all, not just dev) */}
+        {/* Token usage — per-message, persisted (visible to all, not just dev).
+            Not AI Elements <Context>: Context requires maxTokens (a model
+            context-window budget) plus an ai-SDK-shaped LanguageModelUsage
+            object with a modelId for tokenlens cost lookups. docu-store's
+            TokenUsage is just { prompt, completion, total } — no window
+            budget, no per-message model id — so there's no real
+            usedTokens/maxTokens ratio or cost to render. Kept custom,
+            restyled font-mono/tabular-nums. */}
         {!isUser && !isStreaming && message.token_usage && (
           <div
-            className="mt-1 text-[11px] text-text-muted tabular-nums"
+            className="mt-1 font-mono text-[11px] text-text-muted tabular-nums"
             title={`${message.token_usage.prompt.toLocaleString()} prompt + ${message.token_usage.completion.toLocaleString()} completion`}
           >
             {message.token_usage.total.toLocaleString()} tokens
@@ -179,7 +192,7 @@ export function ChatMessage({ message, workspace, isStreaming, onFeedback }: Cha
             </div>
           </div>
         )}
-      </div>
+      </Message>
     </div>
   );
 }
