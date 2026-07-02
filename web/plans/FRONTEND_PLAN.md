@@ -33,18 +33,19 @@
 
 | Concern            | Choice                        | Notes                                      |
 |--------------------|-------------------------------|--------------------------------------------|
-| Component library  | PrimeReact                    | 10.x, Styled mode, Lara Light Blue theme (v11 is alpha — avoid) |
+| Component library  | shadcn/ui + AI Elements       | new-york style, vendored source in `src/components/ui/` and `src/components/ai-elements/` (not an npm dependency) |
 | CSS utilities      | Tailwind CSS                  | 4.x — CSS-first config (`@theme`), no `tailwind.config.ts` |
-| Icons              | PrimeIcons + Lucide React     | PrimeIcons for PrimeReact, Lucide for custom |
+| Icons              | Lucide React                  | Sole icon set (PrimeIcons removed) |
 
-> **Critical: PrimeReact + Tailwind CSS layer ordering.**
-> Tailwind's preflight will break PrimeReact styled components unless CSS layers are configured correctly.
-> In global CSS, import PrimeReact theme with a layer and define ordering:
-> ```css
-> @layer theme, base, primereact, components, utilities;
-> @import 'primereact/resources/themes/lara-light-blue/theme.css' layer(primereact);
-> ```
-> This ensures Tailwind utilities can override PrimeReact styles without `!important`.
+> **Note:** The frontend originally shipped on PrimeReact (Styled mode, Lara Light Blue theme)
+> and was fully migrated to shadcn/ui + AI Elements in 2026-07 (branch `ai-elements`). See
+> `web/plans/2026-07-01-shadcn-ai-elements-migration-design.md` for the rationale and
+> `web/plans/2026-07-01-shadcn-ai-elements-migration-plan.md` for the task-by-task record.
+>
+> shadcn semantic tokens are defined as CSS variables in `globals.css`, layered onto the
+> existing `--ds-*` design-token system, for both light and `[data-theme="dark"]`. No CSS
+> `@layer` juggling against a third-party component stylesheet is needed — shadcn components
+> are unstyled Radix primitives styled entirely with Tailwind utility classes.
 
 ### State & Data
 
@@ -81,7 +82,7 @@
 |--------------------|-------------------------------|--------------------------------------------|
 | PDF viewer         | react-pdf (PDF.js)            | 10.x — artifact page viewing               |
 | Molecular / SMILES | @rdkit/rdkit (WASM)           | Compound mention rendering, lazy-loaded (~10MB WASM) |
-| Charts             | Chart.js via PrimeReact       | Built into PrimeReact (no extra dep)       |
+| Charts             | recharts                      | Used for stats/scoring visualizations      |
 
 ### Chat / RAG
 
@@ -138,7 +139,7 @@ docu-store/
 - Never manually edit `schema.d.ts` — it is always regenerated
 
 #### `packages/ui`
-- Reusable, composable components built on PrimeReact
+- Reusable, composable components (molecule/chemistry rendering — RDKit/Ketcher); app-level shadcn/ui components live in `apps/portal`, not here
 - Examples: `DocumentCard`, `PageViewer`, `MoleculeRenderer`, `SearchResultCard`, `WorkflowStatusBadge`, `ChatWindow`
 - These are the components exported to DAIKON
 - Has its own Storybook (future) for documentation
@@ -158,7 +159,7 @@ docu-store/
 
 ```
 apps/portal/src/app/
-├── layout.tsx                         # Root layout (TanStack Query, PrimeReact, Auth providers)
+├── layout.tsx                         # Root layout (TanStack Query, shadcn/ui providers, Auth providers)
 ├── page.tsx                           # Root → redirect to /default or /login
 ├── (auth)/                            # Auth route group (no workspace prefix)
 │   ├── login/
@@ -216,7 +217,7 @@ apps/portal/src/app/
 └────────────┴─────────────────────────────────────────┘
 ```
 
-- PrimeReact `Sidebar` / custom layout — not a drawer, persistent left nav
+- Custom Tailwind layout (persistent left nav, not a drawer)
 - Topbar has a workspace selector (stub dropdown — only `default` for now)
 - User avatar + menu in topbar (stub — shows placeholder, hooks for Auth.js session later)
 
@@ -332,7 +333,7 @@ Add to dev workflow: regenerate when backend models change.
 ### Workflow Status
 - `WorkflowStatusBadge` component: polls `GET /artifacts/{id}/workflows` every 3s
 - States: `running`, `completed`, `failed`, `pending`
-- PrimeReact `Tag` + `ProgressBar` for visual feedback
+- shadcn `Badge` + `Progress` for visual feedback
 
 ---
 
@@ -347,8 +348,8 @@ Add to dev workflow: regenerate when backend models change.
 
 ### Phase 1 — Portal Scaffold + Layout
 - [ ] `apps/portal` — Next.js 16 app with App Router (Turbopack default)
-- [ ] PrimeReact 10.x + Lara Light Blue theme + CSS layer setup
-- [ ] Tailwind CSS 4 setup (CSS-first `@theme`, layer ordering with PrimeReact)
+- [x] shadcn/ui (new-york) + AI Elements, vendored — see 2026-07 migration docs (superseded original PrimeReact plan)
+- [x] Tailwind CSS 4 setup (CSS-first `@theme`, shadcn tokens layered onto `--ds-*`)
 - [ ] TanStack Query provider
 - [ ] Auth stub — library-agnostic (no real providers, just session context placeholder)
 - [ ] Root layout + `[workspace]` layout (sidebar + topbar)
@@ -368,7 +369,7 @@ Add to dev workflow: regenerate when backend models change.
 - [ ] Search page UI — query input, filter panel
 - [ ] Semantic search results — `SearchResultCard` in `packages/ui`
 - [ ] Hierarchical search results — grouped by artifact/page
-- [ ] Result scoring visualization (PrimeReact Chart)
+- [ ] Result scoring visualization (recharts)
 
 ### Phase 4 — Compounds
 - [ ] Compound browser — DataTable with SMILES column
@@ -442,7 +443,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 - All pages are in `app/[workspace]/` — no exceptions
 - No bare `fetch` in components — always TanStack Query
-- No inline styles — Tailwind classes or PrimeReact props only
+- No inline styles — Tailwind classes or shadcn/ui component props only
 - All shared reusable components go in `packages/ui` — not in `apps/portal/components`
 - `apps/portal/components` is for app-specific, non-shareable components only
 - Query keys are never inline strings — always from `src/lib/query-keys.ts`
