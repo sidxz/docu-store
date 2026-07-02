@@ -25,6 +25,7 @@ stack, and all app behavior are unchanged.
 | 3 | Theming | Keep `data-theme` attribute + zustand theme store + anti-flash script. Define shadcn semantic tokens as CSS variables in `globals.css` for light and `[data-theme="dark"]`, layered onto the existing `--ds-*` token system. Existing `@custom-variant dark` already binds `dark:` to the attribute — shadcn components work unmodified. |
 | 4 | Migration strategy | Phased strangler on this branch: 6 phases, app builds and works after each. PrimeReact coexists (CSS layers already isolate it) until Phase 5 removes it. |
 | 5 | Visual direction | "Precision scientific": near-monochrome neutral base, one sharp blue/cyan accent, 1px hairline borders, minimal shadow, monospace accents (IDs, SMILES, token counts, metrics), dense-but-airy data layouts, restrained motion. Implemented with the frontend-design skill in the polish pass (Phase 5). |
+| 6 | Modernization latitude | User (2026-07-01): "feel free to modernize portions of ui if required" — functional parity is the floor; visual/UX upgrades are allowed where they improve the app (e.g. ⌘K palette, sonner toasts, dropzone). |
 
 ### Approaches considered
 
