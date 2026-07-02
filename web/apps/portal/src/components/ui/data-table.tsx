@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   type ColumnDef, type ColumnFiltersState, type RowData, type SortingState,
   flexRender, getCoreRowModel, getFilteredRowModel, getPaginationRowModel,
@@ -51,8 +51,18 @@ export function DataTable<TData>({
   const [sorting, setSorting] = useState<SortingState>(defaultSorting);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
+  const effectiveColumns = useMemo(
+    () =>
+      columns.map((c) => {
+        const f = c.meta?.filter;
+        if (!f || c.filterFn) return c;
+        return { ...c, filterFn: (f.variant === "select" ? "equalsString" : "includesString") as ColumnDef<TData, unknown>["filterFn"] };
+      }),
+    [columns],
+  );
+
   const table = useReactTable({
-    data, columns,
+    data, columns: effectiveColumns,
     state: { sorting, columnFilters },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
@@ -81,6 +91,7 @@ export function DataTable<TData>({
                     key={h.id}
                     style={{ width: h.column.columnDef.size !== 150 ? h.column.columnDef.size : undefined }}
                     className={cn("text-xs font-semibold uppercase tracking-wider text-text-muted", h.column.columnDef.meta?.headerClassName)}
+                    aria-sort={canSort ? (dir === "asc" ? "ascending" : dir === "desc" ? "descending" : "none") : undefined}
                   >
                     {h.isPlaceholder ? null : canSort ? (
                       <button
@@ -142,7 +153,7 @@ export function DataTable<TData>({
             ))
           ) : table.getRowModel().rows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={columns.length} className="h-24 text-center text-text-muted">
+              <TableCell colSpan={table.getAllLeafColumns().length} className="h-24 text-center text-text-muted">
                 {emptyMessage}
               </TableCell>
             </TableRow>
