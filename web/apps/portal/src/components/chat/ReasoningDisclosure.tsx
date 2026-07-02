@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Brain, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+import { Reasoning, ReasoningTrigger } from "@/components/ai-elements/reasoning";
+import { CollapsibleContent } from "@/components/ui/collapsible";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 
 interface ReasoningDisclosureProps {
@@ -10,31 +10,25 @@ interface ReasoningDisclosureProps {
 }
 
 export function ReasoningDisclosure({ reasoning, isStreaming }: ReasoningDisclosureProps) {
-  // Open while the model is actively reasoning; collapsed once the answer is ready.
-  const [open, setOpen] = useState(true);
   if (!reasoning) return null;
 
   return (
-    <div className="mb-2 rounded-lg border border-border-subtle bg-surface-elevated/60">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
-        aria-expanded={open}
-        aria-controls="reasoning-panel"
-      >
-        <Brain className="h-3.5 w-3.5 text-feature-search" />
-        <span className="font-medium">Reasoning</span>
-        {isStreaming && <Loader2 className="h-3 w-3 animate-spin text-text-muted" />}
-        <span className="ml-auto">
-          {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-        </span>
-      </button>
-      {open && (
-        <div id="reasoning-panel" className="border-t border-border-subtle px-3 py-2 prose prose-sm dark:prose-invert max-w-none text-text-secondary">
+    <Reasoning
+      isStreaming={isStreaming}
+      className="mb-2 rounded-lg border border-border-subtle bg-surface-elevated/60 px-3 py-1.5"
+    >
+      <ReasoningTrigger className="text-xs" />
+      {/* ai-elements ReasoningContent forces its markdown through a private
+          Streamdown instance (typed `children: string`), which lacks this
+          app's custom table/code/link/citation renderers (see
+          MarkdownRenderer.tsx). Use the plain CollapsibleContent primitive
+          instead — same Radix root, same open/close animation classes as
+          ReasoningContent — and keep MarkdownRenderer as the content. */}
+      <CollapsibleContent className="mt-2 border-t border-border-subtle pt-2 text-xs text-text-secondary outline-none data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=closed]:animate-out data-[state=open]:slide-in-from-top-2 data-[state=open]:animate-in">
+        <div className="prose prose-sm dark:prose-invert max-w-none">
           <MarkdownRenderer content={reasoning} />
         </div>
-      )}
-    </div>
+      </CollapsibleContent>
+    </Reasoning>
   );
 }

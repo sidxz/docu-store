@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Loader2, AlertCircle, ListTree, ChevronRight, ChevronDown } from "lucide-react";
+import { useState, type ComponentProps } from "react";
+import { AlertCircle, Check, ChevronDown, ChevronRight, ListTree, Loader2, type LucideIcon } from "lucide-react";
 import type { AgentStep } from "@docu-store/types";
+import { cn } from "@/lib/utils";
+import { ChainOfThoughtStep } from "@/components/ai-elements/chain-of-thought";
 
 const STEP_LABELS: Record<string, string> = {
   // Quick Mode steps
@@ -14,6 +16,37 @@ const STEP_LABELS: Record<string, string> = {
   retrieval: "Document Retrieval",
   synthesis: "Answer Generation",
   verification: "Grounding Verification",
+};
+
+// ponytail: ChainOfThoughtStep's `icon` prop is typed as lucide-react's
+// `LucideIcon` (a forwardRef component) and renders it as `<Icon
+// className="size-4" />` with no way to layer on extra classes (spin,
+// status color) from the outside. Wrap+cast so each status keeps its
+// original icon color (and the "started" spinner), same trick used for
+// checkpoint.tsx's LucideProps mismatch in Task 2.
+function coloredIcon(Icon: LucideIcon, extraClassName: string): LucideIcon {
+  const Wrapped = (props: ComponentProps<LucideIcon>) => (
+    <Icon {...props} className={cn(props.className, extraClassName)} />
+  );
+  return Wrapped as unknown as LucideIcon;
+}
+
+const STATUS_ICON: Record<AgentStep["status"], LucideIcon> = {
+  started: coloredIcon(Loader2, "text-accent-text animate-spin"),
+  completed: coloredIcon(Check, "text-ds-success"),
+  failed: coloredIcon(AlertCircle, "text-ds-error"),
+};
+
+const STATUS_STEP: Record<AgentStep["status"], "pending" | "active" | "complete"> = {
+  started: "active",
+  completed: "complete",
+  failed: "complete",
+};
+
+const STATUS_LABEL_COLOR: Record<AgentStep["status"], string> = {
+  started: "text-accent-text",
+  completed: "text-text-secondary",
+  failed: "text-ds-error",
 };
 
 interface AgentStepIndicatorProps {
@@ -28,34 +61,20 @@ export function AgentStepIndicator({ step, durationMs, devMode }: AgentStepIndic
   const hasThinking = !!step.thinking_content;
 
   return (
-    <div className="flex items-start gap-2 text-xs">
-      {step.status === "started" && (
-        <Loader2 className="w-3.5 h-3.5 text-accent-text animate-spin flex-shrink-0 mt-0.5" />
-      )}
-      {step.status === "completed" && (
-        <Check className="w-3.5 h-3.5 text-ds-success flex-shrink-0 mt-0.5" />
-      )}
-      {step.status === "failed" && (
-        <AlertCircle className="w-3.5 h-3.5 text-ds-error flex-shrink-0 mt-0.5" />
-      )}
-
-      <div className="min-w-0 flex-1">
+    <ChainOfThoughtStep
+      icon={STATUS_ICON[step.status]}
+      status={STATUS_STEP[step.status]}
+      className={cn("text-xs", step.status === "failed" && "text-ds-error")}
+      label={
         <div className="flex items-center gap-2">
-          <span
-            className={`font-medium ${
-              step.status === "started" ? "text-accent-text" : "text-text-secondary"
-            }`}
-          >
-            {label}
-          </span>
+          <span className={cn("font-medium", STATUS_LABEL_COLOR[step.status])}>{label}</span>
           {durationMs != null && (
-            <span className="font-mono text-[10px] text-text-muted">
-              {durationMs}ms
-            </span>
+            <span className="font-mono text-[10px] text-text-muted">{durationMs}ms</span>
           )}
           {hasThinking && (
             <button
-              onClick={() => setThinkingExpanded(!thinkingExpanded)}
+              type="button"
+              onClick={() => setThinkingExpanded((v) => !v)}
               className="flex items-center gap-0.5 text-[10px] text-accent-text/70 hover:text-accent-text transition-colors"
             >
               <ListTree className="w-3 h-3" />
@@ -67,24 +86,25 @@ export function AgentStepIndicator({ step, durationMs, devMode }: AgentStepIndic
             </button>
           )}
         </div>
-        {step.output_summary && (
-          <p className={`text-text-muted mt-0.5 ${devMode ? "whitespace-pre-wrap break-words" : "truncate"}`}>
-            {step.output_summary}
-          </p>
-        )}
-        {hasThinking && thinkingExpanded && (
-          <div className="mt-1.5 space-y-2">
-            {step.thinking_content!.split("\n\n---\n\n").map((block, i) => (
-              <div
-                key={i}
-                className="rounded bg-surface-primary/50 border border-border-subtle px-2.5 py-2 text-[11px] text-text-muted whitespace-pre-wrap break-words leading-relaxed"
-              >
-                {block}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+      }
+    >
+      {step.output_summary && (
+        <p className={`text-text-muted ${devMode ? "whitespace-pre-wrap break-words" : "truncate"}`}>
+          {step.output_summary}
+        </p>
+      )}
+      {hasThinking && thinkingExpanded && (
+        <div className="space-y-2">
+          {step.thinking_content!.split("\n\n---\n\n").map((block, i) => (
+            <div
+              key={i}
+              className="rounded bg-surface-primary/50 border border-border-subtle px-2.5 py-2 text-[11px] text-text-muted whitespace-pre-wrap break-words leading-relaxed"
+            >
+              {block}
+            </div>
+          ))}
+        </div>
+      )}
+    </ChainOfThoughtStep>
   );
 }

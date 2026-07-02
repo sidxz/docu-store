@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Clock, ListTree, Search, Target, FlaskConical, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronRight, ListTree, Search, Target, FlaskConical, Sparkles } from "lucide-react";
 import type { AgentTrace, AgentStep, ThinkingBlock } from "@docu-store/types";
 import { useDevModeStore } from "@/lib/stores/dev-mode-store";
 import { useChatStore } from "@/lib/stores/chat-store";
+import { ChainOfThought, ChainOfThoughtHeader, ChainOfThoughtContent } from "@/components/ai-elements/chain-of-thought";
 import { AgentStepIndicator } from "./AgentStepIndicator";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 
@@ -53,45 +54,32 @@ export function AgentThinkingPanel({ trace, isStreaming }: AgentThinkingPanelPro
     : resolveThinkingBlocks(trace);
 
   return (
-    <div className="mb-2">
-      <button
-        onClick={() => {
-          const next = !expanded;
-          setExpanded(next);
-          if (!next) userCollapsed.current = true;
-        }}
-        className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-secondary transition-colors"
-      >
-        {expanded ? (
-          <ChevronDown className="w-3.5 h-3.5" />
-        ) : (
-          <ChevronRight className="w-3.5 h-3.5" />
-        )}
-        {isStreaming ? (
-          <span className="relative flex h-3 w-3">
-            <span className="absolute inline-flex h-full w-full rounded-full bg-accent-text/40 animate-ping" />
-            <span className="relative inline-flex h-3 w-3 rounded-full bg-accent-text" />
-          </span>
-        ) : (
-          <Clock className="w-3 h-3" />
-        )}
-        <span>{label}</span>
-      </button>
+    <ChainOfThought
+      open={expanded}
+      onOpenChange={(next) => {
+        setExpanded(next);
+        if (!next) userCollapsed.current = true;
+      }}
+      className="mb-2 max-w-none space-y-0"
+    >
+      <ChainOfThoughtHeader className="text-xs text-text-muted hover:text-text-secondary">
+        {label}
+      </ChainOfThoughtHeader>
 
-      {expanded && (
-        <div className="mt-1.5 ml-2 pl-3 border-l-2 border-border-subtle space-y-1.5">
-          {steps.map((step, i) => (
-            <AgentStepIndicator
-              key={`${step.step}-${i}`}
-              step={step}
-              durationMs={getStepDuration(step, stepTimings)}
-              devMode={devMode}
-            />
-          ))}
-        </div>
-      )}
+      <ChainOfThoughtContent className="ml-2 space-y-1.5 border-l-2 border-border-subtle pl-3">
+        {steps.map((step, i) => (
+          <AgentStepIndicator
+            key={`${step.step}-${i}`}
+            step={step}
+            durationMs={getStepDuration(step, stepTimings)}
+            devMode={devMode}
+          />
+        ))}
+      </ChainOfThoughtContent>
 
-      {/* Chronological thinking log — all LLM thoughts across steps */}
+      {/* Chronological thinking log — all LLM thoughts across steps.
+          Kept custom (own collapsible, own "Details (n)" affordance) —
+          not part of the step list, so not a ChainOfThoughtStep. */}
       {expanded && thinkingBlocks.length > 0 && (
         <ThinkingLog blocks={thinkingBlocks} />
       )}
@@ -107,7 +95,7 @@ export function AgentThinkingPanel({ trace, isStreaming }: AgentThinkingPanelPro
           isStreaming={isStreaming}
         />
       )}
-    </div>
+    </ChainOfThought>
   );
 }
 

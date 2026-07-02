@@ -6,6 +6,8 @@ import type { ChatMessage as ChatMessageType } from "@docu-store/types";
 import { useDevModeStore } from "@/lib/stores/dev-mode-store";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useAnalytics } from "@/hooks/use-analytics";
+import { Loader } from "@/components/ai-elements/loader";
+import { Shimmer } from "@/components/ai-elements/shimmer";
 import { AgentThinkingPanel } from "./AgentThinkingPanel";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { ReasoningDisclosure } from "./ReasoningDisclosure";
@@ -97,7 +99,7 @@ export function ChatMessage({ message, workspace, isStreaming, onFeedback }: Cha
               )}
               <div className="prose prose-sm dark:prose-invert max-w-none">
                 <MarkdownRenderer content={message.content} messageId={message.message_id} />
-                {isStreaming && !message.content && <ThinkingDots />}
+                {isStreaming && !message.content && <ThinkingIndicator />}
               </div>
               {message.structured_content && message.structured_content.length > 0 && (
                 <div className="mt-3 border-t border-border-subtle pt-3">
@@ -184,16 +186,14 @@ export function ChatMessage({ message, workspace, isStreaming, onFeedback }: Cha
 
 // Animated "assistant is working" indicator — shown after send, before the first
 // answer token arrives (otherwise the empty bubble reads as hung).
-function ThinkingDots() {
+function ThinkingIndicator() {
   return (
-    <span className="inline-flex items-center gap-2 text-sm text-text-muted">
-      <span className="flex gap-1">
-        <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce [animation-delay:-300ms]" />
-        <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce [animation-delay:-150ms]" />
-        <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce" />
-      </span>
-      <span className="animate-pulse">Working…</span>
-    </span>
+    <div className="inline-flex items-center gap-2 text-sm text-text-muted">
+      <Loader size={14} />
+      <Shimmer as="span" duration={1.5}>
+        Working…
+      </Shimmer>
+    </div>
   );
 }
 
