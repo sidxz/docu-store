@@ -7,10 +7,11 @@ import { useAuthz } from "@sentinel-auth/react";
 
 import { useSession } from "@/lib/auth";
 import { useBreadcrumbs } from "@/hooks/use-breadcrumbs";
+import { useUserTokenUsage } from "@/hooks/use-usage";
 import { useThemeStore } from "@/lib/stores/theme-store";
 import { useScopeStore } from "@/lib/stores/scope-store";
 import { SearchCommand } from "./SearchCommand";
-import { getInitials } from "@/lib/utils";
+import { getInitials, formatTokens } from "@/lib/utils";
 
 export function Topbar() {
   const { user, workspace } = useSession();
@@ -18,6 +19,7 @@ export function Topbar() {
   const breadcrumbs = useBreadcrumbs();
   const { theme, toggleTheme } = useThemeStore();
   const { defaultScope, setDefaultScope } = useScopeStore();
+  const usage = useUserTokenUsage();
 
   const handleLogout = () => {
     logout();
@@ -89,6 +91,17 @@ export function Topbar() {
 
       {/* Right section */}
       <div className="flex items-center gap-1">
+        {/* User token usage total */}
+        {usage.data && usage.data.total > 0 && (
+          <span
+            className="hidden md:inline-flex items-center gap-1 px-2 text-xs text-text-muted tabular-nums"
+            title={`${usage.data.total.toLocaleString()} tokens used — ${usage.data.prompt.toLocaleString()} prompt + ${usage.data.completion.toLocaleString()} completion`}
+          >
+            <i className="pi pi-chart-bar text-[10px]" />
+            {formatTokens(usage.data.total)} tokens
+          </span>
+        )}
+
         {/* Scope toggle */}
         <Button
           label={defaultScope === "workspace" ? "Workspace" : "Private"}

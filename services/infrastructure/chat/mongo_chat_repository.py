@@ -90,6 +90,45 @@ class MongoChatRepository:
         cursor = self._conversations.find(query).sort("updated_at", -1).skip(skip).limit(limit)
         return [_doc_to_conversation(doc) async for doc in cursor]
 
+    async def get_user_token_usage(
+        self,
+        workspace_id: UUID,
+        owner_id: UUID,
+    ) -> TokenUsageDTO:
+        # ponytail: aggregate-on-read over the user's messages. The badge is
+        # cached client-side, so this runs rarely; add a materialized per-user
+        # counter only if it shows up hot.
+        pipeline = [
+            {"$match": {"workspace_id": str(workspace_id), "owner_id": str(owner_id)}},
+            {
+                "$lookup": {
+                    "from": _MESSAGES,
+                    "localField": "conversation_id",
+                    "foreignField": "conversation_id",
+                    "as": "msgs",
+                },
+            },
+            {"$unwind": "$msgs"},
+            {"$match": {"msgs.token_usage": {"$ne": None}}},
+            {
+                "$group": {
+                    "_id": None,
+                    "prompt": {"$sum": "$msgs.token_usage.prompt"},
+                    "completion": {"$sum": "$msgs.token_usage.completion"},
+                    "total": {"$sum": "$msgs.token_usage.total"},
+                },
+            },
+        ]
+        docs = await self._conversations.aggregate(pipeline).to_list(length=1)
+        if not docs:
+            return TokenUsageDTO(prompt=0, completion=0, total=0)
+        d = docs[0]
+        return TokenUsageDTO(
+            prompt=int(d.get("prompt", 0)),
+            completion=int(d.get("completion", 0)),
+            total=int(d.get("total", 0)),
+        )
+
     async def delete_conversation(
         self,
         conversation_id: UUID,

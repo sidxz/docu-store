@@ -5,7 +5,12 @@ from __future__ import annotations
 from typing import Protocol
 from uuid import UUID
 
-from application.dtos.chat_dtos import ChatFeedbackDTO, ChatMessageDTO, ConversationDTO
+from application.dtos.chat_dtos import (
+    ChatFeedbackDTO,
+    ChatMessageDTO,
+    ConversationDTO,
+    TokenUsageDTO,
+)
 
 
 class ChatRepository(Protocol):
@@ -34,6 +39,12 @@ class ChatRepository(Protocol):
         limit: int = 20,
         is_archived: bool = False,
     ) -> list[ConversationDTO]: ...
+
+    async def get_user_token_usage(
+        self,
+        workspace_id: UUID,
+        owner_id: UUID,
+    ) -> TokenUsageDTO: ...
 
     async def delete_conversation(
         self,

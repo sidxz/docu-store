@@ -19,11 +19,13 @@ from application.dtos.chat_dtos import (
     ChatFeedbackDTO,
     ConversationDetailDTO,
     ConversationDTO,
+    TokenUsageDTO,
 )
 from application.use_cases.chat_use_cases import (
     CreateConversationUseCase,
     DeleteConversationUseCase,
     GetConversationUseCase,
+    GetUserTokenUsageUseCase,
     ListConversationsUseCase,
     RecordFeedbackUseCase,
     SendMessageUseCase,
@@ -97,6 +99,20 @@ async def list_conversations(
         skip=skip,
         limit=limit,
         is_archived=is_archived,
+    )
+
+
+@router.get("/usage", status_code=status.HTTP_200_OK)
+@handle_use_case_errors
+async def get_user_token_usage(
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> TokenUsageDTO:
+    """Total token usage across the current user's conversations (usage badge)."""
+    use_case = container[GetUserTokenUsageUseCase]
+    return await use_case.execute(
+        workspace_id=auth.workspace_id,
+        owner_id=auth.user_id,
     )
 
 

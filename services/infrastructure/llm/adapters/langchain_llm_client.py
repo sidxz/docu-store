@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import structlog
 
-from infrastructure.llm.token_counter import extract_usage_from_response, record_usage
+from infrastructure.llm.token_counter import callbacks_for
 
 if TYPE_CHECKING:
     from langchain_core.language_models.chat_models import BaseChatModel
@@ -95,7 +95,9 @@ class LangChainLLMClient:
         return self._models[key]
 
     def _config(self) -> dict:
-        return {"callbacks": [self._langfuse_handler]} if self._langfuse_handler else {}
+        # The token-counting handler is always attached; usage is recorded via
+        # on_llm_end (one collection point for every path), not imperatively.
+        return {"callbacks": callbacks_for(self._langfuse_handler)}
 
     @staticmethod
     def _text_messages(prompt: str, system_prompt: str | None) -> list:
@@ -134,7 +136,6 @@ class LangChainLLMClient:
         if temperature is not None:
             llm = llm.bind(temperature=temperature)
         response = await llm.ainvoke(self._text_messages(prompt, system_prompt), config=self._config())
-        record_usage(*extract_usage_from_response(response))
         return str(response.content)
 
     async def stream_with_reasoning(
@@ -153,16 +154,12 @@ class LangChainLLMClient:
             if images_b64
             else self._text_messages(prompt, system_prompt)
         )
-        last_chunk = None
         async for chunk in llm.astream(messages, config=self._config()):
-            last_chunk = chunk
             reasoning = chunk.additional_kwargs.get("reasoning_content")
             if reasoning:
                 yield ("reasoning", str(reasoning))
             if chunk.content:
                 yield ("content", str(chunk.content))
-        if last_chunk is not None:
-            record_usage(*extract_usage_from_response(last_chunk))
 
     async def stream(
         self,
@@ -191,7 +188,6 @@ class LangChainLLMClient:
         llm = self._get_llm()
         messages = self._image_messages(prompt, [image_b64], system_prompt)
         response = await llm.ainvoke(messages, config=self._config())
-        record_usage(*extract_usage_from_response(response))
         return str(response.content)
 
     async def complete_structured(
@@ -211,7 +207,8 @@ class LangChainLLMClient:
         result = await llm.ainvoke(
             self._text_messages(prompt, system_prompt), config=self._config(),
         )
-        # ponytail: structured-output usage isn't surfaced by LangChain here.
+        # Usage is captured by the token-counting callback in _config() (fires
+        # on the underlying LLM call even though structured output wraps it).
         if hasattr(result, "model_dump"):
             return result.model_dump()
         return dict(result)

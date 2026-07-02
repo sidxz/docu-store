@@ -3,10 +3,12 @@
 import { AuthzProvider } from "@sentinel-auth/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { PrimeReactProvider } from "primereact/api";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { SentinelAuthz } from "@sentinel-auth/js";
 
 import { getAuthzClient } from "@/lib/authz-client";
+import { shouldAutoReauth } from "@/lib/auth-routes";
 import { apiClient, setApiBaseUrl } from "@docu-store/api-client";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { authMiddleware } from "@/lib/api-auth-middleware";
@@ -41,6 +43,7 @@ const primeReactConfig = {
  */
 export function Providers({ children }: { children: ReactNode }) {
   const queryClient = getQueryClient();
+  const pathname = usePathname();
   const clientRef = useRef<SentinelAuthz | null>(null);
   const configRef = useRef<AppConfig | null>(null);
   const middlewareApplied = useRef(false);
@@ -107,7 +110,10 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <AppConfigProvider config={configRef.current}>
-      <AuthzProvider client={clientRef.current!}>
+      <AuthzProvider
+        client={clientRef.current!}
+        autoReauth={shouldAutoReauth(pathname)}
+      >
         <QueryClientProvider client={queryClient}>
           <PrimeReactProvider value={primeReactConfig}>
             <ThemeProvider>{children}</ThemeProvider>

@@ -10,18 +10,19 @@ import { useAuthz } from "@sentinel-auth/react";
  * Authenticated users go to their workspace; others to /login.
  */
 export default function RootPage() {
-  const { isAuthenticated, isLoading, client } = useAuthz();
+  const { authState, isLoading, client } = useAuthz();
   const router = useRouter();
 
   useEffect(() => {
     if (isLoading) return;
-    if (isAuthenticated) {
+    if (authState === "authenticated") {
       const user = client.getUser();
       router.replace(`/${user?.workspaceSlug ?? "default"}`);
-    } else {
+    } else if (authState === "unauthenticated") {
       router.replace("/login");
     }
-  }, [isAuthenticated, isLoading, client, router]);
+    // needs_reauth: hold — AuthzProvider's autoReauth silently re-auths.
+  }, [authState, isLoading, client, router]);
 
   return (
     <div className="flex h-screen items-center justify-center bg-surface-sunken">

@@ -168,6 +168,7 @@ export function useSendMessage(conversationId: string | undefined) {
           queryKey: queryKeys.chat.detail(conversationId),
         });
         queryClient.invalidateQueries({ queryKey: queryKeys.chat.list() });
+        queryClient.invalidateQueries({ queryKey: queryKeys.chat.usage() });
       }
     },
     onError: (error) => {

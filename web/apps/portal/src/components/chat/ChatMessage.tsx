@@ -140,6 +140,16 @@ export function ChatMessage({ message, workspace, isStreaming, onFeedback }: Cha
           </div>
         )}
 
+        {/* Token usage — per-message, persisted (visible to all, not just dev) */}
+        {!isUser && !isStreaming && message.token_usage && (
+          <div
+            className="mt-1 text-[11px] text-text-muted tabular-nums"
+            title={`${message.token_usage.prompt.toLocaleString()} prompt + ${message.token_usage.completion.toLocaleString()} completion`}
+          >
+            {message.token_usage.total.toLocaleString()} tokens
+          </div>
+        )}
+
         {/* Dev-mode diagnostics */}
         {devMode && !isUser && !isStreaming && message.content && (
           <div className="mt-2 rounded bg-surface-elevated px-2 py-1.5 text-[10px] font-mono text-text-muted">

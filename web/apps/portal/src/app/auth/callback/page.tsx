@@ -10,7 +10,10 @@ export default function AuthCallbackPage() {
 
   return (
     <AuthzCallback
-      onSuccess={(user) => router.replace(`/${user.workspaceSlug}`)}
+      onSuccess={(user, returnTo) =>
+        router.replace(returnTo ?? `/${user.workspaceSlug}`)
+      }
+      onSilentReauthFailed={() => router.replace("/login")}
       loadingComponent={
         <AuthShell>
           <div className="text-center">

@@ -51,6 +51,7 @@ from application.use_cases.chat_use_cases import (
     CreateConversationUseCase,
     DeleteConversationUseCase,
     GetConversationUseCase,
+    GetUserTokenUsageUseCase,
     ListConversationsUseCase,
     RecordFeedbackUseCase,
     SendMessageUseCase,
@@ -914,6 +915,9 @@ def create_container() -> Container:
         chat_repository=c[ChatRepository],
     )
     container[GetConversationUseCase] = lambda c: GetConversationUseCase(
+        chat_repository=c[ChatRepository],
+    )
+    container[GetUserTokenUsageUseCase] = lambda c: GetUserTokenUsageUseCase(
         chat_repository=c[ChatRepository],
     )
     container[DeleteConversationUseCase] = lambda c: DeleteConversationUseCase(

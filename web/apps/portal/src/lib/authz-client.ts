@@ -42,6 +42,12 @@ export function getAuthzClient(config?: AppConfig): SentinelAuthz {
       // /authz/resolve with the service key. See app/api/auth/mint/route.ts.
       mintEndpoint: "/api/auth/mint",
       storage: new AuthzLocalStorageStore(),
+      // Refresh the authz token shortly before it expires so an active session
+      // never lapses. (Defaults are true/30 in 0.13.x; set explicitly on this
+      // auth boundary. The reload bounce is fixed by autoReauth in Providers,
+      // not this — see AuthState 'needs_reauth'.)
+      autoRefresh: true,
+      refreshBuffer: 30,
       idps: {
         google: IdpConfigs.google(googleClientId),
         github: githubIdpConfig,

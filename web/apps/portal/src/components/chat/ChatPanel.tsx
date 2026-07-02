@@ -10,6 +10,7 @@ import { useChatStore } from "@/lib/stores/chat-store";
 import { MessageList } from "./MessageList";
 import { ChatInput } from "./ChatInput";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { formatTokens } from "@/lib/utils";
 import type { SourceCitation } from "@docu-store/types";
 
 interface ChatPanelProps {
@@ -158,6 +159,12 @@ export function ChatPanel({
     return 0;
   })();
 
+  // Total tokens for this chat (sum of persisted per-message usage)
+  const chatTokens = (data?.messages ?? []).reduce(
+    (sum, m) => sum + (m.token_usage?.total ?? 0),
+    0,
+  );
+
   // No conversation selected
   if (!conversationId) {
     return (
@@ -202,6 +209,15 @@ export function ChatPanel({
             || pendingUserMessage
             || (isLoading ? "" : "New Chat")}
         </h2>
+        {/* Per-chat token usage — pulled right */}
+        {chatTokens > 0 && (
+          <span
+            className="text-xs text-text-muted tabular-nums whitespace-nowrap"
+            title={`${chatTokens.toLocaleString()} tokens in this chat`}
+          >
+            {formatTokens(chatTokens)} tokens
+          </span>
+        )}
         {/* Sources toggle */}
         {sourceCount > 0 && (
           <Button

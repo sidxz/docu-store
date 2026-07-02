@@ -91,6 +91,28 @@ class ListConversationsUseCase:
             return Failure(AppError("internal_error", f"Failed to list conversations: {e!s}"))
 
 
+class GetUserTokenUsageUseCase:
+    """Aggregate total token usage across a user's conversations."""
+
+    def __init__(self, chat_repository: ChatRepository) -> None:
+        self._repo = chat_repository
+
+    async def execute(
+        self,
+        workspace_id: UUID,
+        owner_id: UUID,
+    ) -> Result[TokenUsageDTO, AppError]:
+        try:
+            usage = await self._repo.get_user_token_usage(
+                workspace_id=workspace_id,
+                owner_id=owner_id,
+            )
+            return Success(usage)
+        except Exception as e:
+            log.exception("chat.usage.get_failed", error=str(e))
+            return Failure(AppError("internal_error", f"Failed to get token usage: {e!s}"))
+
+
 class GetConversationUseCase:
     """Get a conversation with its messages."""
 

@@ -17,6 +17,7 @@ from application.ports.tool_calling_llm import (
     ToolCallResult,
     ToolDefinition,
 )
+from infrastructure.llm.token_counter import callbacks_for
 
 log = structlog.get_logger(__name__)
 
@@ -208,7 +209,7 @@ class NativeToolCallingAdapter(_BaseToolCallingAdapter):
                     ),
                 )
 
-        config = {"callbacks": [self._langfuse_handler]} if self._langfuse_handler else {}
+        config = {"callbacks": callbacks_for(self._langfuse_handler)}
         response: AIMessage = await llm_with_tools.ainvoke(lc_messages, config=config)
 
         # Parse response
@@ -278,7 +279,7 @@ class ReactToolCallingAdapter(_BaseToolCallingAdapter):
                     ),
                 )
 
-        config = {"callbacks": [self._langfuse_handler]} if self._langfuse_handler else {}
+        config = {"callbacks": callbacks_for(self._langfuse_handler)}
         response = await llm.ainvoke(lc_messages, config=config)
         raw_text = str(response.content)
 
