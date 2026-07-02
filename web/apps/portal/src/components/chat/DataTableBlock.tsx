@@ -1,7 +1,14 @@
 "use client";
 
-import { DataTable } from "primereact/datatable";
-import { Column } from "primereact/column";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 interface DataTableBlockProps {
   headers: string[];
@@ -9,21 +16,30 @@ interface DataTableBlockProps {
 }
 
 export function DataTableBlock({ headers, rows }: DataTableBlockProps) {
-  const data = rows.map((row, idx) => {
-    const obj: Record<string, string> = { __idx: String(idx) };
-    headers.forEach((h, i) => {
-      obj[h] = row[i] ?? "";
-    });
-    return obj;
-  });
-
   return (
-    <div className="my-3 rounded-lg overflow-hidden border border-border-default">
-      <DataTable value={data} size="small" stripedRows scrollable>
-        {headers.map((h) => (
-          <Column key={h} field={h} header={h} />
-        ))}
-      </DataTable>
+    <div className="my-3 overflow-x-auto rounded-lg border border-border-default">
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            {headers.map((h) => (
+              <TableHead key={h} className="px-3 py-1.5 text-sm">
+                {h}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row, idx) => (
+            <TableRow key={idx} className={cn(idx % 2 === 1 && "bg-surface-sunken/40")}>
+              {headers.map((h, i) => (
+                <TableCell key={h} className="px-3 py-1.5 text-sm whitespace-normal">
+                  {row[i] ?? ""}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

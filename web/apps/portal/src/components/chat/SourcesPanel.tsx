@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { FileText, X, ChevronDown, ChevronRight, Users, Calendar, Eye } from "lucide-react";
-import { Button } from "primereact/button";
-import { Dialog } from "primereact/dialog";
-import { Skeleton } from "primereact/skeleton";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { SourceCitation } from "@docu-store/types";
 import { AuthThumbnail } from "@/components/ui/TableThumbnail";
 import { useAuthBlobUrl } from "@/hooks/use-auth-blob-url";
+import { usePointerDrag } from "@/hooks/use-pointer-drag";
 import { useDevModeStore } from "@/lib/stores/dev-mode-store";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useAnalytics } from "@/hooks/use-analytics";
@@ -44,11 +45,14 @@ export function SourcesPanel({ sources, workspace, onClose }: SourcesPanelProps)
           </span>
         </div>
         <Button
-          icon={<X className="w-3.5 h-3.5" />}
+          variant="ghost"
+          size="icon-sm"
+          className="rounded-full"
           onClick={onClose}
-          className="p-button-text p-button-sm p-button-rounded"
           aria-label="Close sources"
-        />
+        >
+          <X className="w-3.5 h-3.5" />
+        </Button>
       </div>
 
       {/* Source cards */}
@@ -301,69 +305,62 @@ function PagePreviewDialog({
   onHide: () => void;
 }) {
   const { blobUrl, error } = useAuthBlobUrl(visible && src ? src : "");
-
-  const header = (
-    <div className="flex items-center gap-2 min-w-0">
-      <Eye className="w-4 h-4 text-text-muted flex-shrink-0" />
-      <span className="truncate text-sm">{title}</span>
-    </div>
-  );
-
-  const footer = (
-    <div className="flex justify-end">
-      <Link
-        href={pageHref}
-        className="p-button p-button-sm p-button-text text-xs no-underline"
-      >
-        Open full page
-      </Link>
-    </div>
-  );
+  const drag = usePointerDrag();
 
   return (
     <Dialog
-      visible={visible}
-      onHide={onHide}
-      header={header}
-      footer={footer}
-      draggable
-      resizable
-      modal={false}
-      position="center"
-      style={{ width: "min(56rem, 70vw)" }}
-      pt={{
-        root: { className: "page-preview-dialog !backdrop-blur-xl !bg-surface-primary/80 !border !border-white/10 !shadow-2xl" },
-        content: { className: "!p-3" },
-        header: { className: "!bg-transparent" },
-        footer: { className: "!bg-transparent" },
+      open={visible}
+      onOpenChange={(open) => {
+        if (!open) {
+          onHide();
+          drag.reset();
+        }
       }}
     >
-      <div className="rounded-md overflow-hidden bg-black/30 border border-border-subtle">
-        {!src && (
-          <div className="flex items-center justify-center h-40 text-text-muted text-sm">
-            No preview available
-          </div>
-        )}
-        {src && !blobUrl && !error && (
-          <div className="flex items-center justify-center" style={{ minHeight: "20rem" }}>
-            <Skeleton width="100%" height="20rem" borderRadius="0" />
-          </div>
-        )}
-        {error && (
-          <div className="flex flex-col items-center justify-center h-40 gap-2 text-text-muted">
-            <FileText className="w-6 h-6" />
-            <span className="text-sm">Preview unavailable</span>
-          </div>
-        )}
-        {blobUrl && (
-          <img
-            src={blobUrl}
-            alt={title}
-            className="w-full object-contain"
-            style={{ maxHeight: "70vh" }}
-          />
-        )}
-      </div>
+      <DialogContent
+        style={drag.style}
+        className="gap-3 border border-white/10 bg-surface-primary/80 p-3 shadow-2xl backdrop-blur-xl sm:max-w-[min(56rem,70vw)]"
+      >
+        <DialogHeader
+          onPointerDown={drag.onPointerDown}
+          className="flex-row items-center gap-2 space-y-0 cursor-move select-none"
+        >
+          <Eye className="w-4 h-4 text-text-muted flex-shrink-0" />
+          <DialogTitle className="truncate text-sm font-medium leading-none">{title}</DialogTitle>
+        </DialogHeader>
+
+        <div className="resize overflow-auto rounded-md bg-black/30 border border-border-subtle" style={{ height: "20rem", minHeight: "10rem", maxHeight: "80vh" }}>
+          {!src && (
+            <div className="flex items-center justify-center h-40 text-text-muted text-sm">
+              No preview available
+            </div>
+          )}
+          {src && !blobUrl && !error && (
+            <div className="flex items-center justify-center" style={{ minHeight: "20rem" }}>
+              <Skeleton className="h-[20rem] w-full rounded-none" />
+            </div>
+          )}
+          {error && (
+            <div className="flex flex-col items-center justify-center h-40 gap-2 text-text-muted">
+              <FileText className="w-6 h-6" />
+              <span className="text-sm">Preview unavailable</span>
+            </div>
+          )}
+          {blobUrl && (
+            <img
+              src={blobUrl}
+              alt={title}
+              className="h-full w-full object-contain"
+            />
+          )}
+        </div>
+
+        <div className="flex justify-end">
+          <Button asChild variant="ghost" size="sm" className="text-xs">
+            <Link href={pageHref}>Open full page</Link>
+          </Button>
+        </div>
+      </DialogContent>
     </Dialog>
   );
 }
