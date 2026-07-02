@@ -22,6 +22,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 
 import { ThemeProvider } from "./ThemeProvider";
+import { FontScaleProvider } from "./FontScaleProvider";
 
 /**
  * Root client-side provider tree.
@@ -114,8 +115,10 @@ export function Providers({ children }: { children: ReactNode }) {
         <QueryClientProvider client={queryClient}>
           <TooltipProvider delayDuration={200}>
             <ThemeProvider>
-              {children}
-              <Toaster richColors closeButton position="top-right" />
+              <FontScaleProvider>
+                {children}
+                <Toaster richColors closeButton position="top-right" />
+              </FontScaleProvider>
             </ThemeProvider>
           </TooltipProvider>
         </QueryClientProvider>

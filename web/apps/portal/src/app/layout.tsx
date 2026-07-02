@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         {/* Inline script prevents flash of wrong theme on load */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=JSON.parse(localStorage.getItem('ds-theme')||'{}');var v=t.state&&t.state.theme;if(!v){v=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'}document.documentElement.setAttribute('data-theme',v)}catch(e){}})()`,
+            __html: `(function(){try{var t=JSON.parse(localStorage.getItem('ds-theme')||'{}');var v=t.state&&t.state.theme;if(!v){v=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'}document.documentElement.setAttribute('data-theme',v)}catch(e){}try{var f=JSON.parse(localStorage.getItem('ds-font-scale')||'{}');var s=f.state&&f.state.scale;if(s){document.documentElement.style.fontSize=s+'%'}}catch(e){}})()`,
           }}
         />
       </head>
