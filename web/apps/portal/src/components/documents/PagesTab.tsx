@@ -1,15 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { Column, type ColumnFilterElementTemplateOptions } from "primereact/column";
-import { DataTable, type DataTableFilterMeta } from "primereact/datatable";
-import { InputText } from "primereact/inputtext";
-import { FilterMatchMode } from "primereact/api";
+import { useMemo } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
 
 import type { components } from "@docu-store/api-client";
 import { API_URL } from "@/lib/constants";
 import { useAuthBlobUrl } from "@/hooks/use-auth-blob-url";
+import { DataTable } from "@/components/ui/data-table";
 
 type PageResponse = components["schemas"]["PageResponse"];
 
@@ -20,10 +18,6 @@ interface PagesTabProps {
 }
 
 type PageWithSearch = PageResponse & { _search: string };
-
-const defaultFilters: DataTableFilterMeta = {
-  _search: { value: null, matchMode: FilterMatchMode.CONTAINS },
-};
 
 /* ── Small inline thumbnail for page rows ─────────────────────────── */
 function PageThumbnail({ artifactId, pageIndex, href }: {
@@ -51,7 +45,6 @@ function PageThumbnail({ artifactId, pageIndex, href }: {
 
 export function PagesTab({ pages, workspace, artifactId }: PagesTabProps) {
   const isPageObjects = pages.length > 0 && typeof pages[0] === "object";
-  const [filters] = useState<DataTableFilterMeta>(defaultFilters);
 
   /* ── Rich page table (full PageResponse objects) ─────────────────── */
   if (isPageObjects) {
@@ -109,101 +102,77 @@ export function PagesTab({ pages, workspace, artifactId }: PagesTabProps) {
       );
     };
 
-    const textFilterTemplate = (options: ColumnFilterElementTemplateOptions) => (
-      <InputText
-        value={options.value ?? ""}
-        onChange={(e) => options.filterApplyCallback(e.target.value)}
-        placeholder="Search pages..."
-        className="p-column-filter p-inputtext-sm"
-      />
-    );
+    const columns: ColumnDef<PageWithSearch, unknown>[] = [
+      {
+        id: "page",
+        header: "Page",
+        accessorKey: "_search",
+        filterFn: "includesString",
+        sortingFn: (a, b) => a.original.index - b.original.index,
+        meta: { filter: { variant: "text", placeholder: "Search pages…" } },
+        cell: ({ row }) => pageTemplate(row.original),
+      },
+      {
+        id: "index",
+        header: "#",
+        accessorKey: "index",
+        size: 60,
+        cell: ({ row }) => (
+          <span className="text-xs tabular-nums text-text-secondary">{row.original.index + 1}</span>
+        ),
+      },
+      {
+        id: "compounds",
+        header: "Compounds",
+        accessorFn: (r) => r.compound_mentions?.length ?? 0,
+        size: 100,
+        cell: ({ row }) => compoundsTemplate(row.original),
+      },
+    ];
 
     return (
       <DataTable
-          value={enriched}
-          className="overflow-hidden rounded-xl border border-border-default [&_.p-datatable-thead>tr>th]:bg-surface-secondary [&_.p-datatable-thead>tr>th]:text-xs [&_.p-datatable-thead>tr>th]:font-semibold [&_.p-datatable-thead>tr>th]:uppercase [&_.p-datatable-thead>tr>th]:tracking-wider [&_.p-datatable-thead>tr>th]:text-text-muted"
-          emptyMessage="No pages."
-          rowHover
-          stripedRows
-          size="small"
-          paginator={pageData.length > 20}
-          rows={20}
-          sortField="index"
-          sortOrder={1}
-          filters={filters}
-          filterDisplay="row"
-        >
-          <Column
-            header="Page"
-            body={pageTemplate}
-            sortable
-            sortField="index"
-            field="_search"
-            filter
-            filterField="_search"
-            showFilterMenu={false}
-            filterElement={textFilterTemplate}
-          />
-          <Column
-            header="#"
-            field="index"
-            sortable
-            body={(row: PageResponse) => (
-              <span className="text-xs tabular-nums text-text-secondary">{row.index + 1}</span>
-            )}
-            style={{ width: "60px" }}
-          />
-          <Column
-            header="Compounds"
-            body={compoundsTemplate}
-            sortable
-            sortField="compound_mentions"
-            sortFunction={(e) => {
-              const data = [...(e.data as PageResponse[])];
-              return data.sort((a, b) => {
-                const aLen = a.compound_mentions?.length ?? 0;
-                const bLen = b.compound_mentions?.length ?? 0;
-                return e.order! * (aLen - bLen);
-              });
-            }}
-            style={{ width: "100px" }}
-          />
-        </DataTable>
+        columns={columns}
+        data={enriched}
+        emptyMessage="No pages."
+        defaultSorting={[{ id: "page", desc: false }]}
+      />
     );
   }
 
   /* ── Fallback: string page IDs only ──────────────────────────────── */
+  const fallbackData = (pages as string[]).map((pageId, idx) => ({
+    page_id: pageId,
+    index: idx,
+  }));
+
+  const fallbackColumns: ColumnDef<{ page_id: string; index: number }, unknown>[] = [
+    {
+      id: "page",
+      header: "Page",
+      enableSorting: false,
+      cell: ({ row }) => (
+        <Link
+          href={`/${workspace}/documents/${artifactId}/pages/${row.original.page_id}`}
+          className="text-sm font-medium text-accent-text hover:underline"
+        >
+          Page {row.original.index + 1}
+        </Link>
+      ),
+    },
+    {
+      id: "index",
+      header: "#",
+      accessorKey: "index",
+      enableSorting: false,
+      size: 60,
+      cell: ({ row }) => (
+        <span className="text-xs tabular-nums text-text-secondary">{row.original.index + 1}</span>
+      ),
+    },
+  ];
+
   return (
-      <DataTable
-        value={(pages as string[]).map((pageId, idx) => ({
-          page_id: pageId,
-          index: idx,
-        }))}
-        className="overflow-hidden rounded-xl border border-border-default [&_.p-datatable-thead>tr>th]:bg-surface-secondary [&_.p-datatable-thead>tr>th]:text-xs [&_.p-datatable-thead>tr>th]:font-semibold [&_.p-datatable-thead>tr>th]:uppercase [&_.p-datatable-thead>tr>th]:tracking-wider [&_.p-datatable-thead>tr>th]:text-text-muted"
-        emptyMessage="No pages."
-        rowHover
-        stripedRows
-        size="small"
-      >
-        <Column
-          header="Page"
-          body={(row: { page_id: string; index: number }) => (
-            <Link
-              href={`/${workspace}/documents/${artifactId}/pages/${row.page_id}`}
-              className="text-sm font-medium text-accent-text hover:underline"
-            >
-              Page {row.index + 1}
-            </Link>
-          )}
-        />
-        <Column
-          field="index"
-          header="#"
-          body={(row: { index: number }) => (
-            <span className="text-xs tabular-nums text-text-secondary">{row.index + 1}</span>
-          )}
-          style={{ width: "60px" }}
-        />
-      </DataTable>
+    <DataTable columns={fallbackColumns} data={fallbackData} emptyMessage="No pages." />
   );
 }

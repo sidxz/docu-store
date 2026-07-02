@@ -1,15 +1,12 @@
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { Column, type ColumnFilterElementTemplateOptions } from "primereact/column";
-import { DataTable, type DataTableFilterMeta } from "primereact/datatable";
-import { Dropdown } from "primereact/dropdown";
-import { InputText } from "primereact/inputtext";
-import { Tag } from "primereact/tag";
-import { FilterMatchMode } from "primereact/api";
+import { useMemo } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
 
 import type { ArtifactResponse } from "@docu-store/types";
 import { ARTIFACT_TYPE_LABELS } from "@/lib/constants";
 import { AuthThumbnail } from "@/components/ui/TableThumbnail";
+import { DataTable } from "@/components/ui/data-table";
+import { Badge } from "@/components/ui/badge";
 
 type ArtifactWithSearch = ArtifactResponse & { _search: string };
 
@@ -17,11 +14,6 @@ const typeOptions = Object.entries(ARTIFACT_TYPE_LABELS).map(([value, label]) =>
   label,
   value,
 }));
-
-const defaultFilters: DataTableFilterMeta = {
-  _search: { value: null, matchMode: FilterMatchMode.CONTAINS },
-  artifact_type: { value: null, matchMode: FilterMatchMode.EQUALS },
-};
 
 interface DocumentsTableViewProps {
   artifacts: ArtifactResponse[];
@@ -34,8 +26,6 @@ export function DocumentsTableView({
   workspace,
   isLoading,
 }: DocumentsTableViewProps) {
-  const [filters] = useState<DataTableFilterMeta>(defaultFilters);
-
   const enriched = useMemo<ArtifactWithSearch[]>(
     () =>
       artifacts.map((a) => ({
@@ -79,7 +69,11 @@ export function DocumentsTableView({
 
   const typeTemplate = (row: ArtifactResponse) => {
     const label = ARTIFACT_TYPE_LABELS[row.artifact_type] ?? row.artifact_type;
-    return <Tag value={label} severity="info" rounded />;
+    return (
+      <Badge variant="info" className="rounded-full">
+        {label}
+      </Badge>
+    );
   };
 
   const dateTemplate = (row: ArtifactResponse) => {
@@ -125,96 +119,56 @@ export function DocumentsTableView({
     );
   };
 
-  /* ── Filter elements ─────────────────────────────────────────────── */
-  const typeFilterTemplate = (options: ColumnFilterElementTemplateOptions) => (
-    <Dropdown
-      value={options.value}
-      options={typeOptions}
-      onChange={(e) => options.filterApplyCallback(e.value)}
-      placeholder="All"
-      className="p-column-filter p-inputtext-sm"
-      showClear
-      style={{ minWidth: "8rem" }}
-    />
-  );
-
-  const textFilterTemplate = (options: ColumnFilterElementTemplateOptions) => (
-    <InputText
-      value={options.value ?? ""}
-      onChange={(e) => options.filterApplyCallback(e.target.value)}
-      placeholder="Search..."
-      className="p-column-filter p-inputtext-sm"
-    />
-  );
+  const columns: ColumnDef<ArtifactWithSearch, unknown>[] = [
+    {
+      id: "document",
+      header: "Document",
+      accessorKey: "_search",
+      filterFn: "includesString",
+      sortingFn: (a, b) =>
+        (a.original.source_filename ?? "").localeCompare(b.original.source_filename ?? ""),
+      meta: { filter: { variant: "text", placeholder: "Search…" } },
+      cell: ({ row }) => documentTemplate(row.original),
+    },
+    {
+      id: "artifact_type",
+      header: "Type",
+      accessorKey: "artifact_type",
+      filterFn: "equalsString",
+      size: 160,
+      meta: { filter: { variant: "select", options: typeOptions } },
+      cell: ({ row }) => typeTemplate(row.original),
+    },
+    {
+      id: "date",
+      header: "Date",
+      accessorFn: (r) => r.presentation_date?.date ?? "",
+      size: 110,
+      cell: ({ row }) => dateTemplate(row.original),
+    },
+    {
+      id: "pages",
+      header: "Pages",
+      accessorFn: (r) => r.pages?.length ?? 0,
+      size: 70,
+      cell: ({ row }) => pagesTemplate(row.original),
+    },
+    {
+      id: "tags",
+      header: "Tags",
+      enableSorting: false,
+      size: 180,
+      cell: ({ row }) => tagsTemplate(row.original),
+    },
+  ];
 
   return (
     <DataTable
-      value={enriched}
-      loading={isLoading}
-      paginator
-      rows={20}
-      rowsPerPageOptions={[10, 20, 50]}
+      columns={columns}
+      data={enriched}
+      isLoading={isLoading}
       emptyMessage="No documents found."
-      className="overflow-hidden rounded-xl border border-border-default [&_.p-datatable-thead>tr>th]:bg-surface-secondary [&_.p-datatable-thead>tr>th]:text-xs [&_.p-datatable-thead>tr>th]:font-semibold [&_.p-datatable-thead>tr>th]:uppercase [&_.p-datatable-thead>tr>th]:tracking-wider [&_.p-datatable-thead>tr>th]:text-text-muted"
-      rowHover
-      stripedRows
-      size="small"
-      sortField="source_filename"
-      sortOrder={1}
-      filters={filters}
-      filterDisplay="row"
-    >
-      <Column
-        header="Document"
-        body={documentTemplate}
-        sortable
-        sortField="source_filename"
-        field="_search"
-        filter
-        filterField="_search"
-        showFilterMenu={false}
-        filterElement={textFilterTemplate}
-      />
-      <Column
-        header="Type"
-        body={typeTemplate}
-        sortable
-        sortField="artifact_type"
-        field="artifact_type"
-        filter
-        filterField="artifact_type"
-        showFilterMenu={false}
-        filterElement={typeFilterTemplate}
-        style={{ width: "160px" }}
-      />
-      <Column
-        header="Date"
-        body={dateTemplate}
-        sortable
-        sortField="presentation_date.date"
-        field="presentation_date"
-        style={{ width: "110px" }}
-      />
-      <Column
-        header="Pages"
-        body={pagesTemplate}
-        sortable
-        field="pages"
-        sortFunction={(e) => {
-          const data = [...(e.data as ArtifactResponse[])];
-          return data.sort((a, b) => {
-            const aLen = a.pages?.length ?? 0;
-            const bLen = b.pages?.length ?? 0;
-            return e.order! * (aLen - bLen);
-          });
-        }}
-        style={{ width: "70px" }}
-      />
-      <Column
-        header="Tags"
-        body={tagsTemplate}
-        style={{ width: "180px" }}
-      />
-    </DataTable>
+      defaultSorting={[{ id: "document", desc: false }]}
+    />
   );
 }
