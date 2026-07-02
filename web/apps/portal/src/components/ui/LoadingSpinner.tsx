@@ -13,10 +13,7 @@ interface LoadingSpinnerProps {
 export function LoadingSpinner({ size = "md", className }: LoadingSpinnerProps) {
   return (
     <div className={className ?? "flex items-center justify-center py-20"}>
-      <Loader2
-        className={cn("animate-spin text-text-muted", SIZES[size], className)}
-        aria-label="Loading"
-      />
+      <Loader2 className={cn("animate-spin text-text-muted", SIZES[size])} aria-label="Loading" />
     </div>
   );
 }
