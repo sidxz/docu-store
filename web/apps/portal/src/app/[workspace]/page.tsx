@@ -8,6 +8,7 @@ import {
   ArrowRight,
   Upload,
   Search,
+  MessageSquare,
   ArrowUpRight,
   X,
   Trash2,
@@ -166,19 +167,19 @@ export default function DashboardPage() {
             </h2>
             <div className="space-y-3">
               <Link
-                href={`/${workspace}/documents/upload`}
-                onClick={() => trackEvent("dashboard_action", { action: "upload" })}
+                href={`/${workspace}/chat`}
+                onClick={() => trackEvent("dashboard_action", { action: "chat" })}
                 className="group flex items-center gap-4 rounded-xl border border-border-default bg-surface-elevated p-4 transition-all hover:shadow-ds-sm hover:border-primary/30"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-light">
-                  <Upload className="h-5 w-5 text-accent-text" />
+                  <MessageSquare className="h-5 w-5 text-accent-text" />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-text-primary">
-                    Upload Document
+                    Chat
                   </p>
                   <p className="text-xs text-text-muted">
-                    PDF, PPTX, DOC, DOCX
+                    Ask questions about your documents
                   </p>
                 </div>
               </Link>
@@ -197,6 +198,24 @@ export default function DashboardPage() {
                   </p>
                   <p className="text-xs text-text-muted">
                     Semantic search across all content
+                  </p>
+                </div>
+              </Link>
+
+              <Link
+                href={`/${workspace}/documents/upload`}
+                onClick={() => trackEvent("dashboard_action", { action: "upload" })}
+                className="group flex items-center gap-4 rounded-xl border border-border-default bg-surface-elevated p-4 transition-all hover:shadow-ds-sm hover:border-primary/30"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-light">
+                  <Upload className="h-5 w-5 text-accent-text" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-text-primary">
+                    Upload Document
+                  </p>
+                  <p className="text-xs text-text-muted">
+                    PDF, PPTX, DOC, DOCX
                   </p>
                 </div>
               </Link>
