@@ -3,8 +3,13 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { MessageSquare, PanelLeftOpen, FileText } from "lucide-react";
-import { Button } from "primereact/button";
-import { Badge } from "primereact/badge";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
 import { useConversation, useCreateConversation, useSendMessage, useChatFeedback } from "@/hooks/use-chat";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { MessageList } from "./MessageList";
@@ -54,7 +59,6 @@ export function ChatPanel({
     }
   });
   const pendingUserMessage = useChatStore((s) => s.pendingUserMessage);
-  const scrollRef = useRef<HTMLDivElement>(null);
 
   const handleFeedback = useCallback(
     (messageId: string, feedback: "positive" | "negative") => {
@@ -62,13 +66,6 @@ export function ChatPanel({
     },
     [feedbackMutation, chatMode],
   );
-
-  // Auto-scroll when streaming
-  useEffect(() => {
-    if (isStreaming && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [isStreaming, streamingContent]);
 
   // Push sources to the layout.
   // Priority: activeSourcesMessageId (user clicked citation) > finalSources (cited-only after done)
@@ -171,12 +168,9 @@ export function ChatPanel({
       <div className="flex flex-col h-full">
         {sidebarCollapsed && (
           <div className="p-2 border-b border-border-default">
-            <Button
-              icon={<PanelLeftOpen className="w-4 h-4" />}
-              onClick={onToggleSidebar}
-              className="p-button-text p-button-sm"
-              aria-label="Show sidebar"
-            />
+            <Button variant="ghost" size="icon-sm" onClick={onToggleSidebar} aria-label="Show sidebar">
+              <PanelLeftOpen className="size-4" />
+            </Button>
           </div>
         )}
         <div className="flex-1 flex items-center justify-center">
@@ -196,12 +190,9 @@ export function ChatPanel({
       {/* Top bar */}
       <div className="flex items-center gap-2 px-4 py-2 border-b border-border-default">
         {sidebarCollapsed && (
-          <Button
-            icon={<PanelLeftOpen className="w-4 h-4" />}
-            onClick={onToggleSidebar}
-            className="p-button-text p-button-sm"
-            aria-label="Show sidebar"
-          />
+          <Button variant="ghost" size="icon-sm" onClick={onToggleSidebar} aria-label="Show sidebar">
+            <PanelLeftOpen className="size-4" />
+          </Button>
         )}
         <h2 className="text-sm font-medium text-text-primary truncate flex-1">
           {data?.title
@@ -221,29 +212,39 @@ export function ChatPanel({
         {/* Sources toggle */}
         {sourceCount > 0 && (
           <Button
-            icon={<FileText className="w-4 h-4" />}
+            variant={sourcesOpen ? "outline" : "ghost"}
+            size="icon-sm"
             onClick={onToggleSources}
-            className={`p-button-sm p-button-text ${sourcesOpen ? "p-button-outlined" : ""}`}
             aria-label={sourcesOpen ? "Hide sources" : "Show sources"}
-            badge={String(sourceCount)}
-            badgeClassName="p-badge-sm"
-          />
+            className="relative"
+          >
+            <FileText className="size-4" />
+            <Badge
+              variant="secondary"
+              className="absolute -top-1.5 -right-1.5 h-4 min-w-4 justify-center rounded-full px-1 text-[10px] leading-none"
+            >
+              {sourceCount}
+            </Badge>
+          </Button>
         )}
       </div>
 
       {/* Messages area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        <MessageList
-          messages={data?.messages ?? []}
-          isLoading={isLoading}
-          isStreaming={isStreaming}
-          streamingContent={streamingContent}
-          streamingSteps={streamingSteps}
-          streamingSources={streamingSources}
-          workspace={workspace}
-          onFeedback={handleFeedback}
-        />
-      </div>
+      <Conversation>
+        <ConversationContent className="p-0">
+          <MessageList
+            messages={data?.messages ?? []}
+            isLoading={isLoading}
+            isStreaming={isStreaming}
+            streamingContent={streamingContent}
+            streamingSteps={streamingSteps}
+            streamingSources={streamingSources}
+            workspace={workspace}
+            onFeedback={handleFeedback}
+          />
+        </ConversationContent>
+        <ConversationScrollButton />
+      </Conversation>
 
       {/* Input */}
       <ChatInput onSend={handleSend} disabled={isStreaming} />

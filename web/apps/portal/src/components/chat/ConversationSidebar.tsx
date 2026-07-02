@@ -1,8 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, MessageSquare } from "lucide-react";
-import { Button } from "primereact/button";
+import { Plus, Trash2, MessageSquare, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 import { useConversations, useCreateConversation, useDeleteConversation } from "@/hooks/use-chat";
 import { useChatStore } from "@/lib/stores/chat-store";
 import type { Conversation } from "@docu-store/types";
@@ -50,19 +52,23 @@ export function ConversationSidebar({
       {/* Header */}
       <div className="p-2 border-b border-border-default">
         <Button
-          label="New Chat"
-          size="small"
-          icon={<Plus className="w-4 h-4 mr-2" />}
+          variant="outline"
+          size="sm"
           onClick={handleNew}
-          loading={createConversation.isPending}
+          disabled={createConversation.isPending}
           className="w-full"
-          severity="secondary"
-          outlined
-        />
+        >
+          {createConversation.isPending ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Plus className="size-4" />
+          )}
+          New Chat
+        </Button>
       </div>
 
       {/* Conversation list */}
-      <div className="flex-1 overflow-y-auto">
+      <ScrollArea className="flex-1">
         {isLoading ? (
           <div className="p-4 space-y-3">
             {[1, 2, 3].map((i) => (
@@ -87,7 +93,7 @@ export function ConversationSidebar({
             ))}
           </div>
         )}
-      </div>
+      </ScrollArea>
     </div>
   );
 }
@@ -112,13 +118,14 @@ function ConversationItem({
   return (
     <div
       onClick={() => onSelect(conversation.conversation_id)}
-      className={`group flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
+      className={cn(
+        "group flex items-center gap-2 rounded-lg px-3 py-2.5 cursor-pointer transition-colors",
         isActive
           ? "bg-accent-muted text-accent-text"
-          : "hover:bg-surface-hover text-text-primary"
-      }`}
+          : "text-text-primary hover:bg-surface-hover",
+      )}
     >
-      <MessageSquare className="w-4 h-4 flex-shrink-0 opacity-60" />
+      <MessageSquare className="size-4 shrink-0 opacity-60" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{title}</p>
         <p className="text-xs text-text-muted">
@@ -127,9 +134,10 @@ function ConversationItem({
       </div>
       <button
         onClick={(e) => onDelete(e, conversation.conversation_id)}
-        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface-hover transition-opacity"
+        className="rounded p-1 opacity-0 transition-opacity hover:bg-surface-hover group-hover:opacity-100"
+        aria-label="Delete conversation"
       >
-        <Trash2 className="w-3.5 h-3.5 text-text-muted" />
+        <Trash2 className="size-3.5 text-text-muted" />
       </button>
     </div>
   );
