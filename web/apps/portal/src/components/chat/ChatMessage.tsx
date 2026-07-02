@@ -54,7 +54,7 @@ export function ChatMessage({ message, workspace, isStreaming, onFeedback }: Cha
   // — nothing here conflicts within a single role.
   const bubbleClassName = isUser
     ? "group-[.is-user]:rounded-xl group-[.is-user]:rounded-tr-sm group-[.is-user]:bg-primary group-[.is-user]:text-text-inverse"
-    : "group-[.is-assistant]:w-full group-[.is-assistant]:max-w-full group-[.is-assistant]:rounded-xl group-[.is-assistant]:rounded-tl-sm group-[.is-assistant]:border group-[.is-assistant]:border-border-subtle group-[.is-assistant]:bg-surface-elevated group-[.is-assistant]:px-4 group-[.is-assistant]:py-3 group-[.is-assistant]:text-text-primary";
+    : "group-[.is-assistant]:w-full group-[.is-assistant]:rounded-xl group-[.is-assistant]:rounded-tl-sm group-[.is-assistant]:border group-[.is-assistant]:border-border-subtle group-[.is-assistant]:bg-surface-elevated group-[.is-assistant]:px-4 group-[.is-assistant]:py-3 group-[.is-assistant]:text-text-primary";
 
   return (
     <div className={`group/msg flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}>

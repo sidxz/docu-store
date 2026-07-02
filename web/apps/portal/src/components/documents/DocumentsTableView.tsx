@@ -105,7 +105,7 @@ export function DocumentsTableView({
           (tm: { tag: string; page_count?: number | null }, i: number) => (
             <span
               key={`${tm.tag}-${i}`}
-              className="inline-flex items-center rounded-full bg-surface-hover px-2 py-0.5 text-[11px] text-text-secondary"
+              className="inline-flex items-center rounded-full bg-surface-hover px-2 py-0.5 text-[11px] font-mono tabular-nums text-text-secondary"
             >
               {tm.tag}
               {tm.page_count ? ` (${tm.page_count})` : ""}

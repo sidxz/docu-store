@@ -35,8 +35,8 @@ import { ThemeProvider } from "./ThemeProvider";
  *  2. AuthzProvider       — Sentinel auth context
  *  3. QueryClientProvider — TanStack Query
  *  4. TooltipProvider     — Radix tooltip context (shadcn/ui)
- *  5. ThemeProvider       — Applies the data-theme attribute; also renders
- *                           the shadcn/ui <Toaster> below children
+ *  5. ThemeProvider       — Applies the data-theme attribute; Providers
+ *                           renders the <Toaster> as a sibling after children
  */
 export function Providers({ children }: { children: ReactNode }) {
   const queryClient = getQueryClient();

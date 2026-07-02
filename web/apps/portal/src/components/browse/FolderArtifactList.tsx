@@ -117,7 +117,7 @@ export function FolderArtifactList({
       filterFn: "includesString",
       sortingFn: (a, b) =>
         (a.original.title ?? "").localeCompare(b.original.title ?? ""),
-      meta: { filter: { variant: "text", placeholder: "Search..." } },
+      meta: { filter: { variant: "text", placeholder: "Search…" } },
       cell: ({ row }) => documentTemplate(row.original),
     },
     {

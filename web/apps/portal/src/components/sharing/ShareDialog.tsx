@@ -332,7 +332,13 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
                 {/* Row 1: grantee picker */}
                 <div className="mb-2">
                   {granteeType === "user" ? (
-                    <Popover open={memberOpen} onOpenChange={setMemberOpen}>
+                    <Popover
+                      open={memberOpen}
+                      onOpenChange={(open) => {
+                        setMemberOpen(open);
+                        if (!open) setMemberQuery("");
+                      }}
+                    >
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
