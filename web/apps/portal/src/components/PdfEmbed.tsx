@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuthBlobUrl } from "@/hooks/use-auth-blob-url";
+import { Skeleton } from "@/components/ui/skeleton";
 import { API_URL } from "@/lib/constants";
 
 interface PdfEmbedProps {
@@ -31,7 +32,7 @@ export function PdfEmbed({ artifactId, pageNumber }: PdfEmbedProps) {
   return (
     <div className="overflow-hidden rounded-lg border border-border-default">
       {!blobUrl && (
-        <div className="h-[80vh] w-full animate-pulse bg-surface-elevated" />
+        <Skeleton className="h-[80vh] w-full rounded-none bg-surface-elevated" />
       )}
       {src && (
         <iframe

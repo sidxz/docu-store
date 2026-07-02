@@ -8,6 +8,7 @@ import { useAuthBlobUrl } from "@/hooks/use-auth-blob-url";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -48,7 +49,7 @@ function PageImage({
   return (
     <div className="flex justify-center">
       {!blobUrl && !error && (
-        <div className="h-[600px] w-full animate-pulse rounded-lg bg-surface-elevated" />
+        <Skeleton className="h-[600px] w-full rounded-lg bg-surface-elevated" />
       )}
       {error ? (
         <div className="flex h-48 w-full items-center justify-center rounded-lg border border-border-default bg-surface-elevated">
