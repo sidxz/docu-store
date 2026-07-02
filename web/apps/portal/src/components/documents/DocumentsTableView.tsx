@@ -80,7 +80,7 @@ export function DocumentsTableView({
     const pd = row.presentation_date;
     if (!pd) return <span className="text-xs text-text-muted">—</span>;
     return (
-      <span className="text-xs tabular-nums text-text-secondary">
+      <span className="font-mono text-xs tabular-nums text-text-secondary">
         {new Date(pd.date).toLocaleDateString(undefined, {
           year: "numeric",
           month: "short",
@@ -91,7 +91,7 @@ export function DocumentsTableView({
   };
 
   const pagesTemplate = (row: ArtifactResponse) => (
-    <span className="text-xs tabular-nums text-text-secondary">
+    <span className="font-mono text-xs tabular-nums text-text-secondary">
       {row.pages?.length ?? 0}
     </span>
   );

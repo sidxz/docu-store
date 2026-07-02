@@ -21,7 +21,7 @@ export function CopySmiles({ smiles, maxWidth = "max-w-[180px]" }: CopySmilesPro
     <div className="flex items-center justify-between">
       <span className="text-text-muted">SMILES</span>
       <span className="flex items-center gap-1">
-        <span className={`font-mono text-text-secondary ${maxWidth} truncate`}>
+        <span className={`font-mono tabular-nums text-text-secondary ${maxWidth} truncate`}>
           {smiles}
         </span>
         <button

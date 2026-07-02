@@ -96,7 +96,7 @@ export function Topbar() {
         {/* User token usage total */}
         {usage.data && usage.data.total > 0 && (
           <span
-            className="hidden md:inline-flex items-center gap-1 px-2 text-xs text-text-muted tabular-nums"
+            className="hidden md:inline-flex items-center gap-1 px-2 text-xs font-mono text-text-muted tabular-nums"
             title={`${usage.data.total.toLocaleString()} tokens used — ${usage.data.prompt.toLocaleString()} prompt + ${usage.data.completion.toLocaleString()} completion`}
           >
             <BarChart3 className="size-3" />

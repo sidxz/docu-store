@@ -35,7 +35,7 @@ export function CompoundGrid({
               {cm.extracted_id && (
                 <div className="flex items-center justify-between">
                   <span className="text-text-muted">ID</span>
-                  <span className="font-medium text-text-primary">
+                  <span className="font-mono font-medium text-text-primary">
                     {cm.extracted_id}
                   </span>
                 </div>

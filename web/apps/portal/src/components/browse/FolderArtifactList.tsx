@@ -75,7 +75,7 @@ export function FolderArtifactList({
     if (!row.presentation_date)
       return <span className="text-xs text-text-muted">—</span>;
     return (
-      <span className="text-xs tabular-nums text-text-secondary">
+      <span className="font-mono text-xs tabular-nums text-text-secondary">
         {new Date(row.presentation_date).toLocaleDateString(undefined, {
           year: "numeric",
           month: "short",
@@ -86,7 +86,7 @@ export function FolderArtifactList({
   };
 
   const pagesTemplate = (row: ArtifactBrowseItemDTO) => (
-    <span className="text-xs tabular-nums text-text-secondary">{row.page_count}</span>
+    <span className="font-mono text-xs tabular-nums text-text-secondary">{row.page_count}</span>
   );
 
   const foundOnTemplate = (row: ArtifactBrowseItemDTO) => {
@@ -100,7 +100,7 @@ export function FolderArtifactList({
           <Link
             key={src.page_id}
             href={`/${workspace}/documents/${row.artifact_id}/pages/${src.page_id}`}
-            className="inline-flex items-center rounded-full bg-surface-hover px-2 py-0.5 text-[11px] tabular-nums text-accent-text hover:bg-accent-text/10"
+            className="inline-flex items-center rounded-full bg-surface-hover px-2 py-0.5 text-[11px] font-mono tabular-nums text-accent-text hover:bg-accent-text/10"
           >
             p.{src.page_index + 1}
           </Link>

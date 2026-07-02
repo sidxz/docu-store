@@ -28,7 +28,7 @@ export function ScoreBadge({
   if (variant === "pill") {
     return (
       <span
-        className={`inline-flex items-center gap-1 rounded-full border border-border-default px-2 py-0.5 text-xs font-medium ${getScoreTextColor(score)} ${className}`}
+        className={`inline-flex items-center gap-1 rounded-full border border-border-default px-2 py-0.5 text-xs font-mono font-medium tabular-nums ${getScoreTextColor(score)} ${className}`}
       >
         {pct}%
       </span>
@@ -43,7 +43,7 @@ export function ScoreBadge({
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-xs font-medium text-text-secondary">{pct}%</span>
+      <span className="text-xs font-mono font-medium tabular-nums text-text-secondary">{pct}%</span>
     </div>
   );
 }

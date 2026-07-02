@@ -301,7 +301,7 @@ export default function StatsPage() {
                     contentStyle={{
                       backgroundColor: "var(--color-surface-elevated)",
                       border: "1px solid var(--color-border-default)",
-                      borderRadius: "0.5rem",
+                      borderRadius: "var(--radius)",
                       fontSize: "0.75rem",
                     }}
                     formatter={(value, name) => [
@@ -391,16 +391,16 @@ export default function StatsPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border-default text-left">
-                      <th className="pb-2 pr-4 font-medium text-text-muted">
+                      <th className="pb-2 pr-4 text-xs font-semibold uppercase tracking-wider text-text-muted">
                         Collection
                       </th>
-                      <th className="pb-2 pr-4 text-right font-medium text-text-muted">
+                      <th className="pb-2 pr-4 text-right text-xs font-semibold uppercase tracking-wider text-text-muted">
                         Points
                       </th>
-                      <th className="pb-2 pr-4 text-right font-medium text-text-muted">
+                      <th className="pb-2 pr-4 text-right text-xs font-semibold uppercase tracking-wider text-text-muted">
                         Vectors
                       </th>
-                      <th className="pb-2 font-medium text-text-muted">
+                      <th className="pb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
                         Status
                       </th>
                     </tr>
@@ -411,10 +411,10 @@ export default function StatsPage() {
                         <td className="py-2.5 pr-4 font-medium text-text-primary">
                           {c.collection_name}
                         </td>
-                        <td className="py-2.5 pr-4 text-right tabular-nums text-text-secondary">
+                        <td className="py-2.5 pr-4 text-right font-mono tabular-nums text-text-secondary">
                           {fmtNumber(c.points_count)}
                         </td>
-                        <td className="py-2.5 pr-4 text-right tabular-nums text-text-secondary">
+                        <td className="py-2.5 pr-4 text-right font-mono tabular-nums text-text-secondary">
                           {fmtNumber(c.indexed_vectors_count)}
                         </td>
                         <td className="py-2.5">
@@ -450,16 +450,16 @@ export default function StatsPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border-default text-left">
-                      <th className="pb-2 pr-4 font-medium text-text-muted">
+                      <th className="pb-2 pr-4 text-xs font-semibold uppercase tracking-wider text-text-muted">
                         Workflow
                       </th>
-                      <th className="pb-2 pr-4 font-medium text-text-muted">
+                      <th className="pb-2 pr-4 text-xs font-semibold uppercase tracking-wider text-text-muted">
                         Type
                       </th>
-                      <th className="pb-2 pr-4 font-medium text-text-muted">
+                      <th className="pb-2 pr-4 text-xs font-semibold uppercase tracking-wider text-text-muted">
                         Started
                       </th>
-                      <th className="pb-2 font-medium text-text-muted">
+                      <th className="pb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
                         Error
                       </th>
                     </tr>
@@ -476,7 +476,7 @@ export default function StatsPage() {
                         <td className="py-2.5 pr-4 text-text-primary">
                           {cleanWorkflowName(f.workflow_type)}
                         </td>
-                        <td className="py-2.5 pr-4 whitespace-nowrap text-text-secondary">
+                        <td className="py-2.5 pr-4 whitespace-nowrap font-mono tabular-nums text-text-secondary">
                           {fmtDate(f.started_at)}
                         </td>
                         <td
@@ -675,7 +675,7 @@ function AnalyticsSection() {
                     contentStyle={{
                       backgroundColor: "var(--color-surface-elevated)",
                       border: "1px solid var(--color-border-default)",
-                      borderRadius: "0.5rem",
+                      borderRadius: "var(--radius)",
                       fontSize: "0.75rem",
                     }}
                     formatter={(value, name) => [
@@ -714,7 +714,7 @@ function AnalyticsSection() {
                         />
                       </div>
                     </div>
-                    <span className="text-xs tabular-nums text-text-muted w-16 text-right">
+                    <span className="text-xs font-mono tabular-nums text-text-muted w-16 text-right">
                       {(m.zero_result_rate * 100).toFixed(1)}% empty
                     </span>
                   </div>
@@ -778,7 +778,7 @@ function AnalyticsSection() {
                       contentStyle={{
                         backgroundColor: "var(--color-surface-elevated)",
                         border: "1px solid var(--color-border-default)",
-                        borderRadius: "0.5rem",
+                        borderRadius: "var(--radius)",
                         fontSize: "0.75rem",
                       }}
                       formatter={(value, name) => [
@@ -908,10 +908,10 @@ function AnalyticsSection() {
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0 w-20">
-                    <span className="text-xs tabular-nums font-medium text-amber-500">
+                    <span className="text-xs font-mono tabular-nums font-medium text-amber-500">
                       {(g.gap_rate * 100).toFixed(0)}% gap
                     </span>
-                    <p className="text-[10px] text-text-muted tabular-nums">
+                    <p className="text-[10px] font-mono text-text-muted tabular-nums">
                       {g.gap_count}/{g.query_count} queries
                     </p>
                   </div>
@@ -955,7 +955,7 @@ function AnalyticsSection() {
                       <span className="text-sm text-text-primary truncate flex-1 group-hover/cite:text-primary" title={a.artifact_title ?? a.artifact_id}>
                         {a.artifact_title ?? a.artifact_id.slice(0, 12)}
                       </span>
-                      <span className="text-xs tabular-nums font-medium text-text-secondary flex-shrink-0">
+                      <span className="text-xs font-mono tabular-nums font-medium text-text-secondary flex-shrink-0">
                         {a.citation_count}
                       </span>
                       <span className="text-[10px] text-text-muted flex-shrink-0">
@@ -983,7 +983,7 @@ function AnalyticsSection() {
                         <span className="text-sm text-text-secondary truncate flex-1 group-hover/cite:text-primary" title={a.artifact_title ?? a.artifact_id}>
                           {a.artifact_title ?? a.artifact_id.slice(0, 12)}
                         </span>
-                        <span className="text-xs tabular-nums text-text-muted flex-shrink-0">
+                        <span className="text-xs font-mono tabular-nums text-text-muted flex-shrink-0">
                           {a.citation_count}
                         </span>
                       </Link>
@@ -1066,7 +1066,7 @@ function FunnelRow({
     <div>
       <div className="mb-1 flex items-center justify-between text-sm">
         <span className="text-text-secondary">{label}</span>
-        <span className="font-medium tabular-nums text-text-primary">
+        <span className="font-mono font-medium tabular-nums text-text-primary">
           {fmtNumber(count)}
           {!isAbsolute && total > 0 && (
             <span className="ml-1 text-xs text-text-muted">
@@ -1112,7 +1112,7 @@ function ModelInfoBlock({
             <dt className="text-text-muted capitalize">
               {key.replace(/_/g, " ")}
             </dt>
-            <dd className="font-medium text-text-secondary">{String(value)}</dd>
+            <dd className="font-mono font-medium text-text-secondary">{String(value)}</dd>
           </div>
         ))}
       </dl>

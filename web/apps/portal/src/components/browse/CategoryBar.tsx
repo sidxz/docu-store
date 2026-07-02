@@ -45,7 +45,7 @@ export function CategoryBar({
           >
             {cat.display_name}
             <span
-              className={`tabular-nums ${
+              className={`font-mono tabular-nums ${
                 isActive
                   ? "text-white/70"
                   : "text-text-muted"

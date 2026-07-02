@@ -42,7 +42,7 @@ export function FolderGrid({ folders, onSelect, isLoading, entityType }: FolderG
           <span className="min-w-0 flex-1 truncate text-sm font-medium text-text-primary">
             {folder.display_name}
           </span>
-          <span className="shrink-0 text-xs tabular-nums text-text-muted">
+          <span className="shrink-0 font-mono text-xs tabular-nums text-text-muted">
             {folder.artifact_count}
           </span>
           {folder.has_children && (

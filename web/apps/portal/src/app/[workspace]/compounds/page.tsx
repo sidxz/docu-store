@@ -75,7 +75,7 @@ export default function CompoundsPage() {
               </span>
             </p>
             <span className="text-xs text-text-muted">
-              Model: {search.data.model_used}
+              Model: <span className="font-mono">{search.data.model_used}</span>
             </span>
           </div>
 
@@ -98,7 +98,7 @@ export default function CompoundsPage() {
                   {r.extracted_id && (
                     <div className="flex items-center justify-between">
                       <span className="text-text-muted">ID</span>
-                      <span className="font-medium text-text-primary">
+                      <span className="font-mono font-medium text-text-primary">
                         {r.extracted_id}
                       </span>
                     </div>

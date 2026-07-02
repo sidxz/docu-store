@@ -102,12 +102,12 @@ function ServiceRow({ service }: { service: ServiceStatus }) {
           {service.name}
         </span>
         {service.version && (
-          <span className="rounded bg-surface-sunken px-2 py-0.5 text-xs text-text-muted">
+          <span className="rounded bg-surface-sunken px-2 py-0.5 text-xs font-mono text-text-muted">
             v{service.version}
           </span>
         )}
         {service.latency_ms != null && (
-          <span className="rounded bg-surface-sunken px-2 py-0.5 text-xs tabular-nums text-text-muted">
+          <span className="rounded bg-surface-sunken px-2 py-0.5 text-xs font-mono tabular-nums text-text-muted">
             {service.latency_ms}ms
           </span>
         )}
@@ -163,11 +163,11 @@ function ModelRow({ model }: { model: ModelStatus }) {
         <span className="flex-1 text-sm font-medium text-text-primary">
           {model.name}
         </span>
-        <span className="rounded bg-surface-sunken px-2 py-0.5 text-xs text-text-muted">
+        <span className="rounded bg-surface-sunken px-2 py-0.5 text-xs font-mono text-text-muted">
           {model.model_name}
         </span>
         <span
-          className={`rounded px-2 py-0.5 text-xs font-medium ${
+          className={`rounded px-2 py-0.5 text-xs font-mono font-medium ${
             model.device === "cuda"
               ? "bg-green-500/10 text-green-600 dark:text-green-400"
               : model.device === "mps"
@@ -277,7 +277,7 @@ function GpuDeviceCard({ device }: { device: GpuDevice }) {
         <span className="text-sm font-medium text-text-primary">
           GPU {device.index}: {device.name}
         </span>
-        <span className="text-xs text-text-muted">
+        <span className="text-xs font-mono tabular-nums text-text-muted">
           {device.memory_used_mb} / {device.memory_total_mb} MB ({usedPct}%)
         </span>
       </div>
@@ -350,7 +350,7 @@ function ConfigSection({ config }: { config: DetailedHealthResponse["config"] })
             className="flex items-baseline justify-between border-b border-border-default bg-surface-sunken/30 px-3 py-2 last:border-b-0 sm:[&:nth-last-child(2):nth-child(odd)]:border-b-0"
           >
             <span className="text-xs text-text-muted">{label}</span>
-            <span className="ml-4 text-right text-xs font-medium text-text-primary">
+            <span className="ml-4 text-right text-xs font-mono font-medium text-text-primary">
               {value}
             </span>
           </div>
@@ -605,10 +605,10 @@ export default function StatusPage() {
         badge={
           <span className="flex items-center gap-1.5 text-xs font-medium text-text-muted">
             <span className="rounded bg-surface-sunken px-2 py-0.5">
-              BE v{data.system.app_version}
+              BE <span className="font-mono">v{data.system.app_version}</span>
             </span>
             <span className="rounded bg-surface-sunken px-2 py-0.5">
-              FE v{process.env.APP_VERSION ?? "dev"}
+              FE <span className="font-mono">v{process.env.APP_VERSION ?? "dev"}</span>
             </span>
           </span>
         }
@@ -744,9 +744,11 @@ export default function StatusPage() {
       {/* ---- Footer: last checked ---- */}
       <p className="mt-4 text-right text-xs text-text-muted">
         Last checked:{" "}
-        {dataUpdatedAt
-          ? new Date(dataUpdatedAt).toLocaleTimeString()
-          : "--"}
+        <span className="font-mono tabular-nums">
+          {dataUpdatedAt
+            ? new Date(dataUpdatedAt).toLocaleTimeString()
+            : "--"}
+        </span>
       </p>
     </div>
   );

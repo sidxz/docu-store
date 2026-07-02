@@ -51,7 +51,7 @@ export function SearchResultCard({
   };
 
   return (
-    <div className="rounded-xl border border-border-default bg-surface-elevated p-4 transition-shadow hover:shadow-ds">
+    <div className="rounded-xl border border-border-default bg-surface-elevated p-4 transition-shadow hover:shadow-ds-sm">
       <div className="flex items-start gap-4">
         {/* Thumbnail with auth */}
         {thumbnailSrc && (

@@ -58,7 +58,7 @@ function SourceBadges({
         <Link
           key={s.page_id}
           href={`/${workspace}/documents/${artifactId}/pages/${s.page_id}`}
-          className="flex h-5 min-w-[20px] items-center justify-center rounded-md bg-surface-sunken px-1.5 text-[10px] font-medium tabular-nums text-text-muted transition-colors hover:bg-accent-light hover:text-accent-text"
+          className="flex h-5 min-w-[20px] items-center justify-center rounded-md bg-surface-sunken px-1.5 text-[10px] font-mono font-medium tabular-nums text-text-muted transition-colors hover:bg-accent-light hover:text-accent-text"
         >
           {s.page_index + 1}
         </Link>
@@ -84,7 +84,7 @@ function SourcePillSuffix({
         <Link
           key={s.page_id}
           href={`/${workspace}/documents/${artifactId}/pages/${s.page_id}`}
-          className="rounded px-1 text-[10px] font-medium tabular-nums text-text-muted transition-colors hover:text-accent-text"
+          className="rounded px-1 text-[10px] font-mono font-medium tabular-nums text-text-muted transition-colors hover:text-accent-text"
         >
           {s.page_index + 1}
         </Link>
@@ -146,9 +146,9 @@ function ActivityTable({ activities }: { activities: Bioactivity[] }) {
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b border-border-subtle bg-surface-sunken/50">
-            <th className="px-2 py-1.5 text-left font-medium text-text-muted">Assay</th>
-            <th className="px-2 py-1.5 text-left font-medium text-text-muted">Value</th>
-            <th className="px-2 py-1.5 text-left font-medium text-text-muted">Source</th>
+            <th className="px-2 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wider text-text-muted">Assay</th>
+            <th className="px-2 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wider text-text-muted">Value</th>
+            <th className="px-2 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wider text-text-muted">Source</th>
           </tr>
         </thead>
         <tbody>

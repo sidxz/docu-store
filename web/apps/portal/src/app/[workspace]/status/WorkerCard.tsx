@@ -38,7 +38,7 @@ function DeviceBadge({ device }: { device: string }) {
         ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
         : "bg-surface-sunken text-text-muted";
   return (
-    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${cls}`}>
+    <span className={`rounded px-1.5 py-0.5 text-[10px] font-mono font-medium ${cls}`}>
       {device}
     </span>
   );
@@ -94,17 +94,17 @@ export function WorkerCard({ worker }: { worker: WorkerHeartbeat }) {
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 border-t border-border-default px-4 py-2 text-xs text-text-muted sm:grid-cols-4">
         <div className="flex items-center gap-1">
           <HardDrive className="h-3 w-3" />
-          <span className="truncate">{worker.hostname}</span>
+          <span className="truncate font-mono">{worker.hostname}</span>
         </div>
         <div className="flex items-center gap-1">
           <Cpu className="h-3 w-3" />
-          <span>PID {worker.pid}</span>
+          <span>PID <span className="font-mono tabular-nums">{worker.pid}</span></span>
         </div>
         <div>
-          Uptime: {fmtUptime(uptimeSeconds)}
+          Uptime: <span className="font-mono tabular-nums">{fmtUptime(uptimeSeconds)}</span>
         </div>
         <div>
-          Heartbeat: {timeAgo(worker.last_heartbeat)}
+          Heartbeat: <span className="font-mono tabular-nums">{timeAgo(worker.last_heartbeat)}</span>
         </div>
       </div>
 

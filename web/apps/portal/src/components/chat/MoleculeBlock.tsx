@@ -32,7 +32,7 @@ export function MoleculeBlock({ smiles, label, pageId, artifactId, workspace }: 
           {label}
         </p>
       )}
-      <p className="text-xs font-mono text-text-muted mt-1 text-center break-all line-clamp-2">
+      <p className="text-xs font-mono tabular-nums text-text-muted mt-1 text-center break-all line-clamp-2">
         {smiles}
       </p>
       {href && (

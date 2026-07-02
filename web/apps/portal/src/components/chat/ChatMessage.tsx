@@ -251,7 +251,7 @@ function GroundingBar({
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-text-secondary font-medium tabular-nums">{pct}%</span>
+      <span className="text-text-secondary font-mono font-medium tabular-nums">{pct}%</span>
     </div>
   );
 }

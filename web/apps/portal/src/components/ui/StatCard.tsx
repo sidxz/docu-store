@@ -33,7 +33,7 @@ export function StatCard({
   }
 
   return (
-    <div className="group rounded-xl border border-border-default bg-surface-elevated p-5 transition-all duration-200 hover:shadow-ds hover:border-border-default/80">
+    <div className="group rounded-xl border border-border-default bg-surface-elevated p-5 transition-all duration-200 hover:shadow-ds-sm hover:border-border-default/80">
       <div className="flex items-center justify-between">
         <span className="text-sm text-text-muted">{label}</span>
         <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${accentColor ?? "bg-accent-light"}`}>
@@ -41,7 +41,7 @@ export function StatCard({
         </div>
       </div>
       <div className="mt-3 flex items-baseline gap-2">
-        <span className="text-2xl font-bold tracking-tight text-text-primary">
+        <span className="font-mono text-2xl font-bold tracking-tight tabular-nums text-text-primary">
           {value}
         </span>
         {trend && (

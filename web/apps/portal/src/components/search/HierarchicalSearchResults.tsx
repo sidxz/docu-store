@@ -404,7 +404,7 @@ function DocumentGroupCard({
             </Link>
             <ScoreBadge score={group.bestScore} />
             {!expanded && group.pages.length > 0 && (
-              <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[11px] tabular-nums text-text-muted">
+              <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[11px] font-mono tabular-nums text-text-muted">
                 {group.pages.length} {group.pages.length === 1 ? "page" : "pages"}
               </span>
             )}

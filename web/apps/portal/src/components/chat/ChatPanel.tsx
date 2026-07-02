@@ -203,7 +203,7 @@ export function ChatPanel({
         {/* Per-chat token usage — pulled right */}
         {chatTokens > 0 && (
           <span
-            className="text-xs text-text-muted tabular-nums whitespace-nowrap"
+            className="text-xs font-mono text-text-muted tabular-nums whitespace-nowrap"
             title={`${chatTokens.toLocaleString()} tokens in this chat`}
           >
             {formatTokens(chatTokens)} tokens

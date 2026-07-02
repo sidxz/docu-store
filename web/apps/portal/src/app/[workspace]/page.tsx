@@ -199,7 +199,7 @@ export default function DashboardPage() {
               <Link
                 href={`/${workspace}/documents/upload`}
                 onClick={() => trackEvent("dashboard_action", { action: "upload" })}
-                className="group flex items-center gap-4 rounded-xl border border-border-default bg-surface-elevated p-4 transition-all hover:shadow-ds hover:border-primary/30"
+                className="group flex items-center gap-4 rounded-xl border border-border-default bg-surface-elevated p-4 transition-all hover:shadow-ds-sm hover:border-primary/30"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-light">
                   <Upload className="h-5 w-5 text-accent-text" />
@@ -217,7 +217,7 @@ export default function DashboardPage() {
               <Link
                 href={`/${workspace}/search`}
                 onClick={() => trackEvent("dashboard_action", { action: "search" })}
-                className="group flex items-center gap-4 rounded-xl border border-border-default bg-surface-elevated p-4 transition-all hover:shadow-ds hover:border-primary/30"
+                className="group flex items-center gap-4 rounded-xl border border-border-default bg-surface-elevated p-4 transition-all hover:shadow-ds-sm hover:border-primary/30"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-feature-search/10">
                   <Search className="h-5 w-5 text-feature-search" />
@@ -235,7 +235,7 @@ export default function DashboardPage() {
               <Link
                 href={`/${workspace}/compounds`}
                 onClick={() => trackEvent("dashboard_action", { action: "compounds" })}
-                className="group flex items-center gap-4 rounded-xl border border-border-default bg-surface-elevated p-4 transition-all hover:shadow-ds hover:border-primary/30"
+                className="group flex items-center gap-4 rounded-xl border border-border-default bg-surface-elevated p-4 transition-all hover:shadow-ds-sm hover:border-primary/30"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-feature-compounds/10">
                   <Atom className="h-5 w-5 text-feature-compounds" />

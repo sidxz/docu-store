@@ -171,7 +171,7 @@ export function DataTable<TData>({
         </TableBody>
       </Table>
       <div className="flex items-center justify-between border-t border-border-default px-3 py-2 text-xs text-text-muted">
-        <span className="tabular-nums">
+        <span className="font-mono tabular-nums">
           {total === 0 ? "0" : `${pageIndex * ps + 1}–${Math.min((pageIndex + 1) * ps, total)}`} of {total}
         </span>
         <div className="flex items-center gap-2">

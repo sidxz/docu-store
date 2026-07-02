@@ -96,7 +96,7 @@ export function PagesTab({ pages, workspace, artifactId }: PagesTabProps) {
       const count = row.compound_mentions?.length ?? 0;
       if (!count) return <span className="text-xs text-text-muted">—</span>;
       return (
-        <span className="inline-flex items-center rounded-full bg-surface-hover px-2 py-0.5 text-[11px] tabular-nums text-text-secondary">
+        <span className="inline-flex items-center rounded-full bg-surface-hover px-2 py-0.5 text-[11px] font-mono tabular-nums text-text-secondary">
           {count}
         </span>
       );
@@ -118,7 +118,7 @@ export function PagesTab({ pages, workspace, artifactId }: PagesTabProps) {
         accessorKey: "index",
         size: 60,
         cell: ({ row }) => (
-          <span className="text-xs tabular-nums text-text-secondary">{row.original.index + 1}</span>
+          <span className="font-mono text-xs tabular-nums text-text-secondary">{row.original.index + 1}</span>
         ),
       },
       {
@@ -167,7 +167,7 @@ export function PagesTab({ pages, workspace, artifactId }: PagesTabProps) {
       enableSorting: false,
       size: 60,
       cell: ({ row }) => (
-        <span className="text-xs tabular-nums text-text-secondary">{row.original.index + 1}</span>
+        <span className="font-mono text-xs tabular-nums text-text-secondary">{row.original.index + 1}</span>
       ),
     },
   ];
