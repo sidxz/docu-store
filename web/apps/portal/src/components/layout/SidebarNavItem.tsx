@@ -27,8 +27,8 @@ export function SidebarNavItem({
       aria-current={isActive ? "page" : undefined}
       className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-200 ${
         isActive
-          ? "bg-sidebar-active text-white font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
-          : "text-sidebar-text hover:bg-sidebar-hover hover:text-white"
+          ? "bg-sidebar-active text-sidebar-text-active font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+          : "text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active"
       }`}
     >
       {/* Active indicator bar */}

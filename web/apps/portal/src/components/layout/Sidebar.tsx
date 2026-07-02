@@ -69,7 +69,7 @@ export function Sidebar({ workspaceSlug }: { workspaceSlug: string }) {
         </div>
         {!collapsed && (
           <div className="flex flex-col">
-            <span className="text-sm font-bold tracking-wide text-white">
+            <span className="text-sm font-bold tracking-wide text-sidebar-text-active">
               DocuStore.io
             </span>
             <span className="text-xs uppercase tracking-widest text-sidebar-text opacity-60">
@@ -116,7 +116,7 @@ export function Sidebar({ workspaceSlug }: { workspaceSlug: string }) {
           onClick={toggleTheme}
           title={collapsed ? (theme === "light" ? "Dark mode" : "Light mode") : undefined}
           aria-label={theme === "light" ? "Dark mode" : "Light mode"}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-text transition-all duration-200 hover:bg-sidebar-hover hover:text-white"
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-text transition-all duration-200 hover:bg-sidebar-hover hover:text-sidebar-text-active"
         >
           {theme === "light" ? (
             <Moon className="size-[1.125rem] shrink-0" />
@@ -134,7 +134,7 @@ export function Sidebar({ workspaceSlug }: { workspaceSlug: string }) {
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-expanded={!collapsed}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-text transition-all duration-200 hover:bg-sidebar-hover hover:text-white"
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-text transition-all duration-200 hover:bg-sidebar-hover hover:text-sidebar-text-active"
         >
           {collapsed ? (
             <PanelLeftOpen className="size-[1.125rem] shrink-0" />

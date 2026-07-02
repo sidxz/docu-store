@@ -53,13 +53,13 @@
   --ds-accent-text: #2563eb;
   --ds-accent-subtle: #f5f9ff;
 
-  /* Sidebar (always dark) */
-  --ds-sidebar: #0f172a;
-  --ds-sidebar-text: #cbd5e1;
-  --ds-sidebar-text-active: #ffffff;
-  --ds-sidebar-hover: rgba(255, 255, 255, 0.05);
-  --ds-sidebar-active: rgba(255, 255, 255, 0.1);
-  --ds-sidebar-border: rgba(255, 255, 255, 0.06);
+  /* Sidebar — light panel in light mode, dark in dark (overridden below) */
+  --ds-sidebar: #f1f5f9;
+  --ds-sidebar-text: #475569;
+  --ds-sidebar-text-active: #0f172a;
+  --ds-sidebar-hover: rgba(15, 23, 42, 0.05);
+  --ds-sidebar-active: rgba(59, 130, 246, 0.12);
+  --ds-sidebar-border: #e2e8f0;
 
   /* Semantic — AA-contrast (≥4.5:1) darkened for light-mode text use */
   --ds-success: #15803d;
@@ -146,6 +146,14 @@
   /* Feature accent colors */
   --ds-feature-search: #a78bfa;
   --ds-feature-compounds: #22c55e;
+
+  /* Sidebar — dark panel (light-mode defaults live in :root) */
+  --ds-sidebar: #0f172a;
+  --ds-sidebar-text: #cbd5e1;
+  --ds-sidebar-text-active: #ffffff;
+  --ds-sidebar-hover: rgba(255, 255, 255, 0.05);
+  --ds-sidebar-active: rgba(255, 255, 255, 0.1);
+  --ds-sidebar-border: rgba(255, 255, 255, 0.06);
 
   /* Shadows */
   --ds-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
