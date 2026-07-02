@@ -309,6 +309,7 @@ function PagePreviewDialog({
 
   return (
     <Dialog
+      modal={false}
       open={visible}
       onOpenChange={(open) => {
         if (!open) {
@@ -318,6 +319,7 @@ function PagePreviewDialog({
       }}
     >
       <DialogContent
+        showOverlay={false}
         style={drag.style}
         className="gap-3 border border-white/10 bg-surface-primary/80 p-3 shadow-2xl backdrop-blur-xl sm:max-w-[min(56rem,70vw)]"
       >
@@ -329,7 +331,7 @@ function PagePreviewDialog({
           <DialogTitle className="truncate text-sm font-medium leading-none">{title}</DialogTitle>
         </DialogHeader>
 
-        <div className="resize overflow-auto rounded-md bg-black/30 border border-border-subtle" style={{ height: "20rem", minHeight: "10rem", maxHeight: "80vh" }}>
+        <div className="resize overflow-auto rounded-md bg-black/30 border border-border-subtle">
           {!src && (
             <div className="flex items-center justify-center h-40 text-text-muted text-sm">
               No preview available
@@ -350,7 +352,7 @@ function PagePreviewDialog({
             <img
               src={blobUrl}
               alt={title}
-              className="h-full w-full object-contain"
+              className="max-h-[70vh] w-full object-contain"
             />
           )}
         </div>
