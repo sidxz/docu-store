@@ -13,7 +13,7 @@ export interface DashboardStats {
   withSummary: number;
 }
 
-function useDashboardStats() {
+export function useDashboardStats() {
   return useQuery({
     queryKey: queryKeys.dashboard.stats(),
     queryFn: async (): Promise<DashboardStats> => {

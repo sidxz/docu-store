@@ -4,9 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   FileText,
-  BookOpen,
   Atom,
-  Activity,
   ArrowRight,
   Upload,
   Search,
@@ -16,7 +14,6 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { StatCard } from "@/components/ui/StatCard";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { useDashboard } from "@/hooks/use-dashboard";
 import {
@@ -33,7 +30,7 @@ import { severityToVariant } from "@/lib/severity";
 export default function DashboardPage() {
   const { workspace } = useParams<{ workspace: string }>();
   const { trackEvent } = useAnalytics();
-  const { stats, recentArtifacts, isLoading } = useDashboard();
+  const { recentArtifacts, isLoading } = useDashboard();
   const { data: recentSearches } = useRecentSearches(5);
   const { data: recentDocs } = useRecentDocuments(5);
   const deleteSearch = useDeleteSearchEntry();
@@ -54,36 +51,8 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          icon={FileText}
-          label="Documents"
-          value={stats.totalArtifacts}
-          loading={isLoading}
-        />
-        <StatCard
-          icon={BookOpen}
-          label="Pages"
-          value={stats.totalPages}
-          loading={isLoading}
-        />
-        <StatCard
-          icon={Atom}
-          label="Compounds"
-          value={stats.totalCompounds}
-          loading={isLoading}
-        />
-        <StatCard
-          icon={Activity}
-          label="Summarized"
-          value={stats.withSummary}
-          loading={isLoading}
-        />
-      </div>
-
       {/* Two-column layout */}
-      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Recent Documents — 2/3 width */}
         <div className="lg:col-span-2 rounded-xl border border-border-default bg-surface-elevated">
           <div className="flex items-center justify-between px-5 py-4">

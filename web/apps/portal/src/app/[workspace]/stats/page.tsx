@@ -16,6 +16,8 @@ import {
   Shield,
   Coins,
   FileText,
+  BookOpen,
+  Atom,
   CircleHelp,
 } from "lucide-react";
 import {
@@ -47,6 +49,7 @@ import {
   useKnowledgeGaps,
   useCitationFrequency,
 } from "@/hooks/use-stats";
+import { useDashboardStats } from "@/hooks/use-dashboard";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -141,6 +144,7 @@ export default function StatsPage() {
     isLoading: vecLoading,
     error: vecError,
   } = useVectorStats();
+  const { data: corpus, isLoading: corpusLoading } = useDashboardStats();
 
   const isLoading = wfLoading || plLoading || vecLoading;
   const error = wfError ?? plError ?? vecError;
@@ -238,8 +242,40 @@ export default function StatsPage() {
         subtitle="Workflow performance, processing pipeline, and vector store health"
       />
 
-      {/* ---- Top stat cards ---- */}
+      {/* ---- Corpus overview (moved from dashboard) ---- */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          icon={FileText}
+          label="Documents"
+          value={fmtNumber(corpus?.totalArtifacts ?? 0)}
+          loading={corpusLoading}
+          accentColor="bg-blue-500/10"
+        />
+        <StatCard
+          icon={BookOpen}
+          label="Pages"
+          value={fmtNumber(corpus?.totalPages ?? 0)}
+          loading={corpusLoading}
+          accentColor="bg-purple-500/10"
+        />
+        <StatCard
+          icon={Atom}
+          label="Compounds"
+          value={fmtNumber(corpus?.totalCompounds ?? 0)}
+          loading={corpusLoading}
+          accentColor="bg-green-500/10"
+        />
+        <StatCard
+          icon={Activity}
+          label="Summarized"
+          value={fmtNumber(corpus?.withSummary ?? 0)}
+          loading={corpusLoading}
+          accentColor="bg-amber-500/10"
+        />
+      </div>
+
+      {/* ---- Pipeline stat cards ---- */}
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           icon={Activity}
           label="Completed Workflows"
