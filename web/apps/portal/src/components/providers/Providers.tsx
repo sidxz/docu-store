@@ -2,7 +2,6 @@
 
 import { AuthzProvider } from "@sentinel-auth/react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { PrimeReactProvider } from "primereact/api";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { SentinelAuthz } from "@sentinel-auth/js";
@@ -24,11 +23,6 @@ import { Toaster } from "@/components/ui/sonner";
 
 import { ThemeProvider } from "./ThemeProvider";
 
-// ripple: true enables PrimeReact's touch-feedback ripple animation on buttons
-const primeReactConfig = {
-  ripple: true,
-};
-
 /**
  * Root client-side provider tree.
  *
@@ -40,10 +34,9 @@ const primeReactConfig = {
  *  1. AppConfigProvider   — Runtime config context (outermost)
  *  2. AuthzProvider       — Sentinel auth context
  *  3. QueryClientProvider — TanStack Query
- *  4. PrimeReactProvider  — PrimeReact context (ripple, locale, etc.)
- *  5. TooltipProvider     — Radix tooltip context (shadcn/ui)
- *  6. ThemeProvider       — Injects the PrimeReact theme CSS link; also
- *                           renders the shadcn/ui <Toaster> below children
+ *  4. TooltipProvider     — Radix tooltip context (shadcn/ui)
+ *  5. ThemeProvider       — Applies the data-theme attribute; also renders
+ *                           the shadcn/ui <Toaster> below children
  */
 export function Providers({ children }: { children: ReactNode }) {
   const queryClient = getQueryClient();
@@ -119,14 +112,12 @@ export function Providers({ children }: { children: ReactNode }) {
         autoReauth={shouldAutoReauth(pathname)}
       >
         <QueryClientProvider client={queryClient}>
-          <PrimeReactProvider value={primeReactConfig}>
-            <TooltipProvider delayDuration={200}>
-              <ThemeProvider>
-                {children}
-                <Toaster richColors closeButton position="top-right" />
-              </ThemeProvider>
-            </TooltipProvider>
-          </PrimeReactProvider>
+          <TooltipProvider delayDuration={200}>
+            <ThemeProvider>
+              {children}
+              <Toaster richColors closeButton position="top-right" />
+            </ThemeProvider>
+          </TooltipProvider>
         </QueryClientProvider>
       </AuthzProvider>
     </AppConfigProvider>

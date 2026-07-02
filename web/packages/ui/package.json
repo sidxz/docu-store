@@ -14,8 +14,6 @@
   },
   "peerDependencies": {
     "next": "^16.0.0",
-    "primeicons": "^7.0.0",
-    "primereact": "^10.9.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
@@ -23,8 +21,6 @@
     "@docu-store/tsconfig": "workspace:*",
     "@docu-store/types": "workspace:*",
     "@types/react": "^19.0.0",
-    "primeicons": "^7.0.0",
-    "primereact": "^10.9.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "^5.9.3"

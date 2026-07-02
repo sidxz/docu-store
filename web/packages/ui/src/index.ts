@@ -1,7 +1,7 @@
 /**
  * @docu-store/ui — Shared component library.
  *
- * Reusable PrimeReact-based components for docu-store and DAIKON.
+ * Reusable molecule/chemistry components for docu-store and DAIKON.
  */
 
 export {
