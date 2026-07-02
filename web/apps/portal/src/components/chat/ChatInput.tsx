@@ -1,10 +1,16 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
-import { Send, Zap, Search, Telescope, Brain } from "lucide-react";
-import { InputTextarea } from "primereact/inputtextarea";
-import { Button } from "primereact/button";
-import { Tooltip } from "primereact/tooltip";
+import { useCallback, useRef, useState, type FormEvent } from "react";
+import { Zap, Search, Telescope, Brain } from "lucide-react";
+import {
+  PromptInput,
+  PromptInputFooter,
+  PromptInputSubmit,
+  PromptInputTextarea,
+  PromptInputTools,
+  type PromptInputMessage,
+} from "@/components/ai-elements/prompt-input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useChatStore, isReasoningOn, type ChatMode } from "@/lib/stores/chat-store";
 
 interface ChatInputProps {
@@ -36,12 +42,17 @@ export function ChatInput({
     setTimeout(() => textareaRef.current?.focus(), 0);
   }, [value, disabled, onSend]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
+  // PromptInput's onSubmit hands back { text, files } (AI SDK message shape) plus the
+  // originating form event. This composer has no attachments, so we ignore `message`
+  // and keep using our own controlled `value` state as the source of truth — same
+  // trim/disabled/clear/refocus semantics as before.
+  const handleSubmit = useCallback(
+    (_message: PromptInputMessage, event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
       handleSend();
-    }
-  };
+    },
+    [handleSend],
+  );
 
   const modes: ChatMode[] = ["quick", "thinking", "deep_thinking"];
   const toggleMode = useCallback(() => {
@@ -51,33 +62,32 @@ export function ChatInput({
 
   return (
     <div className="border-t border-border-default p-4 bg-surface">
-      <div className="flex gap-3 items-end max-w-4xl mx-auto">
-        <ModeToggle mode={chatMode} onToggle={toggleMode} disabled={disabled} />
-        {chatMode !== "quick" && (
-          <ReasoningToggle
-            on={reasoningOn}
-            onToggle={() => setSynthesisOverride(reasoningOn ? "off" : "on")}
+      <div className="max-w-4xl mx-auto">
+        <PromptInput onSubmit={handleSubmit}>
+          <PromptInputTextarea
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => setValue(e.currentTarget.value)}
+            placeholder={placeholder}
             disabled={disabled}
           />
-        )}
-        <InputTextarea
-          ref={textareaRef}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          disabled={disabled}
-          autoResize
-          rows={1}
-          className="flex-1 !max-h-40"
-        />
-        <Button
-          icon={<Send className="w-4 h-4" />}
-          onClick={handleSend}
-          disabled={disabled || !value.trim()}
-          className="p-button-rounded flex-shrink-0"
-          aria-label="Send message"
-        />
+          <PromptInputFooter>
+            <PromptInputTools>
+              <ModeToggle mode={chatMode} onToggle={toggleMode} disabled={disabled} />
+              {chatMode !== "quick" && (
+                <ReasoningToggle
+                  on={reasoningOn}
+                  onToggle={() => setSynthesisOverride(reasoningOn ? "off" : "on")}
+                  disabled={disabled}
+                />
+              )}
+            </PromptInputTools>
+            <PromptInputSubmit
+              disabled={disabled || !value.trim()}
+              status={disabled ? "streaming" : undefined}
+            />
+          </PromptInputFooter>
+        </PromptInput>
       </div>
       <p className="text-xs text-text-muted text-center mt-2">
         Docu Store AI can make mistakes. Always verify the information it provides with the original documents.
@@ -126,23 +136,26 @@ function ReasoningToggle({
     : "bg-surface-elevated border-border-subtle text-text-muted hover:bg-surface-hover hover:text-text-secondary";
 
   return (
-    <>
-      <Tooltip target=".chat-reasoning-toggle" position="top" />
-      <button
-        type="button"
-        onClick={onToggle}
-        disabled={disabled}
-        className={`chat-reasoning-toggle flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
-          transition-all flex-shrink-0 border
-          ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-          ${style}`}
-        data-pr-tooltip={on ? "Reasoning on — model thinks step by step (slower)" : "Reasoning off — model answers directly"}
-        aria-label={`Reasoning ${on ? "on" : "off"}. Click to toggle.`}
-      >
-        <Brain className="w-3.5 h-3.5" />
-        <span>Reasoning</span>
-      </button>
-    </>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onToggle}
+          disabled={disabled}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
+            transition-all flex-shrink-0 border
+            ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+            ${style}`}
+          aria-label={`Reasoning ${on ? "on" : "off"}. Click to toggle.`}
+        >
+          <Brain className="w-3.5 h-3.5" />
+          <span>Reasoning</span>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>
+        {on ? "Reasoning on — model thinks step by step (slower)" : "Reasoning off — model answers directly"}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -159,22 +172,23 @@ function ModeToggle({
   const Icon = config.icon;
 
   return (
-    <>
-      <Tooltip target=".chat-mode-toggle" position="top" />
-      <button
-        type="button"
-        onClick={onToggle}
-        disabled={disabled}
-        className={`chat-mode-toggle flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
-          transition-all flex-shrink-0 border
-          ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-          ${config.style}`}
-        data-pr-tooltip={config.tooltip}
-        aria-label={`Mode: ${config.label}. Click to switch.`}
-      >
-        <Icon className="w-3.5 h-3.5" />
-        <span>{config.label}</span>
-      </button>
-    </>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onToggle}
+          disabled={disabled}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
+            transition-all flex-shrink-0 border
+            ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+            ${config.style}`}
+          aria-label={`Mode: ${config.label}. Click to switch.`}
+        >
+          <Icon className="w-3.5 h-3.5" />
+          <span>{config.label}</span>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{config.tooltip}</TooltipContent>
+    </Tooltip>
   );
 }
