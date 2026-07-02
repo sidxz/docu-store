@@ -90,6 +90,21 @@ class MongoChatRepository:
         cursor = self._conversations.find(query).sort("updated_at", -1).skip(skip).limit(limit)
         return [_doc_to_conversation(doc) async for doc in cursor]
 
+    async def list_recent_conversations(
+        self,
+        workspace_id: UUID,
+        owner_id: UUID,
+        limit: int,
+    ) -> list[ConversationDTO]:
+        query = {
+            "workspace_id": str(workspace_id),
+            "owner_id": str(owner_id),
+            "is_archived": False,
+            "message_count": {"$gt": 0},
+        }
+        cursor = self._conversations.find(query).sort("updated_at", -1).limit(limit)
+        return [_doc_to_conversation(doc) async for doc in cursor]
+
     async def get_user_token_usage(
         self,
         workspace_id: UUID,

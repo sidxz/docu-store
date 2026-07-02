@@ -19,6 +19,7 @@ from application.dtos.chat_dtos import (
     ChatFeedbackDTO,
     ConversationDetailDTO,
     ConversationDTO,
+    RecentConversationDTO,
     TokenUsageDTO,
 )
 from application.use_cases.chat_use_cases import (
@@ -27,6 +28,7 @@ from application.use_cases.chat_use_cases import (
     GetConversationUseCase,
     GetUserTokenUsageUseCase,
     ListConversationsUseCase,
+    ListRecentConversationsUseCase,
     RecordFeedbackUseCase,
     SendMessageUseCase,
 )
@@ -113,6 +115,22 @@ async def get_user_token_usage(
     return await use_case.execute(
         workspace_id=auth.workspace_id,
         owner_id=auth.user_id,
+    )
+
+
+@router.get("/recent", status_code=status.HTTP_200_OK)
+@handle_use_case_errors
+async def list_recent_conversations(
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+    limit: int = 5,
+) -> list[RecentConversationDTO]:
+    """Recent conversations enriched with a dashboard summary."""
+    use_case = container[ListRecentConversationsUseCase]
+    return await use_case.execute(
+        workspace_id=auth.workspace_id,
+        owner_id=auth.user_id,
+        limit=limit,
     )
 
 

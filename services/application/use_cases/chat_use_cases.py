@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Literal
@@ -16,10 +17,13 @@ from application.dtos.chat_dtos import (
     AgentTraceDTO,
     ChatFeedbackDTO,
     ChatMessageDTO,
+    CitedDocumentDTO,
     ContentBlockDTO,
     ConversationDetailDTO,
     ConversationDTO,
+    EntityRefDTO,
     QueryContextDTO,
+    RecentConversationDTO,
     SourceCitationDTO,
     ThinkingBlockDTO,
     TokenUsageDTO,
@@ -89,6 +93,87 @@ class ListConversationsUseCase:
         except Exception as e:
             log.exception("chat.conversations.list_failed", error=str(e))
             return Failure(AppError("internal_error", f"Failed to list conversations: {e!s}"))
+
+
+# link pattern BEFORE the single-char class, else "[" strips first and leaves "(url)"
+_MD_STRIP = re.compile(r"(\$[^$]*\$|!?\[[^\]]*\]\([^)]*\)|[*#`_>\[\]])")
+
+
+def _plain_text(text: str) -> str:
+    return re.sub(r"\s+", " ", _MD_STRIP.sub("", text)).strip()
+
+
+def _build_recent_summary(conv: ConversationDTO, messages: list[ChatMessageDTO]) -> RecentConversationDTO:
+    assistant = [m for m in messages if m.role == "assistant"]
+    last = assistant[-1] if assistant else None
+    snippet = _plain_text(last.content)[:120] if last and last.content else None
+
+    order: list[tuple[str, str]] = []       # (lower_text, ...) preserves first-seen order
+    counts: dict[str, int] = {}
+    labels: dict[str, tuple[str, str]] = {}  # lower -> (text, type)
+
+    def add(text, etype):
+        if not text:
+            return
+        key = text.lower()
+        if key not in labels:
+            labels[key] = (text, etype or "other")
+            order.append((key, etype or "other"))
+        counts[key] = counts.get(key, 0) + 1
+
+    for m in messages:
+        qc = m.query_context
+        if not qc:
+            continue
+        for e in qc.ner_entities:
+            add(e.get("entity_text"), e.get("entity_type"))
+        for sr in qc.smiles_resolved:
+            for cid in sr.get("extracted_ids", []):
+                add(cid, "compound")
+
+    _PRI = {"compound": 0, "compound_name": 0, "target": 1, "gene": 1, "assay": 2}
+    ranked = sorted(order, key=lambda o: (_PRI.get(o[1], 9), -counts[o[0]]))
+    entities = [EntityRefDTO(text=labels[k][0], type=labels[k][1]) for k, _ in ranked[:4]]
+
+    seen_art: dict = {}
+    for m in messages:
+        for s in m.sources:
+            seen_art.setdefault(s.artifact_id, s.artifact_title)
+    cited = [CitedDocumentDTO(artifact_id=a, title=t) for a, t in list(seen_art.items())[:2]]
+
+    trace = last.agent_trace if last else None
+    return RecentConversationDTO(
+        **conv.model_dump(),
+        last_answer_snippet=snippet,
+        entities=entities,
+        cited_documents=cited,
+        source_count=len(seen_art),
+        grounded=(trace.grounding_is_grounded if trace else None),
+        grounded_confidence=(trace.grounding_confidence if trace else None),
+    )
+
+
+class ListRecentConversationsUseCase:
+    """Top-N recent conversations enriched with a UI summary."""
+
+    def __init__(self, chat_repository: ChatRepository) -> None:
+        self._repo = chat_repository
+
+    async def execute(
+        self, workspace_id: UUID, owner_id: UUID, limit: int = 5,
+    ) -> Result[list[RecentConversationDTO], AppError]:
+        try:
+            convs = await self._repo.list_recent_conversations(
+                workspace_id=workspace_id, owner_id=owner_id, limit=limit,
+            )
+            out = []
+            for conv in convs:
+                messages = await self._repo.get_messages(conv.conversation_id)
+                out.append(_build_recent_summary(conv, messages))
+            return Success(out)
+        except Exception as e:  # noqa: BLE001
+            log.exception("chat.recent.list_failed", error=str(e))
+            return Failure(AppError("internal_error", f"Failed to list recent chats: {e!s}"))
 
 
 class GetUserTokenUsageUseCase:

@@ -40,6 +40,13 @@ class ChatRepository(Protocol):
         is_archived: bool = False,
     ) -> list[ConversationDTO]: ...
 
+    async def list_recent_conversations(
+        self,
+        workspace_id: UUID,
+        owner_id: UUID,
+        limit: int,
+    ) -> list[ConversationDTO]: ...
+
     async def get_user_token_usage(
         self,
         workspace_id: UUID,

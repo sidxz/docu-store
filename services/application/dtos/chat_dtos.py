@@ -193,6 +193,31 @@ class ConversationDetailDTO(ConversationDTO):
     messages: list[ChatMessageDTO] = Field(default_factory=list)
 
 
+class EntityRefDTO(BaseModel):
+    """A named entity discussed in a conversation (for recent-chat chips)."""
+
+    text: str
+    type: str
+
+
+class CitedDocumentDTO(BaseModel):
+    """A document cited in a conversation (fallback chip)."""
+
+    artifact_id: UUID
+    title: str | None = None
+
+
+class RecentConversationDTO(ConversationDTO):
+    """A conversation enriched with a summary for the dashboard recent-chats panel."""
+
+    last_answer_snippet: str | None = None
+    entities: list[EntityRefDTO] = Field(default_factory=list)
+    cited_documents: list[CitedDocumentDTO] = Field(default_factory=list)
+    source_count: int = 0
+    grounded: bool | None = None
+    grounded_confidence: float | None = None
+
+
 # --- Feedback ---
 
 
