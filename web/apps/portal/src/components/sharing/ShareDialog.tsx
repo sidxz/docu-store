@@ -1,14 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Dialog } from "primereact/dialog";
-import { AutoComplete } from "primereact/autocomplete";
-import { Button } from "primereact/button";
-import { Dropdown } from "primereact/dropdown";
-import { InputSwitch } from "primereact/inputswitch";
-import { SelectButton } from "primereact/selectbutton";
-import { Tag } from "primereact/tag";
-import { Toast } from "primereact/toast";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   Share2,
   Globe,
@@ -16,6 +9,9 @@ import {
   UserPlus,
   Users,
   User,
+  Loader2,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import type { ResourceShare } from "@docu-store/types";
 import type { WorkspaceMember, GroupInfo } from "@sentinel-auth/js";
@@ -25,9 +21,43 @@ import {
   useRevokeShare,
   useUpdateVisibility,
 } from "@/hooks/use-permissions";
+import { usePointerDrag } from "@/hooks/use-pointer-drag";
 import { apiClient } from "@docu-store/api-client";
 import { getInitials } from "@/lib/utils";
+import { severityToVariant } from "@/lib/severity";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const PERMISSION_OPTIONS = [
   { label: "View", value: "view" as const },
@@ -35,8 +65,8 @@ const PERMISSION_OPTIONS = [
 ];
 
 const GRANTEE_TYPE_OPTIONS = [
-  { label: "User", value: "user" as const },
-  { label: "Group", value: "group" as const },
+  { label: "User", value: "user" as const, icon: User },
+  { label: "Group", value: "group" as const, icon: Users },
 ];
 
 interface ShareDialogProps {
@@ -46,7 +76,7 @@ interface ShareDialogProps {
 
 export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
   const [visible, setVisible] = useState(false);
-  const toast = useRef<Toast>(null);
+  const drag = usePointerDrag();
 
   const { data: acl, isLoading } = useArtifactPermissions(artifactId);
   const shareMutation = useShareArtifact();
@@ -56,16 +86,21 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
   // Grantee type toggle
   const [granteeType, setGranteeType] = useState<"user" | "group">("user");
 
-  // User autocomplete state
+  // User combobox state
   const [selectedMember, setSelectedMember] = useState<
     WorkspaceMember | undefined
   >(undefined);
+  const [memberOpen, setMemberOpen] = useState(false);
+  const [memberQuery, setMemberQuery] = useState("");
   const [memberSuggestions, setMemberSuggestions] = useState<WorkspaceMember[]>([]);
+  const memberDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Group dropdown state
+  // Group combobox state
   const [selectedGroup, setSelectedGroup] = useState<GroupInfo | undefined>(
     undefined,
   );
+  const [groupOpen, setGroupOpen] = useState(false);
+  const [groupQuery, setGroupQuery] = useState("");
   const [groupOptions, setGroupOptions] = useState<GroupInfo[]>([]);
   const [groupsLoaded, setGroupsLoaded] = useState(false);
 
@@ -73,22 +108,33 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
 
   const isWorkspaceVisible = acl?.visibility === "workspace";
 
-  const searchMembers = async (event: { query: string }) => {
-    if (event.query.length < 2) {
+  // Debounced server-side member search — house style (200ms), same endpoint/contract as before.
+  useEffect(() => {
+    const q = memberQuery.trim();
+    if (memberDebounceRef.current) clearTimeout(memberDebounceRef.current);
+
+    if (q.length < 2) {
       setMemberSuggestions([]);
       return;
     }
-    try {
-      const { data, error } = await apiClient.GET("/workspace/members", {
-        params: { query: { q: event.query, limit: 10 } },
-      });
-      if (error) throw new Error("Search failed");
-      // Schema type doesn't overlap with Sentinel SDK types — double cast needed
-      setMemberSuggestions((data as unknown as WorkspaceMember[]) ?? []);
-    } catch {
-      setMemberSuggestions([]);
-    }
-  };
+
+    memberDebounceRef.current = setTimeout(async () => {
+      try {
+        const { data, error } = await apiClient.GET("/workspace/members", {
+          params: { query: { q, limit: 10 } },
+        });
+        if (error) throw new Error("Search failed");
+        // Schema type doesn't overlap with Sentinel SDK types — double cast needed
+        setMemberSuggestions((data as unknown as WorkspaceMember[]) ?? []);
+      } catch {
+        setMemberSuggestions([]);
+      }
+    }, 200);
+
+    return () => {
+      if (memberDebounceRef.current) clearTimeout(memberDebounceRef.current);
+    };
+  }, [memberQuery]);
 
   const loadGroups = async () => {
     if (groupsLoaded) return;
@@ -123,19 +169,9 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
       });
       setSelectedMember(undefined);
       setSelectedGroup(undefined);
-      toast.current?.show({
-        severity: "success",
-        summary: "Shared",
-        detail: `Access granted to ${granteeName}`,
-        life: 3000,
-      });
+      toast.success("Shared", { description: `Access granted to ${granteeName}` });
     } catch {
-      toast.current?.show({
-        severity: "error",
-        summary: "Failed",
-        detail: "Could not share artifact",
-        life: 3000,
-      });
+      toast.error("Failed", { description: "Could not share artifact" });
     }
   };
 
@@ -149,19 +185,11 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
           permission: share.permission,
         },
       });
-      toast.current?.show({
-        severity: "success",
-        summary: "Revoked",
-        detail: `Access removed for ${share.grantee_name ?? share.grantee_id}`,
-        life: 3000,
+      toast.success("Revoked", {
+        description: `Access removed for ${share.grantee_name ?? share.grantee_id}`,
       });
     } catch {
-      toast.current?.show({
-        severity: "error",
-        summary: "Failed",
-        detail: "Could not revoke access",
-        life: 3000,
-      });
+      toast.error("Failed", { description: "Could not revoke access" });
     }
   };
 
@@ -173,17 +201,12 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
         visibility: newVisibility,
       });
     } catch {
-      toast.current?.show({
-        severity: "error",
-        summary: "Failed",
-        detail: "Could not update visibility",
-        life: 3000,
-      });
+      toast.error("Failed", { description: "Could not update visibility" });
     }
   };
 
   const memberTemplate = (member: WorkspaceMember) => (
-    <div className="flex items-center gap-3 py-1">
+    <div className="flex flex-1 items-center gap-3 py-1">
       <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/10 text-xs font-medium text-accent-text">
         {getInitials(member.name)}
       </div>
@@ -195,7 +218,7 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
   );
 
   const groupItemTemplate = (option: GroupInfo) => (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-1 items-center gap-3">
       <div className="flex h-7 w-7 items-center justify-center rounded-full bg-border-subtle">
         <Users className="h-3.5 w-3.5 text-text-muted" />
       </div>
@@ -212,24 +235,28 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
     granteeType === "user" ? !!selectedMember : !!selectedGroup;
 
   return (
-    <>
-      <Toast ref={toast} />
-      <Button
-        label="Share"
-        icon={<Share2 className="h-4 w-4" />}
-        onClick={() => setVisible(true)}
-        outlined
-        severity="secondary"
-      />
+    <Dialog
+      open={visible}
+      onOpenChange={(open) => {
+        setVisible(open);
+        if (!open) drag.reset();
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button variant="outline">
+          <Share2 className="h-4 w-4" />
+          Share
+        </Button>
+      </DialogTrigger>
 
-      <Dialog
-        header="Sharing & Permissions"
-        visible={visible}
-        onHide={() => setVisible(false)}
-        style={{ width: "480px" }}
-        modal
-        draggable={false}
-      >
+      <DialogContent style={drag.style} className="sm:max-w-[480px]">
+        <DialogHeader
+          onPointerDown={drag.onPointerDown}
+          className="cursor-move select-none"
+        >
+          <DialogTitle>Sharing &amp; Permissions</DialogTitle>
+        </DialogHeader>
+
         {isLoading ? (
           <LoadingSpinner size="sm" className="flex items-center justify-center py-8" />
         ) : (
@@ -244,9 +271,12 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
                     <Lock className="h-5 w-5 text-text-muted" />
                   )}
                   <div>
-                    <p className="text-sm font-medium text-text-primary">
+                    <Label
+                      htmlFor="visibility-toggle"
+                      className="text-sm font-medium text-text-primary"
+                    >
                       {isWorkspaceVisible ? "Workspace visible" : "Private"}
-                    </p>
+                    </Label>
                     <p className="text-xs text-text-muted">
                       {isWorkspaceVisible
                         ? "All workspace members can access"
@@ -254,9 +284,10 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
                     </p>
                   </div>
                 </div>
-                <InputSwitch
+                <Switch
+                  id="visibility-toggle"
                   checked={isWorkspaceVisible}
-                  onChange={(e) => handleVisibilityToggle(e.value ?? false)}
+                  onCheckedChange={handleVisibilityToggle}
                   disabled={visibilityMutation.isPending}
                 />
               </div>
@@ -272,78 +303,166 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
 
                 {/* Grantee type selector */}
                 <div className="mb-3">
-                  <SelectButton
+                  <ToggleGroup
+                    type="single"
+                    variant="outline"
+                    size="sm"
                     value={granteeType}
-                    options={GRANTEE_TYPE_OPTIONS}
-                    onChange={(e) => {
-                      if (e.value) {
-                        setGranteeType(e.value);
+                    onValueChange={(nv) => {
+                      if (nv) {
+                        setGranteeType(nv as "user" | "group");
                         setSelectedMember(undefined);
                         setSelectedGroup(undefined);
                       }
                     }}
-                    itemTemplate={(option) => (
-                      <span className="flex items-center gap-1.5 text-xs">
-                        {option.value === "user" ? (
-                          <User className="h-3.5 w-3.5" />
-                        ) : (
-                          <Users className="h-3.5 w-3.5" />
-                        )}
+                  >
+                    {GRANTEE_TYPE_OPTIONS.map((option) => (
+                      <ToggleGroupItem
+                        key={option.value}
+                        value={option.value}
+                        className="gap-1.5 text-xs"
+                      >
+                        <option.icon className="h-3.5 w-3.5" />
                         {option.label}
-                      </span>
-                    )}
-                  />
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
                 </div>
 
                 {/* Row 1: grantee picker */}
                 <div className="mb-2">
                   {granteeType === "user" ? (
-                    <AutoComplete
-                      value={selectedMember}
-                      suggestions={memberSuggestions}
-                      completeMethod={searchMembers}
-                      field="name"
-                      itemTemplate={memberTemplate}
-                      selectedItemTemplate={(m: WorkspaceMember) => m.name}
-                      onChange={(e) => setSelectedMember(e.value)}
-                      placeholder="Search by name or email..."
-                      className="w-full"
-                      inputClassName="w-full"
-                      minLength={2}
-                      delay={300}
-                      forceSelection
-                    />
+                    <Popover open={memberOpen} onOpenChange={setMemberOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start font-normal"
+                        >
+                          {selectedMember ? (
+                            selectedMember.name
+                          ) : (
+                            <span className="text-text-muted">
+                              Search by name or email...
+                            </span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        className="w-[var(--radix-popover-trigger-width)] p-0"
+                        align="start"
+                      >
+                        <Command shouldFilter={false}>
+                          <CommandInput
+                            placeholder="Search by name or email..."
+                            value={memberQuery}
+                            onValueChange={setMemberQuery}
+                          />
+                          <CommandList>
+                            <CommandEmpty>
+                              {memberQuery.trim().length < 2
+                                ? "Type at least 2 characters..."
+                                : "No members found"}
+                            </CommandEmpty>
+                            {memberSuggestions.map((member) => (
+                              <CommandItem
+                                key={member.user_id}
+                                value={member.user_id}
+                                onSelect={() => {
+                                  setSelectedMember(member);
+                                  setMemberQuery("");
+                                  setMemberOpen(false);
+                                }}
+                              >
+                                {memberTemplate(member)}
+                              </CommandItem>
+                            ))}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   ) : (
-                    <Dropdown
-                      value={selectedGroup}
-                      options={groupOptions}
-                      optionLabel="name"
-                      onChange={(e) => setSelectedGroup(e.value)}
-                      onShow={loadGroups}
-                      placeholder="Select group..."
-                      className="w-full"
-                      filter
-                      filterBy="name"
-                      itemTemplate={groupItemTemplate}
-                      emptyMessage={groupsLoaded ? "No groups found" : "Loading..."}
-                    />
+                    <Popover
+                      open={groupOpen}
+                      onOpenChange={(open) => {
+                        setGroupOpen(open);
+                        if (open) loadGroups();
+                        else setGroupQuery("");
+                      }}
+                    >
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start font-normal"
+                        >
+                          {selectedGroup ? (
+                            selectedGroup.name
+                          ) : (
+                            <span className="text-text-muted">Select group...</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        className="w-[var(--radix-popover-trigger-width)] p-0"
+                        align="start"
+                      >
+                        <Command>
+                          <CommandInput
+                            placeholder="Search groups..."
+                            value={groupQuery}
+                            onValueChange={setGroupQuery}
+                          />
+                          <CommandList>
+                            <CommandEmpty>
+                              {groupsLoaded ? "No groups found" : "Loading..."}
+                            </CommandEmpty>
+                            {groupOptions.map((group) => (
+                              <CommandItem
+                                key={group.id}
+                                value={group.name}
+                                onSelect={() => {
+                                  setSelectedGroup(group);
+                                  setGroupQuery("");
+                                  setGroupOpen(false);
+                                }}
+                              >
+                                {groupItemTemplate(group)}
+                              </CommandItem>
+                            ))}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   )}
                 </div>
 
                 {/* Row 2: permission + add */}
                 <div className="flex items-center gap-2">
-                  <Dropdown
+                  <Select
                     value={permission}
-                    options={PERMISSION_OPTIONS}
-                    onChange={(e) => setPermission(e.value)}
-                    className="w-28"
-                  />
+                    onValueChange={(v) => setPermission(v as "view" | "edit")}
+                  >
+                    <SelectTrigger className="w-28">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PERMISSION_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Button
-                    label="Add"
                     onClick={handleShare}
                     disabled={!hasSelection || shareMutation.isPending}
-                    loading={shareMutation.isPending}
-                  />
+                  >
+                    {shareMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Plus className="h-4 w-4" />
+                    )}
+                    Add
+                  </Button>
                 </div>
               </div>
             )}
@@ -410,26 +529,35 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Tag
-                          value={share.grantee_type}
-                          severity={share.grantee_type === "group" ? "info" : "secondary"}
+                        <Badge
+                          variant={
+                            severityToVariant[
+                              share.grantee_type === "group" ? "info" : "secondary"
+                            ]
+                          }
                           className="text-xs"
-                        />
+                        >
+                          {share.grantee_type}
+                        </Badge>
                         <span className="rounded-md bg-border-subtle px-2 py-0.5 text-xs font-medium text-text-secondary">
                           {share.permission}
                         </span>
                         {isOwnerOrAdmin && (
-                          <Button
-                            icon="pi pi-trash"
-                            onClick={() => handleRevoke(share)}
-                            disabled={revokeMutation.isPending}
-                            severity="danger"
-                            text
-                            rounded
-                            aria-label="Revoke access"
-                            tooltip="Revoke access"
-                            tooltipOptions={{ position: "top" }}
-                          />
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="rounded-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                onClick={() => handleRevoke(share)}
+                                disabled={revokeMutation.isPending}
+                                aria-label="Revoke access"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Revoke access</TooltipContent>
+                          </Tooltip>
                         )}
                       </div>
                     </div>
@@ -445,7 +573,7 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
             </div>
           </div>
         )}
-      </Dialog>
-    </>
+      </DialogContent>
+    </Dialog>
   );
 }
