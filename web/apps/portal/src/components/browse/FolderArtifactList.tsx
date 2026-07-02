@@ -65,9 +65,7 @@ export function FolderArtifactList({
   const typeTemplate = (row: ArtifactBrowseItemDTO) => {
     const label = ARTIFACT_TYPE_LABELS[row.artifact_type] ?? row.artifact_type;
     return (
-      <Badge variant="info" className="rounded-full">
-        {label}
-      </Badge>
+      <Badge variant="info">{label}</Badge>
     );
   };
 
