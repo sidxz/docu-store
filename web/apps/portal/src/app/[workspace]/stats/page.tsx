@@ -18,8 +18,6 @@ import {
   FileText,
   CircleHelp,
 } from "lucide-react";
-import { Skeleton } from "primereact/skeleton";
-import { SelectButton } from "primereact/selectbutton";
 import {
   BarChart,
   Bar,
@@ -35,6 +33,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/ui/StatCard";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   useWorkflowStats,
   usePipelineStats,
@@ -91,25 +91,25 @@ function LoadingSkeleton() {
             key={i}
             className="rounded-xl border border-border-default bg-surface-elevated p-5"
           >
-            <Skeleton width="5rem" height="0.875rem" />
+            <Skeleton className="h-3.5 w-20" />
             <div className="mt-4">
-              <Skeleton width="4rem" height="1.75rem" />
+              <Skeleton className="h-7 w-16" />
             </div>
           </div>
         ))}
       </div>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 rounded-xl border border-border-default bg-surface-elevated p-5">
-          <Skeleton width="10rem" height="1rem" />
+          <Skeleton className="h-4 w-40" />
           <div className="mt-4">
-            <Skeleton width="100%" height="16rem" />
+            <Skeleton className="h-64 w-full" />
           </div>
         </div>
         <div className="rounded-xl border border-border-default bg-surface-elevated p-5">
-          <Skeleton width="10rem" height="1rem" />
+          <Skeleton className="h-4 w-40" />
           <div className="mt-4 space-y-3">
             {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} width="100%" height="1.5rem" />
+              <Skeleton key={i} className="h-6 w-full" />
             ))}
           </div>
         </div>
@@ -597,11 +597,19 @@ function AnalyticsSection() {
             Chat quality, search health, and LLM usage metrics
           </p>
         </div>
-        <SelectButton
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
           value={period}
-          options={PERIOD_OPTIONS}
-          onChange={(e) => { if (e.value) setPeriod(e.value); }}
-        />
+          onValueChange={(nv) => nv && setPeriod(nv)}
+        >
+          {PERIOD_OPTIONS.map((o) => (
+            <ToggleGroupItem key={o.value} value={o.value}>
+              {o.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
       </div>
 
       {/* ---- Top-level analytics stat cards ---- */}

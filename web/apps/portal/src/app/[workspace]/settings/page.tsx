@@ -1,11 +1,10 @@
 "use client";
 
-import { Settings, Sun, Moon, Globe, Lock, Plug, CheckCircle, Code } from "lucide-react";
-import { ProgressSpinner } from "primereact/progressspinner";
-import { SelectButton } from "primereact/selectbutton";
+import { Settings, Sun, Moon, Globe, Lock, Plug, CheckCircle, Code, Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader } from "@/components/ui/Card";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ReasoningSettings } from "@/components/chat/ReasoningSettings";
 import { useThemeStore } from "@/lib/stores/theme-store";
 import { useScopeStore } from "@/lib/stores/scope-store";
@@ -14,13 +13,13 @@ import { useSession } from "@/lib/auth";
 import { usePlugins } from "@/plugins";
 
 const THEME_OPTIONS = [
-  { label: "Light", value: "light" as const },
-  { label: "Dark", value: "dark" as const },
+  { label: "Light", value: "light" as const, icon: Sun },
+  { label: "Dark", value: "dark" as const, icon: Moon },
 ];
 
 const SCOPE_OPTIONS = [
-  { label: "Workspace", value: "workspace" as const },
-  { label: "Private", value: "private" as const },
+  { label: "Workspace", value: "workspace" as const, icon: Globe },
+  { label: "Private", value: "private" as const, icon: Lock },
 ];
 
 export default function SettingsPage() {
@@ -42,23 +41,24 @@ export default function SettingsPage() {
         {/* Theme */}
         <Card>
           <CardHeader title="Appearance" />
-          <SelectButton
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
             value={theme}
-            options={THEME_OPTIONS}
-            onChange={(e) => {
-              if (e.value) setTheme(e.value);
+            onValueChange={(nv) => {
+              if (nv) setTheme(nv as "light" | "dark");
             }}
-            itemTemplate={(option) => (
-              <span className="flex items-center gap-2">
-                {option.value === "light" ? (
-                  <Sun className="h-4 w-4" />
-                ) : (
-                  <Moon className="h-4 w-4" />
-                )}
-                {option.label}
-              </span>
-            )}
-          />
+          >
+            {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
+              <ToggleGroupItem key={value} value={value}>
+                <span className="flex items-center gap-2">
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </span>
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         </Card>
 
         {/* Developer Mode */}
@@ -67,22 +67,28 @@ export default function SettingsPage() {
           <p className="mb-3 text-xs text-text-muted">
             Show debug overlays with scoring details, RRF breakdowns, and pipeline diagnostics across the UI.
           </p>
-          <SelectButton
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
             value={devMode ? "on" : "off"}
-            options={[
-              { label: "Off", value: "off" as const },
-              { label: "On", value: "on" as const },
-            ]}
-            onChange={(e) => {
-              if (e.value) setDevMode(e.value === "on");
+            onValueChange={(nv) => {
+              if (nv) setDevMode(nv === "on");
             }}
-            itemTemplate={(option) => (
+          >
+            <ToggleGroupItem value="off">
               <span className="flex items-center gap-2">
                 <Code className="h-4 w-4" />
-                {option.label}
+                Off
               </span>
-            )}
-          />
+            </ToggleGroupItem>
+            <ToggleGroupItem value="on">
+              <span className="flex items-center gap-2">
+                <Code className="h-4 w-4" />
+                On
+              </span>
+            </ToggleGroupItem>
+          </ToggleGroup>
         </Card>
 
         {/* Reasoning */}
@@ -94,23 +100,24 @@ export default function SettingsPage() {
           <p className="mb-3 text-xs text-text-muted">
             New documents will be created with this visibility by default.
           </p>
-          <SelectButton
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
             value={defaultScope}
-            options={SCOPE_OPTIONS}
-            onChange={(e) => {
-              if (e.value) setDefaultScope(e.value);
+            onValueChange={(nv) => {
+              if (nv) setDefaultScope(nv as "workspace" | "private");
             }}
-            itemTemplate={(option) => (
-              <span className="flex items-center gap-2">
-                {option.value === "workspace" ? (
-                  <Globe className="h-4 w-4" />
-                ) : (
-                  <Lock className="h-4 w-4" />
-                )}
-                {option.label}
-              </span>
-            )}
-          />
+          >
+            {SCOPE_OPTIONS.map(({ value, label, icon: Icon }) => (
+              <ToggleGroupItem key={value} value={value}>
+                <span className="flex items-center gap-2">
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </span>
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         </Card>
 
         {/* Workspace info */}
@@ -139,10 +146,7 @@ export default function SettingsPage() {
           <CardHeader title="Plugins" />
           {pluginsLoading ? (
             <div className="flex items-center gap-2 py-2">
-              <ProgressSpinner
-                style={{ width: "1.25rem", height: "1.25rem" }}
-                strokeWidth="3"
-              />
+              <Loader2 className="size-5 animate-spin text-text-muted" />
               <span className="text-sm text-text-muted">Loading plugins…</span>
             </div>
           ) : plugins.length === 0 ? (

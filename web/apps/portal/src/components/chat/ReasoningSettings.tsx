@@ -1,8 +1,7 @@
 "use client";
 
-import { SelectButton } from "primereact/selectbutton";
-
 import { Card, CardHeader } from "@/components/ui/Card";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useChatStore, type ReasoningDefault } from "@/lib/stores/chat-store";
 
 const LEVEL_OPTIONS: { label: string; value: ReasoningDefault }[] = [
@@ -34,13 +33,21 @@ export function ReasoningSettings() {
         {LANES.map(({ key, label }) => (
           <div key={key} className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-4">
             <span className="w-20 shrink-0 text-sm text-text-primary">{label}</span>
-            <SelectButton
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
               value={reasoningDefaults[key]}
-              options={LEVEL_OPTIONS}
-              onChange={(e) => {
-                if (e.value) setReasoningDefault(key, e.value as ReasoningDefault);
+              onValueChange={(nv) => {
+                if (nv) setReasoningDefault(key, nv as ReasoningDefault);
               }}
-            />
+            >
+              {LEVEL_OPTIONS.map((o) => (
+                <ToggleGroupItem key={o.value} value={o.value}>
+                  {o.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
           </div>
         ))}
       </div>

@@ -17,8 +17,6 @@ import {
   ShieldAlert,
   XCircle,
 } from "lucide-react";
-import { Skeleton } from "primereact/skeleton";
-import { SelectButton } from "primereact/selectbutton";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthzHasRole } from "@sentinel-auth/react";
 
@@ -26,6 +24,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/ui/StatCard";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { queryKeys } from "@/lib/query-keys";
 import {
   useDetailedHealth,
@@ -47,10 +47,10 @@ import {
 import { WorkersSection } from "./WorkersSection";
 
 const REFRESH_OPTIONS = [
-  { label: "15s", value: 15_000 },
-  { label: "30s", value: 30_000 },
-  { label: "60s", value: 60_000 },
-  { label: "Off", value: false as const },
+  { label: "15s", value: "15000" },
+  { label: "30s", value: "30000" },
+  { label: "60s", value: "60000" },
+  { label: "Off", value: "off" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -364,9 +364,9 @@ function LoadingSkeleton() {
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-border-default bg-surface-elevated p-4">
-        <Skeleton width="12rem" height="1rem" />
+        <Skeleton className="h-4 w-48" />
         <div className="mt-1">
-          <Skeleton width="20rem" height="0.75rem" />
+          <Skeleton className="h-3 w-80" />
         </div>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -375,9 +375,9 @@ function LoadingSkeleton() {
             key={i}
             className="rounded-xl border border-border-default bg-surface-elevated p-5"
           >
-            <Skeleton width="5rem" height="0.875rem" />
+            <Skeleton className="h-3.5 w-20" />
             <div className="mt-4">
-              <Skeleton width="4rem" height="1.75rem" />
+              <Skeleton className="h-7 w-16" />
             </div>
           </div>
         ))}
@@ -387,10 +387,10 @@ function LoadingSkeleton() {
           key={i}
           className="rounded-xl border border-border-default bg-surface-elevated p-5"
         >
-          <Skeleton width="10rem" height="1rem" />
+          <Skeleton className="h-4 w-40" />
           <div className="mt-4 space-y-3">
             {Array.from({ length: 4 }).map((_, j) => (
-              <Skeleton key={j} width="100%" height="2.5rem" />
+              <Skeleton key={j} className="h-10 w-full" />
             ))}
           </div>
         </div>
@@ -614,12 +614,21 @@ export default function StatusPage() {
         }
         actions={
           <div className="flex items-center gap-3">
-            <SelectButton
-              value={refreshInterval}
-              onChange={(e) => setRefreshInterval(e.value)}
-              options={REFRESH_OPTIONS}
-              className="p-selectbutton-sm"
-            />
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              value={refreshInterval === false ? "off" : String(refreshInterval)}
+              onValueChange={(nv) =>
+                nv && setRefreshInterval(nv === "off" ? false : Number(nv))
+              }
+            >
+              {REFRESH_OPTIONS.map((o) => (
+                <ToggleGroupItem key={o.value} value={o.value}>
+                  {o.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
             <button
               type="button"
               onClick={handleCopyReport}
