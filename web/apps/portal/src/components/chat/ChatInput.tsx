@@ -4,6 +4,7 @@ import { useCallback, useRef, useState, type FormEvent } from "react";
 import { Zap, Search, Telescope, Brain } from "lucide-react";
 import {
   PromptInput,
+  PromptInputButton,
   PromptInputFooter,
   PromptInputSubmit,
   PromptInputTextarea,
@@ -108,25 +109,24 @@ const MODE_CONFIG: Record<ChatMode, {
   icon: typeof Zap;
   label: string;
   tooltip: string;
-  style: string;
+  style?: string;
 }> = {
   quick: {
     icon: Zap,
     label: "Quick",
     tooltip: "Quick — fast, direct answer",
-    style: "bg-surface-elevated border-border-subtle text-text-muted hover:bg-surface-hover hover:text-text-secondary",
   },
   thinking: {
     icon: Search,
     label: "Research",
     tooltip: "Research — plans, searches, and verifies across your documents",
-    style: "bg-blue-500/10 border-blue-500/30 text-blue-400 hover:bg-blue-500/20",
+    style: "text-blue-400 hover:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20",
   },
   deep_thinking: {
     icon: Telescope,
     label: "Deep Research",
     tooltip: "Deep Research — iterative agentic retrieval with visual page analysis",
-    style: "bg-violet-500/10 border-violet-500/30 text-violet-400 hover:bg-violet-500/20",
+    style: "text-violet-400 hover:text-violet-400 bg-violet-500/10 hover:bg-violet-500/20",
   },
 };
 
@@ -139,26 +139,18 @@ function ReasoningToggle({
   onToggle: () => void;
   disabled: boolean;
 }) {
-  const style = on
-    ? "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20"
-    : "bg-surface-elevated border-border-subtle text-text-muted hover:bg-surface-hover hover:text-text-secondary";
-
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
-          type="button"
+        <PromptInputButton
           onClick={onToggle}
           disabled={disabled}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
-            transition-all flex-shrink-0 border
-            ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-            ${style}`}
+          className={on ? "text-amber-400 hover:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20" : ""}
           aria-label={`Reasoning ${on ? "on" : "off"}. Click to toggle.`}
         >
-          <Brain className="w-3.5 h-3.5" />
+          <Brain className="size-3.5" />
           <span>Reasoning</span>
-        </button>
+        </PromptInputButton>
       </TooltipTrigger>
       <TooltipContent>
         {on ? "Reasoning on — model thinks step by step (slower)" : "Reasoning off — model answers directly"}
@@ -182,19 +174,15 @@ function ModeToggle({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
-          type="button"
+        <PromptInputButton
           onClick={onToggle}
           disabled={disabled}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
-            transition-all flex-shrink-0 border
-            ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-            ${config.style}`}
+          className={config.style}
           aria-label={`Mode: ${config.label}. Click to switch.`}
         >
-          <Icon className="w-3.5 h-3.5" />
+          <Icon className="size-3.5" />
           <span>{config.label}</span>
-        </button>
+        </PromptInputButton>
       </TooltipTrigger>
       <TooltipContent>{config.tooltip}</TooltipContent>
     </Tooltip>

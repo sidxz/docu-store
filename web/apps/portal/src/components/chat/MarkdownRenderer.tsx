@@ -16,51 +16,14 @@ export function MarkdownRenderer({ content, messageId }: MarkdownRendererProps) 
 
   if (!content) return null;
 
+  // Tables/code/links use Streamdown's built-in styling (sourced in
+  // globals.css). Only citation [N] parsing is app-specific.
   return (
     <Streamdown
       components={{
-        table: ({ children }) => (
-          <div className="overflow-x-auto my-3">
-            <table className="w-full text-sm border-collapse border border-border-default">
-              {children}
-            </table>
-          </div>
-        ),
-        thead: ({ children }) => (
-          <thead className="bg-surface-elevated">{children}</thead>
-        ),
-        th: ({ children }) => (
-          <th className="px-3 py-2 text-left font-semibold border border-border-default">
-            {children}
-          </th>
-        ),
-        td: ({ children }) => (
-          <td className="px-3 py-2 border border-border-default">
-            {children}
-          </td>
-        ),
-        code: ({ className, children, ...props }) => {
-          const isInline = !className;
-          if (isInline) {
-            return (
-              <code className="px-1.5 py-0.5 bg-surface-elevated rounded text-sm font-mono" {...props}>
-                {children}
-              </code>
-            );
-          }
-          return (
-            <code className={`block p-3 bg-surface-sunken text-text-inverse rounded-lg text-sm font-mono overflow-x-auto ${className ?? ""}`} {...props}>
-              {children}
-            </code>
-          );
-        },
-        a: ({ children, href }) => (
-          <a href={href} className="text-accent-text hover:underline" target="_blank" rel="noopener noreferrer">
-            {children}
-          </a>
-        ),
         p: ({ children }) => <p>{styleCitations(children, messageId, highlightCitation, trackEvent)}</p>,
-        li: ({ children }) => <li>{styleCitations(children, messageId, highlightCitation, trackEvent)}</li>,
+        // className mirrors Streamdown's own li default, which this override replaces
+        li: ({ children }) => <li className="py-1 [&>p]:inline">{styleCitations(children, messageId, highlightCitation, trackEvent)}</li>,
       }}
     >
       {content}

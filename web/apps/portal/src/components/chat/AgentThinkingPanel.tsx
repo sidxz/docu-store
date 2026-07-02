@@ -60,13 +60,10 @@ export function AgentThinkingPanel({ trace, isStreaming }: AgentThinkingPanelPro
         setExpanded(next);
         if (!next) userCollapsed.current = true;
       }}
-      className="mb-2 max-w-none space-y-0"
     >
-      <ChainOfThoughtHeader className="text-xs text-text-muted hover:text-text-secondary">
-        {label}
-      </ChainOfThoughtHeader>
+      <ChainOfThoughtHeader>{label}</ChainOfThoughtHeader>
 
-      <ChainOfThoughtContent className="ml-2 space-y-1.5 border-l-2 border-border-subtle pl-3">
+      <ChainOfThoughtContent>
         {steps.map((step, i) => (
           <AgentStepIndicator
             key={`${step.step}-${i}`}
@@ -268,7 +265,7 @@ function ThinkingLog({ blocks }: { blocks: ThinkingBlock[] }) {
                 {queryPlan ? (
                   <QueryPlanCard plan={queryPlan} />
                 ) : (
-                  <div className="rounded bg-surface-primary/50 border border-border-subtle px-2.5 py-2 text-[11px] text-text-muted break-words leading-relaxed prose prose-invert prose-xs max-w-none">
+                  <div className="rounded bg-surface-primary/50 border border-border-subtle px-2.5 py-2 text-[11px] text-text-muted break-words leading-relaxed">
                     <MarkdownRenderer content={block.content} />
                   </div>
                 )}

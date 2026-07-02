@@ -231,7 +231,7 @@ export function ChatPanel({
 
       {/* Messages area */}
       <Conversation>
-        <ConversationContent className="p-0">
+        <ConversationContent className="mx-auto w-full max-w-4xl">
           <MessageList
             messages={data?.messages ?? []}
             isLoading={isLoading}

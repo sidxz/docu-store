@@ -1,6 +1,8 @@
 "use client";
 
 import type { ChatMessage as ChatMessageType, AgentStep, SourceCitation } from "@docu-store/types";
+import { ConversationEmptyState } from "@/components/ai-elements/conversation";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { ChatMessage } from "./ChatMessage";
 
@@ -43,24 +45,23 @@ export function MessageList({
   // - Streaming finished but the API refetch hasn't returned the new messages yet
   const showOptimistic = isStreaming || (streamingContent && !apiHasCaughtUp);
 
+  // Renders as fragment children of ConversationContent — its gap handles
+  // message spacing, ChatPanel constrains the column width.
   if (isLoading) {
     return (
-      <div className="max-w-4xl mx-auto p-6 space-y-4">
+      <>
         {[1, 2, 3].map((i) => (
-          <div key={i} className="flex gap-3">
-            <div className="w-8 h-8 rounded-full bg-border-subtle animate-pulse flex-shrink-0" />
-            <div className="flex-1 space-y-2">
-              <div className="h-4 bg-border-subtle rounded animate-pulse w-3/4" />
-              <div className="h-4 bg-border-subtle rounded animate-pulse w-1/2" />
-            </div>
+          <div key={i} className="space-y-2">
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
           </div>
         ))}
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
+    <>
       {messages.map((msg) => (
         <ChatMessage key={msg.message_id} message={msg} workspace={workspace} onFeedback={onFeedback} />
       ))}
@@ -110,13 +111,12 @@ export function MessageList({
       )}
 
       {messages.length === 0 && !showOptimistic && (
-        <div className="text-center text-text-muted py-12">
-          <p className="text-lg">Ask a question about your documents</p>
-          <p className="text-sm mt-1">
-            Your answers will be grounded in uploaded sources with citations.
-          </p>
-        </div>
+        <ConversationEmptyState
+          title="Ask a question about your documents"
+          description="Your answers will be grounded in uploaded sources with citations."
+          className="py-12"
+        />
       )}
-    </div>
+    </>
   );
 }

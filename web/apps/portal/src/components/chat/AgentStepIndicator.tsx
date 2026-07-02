@@ -43,12 +43,6 @@ const STATUS_STEP: Record<AgentStep["status"], "pending" | "active" | "complete"
   failed: "complete",
 };
 
-const STATUS_LABEL_COLOR: Record<AgentStep["status"], string> = {
-  started: "text-accent-text",
-  completed: "text-text-secondary",
-  failed: "text-ds-error",
-};
-
 interface AgentStepIndicatorProps {
   step: AgentStep;
   durationMs: number | null;
@@ -64,10 +58,10 @@ export function AgentStepIndicator({ step, durationMs, devMode }: AgentStepIndic
     <ChainOfThoughtStep
       icon={STATUS_ICON[step.status]}
       status={STATUS_STEP[step.status]}
-      className={cn("text-xs", step.status === "failed" && "text-ds-error")}
+      className={cn(step.status === "failed" && "text-ds-error")}
       label={
         <div className="flex items-center gap-2">
-          <span className={cn("font-medium", STATUS_LABEL_COLOR[step.status])}>{label}</span>
+          <span className="font-medium">{label}</span>
           {durationMs != null && (
             <span className="font-mono text-[10px] text-text-muted">{durationMs}ms</span>
           )}
