@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, ListTree, Search, Target, FlaskConical, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronRight, ListTree, Search, Target, FlaskConical, Sparkles, Workflow } from "lucide-react";
 import type { AgentTrace, AgentStep, ThinkingBlock } from "@docu-store/types";
 import { useDevModeStore } from "@/lib/stores/dev-mode-store";
 import { useChatStore } from "@/lib/stores/chat-store";
@@ -61,7 +61,7 @@ export function AgentThinkingPanel({ trace, isStreaming }: AgentThinkingPanelPro
         if (!next) userCollapsed.current = true;
       }}
     >
-      <ChainOfThoughtHeader>{label}</ChainOfThoughtHeader>
+      <ChainOfThoughtHeader icon={Workflow}>{label}</ChainOfThoughtHeader>
 
       <ChainOfThoughtContent>
         {steps.map((step, i) => (
