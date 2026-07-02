@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, MessageSquare, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useConversations, useCreateConversation, useDeleteConversation } from "@/hooks/use-chat";
 import { useChatStore } from "@/lib/stores/chat-store";
@@ -67,8 +66,10 @@ export function ConversationSidebar({
         </Button>
       </div>
 
-      {/* Conversation list */}
-      <ScrollArea className="flex-1">
+      {/* Conversation list — native overflow, NOT Radix ScrollArea: its
+          display:table viewport sizes to content, which defeats `truncate`
+          and pushes the per-row delete button outside the w-72 column. */}
+      <div className="flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="p-4 space-y-3">
             {[1, 2, 3].map((i) => (
@@ -93,7 +94,7 @@ export function ConversationSidebar({
             ))}
           </div>
         )}
-      </ScrollArea>
+      </div>
     </div>
   );
 }

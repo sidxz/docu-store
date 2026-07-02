@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@docu-store/api-client";
 import { queryKeys } from "@/lib/query-keys";
+import { authFetchJson } from "@/lib/auth-fetch";
 import { throwApiError } from "@/lib/api-error";
 
 interface Breadcrumb {
@@ -51,6 +52,15 @@ export function useBreadcrumbs(): Breadcrumb[] {
       ? segments[pagesIdx + 1]
       : null;
 
+  // /[workspace]/chat/[conversationId]
+  const chatIdx = segments.indexOf("chat");
+  const conversationId =
+    chatIdx >= 0 &&
+    chatIdx + 1 < segments.length &&
+    isUuidLike(segments[chatIdx + 1])
+      ? segments[chatIdx + 1]
+      : null;
+
   // Fetch titles — shares TanStack Query cache with detail page components.
   const { data: artifact } = useQuery({
     queryKey: queryKeys.artifacts.detail(artifactId ?? ""),
@@ -76,6 +86,16 @@ export function useBreadcrumbs(): Breadcrumb[] {
     },
     enabled: !!pageId,
     staleTime: 5 * 60_000,
+  });
+
+  // Same key + fetch as use-chat's useConversation, so the chat page's own
+  // query populates this from cache.
+  const { data: conversation } = useQuery({
+    queryKey: queryKeys.chat.detail(conversationId ?? ""),
+    queryFn: () =>
+      authFetchJson<{ title?: string | null }>(`/chat/${conversationId}`),
+    enabled: !!conversationId,
+    staleTime: 10_000,
   });
 
   if (segments.length <= 1) {
@@ -120,6 +140,11 @@ export function useBreadcrumbs(): Breadcrumb[] {
       if (p?.name) return p.name as string;
       if (p?.index != null) return `Page ${(p.index as number) + 1}`;
       return "\u2026";
+    }
+
+    if (prevSegment === "chat" && segment === conversationId) {
+      if (!conversation) return "\u2026";
+      return conversation.title || "New Chat";
     }
 
     // Fallback for unrecognised UUIDs
