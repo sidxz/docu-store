@@ -1,10 +1,10 @@
 "use client";
 
 import { useAuthz } from "@sentinel-auth/react";
-import { ProgressSpinner } from "primereact/progressspinner";
 import { useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { usePreferencesSync } from "@/hooks/use-preferences-sync";
 
 /** Runs hooks that require authentication context. */
@@ -32,12 +32,10 @@ export function AuthGuardWrapper({ children }: { children: ReactNode }) {
 
   if (isLoading || authState !== "authenticated") {
     return (
-      <div className="flex h-screen items-center justify-center bg-surface-sunken">
-        <ProgressSpinner
-          style={{ width: "2rem", height: "2rem" }}
-          strokeWidth="3"
-        />
-      </div>
+      <LoadingSpinner
+        size="lg"
+        className="flex h-screen items-center justify-center bg-surface-sunken"
+      />
     );
   }
 

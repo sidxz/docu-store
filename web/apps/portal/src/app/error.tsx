@@ -1,7 +1,8 @@
 "use client";
 
-import { AlertTriangle } from "lucide-react";
-import { Button } from "primereact/button";
+import { AlertTriangle, RefreshCw } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 
 export default function GlobalError({
   error,
@@ -27,14 +28,10 @@ export default function GlobalError({
           {error.message}
         </pre>
       )}
-      <Button
-        label="Try again"
-        icon="pi pi-refresh"
-        onClick={reset}
-        className="mt-6"
-        severity="secondary"
-        outlined
-      />
+      <Button onClick={reset} className="mt-6" variant="outline">
+        <RefreshCw className="size-4" />
+        Try again
+      </Button>
     </div>
   );
 }

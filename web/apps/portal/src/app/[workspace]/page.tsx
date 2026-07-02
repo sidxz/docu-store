@@ -14,9 +14,8 @@ import {
   X,
   Trash2,
 } from "lucide-react";
-import { Skeleton } from "primereact/skeleton";
-import { Tag } from "primereact/tag";
-
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/ui/StatCard";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { useDashboard } from "@/hooks/use-dashboard";
@@ -29,6 +28,7 @@ import {
 import { useSession } from "@/lib/auth";
 import { ARTIFACT_TYPE_LABELS } from "@/lib/constants";
 import { useAnalytics } from "@/hooks/use-analytics";
+import { severityToVariant } from "@/lib/severity";
 
 export default function DashboardPage() {
   const { workspace } = useParams<{ workspace: string }>();
@@ -103,10 +103,10 @@ export default function DashboardPage() {
               <div className="divide-y divide-border-subtle">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className="flex items-center gap-4 px-5 py-3.5">
-                    <Skeleton width="2rem" height="2rem" borderRadius="0.5rem" />
+                    <Skeleton className="size-8 rounded-lg" />
                     <div className="flex-1 space-y-1.5">
-                      <Skeleton width="60%" height="0.875rem" />
-                      <Skeleton width="30%" height="0.75rem" />
+                      <Skeleton className="h-3.5 w-[60%]" />
+                      <Skeleton className="h-3 w-[30%]" />
                     </div>
                   </div>
                 ))}
@@ -157,10 +157,9 @@ export default function DashboardPage() {
                           {title}
                         </p>
                         <div className="mt-0.5 flex items-center gap-2">
-                          <Tag
-                            value={typeLabel}
-                            severity="secondary"
-                          />
+                          <Badge variant={severityToVariant.secondary}>
+                            {typeLabel}
+                          </Badge>
                           {artifact.author_mentions?.length > 0 && (
                             <span className="truncate text-xs text-text-muted">
                               {artifact.author_mentions.map((a) => a.name).join(", ")}

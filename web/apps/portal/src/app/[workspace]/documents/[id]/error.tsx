@@ -1,8 +1,9 @@
 "use client";
 
-import { AlertTriangle, ArrowLeft } from "lucide-react";
-import { Button } from "primereact/button";
+import { AlertTriangle, ArrowLeft, RefreshCw } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
+
+import { Button } from "@/components/ui/button";
 
 export default function DocumentError({
   error,
@@ -32,19 +33,16 @@ export default function DocumentError({
       )}
       <div className="mt-6 flex items-center gap-3">
         <Button
-          label="Back to Documents"
-          icon={<ArrowLeft className="h-4 w-4" />}
           onClick={() => router.push(`/${workspace}/documents`)}
-          severity="secondary"
-          text
-        />
-        <Button
-          label="Try again"
-          icon="pi pi-refresh"
-          onClick={reset}
-          severity="secondary"
-          outlined
-        />
+          variant="ghost"
+        >
+          <ArrowLeft className="size-4" />
+          Back to Documents
+        </Button>
+        <Button onClick={reset} variant="outline">
+          <RefreshCw className="size-4" />
+          Try again
+        </Button>
       </div>
     </div>
   );
