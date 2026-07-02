@@ -8,6 +8,7 @@ import { useChatStore } from "@/lib/stores/chat-store";
 import { useAnalytics } from "@/hooks/use-analytics";
 import type {
   Conversation,
+  RecentConversation,
   ChatMessage,
   AgentEvent,
   AgentStep,
@@ -23,6 +24,14 @@ export function useConversations() {
   return useQuery({
     queryKey: queryKeys.chat.list(),
     queryFn: () => authFetchJson<Conversation[]>("/chat"),
+    staleTime: 30_000,
+  });
+}
+
+export function useRecentChats(limit = 5) {
+  return useQuery({
+    queryKey: queryKeys.chat.recent(limit),
+    queryFn: () => authFetchJson<RecentConversation[]>(`/chat/recent?limit=${limit}`),
     staleTime: 30_000,
   });
 }
@@ -52,7 +61,7 @@ export function useCreateConversation() {
       return res.json() as Promise<Conversation>;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.chat.list() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.all });
     },
   });
 }
@@ -67,7 +76,7 @@ export function useDeleteConversation() {
       if (!res.ok && res.status !== 404) throw new Error("Failed to delete");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.chat.list() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.all });
     },
   });
 }

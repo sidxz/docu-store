@@ -93,6 +93,27 @@ export interface Conversation {
   is_archived: boolean;
 }
 
+// --- Recent chats (dashboard panel) ---
+
+export interface EntityRef {
+  text: string;
+  type: string;
+}
+
+export interface CitedDocument {
+  artifact_id: string;
+  title: string | null;
+}
+
+export interface RecentConversation extends Conversation {
+  last_answer_snippet: string | null;
+  entities: EntityRef[];
+  cited_documents: CitedDocument[];
+  source_count: number;
+  grounded: boolean | null;
+  grounded_confidence: number | null;
+}
+
 // --- SSE event types from the agent stream ---
 
 export interface AgentEvent {
