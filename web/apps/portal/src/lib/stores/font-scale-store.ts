@@ -9,8 +9,8 @@ const STORAGE_KEY = "ds-font-scale";
 // Percent of the browser's default font-size (100 = browser default). Relative
 // (not absolute px) so a user who raised their browser font-size for
 // accessibility keeps that baseline; this scales on top of it.
-export const FONT_SCALE_MIN = 85;
-export const FONT_SCALE_MAX = 130;
+export const FONT_SCALE_MIN = 80;
+export const FONT_SCALE_MAX = 120;
 export const FONT_SCALE_STEP = 5;
 export const FONT_SCALE_DEFAULT = 100;
 
