@@ -180,7 +180,7 @@ export function ChatPanel({
             description="Select an existing conversation or start a new one to chat with your documents."
           />
         </div>
-        <ChatInput onSend={handleSend} disabled={createConversation.isPending} />
+        <ChatInput onSend={handleSend} disabled={createConversation.isPending} onAbort={sendMessage.abort} />
       </div>
     );
   }
@@ -247,7 +247,7 @@ export function ChatPanel({
       </Conversation>
 
       {/* Input */}
-      <ChatInput onSend={handleSend} disabled={isStreaming} />
+      <ChatInput onSend={handleSend} disabled={isStreaming} onAbort={sendMessage.abort} />
     </div>
   );
 }

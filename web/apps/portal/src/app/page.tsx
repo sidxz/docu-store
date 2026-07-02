@@ -26,7 +26,7 @@ export default function RootPage() {
 
   return (
     <div className="flex h-screen items-center justify-center bg-surface-sunken">
-      <div className="h-6 w-6 animate-spin rounded-full border-2 border-border-default border-t-accent" />
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-border-default border-t-primary" />
     </div>
   );
 }

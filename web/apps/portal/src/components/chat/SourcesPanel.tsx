@@ -321,7 +321,7 @@ function PagePreviewDialog({
       <DialogContent
         showOverlay={false}
         style={drag.style}
-        className="gap-3 border border-white/10 bg-surface-primary/80 p-3 shadow-2xl backdrop-blur-xl sm:max-w-[min(56rem,70vw)]"
+        className="gap-3 border border-white/10 bg-popover/95 p-3 shadow-2xl backdrop-blur-xl sm:max-w-[min(56rem,70vw)]"
       >
         <DialogHeader
           onPointerDown={drag.onPointerDown}

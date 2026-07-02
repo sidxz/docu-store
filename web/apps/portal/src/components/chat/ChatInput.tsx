@@ -17,12 +17,14 @@ interface ChatInputProps {
   onSend: (message: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  onAbort?: () => void;
 }
 
 export function ChatInput({
   onSend,
   disabled = false,
   placeholder = "Ask a question about your documents...",
+  onAbort,
 }: ChatInputProps) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -82,10 +84,16 @@ export function ChatInput({
                 />
               )}
             </PromptInputTools>
-            <PromptInputSubmit
-              disabled={disabled || !value.trim()}
-              status={disabled ? "streaming" : undefined}
-            />
+            {disabled ? (
+              <PromptInputSubmit
+                type="button"
+                status="streaming"
+                onClick={onAbort}
+                aria-label="Stop generating"
+              />
+            ) : (
+              <PromptInputSubmit disabled={!value.trim()} />
+            )}
           </PromptInputFooter>
         </PromptInput>
       </div>
