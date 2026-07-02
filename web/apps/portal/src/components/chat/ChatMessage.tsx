@@ -47,6 +47,15 @@ export function ChatMessage({ message, workspace, isStreaming, onFeedback }: Cha
     setTimeout(() => setCopied(false), 2000);
   }, [message.content, message.message_id, trackEvent]);
 
+  // Message bubbles: blue bubble for the user's turn, bordered elevated card
+  // for the reply. Expressed as group-[.is-user]/[.is-assistant] modifiers so
+  // they dedupe against MessageContent's own role defaults (twMerge keeps the
+  // last same-property class). Deliberate app style — the AI Elements default
+  // (plain assistant text, subtle secondary user bubble) was too flat here.
+  const bubbleClassName = isUser
+    ? "group-[.is-user]:rounded-xl group-[.is-user]:rounded-tr-sm group-[.is-user]:bg-primary group-[.is-user]:text-text-inverse"
+    : "group-[.is-assistant]:w-full group-[.is-assistant]:rounded-xl group-[.is-assistant]:rounded-tl-sm group-[.is-assistant]:border group-[.is-assistant]:border-border-subtle group-[.is-assistant]:bg-surface-elevated group-[.is-assistant]:px-4 group-[.is-assistant]:py-3 group-[.is-assistant]:text-text-primary";
+
   return (
     <Message from={message.role}>
       {/* Agent thinking panel (assistant only) */}
@@ -67,9 +76,9 @@ export function ChatMessage({ message, workspace, isStreaming, onFeedback }: Cha
       )}
 
       {/* Message body */}
-      <MessageContent>
+      <MessageContent className={bubbleClassName}>
         {isUser ? (
-          <p className="whitespace-pre-wrap">{message.content}</p>
+          <p className="whitespace-pre-wrap text-sm">{message.content}</p>
         ) : (
           <>
             {/* Grounding indicator — top-right of the reply */}
