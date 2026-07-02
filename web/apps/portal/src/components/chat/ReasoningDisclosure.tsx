@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Reasoning, ReasoningTrigger } from "@/components/ai-elements/reasoning";
 import { CollapsibleContent } from "@/components/ui/collapsible";
 import { MarkdownRenderer } from "./MarkdownRenderer";
@@ -10,11 +11,19 @@ interface ReasoningDisclosureProps {
 }
 
 export function ReasoningDisclosure({ reasoning, isStreaming }: ReasoningDisclosureProps) {
+  // Mount-time snapshot, NOT a live alias: the vendored auto-close effect
+  // gates on `defaultOpen && !isStreaming`, so `defaultOpen={isStreaming}`
+  // would flip both false in the same render when streaming ends and kill
+  // the auto-close. Snapshot keeps historical messages closed (no flash)
+  // while live-streamed ones still open and auto-close.
+  const [initialOpen] = useState(() => !!isStreaming);
+
   if (!reasoning) return null;
 
   return (
     <Reasoning
       isStreaming={isStreaming}
+      defaultOpen={initialOpen}
       className="mb-2 rounded-lg border border-border-subtle bg-surface-elevated/60 px-3 py-1.5"
     >
       <ReasoningTrigger className="text-xs" />
