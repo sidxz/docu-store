@@ -171,13 +171,14 @@ export function useSendMessage(conversationId: string | undefined) {
       });
     },
     onSuccess: () => {
-      // Refresh conversation detail to get persisted messages
+      // Refresh conversation detail to get persisted messages, and sweep the
+      // whole chat namespace (chat.all covers list + recent + usage) so the
+      // dashboard's recent-chats panel reflects the new snippet/entities/grounding.
       if (conversationId) {
         queryClient.invalidateQueries({
           queryKey: queryKeys.chat.detail(conversationId),
         });
-        queryClient.invalidateQueries({ queryKey: queryKeys.chat.list() });
-        queryClient.invalidateQueries({ queryKey: queryKeys.chat.usage() });
+        queryClient.invalidateQueries({ queryKey: queryKeys.chat.all });
       }
     },
     onError: (error) => {

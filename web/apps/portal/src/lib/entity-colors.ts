@@ -1,4 +1,6 @@
-// NER entity-type → chip style. Mirrors EntityTagPanel's map; keep in sync.
+// NER entity-type → chip style for recent-chat cards. Palette echoes
+// EntityTagPanel (compounds emerald, targets amber, diseases rose) but adds
+// gene/assay + text colors, so the two maps are intentionally separate.
 const STYLES: Record<string, string> = {
   compound: "border-emerald-500/30 text-emerald-700 dark:text-emerald-400",
   compound_name: "border-emerald-500/30 text-emerald-700 dark:text-emerald-400",
