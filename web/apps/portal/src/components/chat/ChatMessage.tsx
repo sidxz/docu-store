@@ -76,7 +76,7 @@ export function ChatMessage({ message, workspace, isStreaming, onFeedback }: Cha
         <div
           className={`rounded-xl px-4 py-3 max-w-full ${
             isUser
-              ? "inline-block bg-accent text-text-inverse rounded-tr-sm"
+              ? "inline-block bg-primary text-text-inverse rounded-tr-sm"
               : "bg-surface-elevated text-text-primary rounded-tl-sm border border-border-subtle"
           }`}
         >

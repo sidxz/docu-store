@@ -33,10 +33,10 @@ export function SidebarNavItem({
     >
       {/* Active indicator bar */}
       {isActive && (
-        <span className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-accent shadow-[0_0_6px_rgba(59,130,246,0.5)]" />
+        <span className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-primary shadow-[0_0_6px_rgba(59,130,246,0.5)]" />
       )}
 
-      <Icon className={`size-[1.125rem] shrink-0 transition-colors ${isActive ? "text-accent" : ""}`} />
+      <Icon className={`size-[1.125rem] shrink-0 transition-colors ${isActive ? "text-primary" : ""}`} />
 
       {!collapsed && (
         <>

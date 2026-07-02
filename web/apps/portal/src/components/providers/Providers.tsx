@@ -19,6 +19,8 @@ import {
   type AppConfig,
 } from "@/lib/app-config";
 import { _setApiUrl } from "@/lib/constants";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/sonner";
 
 import { ThemeProvider } from "./ThemeProvider";
 
@@ -39,7 +41,9 @@ const primeReactConfig = {
  *  2. AuthzProvider       — Sentinel auth context
  *  3. QueryClientProvider — TanStack Query
  *  4. PrimeReactProvider  — PrimeReact context (ripple, locale, etc.)
- *  5. ThemeProvider       — Injects the PrimeReact theme CSS link
+ *  5. TooltipProvider     — Radix tooltip context (shadcn/ui)
+ *  6. ThemeProvider       — Injects the PrimeReact theme CSS link; also
+ *                           renders the shadcn/ui <Toaster> below children
  */
 export function Providers({ children }: { children: ReactNode }) {
   const queryClient = getQueryClient();
@@ -116,7 +120,12 @@ export function Providers({ children }: { children: ReactNode }) {
       >
         <QueryClientProvider client={queryClient}>
           <PrimeReactProvider value={primeReactConfig}>
-            <ThemeProvider>{children}</ThemeProvider>
+            <TooltipProvider delayDuration={200}>
+              <ThemeProvider>
+                {children}
+                <Toaster richColors closeButton position="top-right" />
+              </ThemeProvider>
+            </TooltipProvider>
           </PrimeReactProvider>
         </QueryClientProvider>
       </AuthzProvider>

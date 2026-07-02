@@ -39,7 +39,7 @@ export function CategoryBar({
             onMouseEnter={() => onHover?.(cat.entity_type)}
             className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all duration-150 ${
               isActive
-                ? "border-accent bg-accent text-white shadow-ds-sm"
+                ? "border-primary bg-primary text-white shadow-ds-sm"
                 : "border-border-default bg-surface-elevated text-text-secondary hover:border-border-default/80 hover:bg-surface-sunken hover:text-text-primary"
             }`}
           >

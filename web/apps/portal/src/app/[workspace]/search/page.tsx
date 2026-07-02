@@ -245,7 +245,7 @@ export default function SearchPage() {
                 onFocus={() => setShowSuggestions(true)}
                 onKeyDown={handleKeyDown}
                 placeholder="Enter search query..."
-                className="w-full rounded-md border border-border-default bg-surface py-2 pl-10 pr-3 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent"
+                className="w-full rounded-md border border-border-default bg-surface py-2 pl-10 pr-3 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
               />
             </div>
 

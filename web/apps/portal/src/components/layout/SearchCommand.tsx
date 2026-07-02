@@ -146,7 +146,7 @@ export function SearchCommand() {
       {!open ? (
         <button
           onClick={() => setOpen(true)}
-          className="flex items-center gap-2 rounded-full border border-border-default bg-surface-sunken px-4 py-1.5 text-sm text-text-muted transition-all hover:border-accent/40 hover:text-text-secondary hover:shadow-ds-sm"
+          className="flex items-center gap-2 rounded-full border border-border-default bg-surface-sunken px-4 py-1.5 text-sm text-text-muted transition-all hover:border-primary/40 hover:text-text-secondary hover:shadow-ds-sm"
         >
           <Search className="size-3.5" />
           <span>Search...</span>
@@ -157,7 +157,7 @@ export function SearchCommand() {
       ) : (
         <div
           ref={inputBarRef}
-          className="flex items-center gap-2 rounded-full border border-accent bg-surface px-4 py-1.5 shadow-ds-sm"
+          className="flex items-center gap-2 rounded-full border border-primary bg-surface px-4 py-1.5 shadow-ds-sm"
           style={{ minWidth: "24rem" }}
         >
           <button

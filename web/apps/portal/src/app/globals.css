@@ -23,6 +23,7 @@
 
 /* PrimeReact theme loaded dynamically via ThemeProvider — no static import */
 @import "primeicons/primeicons.css" layer(primereact);
+@import "tw-animate-css";
 
 /* ---------------------------------------------------------------------------
  * Design Tokens
@@ -81,6 +82,28 @@
   --ds-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --ds-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
   --ds-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+
+  /* shadcn/ui token bridge — aliases onto --ds-* so components stay theme-reactive */
+  --radius: 0.5rem;
+  --background: var(--ds-surface);
+  --foreground: var(--ds-text-primary);
+  --card: var(--ds-surface-elevated);
+  --card-foreground: var(--ds-text-primary);
+  --popover: var(--ds-surface-overlay);
+  --popover-foreground: var(--ds-text-primary);
+  --primary: var(--ds-accent);
+  --primary-foreground: var(--ds-text-inverse);
+  --secondary: var(--ds-surface-sunken);
+  --secondary-foreground: var(--ds-text-secondary);
+  --muted: var(--ds-surface-sunken);
+  --muted-foreground: var(--ds-text-muted);
+  --accent: var(--ds-accent-light);
+  --accent-foreground: var(--ds-accent-text);
+  --destructive: var(--ds-error);
+  --destructive-foreground: #ffffff;
+  --border: var(--ds-border);
+  --input: var(--ds-border);
+  --ring: var(--ds-accent);
 }
 
 [data-theme="dark"] {
@@ -148,7 +171,8 @@
   --color-text-muted: var(--ds-text-muted);
   --color-text-inverse: var(--ds-text-inverse);
 
-  --color-accent: var(--ds-accent);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
   --color-accent-hover: var(--ds-accent-hover);
   --color-accent-light: var(--ds-accent-light);
   --color-accent-muted: var(--ds-accent-muted);
@@ -177,6 +201,29 @@
   --shadow-ds-sm: var(--ds-shadow-sm);
   --shadow-ds: var(--ds-shadow);
   --shadow-ds-md: var(--ds-shadow-md);
+
+  /* shadcn/ui semantic tokens */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
 /* ---------------------------------------------------------------------------

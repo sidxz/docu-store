@@ -944,7 +944,7 @@ function AnalyticsSection() {
                     >
                       <span className="text-[10px] font-mono text-text-muted w-4 text-right">{i + 1}</span>
                       <FileText className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
-                      <span className="text-sm text-text-primary truncate flex-1 group-hover/cite:text-accent" title={a.artifact_title ?? a.artifact_id}>
+                      <span className="text-sm text-text-primary truncate flex-1 group-hover/cite:text-primary" title={a.artifact_title ?? a.artifact_id}>
                         {a.artifact_title ?? a.artifact_id.slice(0, 12)}
                       </span>
                       <span className="text-xs tabular-nums font-medium text-text-secondary flex-shrink-0">
@@ -972,7 +972,7 @@ function AnalyticsSection() {
                         className="flex items-center gap-2 group/cite rounded-md -mx-1 px-1 py-0.5 hover:bg-surface-hover transition-colors"
                       >
                         <FileText className="h-3.5 w-3.5 text-text-muted flex-shrink-0 ml-5" />
-                        <span className="text-sm text-text-secondary truncate flex-1 group-hover/cite:text-accent" title={a.artifact_title ?? a.artifact_id}>
+                        <span className="text-sm text-text-secondary truncate flex-1 group-hover/cite:text-primary" title={a.artifact_title ?? a.artifact_id}>
                           {a.artifact_title ?? a.artifact_id.slice(0, 12)}
                         </span>
                         <span className="text-xs tabular-nums text-text-muted flex-shrink-0">
@@ -998,7 +998,7 @@ function AnalyticsSection() {
                         className="flex items-center gap-2 group/cite rounded-md -mx-1 px-1 py-0.5 hover:bg-surface-hover transition-colors"
                       >
                         <FileText className="h-3.5 w-3.5 text-amber-500/60 flex-shrink-0 ml-5" />
-                        <span className="text-sm text-text-muted truncate flex-1 group-hover/cite:text-accent" title={a.artifact_title ?? a.artifact_id}>
+                        <span className="text-sm text-text-muted truncate flex-1 group-hover/cite:text-primary" title={a.artifact_title ?? a.artifact_id}>
                           {a.artifact_title ?? a.artifact_id.slice(0, 12)}
                         </span>
                       </Link>

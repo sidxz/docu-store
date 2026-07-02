@@ -36,7 +36,7 @@ export function FolderGrid({ folders, onSelect, isLoading, entityType }: FolderG
         <button
           key={folder.tag_value}
           onClick={() => onSelect(folder)}
-          className="group flex cursor-pointer items-center gap-3 rounded-xl border border-border-default bg-surface-elevated px-4 py-3 text-left transition-all duration-150 hover:border-accent/30 hover:shadow-ds-sm active:scale-[0.99]"
+          className="group flex cursor-pointer items-center gap-3 rounded-xl border border-border-default bg-surface-elevated px-4 py-3 text-left transition-all duration-150 hover:border-primary/30 hover:shadow-ds-sm active:scale-[0.99]"
         >
           <FolderIcon className="h-4 w-4 shrink-0 text-text-muted transition-colors group-hover:text-accent-text" />
           <span className="min-w-0 flex-1 truncate text-sm font-medium text-text-primary">

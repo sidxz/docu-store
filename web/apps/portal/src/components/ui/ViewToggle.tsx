@@ -35,7 +35,7 @@ export function ViewToggle<T extends string>({
             onClick={() => onChange(opt.value)}
             className={`inline-flex cursor-pointer items-center justify-center rounded-md px-2 py-1.5 transition-all duration-150 ${
               isActive
-                ? "bg-accent text-white shadow-ds-sm"
+                ? "bg-primary text-white shadow-ds-sm"
                 : "text-text-muted hover:text-text-primary"
             }`}
           >
