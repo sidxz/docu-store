@@ -276,7 +276,10 @@ function SourcePageRow({
         </div>
 
         {previewSrc && (
-          <Eye className={`w-3.5 h-3.5 flex-shrink-0 mt-0.5 transition-colors ${previewOpen ? "text-accent-text" : "text-text-muted opacity-0 group-hover:opacity-100"}`} />
+          // Always visible (not hover-only): the preview affordance was
+          // undiscoverable, so clicking the blue page link — which navigates
+          // away — read as "preview never opens".
+          <Eye className={`w-3.5 h-3.5 flex-shrink-0 mt-0.5 transition-colors ${previewOpen ? "text-accent-text" : "text-text-muted group-hover:text-text-secondary"}`} />
         )}
       </div>
 
