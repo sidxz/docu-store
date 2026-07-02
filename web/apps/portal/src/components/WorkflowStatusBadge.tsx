@@ -1,33 +1,34 @@
 "use client";
 
-import { Tag } from "primereact/tag";
+import { CheckCircle2, Clock, History, Loader2, MinusCircle, XCircle, type LucideIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { severityToVariant, type PrimeSeverity } from "@/lib/severity";
 
 const STATUS_CONFIG: Record<
   string,
-  { severity: "info" | "success" | "danger" | "warning" | "secondary"; icon: string }
+  { severity: PrimeSeverity; icon: LucideIcon; spin?: boolean }
 > = {
-  RUNNING: { severity: "info", icon: "pi pi-spin pi-spinner" },
-  COMPLETED: { severity: "success", icon: "pi pi-check-circle" },
-  FAILED: { severity: "danger", icon: "pi pi-times-circle" },
-  TIMED_OUT: { severity: "warning", icon: "pi pi-clock" },
-  NOT_FOUND: { severity: "secondary", icon: "pi pi-minus-circle" },
+  RUNNING: { severity: "info", icon: Loader2, spin: true },
+  COMPLETED: { severity: "success", icon: CheckCircle2 },
+  FAILED: { severity: "danger", icon: XCircle },
+  TIMED_OUT: { severity: "warning", icon: Clock },
+  NOT_FOUND: { severity: "secondary", icon: MinusCircle },
 };
 
 export function WorkflowStatusBadge({ status, fromCache }: { status: string; fromCache?: boolean }) {
   const config = STATUS_CONFIG[status] ?? STATUS_CONFIG.NOT_FOUND;
+  const Icon = config.icon;
 
   return (
     <span className="inline-flex items-center gap-1">
-      <Tag
-        value={status}
-        severity={config.severity}
-        icon={config.icon}
-      />
+      <Badge variant={severityToVariant[config.severity]}>
+        <Icon className={config.spin ? "size-3 animate-spin" : "size-3"} />
+        {status}
+      </Badge>
       {fromCache && (
-        <i
-          className="pi pi-history text-xs text-text-muted"
-          title="Cached — workflow history expired in Temporal"
-        />
+        <span title="Cached — workflow history expired in Temporal">
+          <History className="size-3 text-text-muted" />
+        </span>
       )}
     </span>
   );

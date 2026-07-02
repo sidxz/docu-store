@@ -1,8 +1,8 @@
 "use client";
 
+import { Fragment } from "react";
 import Link from "next/link";
-import { BreadCrumb } from "primereact/breadcrumb";
-import { Button } from "primereact/button";
+import { BarChart3, Globe, Lock, LogOut, Moon, Sun } from "lucide-react";
 import { useAuthz } from "@sentinel-auth/react";
 
 import { useSession } from "@/lib/auth";
@@ -12,6 +12,16 @@ import { useThemeStore } from "@/lib/stores/theme-store";
 import { useScopeStore } from "@/lib/stores/scope-store";
 import { SearchCommand } from "./SearchCommand";
 import { getInitials, formatTokens } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 export function Topbar() {
   const { user, workspace } = useSession();
@@ -26,38 +36,10 @@ export function Topbar() {
     window.location.href = "/login";
   };
 
-  // PrimeReact BreadCrumb: home renders FIRST (leftmost), model items follow.
+  // First crumb renders leftmost (workspace-level nav item); the rest follow
+  // as navigable links, with the last one as the current (non-link) page.
   const firstCrumb = breadcrumbs[0];
-  const lastCrumb = breadcrumbs[breadcrumbs.length - 1];
-
-  // Middle crumbs: everything between first and last — navigable links
-  const middleCrumbs = breadcrumbs.slice(1, -1).map((crumb) => ({
-    label: crumb.label,
-    template: () => (
-      <Link
-        href={crumb.href}
-        className="text-sm text-text-secondary hover:text-text-primary transition-colors"
-      >
-        {crumb.label}
-      </Link>
-    ),
-  }));
-
-  // model = middle crumbs (links) + last crumb (current page, non-clickable)
-  const bcModel =
-    breadcrumbs.length > 1
-      ? [
-          ...middleCrumbs,
-          {
-            label: lastCrumb?.label,
-            template: () => (
-              <span className="text-sm font-medium text-text-primary">
-                {lastCrumb?.label}
-              </span>
-            ),
-          },
-        ]
-      : [];
+  const restCrumbs = breadcrumbs.slice(1);
 
   const initials = getInitials(user.name);
 
@@ -65,21 +47,41 @@ export function Topbar() {
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-border-default bg-surface px-6 transition-colors duration-200">
       {/* Breadcrumbs */}
       {breadcrumbs.length > 1 ? (
-        <BreadCrumb
-          model={bcModel}
-          home={{
-            label: firstCrumb?.label,
-            template: () => (
-              <Link
-                href={firstCrumb.href}
-                className="text-sm text-text-secondary hover:text-text-primary transition-colors"
-              >
-                {firstCrumb.label}
-              </Link>
-            ),
-          }}
-          className="border-none bg-transparent p-0"
-        />
+        <Breadcrumb>
+          <BreadcrumbList className="flex-nowrap">
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link
+                  href={firstCrumb.href}
+                  className="text-sm text-text-secondary transition-colors hover:text-text-primary"
+                >
+                  {firstCrumb.label}
+                </Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            {restCrumbs.map((crumb, i) => (
+              <Fragment key={crumb.href}>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  {i === restCrumbs.length - 1 ? (
+                    <BreadcrumbPage className="text-sm font-medium text-text-primary">
+                      {crumb.label}
+                    </BreadcrumbPage>
+                  ) : (
+                    <BreadcrumbLink asChild>
+                      <Link
+                        href={crumb.href}
+                        className="text-sm text-text-secondary transition-colors hover:text-text-primary"
+                      >
+                        {crumb.label}
+                      </Link>
+                    </BreadcrumbLink>
+                  )}
+                </BreadcrumbItem>
+              </Fragment>
+            ))}
+          </BreadcrumbList>
+        </Breadcrumb>
       ) : (
         <span className="text-sm font-medium text-text-primary">
           {firstCrumb?.label}
@@ -97,34 +99,47 @@ export function Topbar() {
             className="hidden md:inline-flex items-center gap-1 px-2 text-xs text-text-muted tabular-nums"
             title={`${usage.data.total.toLocaleString()} tokens used — ${usage.data.prompt.toLocaleString()} prompt + ${usage.data.completion.toLocaleString()} completion`}
           >
-            <i className="pi pi-chart-bar text-[10px]" />
+            <BarChart3 className="size-3" />
             {formatTokens(usage.data.total)} tokens
           </span>
         )}
 
         {/* Scope toggle */}
-        <Button
-          label={defaultScope === "workspace" ? "Workspace" : "Private"}
-          icon={defaultScope === "workspace" ? "pi pi-globe" : "pi pi-lock"}
-          onClick={() => setDefaultScope(defaultScope === "workspace" ? "private" : "workspace")}
-          severity="secondary"
-          text
-          aria-label={`Default visibility: ${defaultScope}. Click to switch.`}
-          tooltip="Default visibility for new documents"
-          tooltipOptions={{ position: "bottom" }}
-        />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              onClick={() => setDefaultScope(defaultScope === "workspace" ? "private" : "workspace")}
+              aria-label={`Default visibility: ${defaultScope}. Click to switch.`}
+            >
+              {defaultScope === "workspace" ? (
+                <Globe className="size-4" />
+              ) : (
+                <Lock className="size-4" />
+              )}
+              {defaultScope === "workspace" ? "Workspace" : "Private"}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Default visibility for new documents</TooltipContent>
+        </Tooltip>
 
         {/* Theme toggle */}
-        <Button
-          icon={theme === "light" ? "pi pi-moon" : "pi pi-sun"}
-          onClick={toggleTheme}
-          severity="secondary"
-          text
-          rounded
-          aria-label={theme === "light" ? "Dark mode" : "Light mode"}
-          tooltip={theme === "light" ? "Dark mode" : "Light mode"}
-          tooltipOptions={{ position: "bottom" }}
-        />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full"
+              onClick={toggleTheme}
+              aria-label={theme === "light" ? "Dark mode" : "Light mode"}
+            >
+              {theme === "light" ? <Moon className="size-4" /> : <Sun className="size-4" />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            {theme === "light" ? "Dark mode" : "Light mode"}
+          </TooltipContent>
+        </Tooltip>
 
         {/* Separator */}
         <div className="mx-1.5 h-5 w-px bg-border-default" />
@@ -144,16 +159,20 @@ export function Topbar() {
               </span>
             </div>
           </div>
-          <Button
-            icon="pi pi-sign-out"
-            onClick={handleLogout}
-            severity="secondary"
-            text
-            rounded
-            aria-label="Sign out"
-            tooltip="Sign out"
-            tooltipOptions={{ position: "bottom" }}
-          />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full"
+                onClick={handleLogout}
+                aria-label="Sign out"
+              >
+                <LogOut className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Sign out</TooltipContent>
+          </Tooltip>
         </div>
       </div>
     </header>
