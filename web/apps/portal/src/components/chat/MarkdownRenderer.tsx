@@ -1,8 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { Streamdown } from "streamdown";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useAnalytics } from "@/hooks/use-analytics";
 
@@ -18,8 +17,7 @@ export function MarkdownRenderer({ content, messageId }: MarkdownRendererProps) 
   if (!content) return null;
 
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
+    <Streamdown
       components={{
         table: ({ children }) => (
           <div className="overflow-x-auto my-3">
@@ -66,7 +64,7 @@ export function MarkdownRenderer({ content, messageId }: MarkdownRendererProps) 
       }}
     >
       {content}
-    </ReactMarkdown>
+    </Streamdown>
   );
 }
 
