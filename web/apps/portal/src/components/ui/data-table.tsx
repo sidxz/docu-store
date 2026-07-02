@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   type ColumnDef, type ColumnFiltersState, type RowData, type SortingState,
   flexRender, getCoreRowModel, getFilteredRowModel, getPaginationRowModel,
@@ -77,11 +77,18 @@ export function DataTable<TData>({
   });
 
   // initialState only applies on mount — keep page size pinned to the full
-  // row count as data loads/changes while hidePagination is on.
+  // row count as data loads/changes while hidePagination is on, and reset to
+  // the pageSize prop when pagination is re-shown (true→false transition
+  // only, so a user's manual page-size choice isn't clobbered otherwise).
+  const prevHide = useRef(hidePagination);
   useEffect(() => {
-    if (hidePagination) table.setPageSize(Math.max(data.length, 1));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hidePagination, data.length]);
+    if (hidePagination) {
+      table.setPageSize(Math.max(data.length, 1));
+    } else if (prevHide.current) {
+      table.setPageSize(pageSize);
+    }
+    prevHide.current = hidePagination;
+  }, [hidePagination, data.length, pageSize, table]);
 
   const hasFilterRow = table.getAllLeafColumns().some((c) => c.columnDef.meta?.filter);
   const { pageIndex, pageSize: ps } = table.getState().pagination;
