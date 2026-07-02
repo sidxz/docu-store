@@ -2,8 +2,15 @@
 
 import type { ReactNode } from "react";
 import { Streamdown } from "streamdown";
+import { createMathPlugin } from "@streamdown/math";
+import "katex/dist/katex.min.css";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useAnalytics } from "@/hooks/use-analytics";
+
+// Render LaTeX. singleDollarTextMath: the model emits single-$ inline math
+// ($\text{IC}_{50}$, $37\mu\text{M}$) — the plugin defaults this to false,
+// which would leave that LaTeX as raw source. Created once at module scope.
+const mathPlugin = createMathPlugin({ singleDollarTextMath: true });
 
 interface MarkdownRendererProps {
   content: string;
@@ -20,6 +27,7 @@ export function MarkdownRenderer({ content, messageId }: MarkdownRendererProps) 
   // globals.css). Only citation [N] parsing is app-specific.
   return (
     <Streamdown
+      plugins={{ math: mathPlugin }}
       components={{
         p: ({ children }) => <p>{styleCitations(children, messageId, highlightCitation, trackEvent)}</p>,
         // className mirrors Streamdown's own li default, which this override replaces

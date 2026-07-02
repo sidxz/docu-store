@@ -76,9 +76,12 @@ export function ChatMessage({ message, workspace, isStreaming, onFeedback }: Cha
       )}
 
       {/* Message body */}
-      <MessageContent className={bubbleClassName}>
+      {/* text-base: MessageContent's own default is text-sm, which reads too
+          small for the reply body — bump to 16px (metadata rows below set
+          their own smaller sizes). */}
+      <MessageContent className={`text-base ${bubbleClassName}`}>
         {isUser ? (
-          <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+          <p className="whitespace-pre-wrap">{message.content}</p>
         ) : (
           <>
             {/* Grounding indicator — top-right of the reply */}

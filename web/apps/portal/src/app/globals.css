@@ -21,6 +21,7 @@
 /* Streamdown ships its own Tailwind classes (markdown typography, tables,
    code blocks) — they only compile if Tailwind scans its dist. */
 @source "../../node_modules/streamdown/dist/*.js";
+@source "../../node_modules/@streamdown/math/dist/*.js";
 
 /* ---------------------------------------------------------------------------
  * Design Tokens
