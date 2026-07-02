@@ -1,16 +1,26 @@
 "use client";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef } from "react";
-import { Button } from "primereact/button";
-import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
-import { Message } from "primereact/message";
-import { TabPanel, TabView } from "primereact/tabview";
-import { Toast } from "primereact/toast";
-import { FileText, ArrowLeft, Lock, Users, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { useEffect } from "react";
+import { toast } from "sonner";
+import { FileText, ArrowLeft, Lock, Users, Loader2, AlertCircle, CheckCircle2, Trash2 } from "lucide-react";
 
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { OverviewTab } from "@/components/documents/OverviewTab";
 import { PagesTab } from "@/components/documents/PagesTab";
 import { PdfEmbed } from "@/components/PdfEmbed";
@@ -33,16 +43,19 @@ export default function ArtifactDetailPage() {
   const { workspace, id } = useParams<{ workspace: string; id: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const toast = useRef<Toast>(null);
 
   const TAB_KEYS = ["overview", "pages", "pdf", "workflows"] as const;
+  type TabKey = (typeof TAB_KEYS)[number];
   const tabParam = searchParams.get("tab");
-  const activeTab = Math.max(0, TAB_KEYS.indexOf(tabParam as typeof TAB_KEYS[number]));
+  // Legacy links used a numeric index (?tab=2); current links use the tab name.
+  const rawTab = TAB_KEYS[Number(tabParam)] ?? tabParam ?? "overview";
+  const activeTab: TabKey = (TAB_KEYS as readonly string[]).includes(rawTab)
+    ? (rawTab as TabKey)
+    : "overview";
 
   const { trackEvent } = useAnalytics();
 
-  const handleTabChange = (index: number) => {
-    const key = TAB_KEYS[index] ?? "overview";
+  const handleTabChange = (key: string) => {
     trackEvent("document_tab_viewed", { tab: key, artifact_id: id });
     const sp = new URLSearchParams(searchParams.toString());
     if (key === "overview") {
@@ -84,18 +97,18 @@ export default function ArtifactDetailPage() {
   if (error || !artifact) {
     return (
       <div>
-        <Message
-          severity="error"
-          text={getErrorMessage(error)}
-        />
+        <Alert variant="destructive">
+          <AlertCircle className="size-4" />
+          <AlertDescription>{getErrorMessage(error)}</AlertDescription>
+        </Alert>
         <Button
-          label="Back to Documents"
-          icon={<ArrowLeft className="h-4 w-4" />}
+          variant="ghost"
           onClick={() => router.push(`/${workspace}/documents`)}
-          text
-          severity="secondary"
           className="mt-4"
-        />
+        >
+          <ArrowLeft className="size-4" />
+          Back to Documents
+        </Button>
       </div>
     );
   }
@@ -107,43 +120,30 @@ export default function ArtifactDetailPage() {
 
   const pages = artifact.pages ?? [];
 
-  const handleDelete = () => {
-    confirmDialog({
-      message: "Delete this artifact and all its pages?",
-      header: "Confirm Deletion",
-      icon: "pi pi-exclamation-triangle",
-      acceptClassName: "p-button-danger",
-      accept: async () => {
-        try {
-          await deleteMutation.mutateAsync(id);
-          router.push(`/${workspace}/documents`);
-        } catch {
-          toast.current?.show({
-            severity: "error",
-            summary: "Delete failed",
-            detail: "Could not delete the artifact. Please try again.",
-          });
-        }
-      },
-    });
+  const handleDelete = async () => {
+    try {
+      await deleteMutation.mutateAsync(id);
+      router.push(`/${workspace}/documents`);
+    } catch {
+      toast.error("Delete failed", {
+        description: "Could not delete the artifact. Please try again.",
+      });
+    }
   };
 
   const workflows = parseWorkflows(workflowData);
 
   return (
     <div>
-      <Toast ref={toast} />
-      <ConfirmDialog />
-
       {/* Back link */}
       <Button
-        label="Documents"
-        icon={<ArrowLeft className="h-3.5 w-3.5" />}
+        variant="ghost"
         onClick={() => router.push(`/${workspace}/documents`)}
-        text
-        severity="secondary"
         className="mb-4"
-      />
+      >
+        <ArrowLeft className="size-3.5" />
+        Documents
+      </Button>
 
       <PageHeader
         icon={FileText}
@@ -168,15 +168,32 @@ export default function ArtifactDetailPage() {
               artifactId={id}
               isOwnerOrAdmin={isOwnerOrAdmin}
             />
-            <Button
-              label="Delete"
-              icon="pi pi-trash"
-              onClick={handleDelete}
-              disabled={deleteMutation.isPending}
-              loading={deleteMutation.isPending}
-              severity="danger"
-              outlined
-            />
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" disabled={deleteMutation.isPending}>
+                  {deleteMutation.isPending ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="size-4" />
+                  )}
+                  Delete
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Delete this artifact and all its pages?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction variant="destructive" onClick={handleDelete}>
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         }
       />
@@ -222,46 +239,49 @@ export default function ArtifactDetailPage() {
         return null;
       })()}
 
-      <TabView className="mt-2" activeIndex={activeTab} onTabChange={(e) => handleTabChange(e.index)}>
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-2">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="pages">Pages</TabsTrigger>
+          <TabsTrigger value="pdf">PDF</TabsTrigger>
+          <TabsTrigger value="workflows">Workflows</TabsTrigger>
+        </TabsList>
+
         {/* Overview Tab */}
-        <TabPanel header="Overview">
+        <TabsContent value="overview" className="pt-4">
           <OverviewTab
             artifact={artifact}
             workspace={workspace}
             artifactId={id}
           />
-        </TabPanel>
+        </TabsContent>
 
         {/* Pages Tab */}
-        <TabPanel header="Pages">
+        <TabsContent value="pages" className="pt-4">
           <PagesTab
             pages={pages}
             workspace={workspace}
             artifactId={id}
           />
-        </TabPanel>
+        </TabsContent>
 
         {/* PDF Tab */}
-        <TabPanel header="PDF">
-          <div className="pt-4">
-            <PdfEmbed artifactId={id} />
-          </div>
-        </TabPanel>
+        <TabsContent value="pdf" className="pt-4">
+          <PdfEmbed artifactId={id} />
+        </TabsContent>
 
         {/* Workflows Tab */}
-        <TabPanel header="Workflows">
-          <div className="pt-4">
-            <WorkflowList
-              workflows={workflows}
-              rerunableWorkflows={RERUNNABLE_ARTIFACT_WORKFLOWS}
-              onRerun={(name) => rerunMutation.mutateAsync(name)}
-              isRerunning={rerunMutation.isPending}
-              rerunningName={rerunMutation.variables}
-              variant="cards"
-            />
-          </div>
-        </TabPanel>
-      </TabView>
+        <TabsContent value="workflows" className="pt-4">
+          <WorkflowList
+            workflows={workflows}
+            rerunableWorkflows={RERUNNABLE_ARTIFACT_WORKFLOWS}
+            onRerun={(name) => rerunMutation.mutateAsync(name)}
+            isRerunning={rerunMutation.isPending}
+            rerunningName={rerunMutation.variables}
+            variant="cards"
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

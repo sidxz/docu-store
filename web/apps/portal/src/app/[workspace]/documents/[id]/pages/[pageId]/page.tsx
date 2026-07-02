@@ -2,15 +2,15 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowLeft, BookOpen } from "lucide-react";
-import { Button } from "primereact/button";
-import { Message } from "primereact/message";
-import { SelectButton } from "primereact/selectbutton";
+import { AlertCircle, ArrowLeft, BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { useAuthBlobUrl } from "@/hooks/use-auth-blob-url";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { EntityTagPanel } from "@/components/EntityTagPanel";
 import { PdfEmbed } from "@/components/PdfEmbed";
 import { CompoundGrid } from "@/components/documents/CompoundGrid";
@@ -30,8 +30,8 @@ import { getErrorMessage } from "@/lib/api-error";
 import { API_URL } from "@/lib/constants";
 
 const VIEW_MODES = [
-  { label: "Image", value: "image" as const, icon: "pi pi-image" },
-  { label: "Full PDF", value: "pdf" as const, icon: "pi pi-file-pdf" },
+  { label: "Image", value: "image" as const },
+  { label: "Full PDF", value: "pdf" as const },
 ];
 
 function PageImage({
@@ -110,18 +110,18 @@ export default function PageViewerPage() {
   if (error || !page) {
     return (
       <div>
-        <Message
-          severity="error"
-          text={getErrorMessage(error)}
-        />
+        <Alert variant="destructive">
+          <AlertCircle className="size-4" />
+          <AlertDescription>{getErrorMessage(error)}</AlertDescription>
+        </Alert>
         <Button
-          label="Back to Artifact"
-          icon={<ArrowLeft className="h-4 w-4" />}
+          variant="ghost"
           onClick={() => router.push(`/${workspace}/documents/${id}?tab=pages`)}
-          text
-          severity="secondary"
           className="mt-4"
-        />
+        >
+          <ArrowLeft className="size-4" />
+          Back to Artifact
+        </Button>
       </div>
     );
   }
@@ -132,13 +132,13 @@ export default function PageViewerPage() {
     <div>
       {/* Back link */}
       <Button
-        label="Back to document"
-        icon={<ArrowLeft className="h-3.5 w-3.5" />}
+        variant="ghost"
         onClick={() => router.push(`/${workspace}/documents/${id}?tab=pages`)}
-        text
-        severity="secondary"
         className="mb-4"
-      />
+      >
+        <ArrowLeft className="size-3.5" />
+        Back to document
+      </Button>
 
       <PageHeader
         icon={BookOpen}
@@ -147,8 +147,7 @@ export default function PageViewerPage() {
         actions={
           <div className="flex items-center gap-1">
             <Button
-              label="Prev"
-              icon="pi pi-chevron-left"
+              variant="outline"
               disabled={!siblingPages.prev}
               onClick={() =>
                 siblingPages.prev &&
@@ -156,13 +155,12 @@ export default function PageViewerPage() {
                   `/${workspace}/documents/${id}/pages/${siblingPages.prev}`,
                 )
               }
-              outlined
-              severity="secondary"
-            />
+            >
+              <ChevronLeft className="size-4" />
+              Prev
+            </Button>
             <Button
-              label="Next"
-              icon="pi pi-chevron-right"
-              iconPos="right"
+              variant="outline"
               disabled={!siblingPages.next}
               onClick={() =>
                 siblingPages.next &&
@@ -170,9 +168,10 @@ export default function PageViewerPage() {
                   `/${workspace}/documents/${id}/pages/${siblingPages.next}`,
                 )
               }
-              outlined
-              severity="secondary"
-            />
+            >
+              Next
+              <ChevronRight className="size-4" />
+            </Button>
           </div>
         }
       />
@@ -181,13 +180,19 @@ export default function PageViewerPage() {
       <Card className="mb-6">
         <div className="mb-3 flex items-center justify-between">
           <CardHeader title="Page View" />
-          <SelectButton
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
             value={viewMode}
-            options={VIEW_MODES}
-            onChange={(e) => {
-              if (e.value) setViewMode(e.value);
-            }}
-          />
+            onValueChange={(nv) => nv && setViewMode(nv as "image" | "pdf")}
+          >
+            {VIEW_MODES.map((o) => (
+              <ToggleGroupItem key={o.value} value={o.value}>
+                {o.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         </div>
 
         {viewMode === "image" ? (

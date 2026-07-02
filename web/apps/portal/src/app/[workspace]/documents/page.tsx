@@ -2,11 +2,7 @@
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
-import { IconField } from "primereact/iconfield";
-import { InputIcon } from "primereact/inputicon";
-import { InputText } from "primereact/inputtext";
-import { Message } from "primereact/message";
-import { FileText, Grid3X3, List, Upload } from "lucide-react";
+import { AlertCircle, FileText, Grid3X3, List, Search, Upload } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import type { TagFolderDTO } from "@docu-store/types";
@@ -16,6 +12,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ViewToggle } from "@/components/ui/ViewToggle";
 import { LinkButton } from "@/components/ui/LinkButton";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CategoryBar } from "@/components/browse/CategoryBar";
 import { FolderGrid } from "@/components/browse/FolderGrid";
 import { FolderArtifactList } from "@/components/browse/FolderArtifactList";
@@ -168,12 +166,12 @@ export default function DocumentsPage() {
       />
 
       {tableError && viewMode === "table" && (
-        <div className="mb-4">
-          <Message
-            severity="error"
-            text="Failed to load documents. Is the backend running?"
-          />
-        </div>
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="size-4" />
+          <AlertDescription>
+            Failed to load documents. Is the backend running?
+          </AlertDescription>
+        </Alert>
       )}
 
       {viewMode === "browse" ? (
@@ -196,14 +194,15 @@ export default function DocumentsPage() {
                   onNavigate={handleBreadcrumbNavigate}
                 />
                 {!foldersLoading && (foldersData?.folders?.length ?? 0) > 5 && (
-                  <IconField iconPosition="left" className="w-48 shrink-0">
-                    <InputIcon className="pi pi-search" />
-                    <InputText
+                  <div className="relative w-48 shrink-0">
+                    <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-muted" />
+                    <Input
+                      className="pl-9"
                       value={folderFilter}
                       onChange={(e) => setFolderFilter(e.target.value)}
                       placeholder="Filter..."
                     />
-                  </IconField>
+                  </div>
                 )}
               </div>
             )}
