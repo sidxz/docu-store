@@ -18,6 +18,11 @@ const STEP_LABELS: Record<string, string> = {
   verification: "Grounding Verification",
 };
 
+/** Title-case any step key not in STEP_LABELS: "image_loading" → "Image Loading". */
+function humanizeStep(key: string): string {
+  return key.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 // ponytail: ChainOfThoughtStep's `icon` prop is typed as lucide-react's
 // `LucideIcon` (a forwardRef component) and renders it as `<Icon
 // className="size-4" />` with no way to layer on extra classes (spin,
@@ -51,7 +56,7 @@ interface AgentStepIndicatorProps {
 
 export function AgentStepIndicator({ step, durationMs, devMode }: AgentStepIndicatorProps) {
   const [thinkingExpanded, setThinkingExpanded] = useState(false);
-  const label = STEP_LABELS[step.step] ?? step.step;
+  const label = STEP_LABELS[step.step] ?? humanizeStep(step.step);
   const hasThinking = !!step.thinking_content;
 
   return (

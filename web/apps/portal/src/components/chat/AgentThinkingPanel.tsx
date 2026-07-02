@@ -45,8 +45,8 @@ export function AgentThinkingPanel({ trace, isStreaming }: AgentThinkingPanelPro
   const completedCount = steps.filter((s) => s.status === "completed").length;
   const totalMs = trace.total_duration_ms;
   const label = isStreaming
-    ? `Process (${completedCount}/${steps.length} steps)...`
-    : `Process (${completedCount} steps${totalMs ? `, ${(totalMs / 1000).toFixed(1)}s` : ""})`;
+    ? `Steps · ${completedCount} of ${steps.length}…`
+    : `Steps · ${completedCount}${totalMs ? ` · ${(totalMs / 1000).toFixed(1)}s` : ""}`;
 
   // Resolve thinking blocks: streaming → persisted → fallback from step thinking_content
   const thinkingBlocks = isStreaming
