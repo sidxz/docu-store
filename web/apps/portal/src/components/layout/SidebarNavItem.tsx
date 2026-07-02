@@ -10,6 +10,8 @@ interface SidebarNavItemProps {
   isActive: boolean;
   collapsed: boolean;
   badge?: string | number;
+  /** Tailwind text-color class for the icon (e.g. "text-blue-500"). */
+  iconColor?: string;
 }
 
 export function SidebarNavItem({
@@ -19,6 +21,7 @@ export function SidebarNavItem({
   isActive,
   collapsed,
   badge,
+  iconColor,
 }: SidebarNavItemProps) {
   return (
     <Link
@@ -36,7 +39,7 @@ export function SidebarNavItem({
         <span className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-primary shadow-[0_0_6px_rgba(59,130,246,0.5)]" />
       )}
 
-      <Icon className={`size-[1.125rem] shrink-0 transition-colors ${isActive ? "text-primary" : ""}`} />
+      <Icon className={`size-[1.125rem] shrink-0 transition-colors ${iconColor ?? ""}`} />
 
       {!collapsed && (
         <>

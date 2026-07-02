@@ -29,17 +29,18 @@ interface NavItem {
   label: string;
   icon: LucideIcon;
   href: string;
+  color: string;
   requireAdmin?: boolean;
 }
 
 const mainNav: NavItem[] = [
-  { label: "Dashboard", icon: LayoutDashboard, href: "" },
-  { label: "Documents", icon: FileText, href: "/documents" },
-  { label: "Search", icon: Search, href: "/search" },
-  { label: "Compounds", icon: Atom, href: "/compounds" },
-  { label: "Chat", icon: MessageSquare, href: "/chat" },
-  { label: "Stats", icon: BarChart3, href: "/stats", requireAdmin: true },
-  { label: "Status", icon: Activity, href: "/status", requireAdmin: true },
+  { label: "Dashboard", icon: LayoutDashboard, href: "", color: "text-blue-500" },
+  { label: "Chat", icon: MessageSquare, href: "/chat", color: "text-indigo-500" },
+  { label: "Search", icon: Search, href: "/search", color: "text-violet-500" },
+  { label: "Documents", icon: FileText, href: "/documents", color: "text-amber-500" },
+  { label: "Compounds", icon: Atom, href: "/compounds", color: "text-emerald-500" },
+  { label: "Stats", icon: BarChart3, href: "/stats", color: "text-orange-500", requireAdmin: true },
+  { label: "Status", icon: Activity, href: "/status", color: "text-rose-500", requireAdmin: true },
 ];
 
 export function Sidebar({ workspaceSlug }: { workspaceSlug: string }) {
@@ -95,6 +96,7 @@ export function Sidebar({ workspaceSlug }: { workspaceSlug: string }) {
                 href={`/${workspaceSlug}${item.href}`}
                 isActive={isActive(item.href)}
                 collapsed={collapsed}
+                iconColor={item.color}
               />
             </div>
           ))}
@@ -109,6 +111,7 @@ export function Sidebar({ workspaceSlug }: { workspaceSlug: string }) {
           href={`/${workspaceSlug}/settings`}
           isActive={pathname.startsWith(`/${workspaceSlug}/settings`)}
           collapsed={collapsed}
+          iconColor="text-slate-400"
         />
 
         {/* Theme toggle */}
