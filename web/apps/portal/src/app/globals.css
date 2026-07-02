@@ -107,7 +107,7 @@
   --ds-surface-elevated: #1e293b;
   --ds-surface-sunken: #020617;
   --ds-surface-overlay: #1e293b;
-  --ds-surface-hover: #1e293b;
+  --ds-surface-hover: rgba(148, 163, 184, 0.08); /* translucent: must lighten over both #0f172a and #1e293b bases */
 
   /* Borders */
   --ds-border: #334155;
