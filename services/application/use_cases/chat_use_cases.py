@@ -171,7 +171,7 @@ class ListRecentConversationsUseCase:
                 messages = await self._repo.get_messages(conv.conversation_id)
                 out.append(_build_recent_summary(conv, messages))
             return Success(out)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log.exception("chat.recent.list_failed", error=str(e))
             return Failure(AppError("internal_error", f"Failed to list recent chats: {e!s}"))
 

@@ -87,6 +87,33 @@ async def test_enriches_entities_snippet_grounding():
 
 
 @pytest.mark.asyncio
+async def test_entity_cap_and_priority():
+    # 6 distinct candidates across types; compound/target/assay must win the top 4.
+    ws, owner, cid = uuid4(), uuid4(), uuid4()
+    convs = [_conv(cid, ws, owner)]
+    messages = {cid: [_asst(
+        cid, "answer",
+        entities=[
+            ("DiseaseX", "disease"),   # low priority
+            ("Other", "misc"),         # fallback priority
+            ("FadD32", "target"),      # priority 1
+            ("IC50", "assay"),         # priority 2
+            ("GeneY", "gene"),         # priority 1
+        ],
+        smiles=["NZ-967"],             # -> compound, priority 0
+    )]}
+
+    result = await ListRecentConversationsUseCase(_FakeRepo(convs, messages)).execute(ws, owner)
+    [rc] = result.unwrap()
+
+    assert len(rc.entities) == 4  # capped
+    kept = {e.text for e in rc.entities}
+    # highest-priority types kept; the low-priority disease/misc dropped
+    assert "NZ-967" in kept and "FadD32" in kept and "GeneY" in kept and "IC50" in kept
+    assert "DiseaseX" not in kept and "Other" not in kept
+
+
+@pytest.mark.asyncio
 async def test_generic_chat_no_entities_no_sources():
     ws, owner, cid = uuid4(), uuid4(), uuid4()
     convs = [_conv(cid, ws, owner)]
