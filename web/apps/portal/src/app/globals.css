@@ -29,6 +29,7 @@
   --ds-surface-elevated: #ffffff;
   --ds-surface-sunken: #f8fafc;
   --ds-surface-overlay: #ffffff;
+  --ds-surface-hover: #f1f5f9;
 
   /* Borders */
   --ds-border: #e2e8f0;
@@ -46,6 +47,7 @@
   --ds-accent-light: #eff6ff;
   --ds-accent-muted: #dbeafe;
   --ds-accent-text: #2563eb;
+  --ds-accent-subtle: #f5f9ff;
 
   /* Sidebar (always dark) */
   --ds-sidebar: #0f172a;
@@ -55,11 +57,11 @@
   --ds-sidebar-active: rgba(255, 255, 255, 0.1);
   --ds-sidebar-border: rgba(255, 255, 255, 0.06);
 
-  /* Semantic */
-  --ds-success: #16a34a;
-  --ds-warning: #d97706;
-  --ds-error: #dc2626;
-  --ds-info: #3b82f6;
+  /* Semantic — AA-contrast (≥4.5:1) darkened for light-mode text use */
+  --ds-success: #15803d;
+  --ds-warning: #a16207;
+  --ds-error: #b91c1c;
+  --ds-info: #1d4ed8;
 
   /* Score severity — for ScoreBadge and similar */
   --ds-score-excellent: #16a34a;
@@ -105,6 +107,7 @@
   --ds-surface-elevated: #1e293b;
   --ds-surface-sunken: #020617;
   --ds-surface-overlay: #1e293b;
+  --ds-surface-hover: #1e293b;
 
   /* Borders */
   --ds-border: #334155;
@@ -122,6 +125,7 @@
   --ds-accent-light: rgba(59, 130, 246, 0.15);
   --ds-accent-muted: rgba(59, 130, 246, 0.1);
   --ds-accent-text: #60a5fa;
+  --ds-accent-subtle: rgba(59, 130, 246, 0.08);
 
   /* Semantic */
   --ds-success: #22c55e;
@@ -155,6 +159,10 @@
   --color-surface-elevated: var(--ds-surface-elevated);
   --color-surface-sunken: var(--ds-surface-sunken);
   --color-surface-overlay: var(--ds-surface-overlay);
+  --color-surface-hover: var(--ds-surface-hover);
+  --color-surface-primary: var(--ds-surface);
+  --color-surface-default: var(--ds-surface);
+  --color-surface-raised: var(--ds-surface-elevated);
 
   --color-border-default: var(--ds-border);
   --color-border-subtle: var(--ds-border-subtle);
@@ -170,6 +178,7 @@
   --color-accent-light: var(--ds-accent-light);
   --color-accent-muted: var(--ds-accent-muted);
   --color-accent-text: var(--ds-accent-text);
+  --color-accent-subtle: var(--ds-accent-subtle);
 
   --color-sidebar: var(--ds-sidebar);
   --color-sidebar-text: var(--ds-sidebar-text);
