@@ -149,9 +149,9 @@ export default function UploadPage() {
   });
 
   // ponytail: upload goes through fetch (see useUploadArtifact), which has no
-  // byte-level progress events — this shows a fixed in-flight fill, not real
-  // percent. Switch the mutation to XHR/axios with onUploadProgress if real
-  // per-file progress is ever needed.
+  // byte-level progress events — this shows an indeterminate sliding bar,
+  // not real percent. Switch the mutation to XHR/axios with onUploadProgress
+  // if real per-file progress is ever needed.
   const statusFor = (file: File): FileStatus => {
     if (fileStatuses[file.name]) return fileStatuses[file.name];
     if (!isBatch && uploadMutation.isPending) return "uploading";
@@ -267,7 +267,7 @@ export default function UploadPage() {
                             {formatFileSize(file.size)}
                           </p>
                           {status === "uploading" && (
-                            <Progress value={60} className="mt-1 h-1" />
+                            <Progress value={null} className="mt-1 h-1" />
                           )}
                         </div>
                         {status === "pending" && !busy && (

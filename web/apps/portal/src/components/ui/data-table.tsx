@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   type ColumnDef, type ColumnFiltersState, type RowData, type SortingState,
   flexRender, getCoreRowModel, getFilteredRowModel, getPaginationRowModel,
@@ -42,11 +42,14 @@ interface DataTableProps<TData> {
   defaultSorting?: SortingState;
   pageSize?: number;
   pageSizeOptions?: number[];
+  /** Hide the pagination footer and show every row (page size = row count). */
+  hidePagination?: boolean;
 }
 
 export function DataTable<TData>({
   columns, data, isLoading = false, emptyMessage = "No results.",
   defaultSorting = [], pageSize = 20, pageSizeOptions = [10, 20, 50],
+  hidePagination = false,
 }: DataTableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>(defaultSorting);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -70,8 +73,15 @@ export function DataTable<TData>({
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    initialState: { pagination: { pageSize } },
+    initialState: { pagination: { pageSize: hidePagination ? Math.max(data.length, 1) : pageSize } },
   });
+
+  // initialState only applies on mount — keep page size pinned to the full
+  // row count as data loads/changes while hidePagination is on.
+  useEffect(() => {
+    if (hidePagination) table.setPageSize(Math.max(data.length, 1));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hidePagination, data.length]);
 
   const hasFilterRow = table.getAllLeafColumns().some((c) => c.columnDef.meta?.filter);
   const { pageIndex, pageSize: ps } = table.getState().pagination;
@@ -170,25 +180,27 @@ export function DataTable<TData>({
           )}
         </TableBody>
       </Table>
-      <div className="flex items-center justify-between border-t border-border-default px-3 py-2 text-xs text-text-muted">
-        <span className="font-mono tabular-nums">
-          {total === 0 ? "0" : `${pageIndex * ps + 1}–${Math.min((pageIndex + 1) * ps, total)}`} of {total}
-        </span>
-        <div className="flex items-center gap-2">
-          <Select value={String(ps)} onValueChange={(v) => table.setPageSize(Number(v))}>
-            <SelectTrigger className="h-7 w-[70px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {pageSizeOptions.map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Button variant="ghost" size="icon" className="size-7" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()} aria-label="Previous page">
-            <ChevronLeft className="size-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="size-7" disabled={!table.getCanNextPage()} onClick={() => table.nextPage()} aria-label="Next page">
-            <ChevronRight className="size-4" />
-          </Button>
+      {!hidePagination && (
+        <div className="flex items-center justify-between border-t border-border-default px-3 py-2 text-xs text-text-muted">
+          <span className="font-mono tabular-nums">
+            {total === 0 ? "0" : `${pageIndex * ps + 1}–${Math.min((pageIndex + 1) * ps, total)}`} of {total}
+          </span>
+          <div className="flex items-center gap-2">
+            <Select value={String(ps)} onValueChange={(v) => table.setPageSize(Number(v))}>
+              <SelectTrigger className="h-7 w-[70px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {pageSizeOptions.map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button variant="ghost" size="icon" className="size-7" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()} aria-label="Previous page">
+              <ChevronLeft className="size-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="size-7" disabled={!table.getCanNextPage()} onClick={() => table.nextPage()} aria-label="Next page">
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

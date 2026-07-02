@@ -23,6 +23,7 @@ import {
   CommandEmpty,
   CommandGroup,
   CommandItem,
+  CommandSeparator,
 } from "@/components/ui/command";
 
 // Debounce delay for live search-as-you-type, matching TagFilter's convention.
@@ -156,10 +157,11 @@ export function SearchCommand() {
                   </button>
                 </CommandItem>
               ))}
+              <CommandSeparator />
               <CommandItem
                 value="clear-recent-searches"
                 onSelect={() => clearHistory.mutate()}
-                className="text-text-muted"
+                className="text-text-muted text-xs"
               >
                 <Trash2 className="size-3.5" />
                 Clear all recent searches

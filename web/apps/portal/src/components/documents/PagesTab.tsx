@@ -136,6 +136,7 @@ export function PagesTab({ pages, workspace, artifactId }: PagesTabProps) {
         data={enriched}
         emptyMessage="No pages."
         defaultSorting={[{ id: "page", desc: false }]}
+        hidePagination={pageData.length <= 20}
       />
     );
   }

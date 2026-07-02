@@ -303,4 +303,13 @@
   .page-enter {
     animation: fade-in 0.2s ease-out;
   }
+
+  /* Indeterminate progress fill — see components/ui/progress.tsx */
+  @keyframes progress-indeterminate {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(250%); }
+  }
+  .animate-progress-indeterminate {
+    animation: progress-indeterminate 1.1s ease-in-out infinite;
+  }
 }
