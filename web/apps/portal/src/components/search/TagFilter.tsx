@@ -1,16 +1,24 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
-import { AutoComplete, type AutoCompleteCompleteEvent } from "primereact/autocomplete";
-import { Chip } from "primereact/chip";
-import { SelectButton } from "primereact/selectbutton";
-import { Tag, Filter } from "lucide-react";
-import { authFetchJson } from "@/lib/auth-fetch";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Filter, Plus, Tag, X } from "lucide-react";
 
-const MATCH_MODES = [
-  { label: "Any", value: "any" as const },
-  { label: "All", value: "all" as const },
-];
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { authFetchJson } from "@/lib/auth-fetch";
 
 interface TagSuggestion {
   tag: string;
@@ -24,13 +32,28 @@ interface TagFilterProps {
   onMatchModeChange: (mode: "any" | "all") => void;
 }
 
+const ENTITY_TYPE_LABELS: Record<string, string> = {
+  target: "Target",
+  compound_name: "Compound",
+  gene_name: "Gene",
+  disease: "Disease",
+  assay: "Assay",
+  author: "Author",
+  bioactivity: "Bioactivity",
+  mechanism_of_action: "MoA",
+  accession_number: "Accession",
+  screening_method: "Screen",
+  protein_name: "Protein",
+};
+
 export function TagFilter({
   tags,
   matchMode,
   onTagsChange,
   onMatchModeChange,
 }: TagFilterProps) {
-  const [inputValue, setInputValue] = useState("");
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<TagSuggestion[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -40,7 +63,6 @@ export function TagFilter({
       if (!tag || tags.some((t) => t.toLowerCase() === tag.toLowerCase()))
         return;
       onTagsChange([...tags, tag]);
-      setInputValue("");
     },
     [tags, onTagsChange],
   );
@@ -52,15 +74,15 @@ export function TagFilter({
     [tags, onTagsChange],
   );
 
-  const searchTags = useCallback(async (event: AutoCompleteCompleteEvent) => {
-    const q = event.query.trim();
+  // Debounced server-side tag suggestions — same endpoint/contract as before.
+  useEffect(() => {
+    const q = query.trim();
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
     if (q.length < 1) {
       setSuggestions([]);
       return;
     }
-
-    // Debounce: cancel previous request
-    if (debounceRef.current) clearTimeout(debounceRef.current);
 
     debounceRef.current = setTimeout(async () => {
       try {
@@ -72,48 +94,24 @@ export function TagFilter({
         setSuggestions([]);
       }
     }, 200);
-  }, []);
 
-  const handleSelect = useCallback(
-    (e: { value: TagSuggestion | string }) => {
-      const val = typeof e.value === "string" ? e.value : e.value.tag;
-      addTag(val);
-    },
-    [addTag],
-  );
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === ",") {
+    if (e.key === "Enter" && query && suggestions.length === 0) {
+      addTag(query);
+      setQuery("");
+    } else if (e.key === ",") {
       e.preventDefault();
-      addTag(inputValue);
-    }
-    if (e.key === "Backspace" && !inputValue && tags.length > 0) {
+      addTag(query);
+      setQuery("");
+    } else if (e.key === "Backspace" && !query && tags.length > 0) {
       onTagsChange(tags.slice(0, -1));
     }
   };
-
-  const ENTITY_TYPE_LABELS: Record<string, string> = {
-    target: "Target",
-    compound_name: "Compound",
-    gene_name: "Gene",
-    disease: "Disease",
-    assay: "Assay",
-    author: "Author",
-    bioactivity: "Bioactivity",
-    mechanism_of_action: "MoA",
-    accession_number: "Accession",
-    screening_method: "Screen",
-    protein_name: "Protein",
-  };
-
-  const itemTemplate = (item: TagSuggestion) => (
-    <div className="flex items-center justify-between gap-3 px-1 py-0.5">
-      <span className="text-sm">{item.tag}</span>
-      <span className="rounded bg-surface-sunken px-1.5 py-0.5 text-[10px] font-medium text-text-muted">
-        {ENTITY_TYPE_LABELS[item.entity_type] ?? item.entity_type}
-      </span>
-    </div>
-  );
 
   return (
     <div className="rounded-lg border border-border-default bg-surface-raised p-3">
@@ -123,49 +121,84 @@ export function TagFilter({
           Tag Filters
         </span>
         {tags.length > 1 && (
-          <SelectButton
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
             value={matchMode}
-            options={MATCH_MODES}
-            onChange={(e) => {
-              if (e.value) onMatchModeChange(e.value);
-            }}
-            className="ml-auto [&_.p-button]:!px-2 [&_.p-button]:!py-0.5 [&_.p-button]:!text-xs"
-          />
+            onValueChange={(nv) => nv && onMatchModeChange(nv as "any" | "all")}
+            className="ml-auto"
+          >
+            <ToggleGroupItem value="any" className="h-6 px-2 text-xs">
+              Any
+            </ToggleGroupItem>
+            <ToggleGroupItem value="all" className="h-6 px-2 text-xs">
+              All
+            </ToggleGroupItem>
+          </ToggleGroup>
         )}
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
         {tags.map((tag) => (
-          <Chip
+          <Badge
             key={tag}
-            label={tag}
-            removable
-            onRemove={() => {
-              removeTag(tag);
-              return true;
-            }}
-            icon={<Tag className="mr-1 h-3 w-3" />}
-            className="!bg-accent-subtle !text-xs !text-accent-text"
-          />
+            variant="secondary"
+            className="gap-1 bg-accent-subtle text-accent-text"
+          >
+            <Tag className="size-3" />
+            {tag}
+            <button
+              type="button"
+              onClick={() => removeTag(tag)}
+              aria-label={`Remove ${tag}`}
+              className="rounded-full hover:opacity-70"
+            >
+              <X className="size-3" />
+            </button>
+          </Badge>
         ))}
-        <AutoComplete
-          value={inputValue}
-          suggestions={suggestions}
-          completeMethod={searchTags}
-          onChange={(e) => {
-            const v = e.value;
-            setInputValue(typeof v === "string" ? v : (v?.tag ?? ""));
-          }}
-          onSelect={handleSelect}
-          onKeyDown={handleKeyDown}
-          field="tag"
-          itemTemplate={itemTemplate}
-          placeholder={tags.length === 0 ? "Type to search tags..." : "Add tag..."}
-          className="min-w-[180px] flex-1 [&_.p-autocomplete-input]:!border-0 [&_.p-autocomplete-input]:!bg-transparent [&_.p-autocomplete-input]:!p-1 [&_.p-autocomplete-input]:!text-sm [&_.p-autocomplete-input]:!shadow-none"
-          inputClassName="!ring-0"
-          delay={0}
-          minLength={1}
-        />
+
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-7 gap-1 text-xs">
+              <Plus className="size-3.5" />
+              Add tag
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-0" align="start">
+            <Command shouldFilter={false}>
+              <CommandInput
+                placeholder="Type to search tags…"
+                value={query}
+                onValueChange={setQuery}
+                onKeyDown={handleKeyDown}
+              />
+              <CommandList>
+                <CommandEmpty>
+                  {query.trim()
+                    ? `Press Enter to add “${query}”`
+                    : "Type to search tags…"}
+                </CommandEmpty>
+                {suggestions.map((s) => (
+                  <CommandItem
+                    key={s.tag}
+                    value={s.tag}
+                    onSelect={() => {
+                      addTag(s.tag);
+                      setQuery("");
+                    }}
+                  >
+                    <span className="flex-1 truncate">{s.tag}</span>
+                    <span className="rounded bg-surface-sunken px-1.5 py-0.5 text-[10px] font-medium text-text-muted">
+                      {ENTITY_TYPE_LABELS[s.entity_type] ?? s.entity_type}
+                    </span>
+                  </CommandItem>
+                ))}
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {tags.length > 0 && (

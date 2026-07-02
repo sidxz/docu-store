@@ -1,9 +1,9 @@
 "use client";
 
-import { Chip } from "primereact/chip";
-import { Skeleton } from "primereact/skeleton";
 import { TrendingUp } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { usePopularTags } from "@/hooks/use-browse";
 
 const ENTITY_TYPE_LABELS: Record<string, string> = {
@@ -28,7 +28,7 @@ export function PopularTags({ onTagClick }: PopularTagsProps) {
     return (
       <div className="flex flex-wrap gap-2">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} width="5rem" height="1.75rem" borderRadius="9999px" />
+          <Skeleton key={i} className="h-7 w-20 rounded-full" />
         ))}
       </div>
     );
@@ -46,17 +46,15 @@ export function PopularTags({ onTagClick }: PopularTagsProps) {
       </div>
       <div className="flex flex-wrap gap-1.5">
         {tags.map((t) => (
-          <Chip
+          <Badge
             key={`${t.entity_type}-${t.tag}`}
-            label={`${t.tag} (${t.artifact_count})`}
-            className="cursor-pointer !bg-surface-sunken !text-xs hover:!bg-accent-subtle hover:!text-accent-text"
+            variant="secondary"
+            title={ENTITY_TYPE_LABELS[t.entity_type] ?? t.entity_type}
+            className="cursor-pointer bg-surface-sunken text-text-secondary hover:bg-accent-subtle hover:text-accent-text"
             onClick={() => onTagClick(t.tag)}
-            pt={{
-              label: {
-                title: ENTITY_TYPE_LABELS[t.entity_type] ?? t.entity_type,
-              },
-            }}
-          />
+          >
+            {t.tag} ({t.artifact_count})
+          </Badge>
         ))}
       </div>
     </div>

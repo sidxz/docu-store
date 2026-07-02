@@ -2,11 +2,18 @@
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Search as SearchIcon, X, Trash2, Clock } from "lucide-react";
-import { Button } from "primereact/button";
-import { Message } from "primereact/message";
-import { SelectButton } from "primereact/selectbutton";
+import {
+  Search as SearchIcon,
+  X,
+  Trash2,
+  Clock,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { TextSearchResults } from "@/components/search/TextSearchResults";
@@ -307,21 +314,29 @@ export default function SearchPage() {
             )}
           </div>
 
-          <Button
-            label="Search"
-            icon={isLoading ? "pi pi-spin pi-spinner" : "pi pi-search"}
-            onClick={handleSearch}
-            disabled={!inputValue.trim() || isLoading}
-          />
+          <Button onClick={handleSearch} disabled={!inputValue.trim() || isLoading}>
+            {isLoading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <SearchIcon className="size-4" />
+            )}
+            Search
+          </Button>
         </div>
 
-        <SelectButton
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
           value={localMode}
-          options={SEARCH_MODES}
-          onChange={(e) => {
-            if (e.value) handleModeChange(e.value);
-          }}
-        />
+          onValueChange={(nv) => nv && handleModeChange(nv as SearchMode)}
+        >
+          {SEARCH_MODES.map((o) => (
+            <ToggleGroupItem key={o.value} value={o.value}>
+              {o.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
 
         <TagFilter
           tags={filterTags}
@@ -363,10 +378,12 @@ export default function SearchPage() {
 
       {(textSearch.error || summarySearch.error || hierarchicalSearch.error) && (
         <div className="mt-6">
-          <Message
-            severity="error"
-            text="Search failed. Please check that the backend is running and try again."
-          />
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Search failed. Please check that the backend is running and try again.
+            </AlertDescription>
+          </Alert>
         </div>
       )}
     </div>
