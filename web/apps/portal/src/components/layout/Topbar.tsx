@@ -2,7 +2,7 @@
 
 import { Fragment } from "react";
 import Link from "next/link";
-import { BarChart3, Globe, Lock, LogOut, Moon, Sun } from "lucide-react";
+import { Coins, Globe, Lock, LogOut, Moon, Sun } from "lucide-react";
 import { useAuthz } from "@sentinel-auth/react";
 
 import { useSession } from "@/lib/auth";
@@ -100,7 +100,7 @@ export function Topbar() {
             className="hidden md:inline-flex items-center gap-1 px-2 text-xs font-mono text-text-muted tabular-nums"
             title={`${usage.data.total.toLocaleString()} tokens used — ${usage.data.prompt.toLocaleString()} prompt + ${usage.data.completion.toLocaleString()} completion`}
           >
-            <BarChart3 className="size-3" />
+            <Coins className="size-3 text-amber-500" />
             {formatTokens(usage.data.total)} tokens
           </span>
         )}
