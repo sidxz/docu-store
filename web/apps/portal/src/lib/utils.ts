@@ -28,3 +28,14 @@ const _compact = new Intl.NumberFormat("en", { notation: "compact", maximumFract
 export function formatTokens(n: number): string {
   return _compact.format(n);
 }
+
+/** Relative time for timestamps: "just now", "5m ago", "3h ago", "2d ago", then a date. */
+export function formatRelativeTime(iso: string): string {
+  const d = new Date(iso);
+  const s = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  if (s < 604800) return `${Math.floor(s / 86400)}d ago`;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}

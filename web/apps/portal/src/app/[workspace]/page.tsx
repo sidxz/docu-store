@@ -16,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LinkButton } from "@/components/ui/LinkButton";
+import { RecentChatsPanel } from "@/components/dashboard/RecentChatsPanel";
 import { useDashboard } from "@/hooks/use-dashboard";
 import {
   useRecentSearches,
@@ -54,8 +55,11 @@ export default function DashboardPage() {
 
       {/* Two-column layout */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Recent Documents — 2/3 width */}
-        <div className="lg:col-span-2 rounded-xl border border-border-default bg-surface-elevated">
+        {/* Recent Chats + Recent Documents — 2/3 width */}
+        <div className="space-y-8 lg:col-span-2">
+          <RecentChatsPanel workspace={workspace} />
+
+          <div className="rounded-xl border border-border-default bg-surface-elevated">
           <div className="flex items-center justify-between px-5 py-4">
             <h2 className="text-sm font-semibold text-text-primary">
               Recent Documents
@@ -156,6 +160,7 @@ export default function DashboardPage() {
                 })}
               </div>
             )}
+          </div>
           </div>
         </div>
 
