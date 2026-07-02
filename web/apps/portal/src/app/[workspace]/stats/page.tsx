@@ -511,7 +511,7 @@ export default function StatsPage() {
                           {fmtDate(f.started_at)}
                         </td>
                         <td
-                          className="max-w-[14rem] truncate py-2.5 text-xs text-red-400"
+                          className="max-w-[14rem] truncate py-2.5 text-xs text-red-600 dark:text-red-400"
                           title={f.failure_message ?? undefined}
                         >
                           {truncate(f.failure_message, 60)}

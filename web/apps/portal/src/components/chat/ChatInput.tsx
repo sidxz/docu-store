@@ -120,13 +120,13 @@ const MODE_CONFIG: Record<ChatMode, {
     icon: Search,
     label: "Research",
     tooltip: "Research — plans, searches, and verifies across your documents",
-    style: "text-blue-400 hover:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20",
+    style: "text-blue-600 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20",
   },
   deep_thinking: {
     icon: Telescope,
     label: "Deep Research",
     tooltip: "Deep Research — iterative agentic retrieval with visual page analysis",
-    style: "text-violet-400 hover:text-violet-400 bg-violet-500/10 hover:bg-violet-500/20",
+    style: "text-violet-600 dark:text-violet-400 hover:text-violet-600 dark:hover:text-violet-400 bg-violet-500/10 hover:bg-violet-500/20",
   },
 };
 
@@ -145,7 +145,7 @@ function ReasoningToggle({
         <PromptInputButton
           onClick={onToggle}
           disabled={disabled}
-          className={on ? "text-amber-400 hover:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20" : ""}
+          className={on ? "text-amber-600 dark:text-amber-400 hover:text-amber-600 dark:hover:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20" : ""}
           aria-label={`Reasoning ${on ? "on" : "off"}. Click to toggle.`}
         >
           <Brain className="size-3.5" />

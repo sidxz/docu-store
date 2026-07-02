@@ -99,10 +99,10 @@ export function AgentThinkingPanel({ trace, isStreaming }: AgentThinkingPanelPro
 // --- Thinking Log ---
 
 const STEP_COLORS: Record<string, string> = {
-  planning: "bg-blue-500/15 text-blue-400",
-  retrieval: "bg-amber-500/15 text-amber-400",
-  synthesis: "bg-purple-500/15 text-purple-400",
-  verification: "bg-emerald-500/15 text-emerald-400",
+  planning: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
+  retrieval: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  synthesis: "bg-purple-500/15 text-purple-700 dark:text-purple-400",
+  verification: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
 };
 
 function resolveThinkingBlocks(trace: AgentTrace): ThinkingBlock[] {
@@ -156,11 +156,11 @@ function tryParseQueryPlan(content: string): QueryPlan | null {
 }
 
 const QUERY_TYPE_STYLES: Record<string, string> = {
-  factual: "bg-blue-500/15 text-blue-400",
-  comparative: "bg-purple-500/15 text-purple-400",
-  exploratory: "bg-amber-500/15 text-amber-400",
-  compound: "bg-emerald-500/15 text-emerald-400",
-  follow_up: "bg-zinc-500/15 text-zinc-400",
+  factual: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
+  comparative: "bg-purple-500/15 text-purple-700 dark:text-purple-400",
+  exploratory: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  compound: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  follow_up: "bg-zinc-500/15 text-zinc-700 dark:text-zinc-400",
 };
 
 const STRATEGY_ICONS: Record<string, typeof Search> = {
@@ -170,7 +170,7 @@ const STRATEGY_ICONS: Record<string, typeof Search> = {
 };
 
 function QueryPlanCard({ plan }: { plan: QueryPlan }) {
-  const typeStyle = QUERY_TYPE_STYLES[plan.query_type ?? ""] ?? "bg-zinc-500/15 text-zinc-400";
+  const typeStyle = QUERY_TYPE_STYLES[plan.query_type ?? ""] ?? "bg-zinc-500/15 text-zinc-700 dark:text-zinc-400";
   const StrategyIcon = STRATEGY_ICONS[plan.search_strategy ?? ""] ?? Search;
 
   return (
@@ -252,7 +252,7 @@ function ThinkingLog({ blocks }: { blocks: ThinkingBlock[] }) {
       {logExpanded && (
         <div className="pl-3 border-l-2 border-border-subtle space-y-2">
           {blocks.map((block, i) => {
-            const colorClass = STEP_COLORS[block.step] ?? "bg-zinc-500/15 text-zinc-400";
+            const colorClass = STEP_COLORS[block.step] ?? "bg-zinc-500/15 text-zinc-700 dark:text-zinc-400";
             const queryPlan = block.step === "planning" ? tryParseQueryPlan(block.content) : null;
             return (
               <div key={i} className="space-y-1">

@@ -334,7 +334,7 @@ function PagePreviewDialog({
           <DialogTitle className="truncate text-sm font-medium leading-none">{title}</DialogTitle>
         </DialogHeader>
 
-        <div className="resize overflow-auto rounded-md bg-black/30 border border-border-subtle">
+        <div className="resize overflow-auto rounded-md bg-surface-sunken border border-border-subtle">
           {!src && (
             <div className="flex items-center justify-center h-40 text-text-muted text-sm">
               No preview available

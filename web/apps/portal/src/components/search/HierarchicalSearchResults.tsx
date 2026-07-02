@@ -478,10 +478,10 @@ function DocumentGroupCard({
                   <span className="text-green-500">multi-hit</span>
                 )}
                 {group.bestChunkPosition === null && (
-                  <span className="text-orange-400">summary-only</span>
+                  <span className="text-orange-500">summary-only</span>
                 )}
                 {group.bestSummaryRank === null && (
-                  <span className="text-orange-400">chunk-only</span>
+                  <span className="text-orange-500">chunk-only</span>
                 )}
                 {gap !== null && (
                   <span className="text-text-muted">

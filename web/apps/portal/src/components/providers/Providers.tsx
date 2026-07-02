@@ -88,13 +88,13 @@ export function Providers({ children }: { children: ReactNode }) {
 
   if (configError) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "system-ui, sans-serif" }}>
-        <div style={{ textAlign: "center", maxWidth: 420 }}>
-          <h2 style={{ marginBottom: 8 }}>Configuration Error</h2>
-          <p style={{ color: "#666", marginBottom: 16 }}>{configError}</p>
+      <div className="flex h-screen items-center justify-center p-6">
+        <div className="max-w-md text-center">
+          <h2 className="mb-2 text-lg font-semibold text-text-primary">Configuration Error</h2>
+          <p className="mb-4 text-sm text-text-secondary">{configError}</p>
           <button
             onClick={() => window.location.reload()}
-            style={{ padding: "8px 20px", cursor: "pointer", borderRadius: 6, border: "1px solid #ccc", background: "#fff" }}
+            className="rounded-md border border-border-default bg-surface-elevated px-5 py-2 text-sm text-text-primary transition-colors hover:bg-surface-hover"
           >
             Retry
           </button>

@@ -111,7 +111,7 @@ export function Sidebar({ workspaceSlug }: { workspaceSlug: string }) {
           href={`/${workspaceSlug}/settings`}
           isActive={pathname.startsWith(`/${workspaceSlug}/settings`)}
           collapsed={collapsed}
-          iconColor="text-slate-400"
+          iconColor="text-slate-500"
         />
 
         {/* Theme toggle */}

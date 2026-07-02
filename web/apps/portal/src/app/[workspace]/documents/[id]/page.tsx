@@ -209,7 +209,7 @@ export default function ArtifactDetailPage() {
             <div className="mt-3 flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-4 py-2.5">
               <Loader2 className="h-4 w-4 shrink-0 animate-spin text-blue-500" />
               <div className="min-w-0 text-sm">
-                <span className="font-medium text-blue-400">
+                <span className="font-medium text-blue-600 dark:text-blue-400">
                   {running.length} {running.length === 1 ? "workflow" : "workflows"} running
                 </span>
                 <span className="ml-2 text-xs text-text-muted">
@@ -225,7 +225,7 @@ export default function ArtifactDetailPage() {
             <div className="mt-3 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-2.5">
               <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
               <div className="min-w-0 text-sm">
-                <span className="font-medium text-red-400">
+                <span className="font-medium text-red-600 dark:text-red-400">
                   {failed.length} {failed.length === 1 ? "workflow" : "workflows"} failed
                 </span>
                 <span className="ml-2 text-xs text-text-muted">
