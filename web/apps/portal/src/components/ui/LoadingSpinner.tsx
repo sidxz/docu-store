@@ -1,12 +1,9 @@
 "use client";
 
-import { ProgressSpinner } from "primereact/progressspinner";
+import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-const SIZES = {
-  sm: { width: "1.5rem", height: "1.5rem" },
-  md: { width: "2rem", height: "2rem" },
-  lg: { width: "3rem", height: "3rem" },
-} as const;
+const SIZES = { sm: "size-4", md: "size-6", lg: "size-8" } as const;
 
 interface LoadingSpinnerProps {
   size?: keyof typeof SIZES;
@@ -16,7 +13,10 @@ interface LoadingSpinnerProps {
 export function LoadingSpinner({ size = "md", className }: LoadingSpinnerProps) {
   return (
     <div className={className ?? "flex items-center justify-center py-20"}>
-      <ProgressSpinner style={SIZES[size]} strokeWidth="3" />
+      <Loader2
+        className={cn("animate-spin text-text-muted", SIZES[size], className)}
+        aria-label="Loading"
+      />
     </div>
   );
 }

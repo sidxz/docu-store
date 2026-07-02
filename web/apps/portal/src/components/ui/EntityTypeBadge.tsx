@@ -1,14 +1,16 @@
-import { Tag } from "primereact/tag";
+import { FileText, StickyNote, FlaskConical, type LucideIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { severityToVariant, type PrimeSeverity } from "@/lib/severity";
 
 type EntityType = "artifact" | "page" | "compound";
 
 const CONFIG: Record<
   EntityType,
-  { icon: string; label: string; severity: "info" | "success" | "warning" | "secondary" }
+  { icon: LucideIcon; label: string; severity: PrimeSeverity }
 > = {
-  artifact: { icon: "pi pi-file", label: "Document", severity: "info" },
-  page: { icon: "pi pi-book", label: "Page", severity: "secondary" },
-  compound: { icon: "pi pi-sitemap", label: "Compound", severity: "success" },
+  artifact: { icon: FileText, label: "Document", severity: "info" },
+  page: { icon: StickyNote, label: "Page", severity: "secondary" },
+  compound: { icon: FlaskConical, label: "Compound", severity: "success" },
 };
 
 interface EntityTypeBadgeProps {
@@ -18,13 +20,12 @@ interface EntityTypeBadgeProps {
 
 export function EntityTypeBadge({ type, className = "" }: EntityTypeBadgeProps) {
   const config = CONFIG[type] || CONFIG.artifact;
+  const Icon = config.icon;
 
   return (
-    <Tag
-      value={config.label}
-      severity={config.severity}
-      icon={config.icon}
-      className={className}
-    />
+    <Badge variant={severityToVariant[config.severity]} className={className}>
+      <Icon />
+      {config.label}
+    </Badge>
   );
 }

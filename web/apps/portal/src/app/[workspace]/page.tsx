@@ -125,7 +125,7 @@ export default function DashboardPage() {
                 <LinkButton
                   href={`/${workspace}/documents/upload`}
                   label="Upload"
-                  icon="pi pi-upload"
+                  icon={Upload}
                   className="mt-4"
                 />
               </div>

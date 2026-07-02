@@ -6,7 +6,7 @@ import { IconField } from "primereact/iconfield";
 import { InputIcon } from "primereact/inputicon";
 import { InputText } from "primereact/inputtext";
 import { Message } from "primereact/message";
-import { FileText, Grid3X3, List } from "lucide-react";
+import { FileText, Grid3X3, List, Upload } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import type { TagFolderDTO } from "@docu-store/types";
@@ -162,7 +162,7 @@ export default function DocumentsPage() {
         actions={
           <div className="flex items-center gap-2">
             <ViewToggle value={viewMode} options={VIEW_MODES} onChange={handleViewModeChange} />
-            <LinkButton href={`/${workspace}/documents/upload`} label="Upload" icon="pi pi-upload" />
+            <LinkButton href={`/${workspace}/documents/upload`} label="Upload" icon={Upload} />
           </div>
         }
       />
@@ -250,7 +250,7 @@ export default function DocumentsPage() {
             <LinkButton
               href={`/${workspace}/documents/upload`}
               label="Upload Document"
-              icon="pi pi-upload"
+              icon={Upload}
             />
           }
         />

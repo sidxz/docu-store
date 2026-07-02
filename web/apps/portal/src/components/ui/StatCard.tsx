@@ -1,4 +1,4 @@
-import { Skeleton } from "primereact/skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { LucideIcon } from "lucide-react";
 
 interface StatCardProps {
@@ -22,11 +22,11 @@ export function StatCard({
     return (
       <div className="rounded-xl border border-border-default bg-surface-elevated p-5">
         <div className="flex items-center justify-between">
-          <Skeleton width="5rem" height="0.875rem" />
-          <Skeleton width="2.25rem" height="2.25rem" borderRadius="0.5rem" />
+          <Skeleton className="h-3.5 w-20" />
+          <Skeleton className="size-9 rounded-lg" />
         </div>
         <div className="mt-4">
-          <Skeleton width="4rem" height="1.75rem" />
+          <Skeleton className="h-7 w-16" />
         </div>
       </div>
     );

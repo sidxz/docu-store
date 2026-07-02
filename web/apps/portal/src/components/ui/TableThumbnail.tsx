@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { type ReactNode } from "react";
-import { Skeleton } from "primereact/skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthBlobUrl } from "@/hooks/use-auth-blob-url";
 import { API_URL } from "@/lib/constants";
 
 const sizes = {
-  xs: { cls: "w-16 h-20", skW: "4rem", skH: "5rem", radius: "0.375rem" },
-  sm: { cls: "h-12 w-12", skW: "3rem", skH: "3rem", radius: "0.25rem" },
-  md: { cls: "h-20 w-20", skW: "5rem", skH: "5rem", radius: "0.375rem" },
-  lg: { cls: "h-32 w-32", skW: "8rem", skH: "8rem", radius: "0.375rem" },
+  xs: { cls: "w-16 h-20", radius: "rounded-md" },
+  sm: { cls: "h-12 w-12", radius: "rounded-sm" },
+  md: { cls: "h-20 w-20", radius: "rounded-md" },
+  lg: { cls: "h-32 w-32", radius: "rounded-md" },
 } as const;
 
 interface AuthThumbnailProps {
@@ -41,7 +41,7 @@ export function AuthThumbnail({
 
   return (
     <Link href={href} className={`block shrink-0 ${s.cls} ${className ?? ""}`}>
-      {!blobUrl && <Skeleton width={s.skW} height={s.skH} borderRadius={s.radius} />}
+      {!blobUrl && <Skeleton className={`${s.cls} ${s.radius}`} />}
       {blobUrl && (
         <img
           src={blobUrl}
