@@ -13,6 +13,7 @@ import { useScopeStore } from "@/lib/stores/scope-store";
 import { SearchCommand } from "./SearchCommand";
 import { getInitials, formatTokens } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Breadcrumb,
@@ -142,7 +143,7 @@ export function Topbar() {
         </Tooltip>
 
         {/* Separator */}
-        <div className="mx-1.5 h-5 w-px bg-border-default" />
+        <Separator orientation="vertical" className="mx-1.5 data-[orientation=vertical]:h-5" />
 
         {/* User + logout */}
         <div className="flex items-center gap-2.5">

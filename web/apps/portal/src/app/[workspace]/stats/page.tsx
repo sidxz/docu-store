@@ -32,6 +32,7 @@ import { useAuthzHasRole } from "@sentinel-auth/react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/ui/StatCard";
 import { Card, CardHeader } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -418,15 +419,9 @@ export default function StatsPage() {
                           {fmtNumber(c.indexed_vectors_count)}
                         </td>
                         <td className="py-2.5">
-                          <span
-                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                              c.status === "green"
-                                ? "bg-green-500/10 text-green-500"
-                                : "bg-amber-500/10 text-amber-500"
-                            }`}
-                          >
+                          <Badge variant={c.status === "green" ? "success" : "warning"}>
                             {c.status}
-                          </span>
+                          </Badge>
                         </td>
                       </tr>
                     ))}

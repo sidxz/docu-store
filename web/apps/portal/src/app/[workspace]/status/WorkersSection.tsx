@@ -1,6 +1,7 @@
 "use client";
 
 import { Card, CardHeader } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/badge";
 import type { WorkerHeartbeat } from "@/hooks/use-health";
 import { WorkerCard } from "./WorkerCard";
 
@@ -19,9 +20,9 @@ export function WorkersSection({ workers }: { workers: WorkerHeartbeat[] }) {
         title="Workers"
         action={
           workers.length > 0 ? (
-            <span className="rounded-full bg-surface-sunken px-2 py-0.5 text-xs font-medium text-text-muted">
+            <Badge className="bg-surface-sunken text-text-muted">
               {online}/{workers.length} online
-            </span>
+            </Badge>
           ) : undefined
         }
       />
