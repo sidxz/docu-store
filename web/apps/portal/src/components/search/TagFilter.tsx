@@ -144,7 +144,7 @@ export function TagFilter({
           <Badge
             key={tag}
             variant="secondary"
-            className="gap-1 bg-accent-subtle text-accent-text"
+            className="bg-accent-subtle text-accent-text"
           >
             <Tag className="size-3" />
             {tag}
