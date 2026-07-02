@@ -1,4 +1,4 @@
-import { Skeleton } from "primereact/skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { TagCategoryDTO } from "@docu-store/types";
 
 interface CategoryBarProps {
@@ -20,7 +20,7 @@ export function CategoryBar({
     return (
       <div className="flex gap-2">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} width="7rem" height="2rem" borderRadius="0.5rem" />
+          <Skeleton key={i} className="h-8 w-28" />
         ))}
       </div>
     );

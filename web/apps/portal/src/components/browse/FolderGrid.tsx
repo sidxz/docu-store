@@ -1,5 +1,5 @@
 import { Folder, Calendar, ChevronRight } from "lucide-react";
-import { Skeleton } from "primereact/skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { TagFolderDTO } from "@docu-store/types";
 
 interface FolderGridProps {
@@ -14,7 +14,7 @@ export function FolderGrid({ folders, onSelect, isLoading, entityType }: FolderG
     return (
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {Array.from({ length: 8 }).map((_, i) => (
-          <Skeleton key={i} height="3.5rem" borderRadius="0.75rem" />
+          <Skeleton key={i} className="h-[3.5rem]" />
         ))}
       </div>
     );

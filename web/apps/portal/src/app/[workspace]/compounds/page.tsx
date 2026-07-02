@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { Atom } from "lucide-react";
-import { Button } from "primereact/button";
-import { Message } from "primereact/message";
+import { Atom, Search, Loader2, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 import { MoleculeStructure, StructureInput } from "@docu-store/ui";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -40,21 +40,26 @@ export default function CompoundsPage() {
         <StructureInput value={smiles} onChange={setSmiles} />
         <div className="mt-4">
           <Button
-            label="Search"
-            icon={search.isPending ? "pi pi-spin pi-spinner" : "pi pi-search"}
             onClick={handleSearch}
             disabled={!smiles.trim() || search.isPending}
-          />
+          >
+            {search.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Search className="size-4" />
+            )}
+            Search
+          </Button>
         </div>
       </Card>
 
       {/* Error */}
       {search.error && (
         <div className="mb-6">
-          <Message
-            severity="error"
-            text="Compound search failed. Ensure the SMILES string is valid and the backend is running."
-          />
+          <Alert variant="destructive">
+            <AlertCircle className="size-4" />
+            <AlertDescription>Compound search failed. Ensure the SMILES string is valid and the backend is running.</AlertDescription>
+          </Alert>
         </div>
       )}
 
