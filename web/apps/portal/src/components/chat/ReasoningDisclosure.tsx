@@ -36,7 +36,9 @@ export function ReasoningDisclosure({ reasoning, isStreaming, steps }: Reasoning
     !isStreaming && synthesisStep?.started_at && synthesisStep?.completed_at
       ? Math.max(
           1,
-          Math.round(
+          // ceil matches the vendored live timer so the number never
+          // visibly decreases when persisted data replaces the live value
+          Math.ceil(
             (new Date(synthesisStep.completed_at).getTime() -
               new Date(synthesisStep.started_at).getTime()) /
               1000,
