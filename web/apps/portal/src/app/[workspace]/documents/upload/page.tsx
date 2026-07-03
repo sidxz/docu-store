@@ -29,7 +29,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { useUploadArtifact } from "@/hooks/use-artifacts";
 import { useScopeStore } from "@/lib/stores/scope-store";
-import { cn } from "@/lib/utils";
+import { cn, formatFileSize } from "@/lib/utils";
 
 const ARTIFACT_TYPES = [
   { label: "Research Article", value: "RESEARCH_ARTICLE" },
@@ -52,18 +52,6 @@ const ACCEPT: Accept = {
 const MAX_FILE_SIZE = 100_000_000;
 
 type FileStatus = "pending" | "uploading" | "success" | "error";
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ["KB", "MB", "GB"];
-  let value = bytes;
-  let i = -1;
-  do {
-    value /= 1024;
-    i++;
-  } while (value >= 1024 && i < units.length - 1);
-  return `${value.toFixed(1)} ${units[i]}`;
-}
 
 export default function UploadPage() {
   const { workspace } = useParams<{ workspace: string }>();

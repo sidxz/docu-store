@@ -39,3 +39,16 @@ export function formatRelativeTime(iso: string): string {
   if (s < 604800) return `${Math.floor(s / 86400)}d ago`;
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
+
+/** Human-readable file size: 512 → "512 B", 2048 → "2.0 KB", 5_242_880 → "5.0 MB". */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = bytes;
+  let i = -1;
+  do {
+    value /= 1024;
+    i++;
+  } while (value >= 1024 && i < units.length - 1);
+  return `${value.toFixed(1)} ${units[i]}`;
+}
