@@ -86,11 +86,24 @@ export interface Conversation {
   workspace_id: string;
   owner_id: string;
   title: string | null;
+  folder_id: string | null;
   created_at: string;
   updated_at: string;
   message_count: number;
   model_used: string | null;
   is_archived: boolean;
+}
+
+// --- Chat folders (per-user, per-workspace, flat) ---
+
+export interface ChatFolder {
+  folder_id: string;
+  workspace_id: string;
+  owner_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+  chat_count: number;
 }
 
 // --- Recent chats (dashboard panel) ---

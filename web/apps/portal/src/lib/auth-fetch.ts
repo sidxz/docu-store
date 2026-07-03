@@ -41,6 +41,16 @@ export async function authFetchJson<T>(
   init?: RequestInit,
 ): Promise<T> {
   const res = await authFetch(path, init);
-  if (!res.ok) throw new ApiError(`API error: ${res.statusText}`, res.status);
+  if (!res.ok) {
+    // Surface FastAPI's error `detail` as the message when present.
+    let detail: string | undefined;
+    try {
+      const body = (await res.json()) as { detail?: unknown };
+      if (typeof body?.detail === "string") detail = body.detail;
+    } catch {
+      // non-JSON error body — fall back to statusText
+    }
+    throw new ApiError(detail ?? `API error: ${res.statusText}`, res.status, detail);
+  }
   return res.json();
 }

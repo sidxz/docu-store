@@ -7,10 +7,12 @@ from uuid import UUID
 
 import structlog
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import ReturnDocument
 
 from application.dtos.chat_dtos import (
     AgentTraceDTO,
     ChatFeedbackDTO,
+    ChatFolderDTO,
     ChatMessageDTO,
     ContentBlockDTO,
     ConversationDTO,
@@ -25,6 +27,7 @@ _CONVERSATIONS = "conversations"
 _MESSAGES = "chat_messages"
 _SUMMARIES = "conversation_summaries"
 _FEEDBACK = "chat_feedback"
+_FOLDERS = "chat_folders"
 
 
 class MongoChatRepository:
@@ -46,6 +49,7 @@ class MongoChatRepository:
         self._messages = self._db[_MESSAGES]
         self._summaries = self._db[_SUMMARIES]
         self._feedback = self._db[_FEEDBACK]
+        self._folders = self._db[_FOLDERS]
 
     # --- Conversations ---
 
@@ -81,12 +85,15 @@ class MongoChatRepository:
         skip: int = 0,
         limit: int = 20,
         is_archived: bool = False,
+        folder_id: UUID | None = None,
     ) -> list[ConversationDTO]:
         query = {
             "workspace_id": str(workspace_id),
             "owner_id": str(owner_id),
             "is_archived": is_archived,
         }
+        if folder_id is not None:
+            query["folder_id"] = str(folder_id)
         cursor = self._conversations.find(query).sort("updated_at", -1).skip(skip).limit(limit)
         return [_doc_to_conversation(doc) async for doc in cursor]
 
@@ -186,6 +193,152 @@ class MongoChatRepository:
             {"$set": updates},
         )
         return result.modified_count > 0
+
+    async def set_conversation_folder(
+        self,
+        conversation_id: UUID,
+        folder_id: UUID | None,
+        workspace_id: UUID,
+        owner_id: UUID,
+    ) -> bool:
+        # No updated_at bump: filing must not reorder the recency-sorted list.
+        result = await self._conversations.update_one(
+            {
+                "conversation_id": str(conversation_id),
+                "workspace_id": str(workspace_id),
+                "owner_id": str(owner_id),
+            },
+            {"$set": {"folder_id": str(folder_id) if folder_id else None}},
+        )
+        # matched, not modified: a concurrent identical move must not read as
+        # "conversation not found" — matched=1/modified=0 is still success.
+        return result.matched_count > 0
+
+    # --- Folders ---
+
+    async def create_folder(self, folder: ChatFolderDTO) -> ChatFolderDTO:
+        await self._folders.insert_one(_folder_to_doc(folder))
+        log.debug("chat.repo.folder_created", folder_id=str(folder.folder_id))
+        return folder
+
+    async def list_folders(
+        self,
+        workspace_id: UUID,
+        owner_id: UUID,
+    ) -> list[ChatFolderDTO]:
+        cursor = self._folders.find(
+            {"workspace_id": str(workspace_id), "owner_id": str(owner_id)},
+        )
+        folders = [_doc_to_folder(doc) async for doc in cursor]
+        if not folders:
+            return folders
+        # Sort in Python: Mongo's default byte-wise sort puts "Z" before "a".
+        folders.sort(key=lambda f: f.name.casefold())
+        counts = await self._counts_by_folder(workspace_id, owner_id)
+        for f in folders:
+            f.chat_count = counts.get(str(f.folder_id), 0)
+        return folders
+
+    async def _counts_by_folder(
+        self,
+        workspace_id: UUID,
+        owner_id: UUID,
+    ) -> dict[str, int]:
+        pipeline = [
+            {
+                "$match": {
+                    "workspace_id": str(workspace_id),
+                    "owner_id": str(owner_id),
+                    "folder_id": {"$ne": None},
+                    "is_archived": {"$ne": True},  # match the folder-view list filter
+                },
+            },
+            {"$group": {"_id": "$folder_id", "n": {"$sum": 1}}},
+        ]
+        docs = await self._conversations.aggregate(pipeline).to_list(length=None)
+        return {d["_id"]: int(d["n"]) for d in docs if d.get("_id")}
+
+    async def get_folder(
+        self,
+        workspace_id: UUID,
+        owner_id: UUID,
+        folder_id: UUID,
+    ) -> ChatFolderDTO | None:
+        doc = await self._folders.find_one(
+            {
+                "folder_id": str(folder_id),
+                "workspace_id": str(workspace_id),
+                "owner_id": str(owner_id),
+            },
+        )
+        return _doc_to_folder(doc) if doc else None
+
+    async def rename_folder(
+        self,
+        workspace_id: UUID,
+        owner_id: UUID,
+        folder_id: UUID,
+        name: str,
+    ) -> ChatFolderDTO | None:
+        # No updated_at bump — a rename is not a membership change.
+        doc = await self._folders.find_one_and_update(
+            {
+                "folder_id": str(folder_id),
+                "workspace_id": str(workspace_id),
+                "owner_id": str(owner_id),
+            },
+            {"$set": {"name": name}},
+            return_document=ReturnDocument.AFTER,
+        )
+        return _doc_to_folder(doc) if doc else None
+
+    async def touch_folders(
+        self,
+        workspace_id: UUID,
+        owner_id: UUID,
+        folder_ids: list[UUID],
+    ) -> None:
+        if not folder_ids:
+            return
+        await self._folders.update_many(
+            {
+                "folder_id": {"$in": [str(f) for f in folder_ids]},
+                "workspace_id": str(workspace_id),
+                "owner_id": str(owner_id),
+            },
+            {"$set": {"updated_at": datetime.now(UTC)}},
+        )
+
+    async def delete_folder(
+        self,
+        workspace_id: UUID,
+        owner_id: UUID,
+        folder_id: UUID,
+    ) -> bool:
+        result = await self._folders.delete_one(
+            {
+                "folder_id": str(folder_id),
+                "workspace_id": str(workspace_id),
+                "owner_id": str(owner_id),
+            },
+        )
+        return result.deleted_count > 0
+
+    async def clear_folder(
+        self,
+        workspace_id: UUID,
+        owner_id: UUID,
+        folder_id: UUID,
+    ) -> int:
+        result = await self._conversations.update_many(
+            {
+                "folder_id": str(folder_id),
+                "workspace_id": str(workspace_id),
+                "owner_id": str(owner_id),
+            },
+            {"$set": {"folder_id": None}},
+        )
+        return result.modified_count
 
     # --- Messages ---
 
@@ -326,6 +479,25 @@ class MongoChatRepository:
             unique=True,
             name="idx_conv_id",
         )
+        # Covers the folder-view query + its updated_at desc sort. Renamed from
+        # idx_conv_folder (different keys, same name would error); drop the old
+        # index manually on dev DBs.
+        await self._conversations.create_index(
+            [("workspace_id", 1), ("owner_id", 1), ("folder_id", 1), ("updated_at", -1)],
+            name="idx_conv_folder_recency",
+        )
+        await self._folders.create_index(
+            "folder_id",
+            unique=True,
+            name="idx_folder_id",
+        )
+        # Renamed from idx_folder_workspace_owner_name (now unique, same name
+        # would error); drop the old index manually on dev DBs.
+        await self._folders.create_index(
+            [("workspace_id", 1), ("owner_id", 1), ("name", 1)],
+            unique=True,
+            name="uniq_folder_owner_name",
+        )
         await self._messages.create_index(
             [("conversation_id", 1), ("created_at", 1)],
             name="idx_msg_conv_time",
@@ -350,12 +522,20 @@ class MongoChatRepository:
 # --- Document <-> DTO Converters ---
 
 
+def _utc(dt: datetime) -> datetime:
+    # ponytail: Motor client is not tz_aware, so BSON datetimes come back naive;
+    # re-attach UTC here rather than flip the shared client (other consumers
+    # assume naive).
+    return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
+
+
 def _conversation_to_doc(conv: ConversationDTO) -> dict:
     return {
         "conversation_id": str(conv.conversation_id),
         "workspace_id": str(conv.workspace_id),
         "owner_id": str(conv.owner_id),
         "title": conv.title,
+        "folder_id": str(conv.folder_id) if conv.folder_id else None,
         "created_at": conv.created_at,
         "updated_at": conv.updated_at,
         "message_count": conv.message_count,
@@ -370,11 +550,34 @@ def _doc_to_conversation(doc: dict) -> ConversationDTO:
         workspace_id=UUID(doc["workspace_id"]),
         owner_id=UUID(doc["owner_id"]),
         title=doc.get("title"),
-        created_at=doc["created_at"],
-        updated_at=doc["updated_at"],
+        folder_id=UUID(doc["folder_id"]) if doc.get("folder_id") else None,
+        created_at=_utc(doc["created_at"]),
+        updated_at=_utc(doc["updated_at"]),
         message_count=doc.get("message_count", 0),
         model_used=doc.get("model_used"),
         is_archived=doc.get("is_archived", False),
+    )
+
+
+def _folder_to_doc(folder: ChatFolderDTO) -> dict:
+    return {
+        "folder_id": str(folder.folder_id),
+        "workspace_id": str(folder.workspace_id),
+        "owner_id": str(folder.owner_id),
+        "name": folder.name,
+        "created_at": folder.created_at,
+        "updated_at": folder.updated_at,
+    }
+
+
+def _doc_to_folder(doc: dict) -> ChatFolderDTO:
+    return ChatFolderDTO(
+        folder_id=UUID(doc["folder_id"]),
+        workspace_id=UUID(doc["workspace_id"]),
+        owner_id=UUID(doc["owner_id"]),
+        name=doc["name"],
+        created_at=_utc(doc["created_at"]),
+        updated_at=_utc(doc["updated_at"]),
     )
 
 
@@ -424,5 +627,5 @@ def _doc_to_message(doc: dict) -> ChatMessageDTO:
         agent_trace=agent_trace,
         token_usage=token_usage,
         query_context=query_context,
-        created_at=doc["created_at"],
+        created_at=_utc(doc["created_at"]),
     )

@@ -5,6 +5,7 @@ import { Plus, Trash2, MessageSquare, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useConversations, useCreateConversation, useDeleteConversation } from "@/hooks/use-chat";
+import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { useChatStore } from "@/lib/stores/chat-store";
 import type { Conversation } from "@docu-store/types";
 
@@ -23,6 +24,7 @@ export function ConversationSidebar({
   const { data: conversations, isLoading } = useConversations();
   const createConversation = useCreateConversation();
   const deleteConversation = useDeleteConversation();
+  const confirm = useConfirm();
 
   const resetChat = useChatStore((s) => s.reset);
 
@@ -34,6 +36,16 @@ export function ConversationSidebar({
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    if (
+      !(await confirm({
+        title: "Delete chat?",
+        description: "This conversation and its messages will be permanently deleted.",
+        confirmLabel: "Delete",
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
     await deleteConversation.mutateAsync(id);
     if (id === activeConversationId) {
       resetChat();

@@ -1,21 +1,35 @@
 "use client";
 
+import { memo } from "react";
 import { FileText, CheckCircle2, XCircle, RotateCcw, X, Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { formatFileSize } from "@/lib/utils";
 
 interface Props {
+  id: string;
   name: string;
   relativePath?: string;
   size: number;
   status: "queued" | "uploading" | "success" | "error";
   progress: number;
   error?: string;
-  onRetry?: () => void;
-  onRemove?: () => void;
+  onRetry?: (id: string) => void;
+  onRemove?: (id: string) => void;
 }
 
-export function UploadFileRow({ name, relativePath, size, status, progress, error, onRetry, onRemove }: Props) {
+// memo: the page re-renders on every progress tick; rows whose props didn't
+// change (primitives + stable callbacks) skip re-rendering.
+export const UploadFileRow = memo(function UploadFileRow({
+  id,
+  name,
+  relativePath,
+  size,
+  status,
+  progress,
+  error,
+  onRetry,
+  onRemove,
+}: Props) {
   return (
     <div className="flex items-center gap-3 px-3 py-2.5">
       <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface-sunken">
@@ -44,16 +58,16 @@ export function UploadFileRow({ name, relativePath, size, status, progress, erro
       </div>
       <div className="flex shrink-0 items-center gap-1">
         {status === "error" && onRetry && (
-          <button type="button" onClick={onRetry} aria-label="Retry" className="rounded p-1 text-text-muted hover:text-text-secondary">
+          <button type="button" onClick={() => onRetry(id)} aria-label="Retry" className="rounded p-1 text-text-muted hover:text-text-secondary">
             <RotateCcw className="size-3.5" />
           </button>
         )}
         {status !== "uploading" && onRemove && (
-          <button type="button" onClick={onRemove} aria-label="Remove" className="rounded p-1 text-text-muted hover:text-ds-error">
+          <button type="button" onClick={() => onRemove(id)} aria-label="Remove" className="rounded p-1 text-text-muted hover:text-ds-error">
             <X className="size-3.5" />
           </button>
         )}
       </div>
     </div>
   );
-}
+});

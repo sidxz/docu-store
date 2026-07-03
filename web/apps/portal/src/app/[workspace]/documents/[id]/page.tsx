@@ -10,17 +10,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { OverviewTab } from "@/components/documents/OverviewTab";
 import { PagesTab } from "@/components/documents/PagesTab";
 import { PdfEmbed } from "@/components/PdfEmbed";
@@ -71,6 +61,7 @@ export default function ArtifactDetailPage() {
   const { data: workflowData } = useArtifactWorkflows(id);
   const { data: acl } = useArtifactPermissions(id);
   const deleteMutation = useDeleteArtifact();
+  const confirm = useConfirm();
   const rerunMutation = useRerunArtifactWorkflow(id);
 
   // Record document open for activity tracking (fire-and-forget)
@@ -168,32 +159,29 @@ export default function ArtifactDetailPage() {
               artifactId={id}
               isOwnerOrAdmin={isOwnerOrAdmin}
             />
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" disabled={deleteMutation.isPending}>
-                  {deleteMutation.isPending ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="size-4" />
-                  )}
-                  Delete
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Delete this artifact and all its pages?
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction variant="destructive" onClick={handleDelete}>
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <Button
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={async () => {
+                if (
+                  await confirm({
+                    title: "Delete document?",
+                    description: `Delete "${title}" and all its pages? This can't be undone.`,
+                    confirmLabel: "Delete",
+                    destructive: true,
+                  })
+                ) {
+                  handleDelete();
+                }
+              }}
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Trash2 className="size-4" />
+              )}
+              Delete
+            </Button>
           </div>
         }
       />

@@ -89,6 +89,9 @@ export const queryKeys = {
       [...queryKeys.chat.all, conversationId, "messages"] as const,
     usage: () => [...queryKeys.chat.all, "usage"] as const,
     recent: (limit: number) => [...queryKeys.chat.all, "recent", limit] as const,
+    folders: () => [...queryKeys.chat.all, "folders"] as const,
+    folderChats: (folderId: string) =>
+      [...queryKeys.chat.all, "folder", folderId] as const,
   },
   health: {
     all: ["health"] as const,

@@ -83,7 +83,7 @@ export function PagesTab({ pages, workspace, artifactId }: PagesTabProps) {
               {row.name ?? `Page ${row.index + 1}`}
             </Link>
             {row.summary_candidate?.summary && (
-              <p className="mt-0.5 text-xs leading-relaxed text-text-muted line-clamp-3">
+              <p className="mt-0.5 text-xs leading-relaxed text-text-secondary line-clamp-3">
                 {row.summary_candidate.summary}
               </p>
             )}
@@ -109,7 +109,10 @@ export function PagesTab({ pages, workspace, artifactId }: PagesTabProps) {
         accessorKey: "_search",
         filterFn: "includesString",
         sortingFn: (a, b) => a.original.index - b.original.index,
-        meta: { filter: { variant: "text", placeholder: "Search pages…" } },
+        meta: {
+          filter: { variant: "text", placeholder: "Search pages…" },
+          cellClassName: "whitespace-normal",
+        },
         cell: ({ row }) => pageTemplate(row.original),
       },
       {

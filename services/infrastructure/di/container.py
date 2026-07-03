@@ -47,6 +47,13 @@ from application.use_cases.artifact_use_cases import (
     UpdateTagMentionsUseCase as UpdateArtifactTagMentionsUseCase,
 )
 from application.use_cases.blob_use_cases import UploadBlobUseCase
+from application.use_cases.chat_folder_use_cases import (
+    CreateFolderUseCase,
+    DeleteFolderUseCase,
+    ListFoldersUseCase,
+    RenameFolderUseCase,
+    SetConversationFolderUseCase,
+)
 from application.use_cases.chat_use_cases import (
     CreateConversationUseCase,
     DeleteConversationUseCase,
@@ -932,6 +939,23 @@ def create_container() -> Container:
         chat_agent=c[ChatAgentPort],
     )
     container[RecordFeedbackUseCase] = lambda c: RecordFeedbackUseCase(
+        chat_repository=c[ChatRepository],
+    )
+
+    # Chat Folder Use Cases
+    container[ListFoldersUseCase] = lambda c: ListFoldersUseCase(
+        chat_repository=c[ChatRepository],
+    )
+    container[CreateFolderUseCase] = lambda c: CreateFolderUseCase(
+        chat_repository=c[ChatRepository],
+    )
+    container[RenameFolderUseCase] = lambda c: RenameFolderUseCase(
+        chat_repository=c[ChatRepository],
+    )
+    container[DeleteFolderUseCase] = lambda c: DeleteFolderUseCase(
+        chat_repository=c[ChatRepository],
+    )
+    container[SetConversationFolderUseCase] = lambda c: SetConversationFolderUseCase(
         chat_repository=c[ChatRepository],
     )
 

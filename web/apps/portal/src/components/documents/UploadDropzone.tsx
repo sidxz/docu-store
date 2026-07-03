@@ -1,19 +1,11 @@
 "use client";
 
 import { useRef } from "react";
-import { useDropzone, type Accept } from "react-dropzone";
+import { useDropzone } from "react-dropzone";
 import { UploadCloud, FolderOpen, FilePlus2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-
-const ACCEPT: Accept = {
-  "application/pdf": [".pdf"],
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation": [".pptx"],
-  "application/vnd.ms-powerpoint": [".ppt"],
-  "application/msword": [".doc"],
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
-};
-const MAX_FILE_SIZE = 100_000_000;
+import { ACCEPT, MAX_FILE_SIZE } from "@/hooks/use-document-uploader";
 
 export function UploadDropzone({ onFiles, onReject, disabled }: { onFiles: (files: File[]) => void; onReject?: (count: number) => void; disabled?: boolean }) {
   const folderRef = useRef<HTMLInputElement>(null);

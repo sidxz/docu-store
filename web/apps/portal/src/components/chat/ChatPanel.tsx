@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { MessageSquare, PanelLeftOpen, FileText } from "lucide-react";
+import { MessageSquare, PanelLeftOpen, FileText, Folder } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MoveToFolderMenu } from "@/components/folders/MoveToFolderMenu";
+import { useFolders } from "@/hooks/use-folders";
 import { Badge } from "@/components/ui/badge";
 import {
   Conversation,
@@ -39,6 +41,7 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const router = useRouter();
   const { data, isLoading } = useConversation(conversationId);
+  const { data: folders } = useFolders();
   const createConversation = useCreateConversation();
   const sendMessage = useSendMessage(conversationId);
 
@@ -200,6 +203,22 @@ export function ChatPanel({
             || pendingUserMessage
             || (isLoading ? "" : "New Chat")}
         </h2>
+        {/* In-folder picker */}
+        {conversationId && (
+          <MoveToFolderMenu conversationId={conversationId} currentFolderId={data?.folder_id ?? null}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-text-muted"
+              aria-label="Move chat to folder"
+            >
+              <Folder className="size-4" />
+              <span className="max-w-[10rem] truncate text-xs">
+                {folders?.find((f) => f.folder_id === data?.folder_id)?.name ?? "Add to folder"}
+              </span>
+            </Button>
+          </MoveToFolderMenu>
+        )}
         {/* Per-chat token usage — pulled right */}
         {chatTokens > 0 && (
           <span

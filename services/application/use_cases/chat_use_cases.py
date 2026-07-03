@@ -80,6 +80,7 @@ class ListConversationsUseCase:
         skip: int = 0,
         limit: int = 20,
         is_archived: bool = False,
+        folder_id: UUID | None = None,
     ) -> Result[list[ConversationDTO], AppError]:
         try:
             conversations = await self._repo.list_conversations(
@@ -88,6 +89,7 @@ class ListConversationsUseCase:
                 skip=skip,
                 limit=limit,
                 is_archived=is_archived,
+                folder_id=folder_id,
             )
             return Success(conversations)
         except Exception as e:

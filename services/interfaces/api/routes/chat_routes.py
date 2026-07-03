@@ -22,6 +22,7 @@ from application.dtos.chat_dtos import (
     RecentConversationDTO,
     TokenUsageDTO,
 )
+from application.use_cases.chat_folder_use_cases import SetConversationFolderUseCase
 from application.use_cases.chat_use_cases import (
     CreateConversationUseCase,
     DeleteConversationUseCase,
@@ -68,6 +69,17 @@ class FeedbackRequest(BaseModel):
     feedback: Literal["positive", "negative"]
 
 
+class SetFolderRequest(BaseModel):
+    """Request to move a conversation into a folder.
+
+    ``folder_id`` is required but nullable: explicit null unfiles the
+    conversation; omitting the field is a 422 (guards PATCH {} from
+    silently unfiling).
+    """
+
+    folder_id: UUID | None
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 @handle_use_case_errors
 async def create_conversation(
@@ -92,8 +104,9 @@ async def list_conversations(
     skip: int = 0,
     limit: int = 20,
     is_archived: bool = False,
+    folder_id: UUID | None = None,
 ) -> list[ConversationDTO]:
-    """List conversations for the current user."""
+    """List conversations for the current user. Pass ``folder_id`` for a folder view."""
     use_case = container[ListConversationsUseCase]
     return await use_case.execute(
         workspace_id=auth.workspace_id,
@@ -101,6 +114,7 @@ async def list_conversations(
         skip=skip,
         limit=limit,
         is_archived=is_archived,
+        folder_id=folder_id,
     )
 
 
@@ -165,6 +179,24 @@ async def delete_conversation(
     return await use_case.execute(
         conversation_id=conversation_id,
         workspace_id=auth.workspace_id,
+    )
+
+
+@router.patch("/{conversation_id}", status_code=status.HTTP_200_OK)
+@handle_use_case_errors
+async def set_conversation_folder(
+    conversation_id: UUID,
+    request: SetFolderRequest,
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> ConversationDTO:
+    """Move a conversation into a folder (``folder_id: null`` removes it from its folder)."""
+    use_case = container[SetConversationFolderUseCase]
+    return await use_case.execute(
+        conversation_id=conversation_id,
+        workspace_id=auth.workspace_id,
+        owner_id=auth.user_id,
+        folder_id=request.folder_id,
     )
 
 

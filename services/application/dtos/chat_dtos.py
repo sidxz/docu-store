@@ -180,6 +180,7 @@ class ConversationDTO(BaseModel):
     workspace_id: UUID
     owner_id: UUID
     title: str | None = None
+    folder_id: UUID | None = None
     created_at: datetime
     updated_at: datetime
     message_count: int = 0
@@ -216,6 +217,21 @@ class RecentConversationDTO(ConversationDTO):
     source_count: int = 0
     grounded: bool | None = None
     grounded_confidence: float | None = None
+
+
+# --- Folders ---
+
+
+class ChatFolderDTO(BaseModel):
+    """A per-user chat folder within a workspace (flat, non-nested)."""
+
+    folder_id: UUID
+    workspace_id: UUID
+    owner_id: UUID
+    name: str
+    created_at: datetime
+    updated_at: datetime
+    chat_count: int = 0
 
 
 # --- Feedback ---

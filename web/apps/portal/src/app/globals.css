@@ -77,6 +77,7 @@
   /* Feature accent colors */
   --ds-feature-search: #8b5cf6;
   --ds-feature-compounds: #16a34a;
+  --ds-feature-folder: #14b8a6;
 
   /* Shadows */
   --ds-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -147,6 +148,7 @@
   /* Feature accent colors */
   --ds-feature-search: #a78bfa;
   --ds-feature-compounds: #22c55e;
+  --ds-feature-folder: #2dd4bf;
 
   /* Sidebar — dark panel (light-mode defaults live in :root) */
   --ds-sidebar: #0f172a;
@@ -212,6 +214,7 @@
 
   --color-feature-search: var(--ds-feature-search);
   --color-feature-compounds: var(--ds-feature-compounds);
+  --color-feature-folder: var(--ds-feature-folder);
 
   --shadow-ds-sm: var(--ds-shadow-sm);
   --shadow-ds: var(--ds-shadow);
@@ -239,6 +242,28 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* ---------------------------------------------------------------------------
+ * Base — default border color
+ *
+ * shadcn/ui + the table primitive use the bare `border` / `border-b` utility
+ * (width only). Tailwind v4 defaults that color to `currentColor`, so any
+ * border that doesn't name a color renders as the dark text color — the harsh
+ * "wireframe" borders on buttons, dropdowns, popovers, and table rows.
+ *
+ * This one rule restores the token default (Tailwind v3 preflight behaviour)
+ * so every bare border/divide across the app uses --ds-border. Explicit color
+ * utilities (border-border-default, border-transparent, …) live in the higher
+ * `utilities` layer and still win, so nothing that names a color is affected.
+ * ------------------------------------------------------------------------- */
+
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--border);
+  }
 }
 
 /* ---------------------------------------------------------------------------

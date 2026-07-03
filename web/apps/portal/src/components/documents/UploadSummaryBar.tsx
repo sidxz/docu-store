@@ -1,6 +1,7 @@
 "use client";
 
-import { Upload, Pause, Play, RotateCcw, X, CheckCircle2, AlertTriangle } from "lucide-react";
+import Link from "next/link";
+import { Upload, RotateCcw, X, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
@@ -10,11 +11,9 @@ interface Props {
   failed: number;
   overallProgress: number;
   isUploading: boolean;
-  isPaused: boolean;
-  hasFailed: boolean;
   done: boolean; // all files reached a terminal state (success or error)
+  documentsHref?: string; // when set, the done banner links to the documents list
   onUpload: () => void;
-  onPauseResume: () => void;
   onRetryFailed: () => void;
   onCancel: () => void;
   onClearDone: () => void;
@@ -32,8 +31,13 @@ export function UploadSummaryBar(p: Props) {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {p.hasFailed && (
+          {p.failed > 0 && (
             <Button size="sm" variant="outline" onClick={p.onRetryFailed}><RotateCcw className="size-4" />Retry failed</Button>
+          )}
+          {p.documentsHref && (
+            <Button size="sm" variant="outline" asChild>
+              <Link href={p.documentsHref}>View documents</Link>
+            </Button>
           )}
           <Button size="sm" variant="ghost" onClick={p.onClearDone}>Clear</Button>
         </div>
@@ -48,14 +52,9 @@ export function UploadSummaryBar(p: Props) {
         </span>
         <div className="flex items-center gap-2">
           {p.isUploading ? (
-            <Button size="sm" variant="outline" onClick={p.onPauseResume}>
-              {p.isPaused ? <><Play className="size-4" />Resume</> : <><Pause className="size-4" />Pause</>}
-            </Button>
+            <Button size="sm" variant="ghost" onClick={p.onCancel}><X className="size-4" />Cancel</Button>
           ) : (
             <Button size="sm" onClick={p.onUpload} disabled={p.total === 0}><Upload className="size-4" />Upload {p.total > 0 ? `${p.total} files` : ""}</Button>
-          )}
-          {p.isUploading && (
-            <Button size="sm" variant="ghost" onClick={p.onCancel}><X className="size-4" />Cancel</Button>
           )}
         </div>
       </div>

@@ -1,18 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { MessageSquare, FileText, ShieldCheck } from "lucide-react";
+import { MessageSquare, FileText, ShieldCheck, MoreHorizontal } from "lucide-react";
 import type { RecentConversation } from "@docu-store/types";
 import { entityChipClass } from "@/lib/entity-colors";
 import { formatRelativeTime } from "@/lib/utils";
+import { MoveToFolderMenu } from "@/components/folders/MoveToFolderMenu";
+import { setChatDragData } from "@/components/folders/dnd";
 
 export function RecentChatCard({ chat, workspace }: { chat: RecentConversation; workspace: string }) {
   const hasChips = chat.entities.length > 0;
   const hasDocs = !hasChips && chat.cited_documents.length > 0;
   return (
+    <div className="group relative">
     <Link
       href={`/${workspace}/chat/${chat.conversation_id}`}
-      className="group block rounded-xl border border-border-default bg-surface-elevated p-4 transition-all hover:border-primary/30 hover:shadow-ds-sm"
+      draggable
+      onDragStart={(e) => setChatDragData(e, chat.conversation_id, chat.folder_id)}
+      className="block rounded-xl border border-border-default bg-surface-elevated p-4 transition-all hover:border-primary/30 hover:shadow-ds-sm"
     >
       <div className="flex items-start gap-3">
         <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-light">
@@ -61,5 +66,17 @@ export function RecentChatCard({ chat, workspace }: { chat: RecentConversation; 
         </div>
       </div>
     </Link>
+      <div className="absolute right-2 top-2">
+        <MoveToFolderMenu conversationId={chat.conversation_id} currentFolderId={chat.folder_id}>
+          <button
+            type="button"
+            aria-label="Move to folder"
+            className="rounded-md bg-surface-elevated/90 p-1 text-text-muted opacity-0 shadow-ds-sm backdrop-blur transition-opacity hover:bg-surface-sunken group-hover:opacity-100 data-[state=open]:bg-surface-sunken data-[state=open]:opacity-100"
+          >
+            <MoreHorizontal className="size-4" />
+          </button>
+        </MoveToFolderMenu>
+      </div>
+    </div>
   );
 }
