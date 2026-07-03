@@ -4,8 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@docu-store/api-client";
 import type { ArtifactResponse, WorkflowMap } from "@docu-store/types";
 import { queryKeys, workflowPollingInterval } from "@/lib/query-keys";
-import { getAuthzClient } from "@/lib/authz-client";
-import { API_URL } from "@/lib/constants";
 import { authFetch } from "@/lib/auth-fetch";
 import { ApiError, throwApiError } from "@/lib/api-error";
 import { useAnalytics } from "@/hooks/use-analytics";
@@ -97,63 +95,6 @@ export function useArtifactSummary(id: string) {
       return data;
     },
     enabled: !!id,
-  });
-}
-
-export function useUploadArtifact() {
-  const queryClient = useQueryClient();
-  const { trackEvent } = useAnalytics();
-
-  return useMutation({
-    mutationFn: async ({
-      file,
-      artifactType,
-      sourceUri,
-      visibility,
-    }: {
-      file: File;
-      artifactType: string;
-      sourceUri?: string;
-      visibility?: "workspace" | "private";
-    }) => {
-      // apiClient doesn't support multipart/form-data, so use fetch directly.
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("artifact_type", artifactType);
-      if (sourceUri) formData.append("source_uri", sourceUri);
-      if (visibility) formData.append("visibility", visibility);
-
-      const authHeaders = getAuthzClient().getHeaders();
-
-      const res = await fetch(`${API_URL}/artifacts/upload`, {
-        method: "POST",
-        body: formData,
-        headers: authHeaders,
-      });
-
-      if (!res.ok) {
-        const errorBody = await res.text();
-        throw new ApiError(`Upload failed: ${errorBody}`, res.status, errorBody);
-      }
-
-      return res.json();
-    },
-    onSuccess: (_data, variables) => {
-      const ext = variables.file.name.split(".").pop()?.toLowerCase() ?? "unknown";
-      trackEvent("document_uploaded", {
-        file_count: 1,
-        file_type: ext,
-        file_size_kb: Math.round(variables.file.size / 1024),
-      });
-      queryClient.invalidateQueries({ queryKey: queryKeys.artifacts.all });
-    },
-    onError: (_error, variables) => {
-      const ext = variables.file.name.split(".").pop()?.toLowerCase() ?? "unknown";
-      trackEvent("upload_failed", {
-        file_type: ext,
-        file_size_kb: Math.round(variables.file.size / 1024),
-      });
-    },
   });
 }
 
