@@ -56,8 +56,10 @@ class SendMessageRequest(BaseModel):
         default=None,
         description="Pipeline mode. 'quick' = 4-step, 'thinking' = 5-stage, 'deep_thinking' = thinking + page images. None = server default.",
     )
-    reasoning: dict[Literal["synthesis", "retrieval", "base"],
-                    Literal["off", "low", "medium", "high"]] | None = Field(
+    reasoning: (
+        dict[Literal["synthesis", "retrieval", "base"], Literal["off", "low", "medium", "high"]]
+        | None
+    ) = Field(
         default=None,
         description="Per-lane reasoning override; absent lanes use the server default.",
     )

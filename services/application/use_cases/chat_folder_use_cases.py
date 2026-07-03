@@ -159,7 +159,10 @@ class SetConversationFolderUseCase:
                     return Failure(AppError("not_found", "Folder not found"))
 
             moved = await self._repo.set_conversation_folder(
-                conversation_id, folder_id, workspace_id, owner_id,
+                conversation_id,
+                folder_id,
+                workspace_id,
+                owner_id,
             )
             if not moved:
                 # Deleted between our read and this write — don't bump folder dates.

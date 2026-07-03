@@ -105,12 +105,14 @@ def _plain_text(text: str) -> str:
     return re.sub(r"\s+", " ", _MD_STRIP.sub("", text)).strip()
 
 
-def _build_recent_summary(conv: ConversationDTO, messages: list[ChatMessageDTO]) -> RecentConversationDTO:
+def _build_recent_summary(
+    conv: ConversationDTO, messages: list[ChatMessageDTO]
+) -> RecentConversationDTO:
     assistant = [m for m in messages if m.role == "assistant"]
     last = assistant[-1] if assistant else None
     snippet = _plain_text(last.content)[:120] if last and last.content else None
 
-    order: list[tuple[str, str]] = []       # (lower_text, ...) preserves first-seen order
+    order: list[tuple[str, str]] = []  # (lower_text, ...) preserves first-seen order
     counts: dict[str, int] = {}
     labels: dict[str, tuple[str, str]] = {}  # lower -> (text, type)
 
@@ -162,11 +164,16 @@ class ListRecentConversationsUseCase:
         self._repo = chat_repository
 
     async def execute(
-        self, workspace_id: UUID, owner_id: UUID, limit: int = 5,
+        self,
+        workspace_id: UUID,
+        owner_id: UUID,
+        limit: int = 5,
     ) -> Result[list[RecentConversationDTO], AppError]:
         try:
             convs = await self._repo.list_recent_conversations(
-                workspace_id=workspace_id, owner_id=owner_id, limit=limit,
+                workspace_id=workspace_id,
+                owner_id=owner_id,
+                limit=limit,
             )
             out = []
             for conv in convs:
