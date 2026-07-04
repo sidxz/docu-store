@@ -39,6 +39,11 @@ COPY pyproject.toml ./tmp_pyproject.toml
 RUN sed 's/^version *=.*/version = "0.0.0"/' ./tmp_pyproject.toml > ./pyproject.toml && rm ./tmp_pyproject.toml
 RUN uv sync --no-dev --no-install-project --frozen
 
+# Point XLA at the cuda_nvcc wheel (libdevice + ptxas). Without this, DECIMER's
+# GPU XLA convolutions fail "libdevice not found" and CSER silently extracts 0
+# compounds. Harmless for non-TF/CPU processes sharing this image.
+ENV XLA_FLAGS="--xla_gpu_cuda_data_dir=/app/.venv/lib/python3.12/site-packages/nvidia/cuda_nvcc"
+
 # Restore real pyproject.toml (with version) + application code
 COPY pyproject.toml ./
 COPY application/ application/

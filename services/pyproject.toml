@@ -46,6 +46,13 @@ dependencies = [
     "langchain-anthropic>=1.4.7",
     "langchain-google-genai>=4.2.5",
     "docling>=2.107.0",
+    # DECIMER's SavedModel runs XLA-compiled convolutions on GPU (baked-in
+    # jit_compile via _jit_compiled_convolution_op) which need CUDA's
+    # nvvm/libdevice + ptxas. TF's transitive CUDA-12.8 wheels ship everything
+    # EXCEPT cuda_nvcc, so XLA dies with "libdevice not found" and CSER silently
+    # returns 0 compounds. Linux/x86_64 only, matching the other nvidia-*-cu12
+    # wheels (absent on macOS where TF has no CUDA). See XLA_FLAGS in Dockerfile.
+    "nvidia-cuda-nvcc-cu12>=12.8,<12.9; sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 
 
