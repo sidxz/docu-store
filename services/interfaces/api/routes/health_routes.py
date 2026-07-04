@@ -14,6 +14,9 @@ from application.dtos.health_dtos import (
 )
 from application.use_cases.system_health_use_case import GetSystemHealthUseCase
 from application.workflow_use_cases.trigger_bulk_reembed_use_case import TriggerBulkReEmbedUseCase
+from application.workflow_use_cases.trigger_bulk_reprocess_compounds_use_case import (
+    TriggerBulkReprocessCompoundsUseCase,
+)
 from interfaces.dependencies import get_auth, get_container
 
 logger = structlog.get_logger()
@@ -69,3 +72,23 @@ async def trigger_reembed_all(
     targets = body.targets if body else None
     use_case = container[TriggerBulkReEmbedUseCase]
     return await use_case.execute(workspace_id=auth.workspace_id, targets=targets)
+
+
+@router.post("/reprocess-compounds-all", status_code=status.HTTP_202_ACCEPTED)
+async def trigger_reprocess_compounds_all(
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> BulkWorkflowResponse:
+    """Re-run CSER compound extraction for ALL artifacts in the workspace (admin only).
+
+    Purges the workspace's compound vectors, then starts the compound extraction
+    workflow for every page. The event cascade re-embeds the extracted SMILES.
+    """
+    if not auth.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+
+    use_case = container[TriggerBulkReprocessCompoundsUseCase]
+    return await use_case.execute(workspace_id=auth.workspace_id)

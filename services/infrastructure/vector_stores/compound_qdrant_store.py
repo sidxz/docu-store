@@ -241,6 +241,36 @@ class CompoundQdrantStore(CompoundVectorStore):
                 error=str(e),
             )
 
+    async def delete_compound_embeddings_for_workspace(self, workspace_id: UUID) -> None:
+        """Delete all compound embedding points belonging to a workspace.
+
+        Purges stale/orphan points (including ones whose page no longer exists) before
+        a bulk re-extraction. Best-effort — no error if the collection is empty/missing.
+        """
+        client = await self._get_client()
+
+        try:
+            await client.delete(
+                collection_name=self.collection_name,
+                points_selector=models.FilterSelector(
+                    filter=models.Filter(
+                        must=[
+                            models.FieldCondition(
+                                key="workspace_id",
+                                match=models.MatchValue(value=str(workspace_id)),
+                            ),
+                        ],
+                    ),
+                ),
+            )
+            logger.info("compound_embeddings_deleted_for_workspace", workspace_id=str(workspace_id))
+        except Exception as e:
+            logger.warning(
+                "failed_to_delete_compound_embeddings_for_workspace",
+                workspace_id=str(workspace_id),
+                error=str(e),
+            )
+
     async def search_similar_compounds(
         self,
         query_embedding: TextEmbedding,

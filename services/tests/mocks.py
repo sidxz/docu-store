@@ -287,6 +287,7 @@ class MockCompoundVectorStore:
 
     def __init__(self) -> None:
         self.upsert_calls: list[dict] = []
+        self.deleted_workspaces: list[UUID] = []
 
     async def ensure_compound_collection_exists(self) -> None:
         pass
@@ -306,6 +307,9 @@ class MockCompoundVectorStore:
 
     async def delete_compound_embeddings_for_page(self, page_id: UUID) -> None:
         pass
+
+    async def delete_compound_embeddings_for_workspace(self, workspace_id: UUID) -> None:
+        self.deleted_workspaces.append(workspace_id)
 
     async def search_similar_compounds(
         self,
@@ -510,6 +514,14 @@ class MockPageReadModel:
 
     async def get_pages_by_id(self, page_ids: list[UUID], workspace_id: UUID | None = None) -> list:
         return [self._pages[pid] for pid in page_ids if pid in self._pages]
+
+    async def get_pages_by_artifact_ids(
+        self,
+        artifact_ids: list[UUID],
+        workspace_id: UUID | None = None,
+    ) -> list:
+        ids = set(artifact_ids)
+        return [p for p in self._pages.values() if getattr(p, "artifact_id", None) in ids]
 
     async def list_pages(self, *args: Any, **kwargs: Any) -> list:
         return list(self._pages.values())

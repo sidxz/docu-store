@@ -75,6 +75,14 @@ class CompoundVectorStore(Protocol):
         """
         ...
 
+    async def delete_compound_embeddings_for_workspace(self, workspace_id: UUID) -> None:
+        """Delete all compound embeddings for a workspace.
+
+        Used to purge stale/orphan compound points (e.g. from old page ids) before a
+        bulk re-extraction. Idempotent — best-effort, no error if none exist.
+        """
+        ...
+
     async def search_similar_compounds(
         self,
         query_embedding: TextEmbedding,

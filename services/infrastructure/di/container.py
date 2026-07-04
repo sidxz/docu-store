@@ -690,6 +690,19 @@ def create_container() -> Container:
         workflow_orchestrator=c[WorkflowOrchestrator],
     )
 
+    from application.workflow_use_cases.trigger_bulk_reprocess_compounds_use_case import (
+        TriggerBulkReprocessCompoundsUseCase,
+    )
+
+    container[TriggerBulkReprocessCompoundsUseCase] = (
+        lambda c: TriggerBulkReprocessCompoundsUseCase(
+            artifact_read_model=c[ArtifactReadModel],
+            page_read_model=c[PageReadModel],
+            compound_vector_store=c[CompoundVectorStore],
+            workflow_orchestrator=c[WorkflowOrchestrator],
+        )
+    )
+
     # Worker heartbeat store (infrastructure → port)
     from application.ports.worker_heartbeat_store import WorkerHeartbeatStore
     from infrastructure.health.heartbeat_reader import MongoHeartbeatReader
