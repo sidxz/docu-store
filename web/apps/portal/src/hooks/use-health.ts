@@ -132,3 +132,12 @@ export function useReembedAll() {
       }),
   });
 }
+
+export function useReprocessCompounds() {
+  return useMutation({
+    mutationFn: () =>
+      authFetchJson<BulkWorkflowResponse>("/system/reprocess-compounds-all", {
+        method: "POST",
+      }),
+  });
+}

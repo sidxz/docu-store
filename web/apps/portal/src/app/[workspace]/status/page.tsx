@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardCopy,
+  FlaskConical,
   HardDrive,
   Layers,
   MonitorCog,
@@ -30,6 +31,7 @@ import { queryKeys } from "@/lib/query-keys";
 import {
   useDetailedHealth,
   useReembedAll,
+  useReprocessCompounds,
   ALL_REEMBED_TARGETS,
   type ReEmbedTarget,
   type ServiceStatus,
@@ -521,6 +523,87 @@ function ReEmbedSection() {
 }
 
 // ---------------------------------------------------------------------------
+// Compound re-extraction (CSER) Admin Action
+// ---------------------------------------------------------------------------
+
+function ReprocessCompoundsSection() {
+  const reprocess = useReprocessCompounds();
+  const [confirming, setConfirming] = useState(false);
+
+  return (
+    <Card>
+      <CardHeader title="Compound Re-extraction (CSER)" />
+      <div className="space-y-3">
+        <div className="rounded-lg border border-border-default bg-surface-sunken/30 p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-500/10">
+              <FlaskConical className="h-4.5 w-4.5 text-sky-600 dark:text-sky-400" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-text-primary">
+                Re-run CSER on all documents
+              </p>
+              <p className="text-xs text-text-muted">
+                Purges existing compound vectors, then re-runs SMILES extraction
+                on every page. Extracted compounds are re-embedded automatically.
+                Heavy — starts one workflow per page.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center justify-end gap-2">
+            {confirming && (
+              <span className="text-xs text-text-muted">
+                Wipes and rebuilds all compound data. Sure?
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                if (confirming) {
+                  reprocess.mutate();
+                  setConfirming(false);
+                } else {
+                  setConfirming(true);
+                }
+              }}
+              disabled={reprocess.isPending}
+              className="shrink-0 rounded-lg border border-sky-500/30 bg-sky-500/10 px-4 py-2 text-xs font-semibold text-sky-700 transition-colors hover:bg-sky-500/20 disabled:opacity-50 dark:text-sky-400"
+            >
+              {reprocess.isPending
+                ? "Triggering..."
+                : confirming
+                  ? "Confirm re-extraction"
+                  : "Re-run CSER"}
+            </button>
+          </div>
+        </div>
+
+        {reprocess.isSuccess && (
+          <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3">
+            <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+              Started compound extraction for {reprocess.data.triggered} page
+              {reprocess.data.triggered !== 1 ? "s" : ""}.
+            </p>
+          </div>
+        )}
+
+        {reprocess.isError && (
+          <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3">
+            <p className="text-xs font-medium text-ds-error">
+              Failed to trigger re-extraction:{" "}
+              {reprocess.error instanceof Error
+                ? reprocess.error.message
+                : "Unknown error"}
+            </p>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -737,8 +820,9 @@ export default function StatusPage() {
       </div>
 
       {/* ---- Admin Actions ---- */}
-      <div className="mt-6">
+      <div className="mt-6 space-y-6">
         <ReEmbedSection />
+        <ReprocessCompoundsSection />
       </div>
 
       {/* ---- Footer: last checked ---- */}
