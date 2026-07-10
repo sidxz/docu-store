@@ -7,8 +7,8 @@ export function FontToggle() {
   const setFont = useFontFamilyStore((s) => s.setFont);
   return (
     <div className="flex gap-1">
-      <Button size="sm" variant={font === "plex" ? "default" : "outline"} onClick={() => setFont("plex")}>IBM Plex</Button>
-      <Button size="sm" variant={font === "inter" ? "default" : "outline"} onClick={() => setFont("inter")}>Inter</Button>
+      <Button size="sm" aria-pressed={font === "plex"} variant={font === "plex" ? "default" : "outline"} onClick={() => setFont("plex")}>IBM Plex</Button>
+      <Button size="sm" aria-pressed={font === "inter"} variant={font === "inter" ? "default" : "outline"} onClick={() => setFont("inter")}>Inter</Button>
     </div>
   );
 }
