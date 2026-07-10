@@ -69,7 +69,7 @@ services:
       EVENTSTORE_INSECURE: "true"
       EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP: "true"
     ports:
-      - "${ESDB_PORT:-2113}:2113"
+      - "${ESDB_PORT:-2114}:2113"
     volumes:
       - eventstoredb-data:/var/lib/eventstore
     networks:
@@ -189,7 +189,7 @@ services:
       POSTGRES_PWD: ${TEMPORAL_POSTGRES_PASSWORD}
       POSTGRES_SEEDS: postgres
     ports:
-      - "${TEMPORAL_PORT:-7233}:7233"
+      - "${TEMPORAL_PORT:-7234}:7233"
     networks:
       - docu-store
     deploy:
@@ -413,7 +413,7 @@ services:
       langfuse-clickhouse:
         condition: service_healthy
     ports:
-      - "${LANGFUSE_PORT:-3000}:3000"
+      - "${LANGFUSE_PORT:-3002}:3000"
     environment:
       <<: *langfuse-env
       # Pre-seed org/project/keys (set in .env.prod)
@@ -476,7 +476,7 @@ services:
       umami-db:
         condition: service_healthy
     ports:
-      - "${UMAMI_PORT:-3001}:3000"
+      - "${UMAMI_PORT:-3003}:3000"
     environment:
       DATABASE_URL: postgresql://umami:${UMAMI_PG_PASSWORD}@umami-db:5432/umami
       TRACKER_SCRIPT_NAME: ${UMAMI_TRACKER_SCRIPT:-ds-analytics}

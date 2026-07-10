@@ -45,7 +45,7 @@ services:
       RERANKER_DEVICE: cpu
       APP_ENV: production
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "${API_PORT:-8002}:8000"
     networks:
       - docu-store
     restart: unless-stopped
