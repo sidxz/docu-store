@@ -19,6 +19,7 @@
     "@sentinel-auth/nextjs": "^0.13.1",
     "@sentinel-auth/react": "^0.13.1",
     "@streamdown/math": "^1.0.2",
+    "@structflo/daikon-design-tokens": "^1.0.0",
     "@tanstack/react-query": "^5.90.0",
     "@tanstack/react-table": "^8.21.3",
     "@uppy/core": "^5.2.0",
