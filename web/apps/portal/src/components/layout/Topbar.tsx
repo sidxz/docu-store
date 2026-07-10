@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { FontSizeControl } from "./FontSizeControl";
+import { FontToggle } from "@/components/settings/FontToggle";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -124,6 +125,9 @@ export function Topbar() {
           </TooltipTrigger>
           <TooltipContent side="bottom">Default visibility for new documents</TooltipContent>
         </Tooltip>
+
+        {/* Font family switcher */}
+        <FontToggle />
 
         {/* Global text-size slider */}
         <FontSizeControl />
