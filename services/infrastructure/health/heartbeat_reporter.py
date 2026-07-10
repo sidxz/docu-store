@@ -17,6 +17,7 @@ import threading
 import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from pathlib import Path
 
 import structlog
 
@@ -44,6 +45,7 @@ class HeartbeatReporter:
         worker_name: str,
         interval_seconds: int = 30,
         model_info_providers: list[Callable[[], Awaitable[ModelStatus]]] | None = None,
+        liveness_file: str = "/tmp/worker-liveness",  # noqa: S108 — container-private tmp
     ) -> None:
         self._mongo_uri = mongo_uri
         self._mongo_db = mongo_db
@@ -51,6 +53,7 @@ class HeartbeatReporter:
         self._worker_name = worker_name
         self._interval = interval_seconds
         self._model_providers = model_info_providers or []
+        self._liveness_file = liveness_file
 
         self._hostname = socket.gethostname()
         self._pid = os.getpid()
@@ -75,6 +78,7 @@ class HeartbeatReporter:
         )
         try:
             while True:
+                self._touch_liveness()
                 await self._tick()
                 await asyncio.sleep(self._interval)
         except asyncio.CancelledError:
@@ -140,9 +144,22 @@ class HeartbeatReporter:
                 logger.warning("heartbeat_model_check_failed", error=str(exc))
         return results
 
+    def _touch_liveness(self) -> None:
+        """Touch the local liveness file — proof this loop is running.
+
+        Deliberately independent of the Mongo write: liveness means "the worker
+        loop runs", not "Mongo is reachable". Container healthchecks test the
+        file's mtime, catching a frozen worker that still looks Running to Swarm.
+        """
+        try:
+            Path(self._liveness_file).touch()
+        except OSError:
+            logger.warning("liveness_touch_failed", path=self._liveness_file, exc_info=True)
+
     def _sync_loop(self) -> None:
         """Blocking loop for use in a background thread."""
         while not self._stop_event.is_set():
+            self._touch_liveness()
             try:
                 self._write_heartbeat_sync()
             except Exception:

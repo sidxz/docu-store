@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import io
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
@@ -62,11 +63,15 @@ class ParseArtifactUseCase:
 
         # Office formats (PPTX, …) are rendered to a derived PDF first, then the one
         # PDF pipeline takes over. render_key == storage_location for native PDFs.
+        # Both heavy steps run off the event loop: blocking it starves the Temporal
+        # pollers (workflow tasks time out while a long parse runs).
         render_key = render_pdf_key(artifact)
         if artifact.mime_type != MimeType.PDF:
-            self.office_converter.convert_to_pdf(artifact.storage_location, render_key)
+            await asyncio.to_thread(
+                self.office_converter.convert_to_pdf, artifact.storage_location, render_key
+            )
 
-        parsed = parser.parse(render_key)
+        parsed = await asyncio.to_thread(parser.parse, render_key)
 
         # Persist page images (same keys chat already uses).
         for page in parsed.pages:

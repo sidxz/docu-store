@@ -155,9 +155,9 @@ from infrastructure.event_sourced_repositories.artifact_repository import (
     EventSourcedArtifactRepository,
 )
 from infrastructure.event_sourced_repositories.page_repository import EventSourcedPageRepository
-from infrastructure.file_services.docling_parser import DoclingParser
 from infrastructure.file_services.font_title_extractor import FontTitleExtractor
 from infrastructure.file_services.libreoffice_converter import LibreOfficeConverter
+from infrastructure.file_services.subprocess_parse import SubprocessParser
 from infrastructure.kafka.kafka_external_event_streamer import KafkaExternalEventPublisher
 from infrastructure.kafka.kafka_publisher import KafkaPublisher
 from infrastructure.llm.factory import (
@@ -329,8 +329,10 @@ def create_container() -> Container:
         permission_registrar=c[PermissionRegistrar],
     )
 
-    # Register Docling Parser (document parsing — PDF → structured IR + page images)
-    container[DoclingParser] = lambda c: DoclingParser(blob_store=c[BlobStore])
+    # Register Docling Parser (document parsing — PDF → structured IR + page images).
+    # Wrapped in a killable subprocess: a hung/segfaulting MuPDF parse must fail the
+    # activity (Temporal retries), not freeze the worker (2026-07-08 outage).
+    container[SubprocessParser] = lambda c: SubprocessParser(blob_store=c[BlobStore])
 
     # Register Office→PDF converter (PPTX/DOCX → PDF, so they reuse the PDF pipeline)
     container[OfficeToPdfConverter] = lambda c: LibreOfficeConverter(blob_store=c[BlobStore])
@@ -587,9 +589,9 @@ def create_container() -> Container:
     container[ParseArtifactUseCase] = lambda c: ParseArtifactUseCase(
         # PPTX/DOCX are converted to PDF first (see office_converter), then parsed as PDF.
         parsers={
-            MimeType.PDF: c[DoclingParser],
-            MimeType.PPTX: c[DoclingParser],
-            MimeType.DOCX: c[DoclingParser],
+            MimeType.PDF: c[SubprocessParser],
+            MimeType.PPTX: c[SubprocessParser],
+            MimeType.DOCX: c[SubprocessParser],
         },
         blob_store=c[BlobStore],
         artifact_repository=c[ArtifactRepository],

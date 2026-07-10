@@ -18,6 +18,17 @@
 # are managed separately via docker-compose.infra.yml and connected
 # through the shared "docu-store" overlay network.
 
+# Worker liveness: each worker's heartbeat reporter touches /tmp/worker-liveness
+# every 30s. A hung process looks "Running" to Swarm (2026-07-08: worker frozen
+# 31h, 1500-task backlog); a stale file gets the task killed and rescheduled.
+# Conservative on purpose: ~10 min of true silence before restart.
+x-worker-liveness: &worker-liveness
+  test: ["CMD-SHELL", "find /tmp/worker-liveness -mmin -5 | grep -q ."]
+  interval: 60s
+  timeout: 5s
+  retries: 5
+  start_period: 300s
+
 services:
 
   api:
@@ -61,6 +72,7 @@ services:
     networks:
       - docu-store
     restart: unless-stopped
+    healthcheck: *worker-liveness
     deploy:
       resources:
         limits:
@@ -79,6 +91,7 @@ services:
     networks:
       - docu-store
     restart: unless-stopped
+    healthcheck: *worker-liveness
     deploy:
       resources:
         limits:
@@ -102,6 +115,7 @@ services:
     networks:
       - docu-store
     restart: unless-stopped
+    healthcheck: *worker-liveness
     deploy:
       resources:
         limits:
@@ -119,6 +133,7 @@ services:
     networks:
       - docu-store
     restart: unless-stopped
+    healthcheck: *worker-liveness
     deploy:
       resources:
         limits:
@@ -136,6 +151,7 @@ services:
     networks:
       - docu-store
     restart: unless-stopped
+    healthcheck: *worker-liveness
     deploy:
       resources:
         limits:

@@ -87,7 +87,11 @@ class DoclingParser(DocumentParser):
 
     def parse(self, storage_key: str) -> ParseResult:
         with self.blob_store.get_file(storage_key) as path:
-            conv = self._get_converter().convert(str(path))
+            return self.parse_path(path)
+
+    def parse_path(self, path) -> ParseResult:
+        """Parse a local file — no blob store involved (subprocess child entry)."""
+        conv = self._get_converter().convert(str(path))
         dl_doc = conv.document
 
         blocks: list[Block] = []
