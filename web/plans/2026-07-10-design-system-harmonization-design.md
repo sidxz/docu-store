@@ -14,7 +14,7 @@ Make four independently-built Next.js apps read as one product suite by unifying
 - **Colors** — docu-store's blue + slate `--ds-*` token system, everywhere.
 - **Fonts** — IBM Plex Sans/Mono (from chem-cellar) *and* Inter (from docu-store), offered as a **user preference**, default IBM Plex.
 - **Component primitive** — Radix UI + shadcn/ui across all four (daikon-gen3 migrates off base-ui).
-- **Distribution** — a single published package, `@daikon/design-tokens` (public npm), consumed by all four.
+- **Distribution** — a single published package, `@structflo/daikon-design-tokens` (public npm), consumed by all four.
 
 Non-goal: a shared component library. Flagged as the natural next step, explicitly out of scope here (§9).
 
@@ -30,7 +30,7 @@ Non-goal: a shared component library. Flagged as the natural next step, explicit
 | **daikon-gen3** | Geist + Geist Mono | **@base-ui/react** + shadcn v4 | `.dark` class | OKLCH default **gray** (no brand) |
 
 Notes established during exploration:
-- `@sentinel-auth/*` (used by all four) resolves from **public npm** — the Docker build is a plain `pnpm install --frozen-lockfile` with no `.npmrc`, no token. This is the template for `@daikon/design-tokens`.
+- `@sentinel-auth/*` (used by all four) resolves from **public npm** — the Docker build is a plain `pnpm install --frozen-lockfile` with no `.npmrc`, no token. This is the template for `@structflo/daikon-design-tokens`.
 - daikon-gen3's `ui/` folder holds only `button.tsx` (sole base-ui importer) and `sonner.tsx`. The "radix migration" is ~1 component, not a rewrite.
 - All three cellar-style apps import Tailwind identically (`@import "tailwindcss"`), so a package `@import` slots in cleanly.
 - Design tokens are not secret — they ship in every app's CSS and are readable in any browser's devtools. Hence public npm, not a private registry.
@@ -39,10 +39,10 @@ Notes established during exploration:
 
 ## 3. Target Architecture
 
-### 3.1 Shared package — `@daikon/design-tokens`
+### 3.1 Shared package — `@structflo/daikon-design-tokens`
 
 - **Repo:** new, dedicated `sidxz/daikon-design-tokens` (~4 files). Independent version lifecycle; not nested in an app repo.
-- **Registry:** **public npm**, published `--access public`, scope `@daikon`. Installs via the existing `pnpm install --frozen-lockfile` — no Dockerfile, CI, or dev-auth changes (mirrors `@sentinel-auth`).
+- **Registry:** **public npm**, published `--access public`, scope `@structflo`. Installs via the existing `pnpm install --frozen-lockfile` — no Dockerfile, CI, or dev-auth changes (mirrors `@sentinel-auth`).
 - **Content:** CSS-only. Its content *is* docu-store's current token system, lifted verbatim — docu-store becomes the first consumer of its own extracted tokens (dogfood).
 - **Prod impact:** none at runtime (build-time CSS dep; Tailwind inlines it into each app's `.next/static`; the running container never touches a registry).
 
@@ -61,7 +61,7 @@ Notes established during exploration:
 All four apps standardize the dark-mode selector on the `data-theme` attribute so one CSS file works everywhere:
 
 - **docu-store** — dark selector unchanged (already `[data-theme="dark"]` + custom provider with theme/font-scale persistence). It still extracts its tokens into the package and adds the font switch — see §4.
-- **chem-cellar, prot-cellar, daikon-gen3** — flip next-themes `attribute="class"` → `attribute="data-theme"` (or `["class","data-theme"]`); delete their local token block; `@import "@daikon/design-tokens/tokens.css"`. `@custom-variant dark` now comes from the package.
+- **chem-cellar, prot-cellar, daikon-gen3** — flip next-themes `attribute="class"` → `attribute="data-theme"` (or `["class","data-theme"]`); delete their local token block; `@import "@structflo/daikon-design-tokens/tokens.css"`. `@custom-variant dark` now comes from the package.
 - Before flipping: grep each app for hardcoded `.dark` selectors / `classList` toggles in component code and update.
 - **prot-cellar's teal accent is intentionally dropped** — it becomes blue like the rest.
 
@@ -109,7 +109,7 @@ daikon-gen3 migrates base-ui → radix to match the other three:
 
 ```
 daikon-design-tokens/
-  package.json          # name @daikon/design-tokens, exports ./tokens.css, publishConfig public
+  package.json          # name @structflo/daikon-design-tokens, exports ./tokens.css, publishConfig public
   tokens.css            # the canonical system (§3.1)
   no-flash.js           # optional inline snippet apps embed for data-theme/data-font
   README.md             # consumer contract: @import path + required --font-plex-*/--font-inter vars
@@ -117,7 +117,7 @@ daikon-design-tokens/
 ```
 
 **Consumer contract (documented in README):**
-1. `@import "@daikon/design-tokens/tokens.css";` after `@import "tailwindcss";`.
+1. `@import "@structflo/daikon-design-tokens/tokens.css";` after `@import "tailwindcss";`.
 2. Define `--font-plex-sans`, `--font-plex-mono`, `--font-inter` via next/font in `layout.tsx`.
 3. Manage `data-theme` and `data-font` on `<html>`; embed the no-flash snippet.
 
@@ -126,7 +126,7 @@ daikon-design-tokens/
 ## 6. Rollout Plan (ordered)
 
 1. **Spike (~15 min):** confirm Tailwind v4 honors `@theme` from a `node_modules` CSS import. **Fallback if not:** package ships raw `--ds-*` + variant only; each app keeps a thin `@theme` map (still DRY on values).
-2. **Build + publish `@daikon/design-tokens` v1** from docu-store's tokens → public npm. Move this spec into that repo.
+2. **Build + publish `@structflo/daikon-design-tokens` v1** from docu-store's tokens → public npm. Move this spec into that repo.
 3. **docu-store:** consume the package (dogfood — should be a visual no-op); add IBM Plex + Inter font switch. Verify.
 4. **chem-cellar + prot-cellar:** import package, delete local tokens, flip provider to `data-theme`, add Inter + font switch. Verify (prot-cellar visibly goes blue).
 5. **daikon-gen3:** import package, swap Geist→Plex+Inter, base-ui→radix, wire `data-theme`/`data-font` provider. Verify.
@@ -152,7 +152,7 @@ Treated as a **standing principle**, not a bulk import: when an app newly needs 
 
 ## 9. Out of Scope
 
-- **Shared Radix component library** (`@daikon/ui`) — the logical successor once all four share tokens + radix, but not part of this effort.
+- **Shared Radix component library** (`@structflo/daikon-ui`) — the logical successor once all four share tokens + radix, but not part of this effort.
 - Any backend, layout, or feature changes. This is a theming + primitive-alignment effort only.
 
 ---
