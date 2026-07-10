@@ -23,6 +23,7 @@ import { Toaster } from "@/components/ui/sonner";
 
 import { ThemeProvider } from "./ThemeProvider";
 import { FontScaleProvider } from "./FontScaleProvider";
+import { FontFamilyProvider } from "./FontFamilyProvider";
 import { ConfirmProvider } from "./ConfirmProvider";
 
 /**
@@ -117,8 +118,10 @@ export function Providers({ children }: { children: ReactNode }) {
           <TooltipProvider delayDuration={200}>
             <ThemeProvider>
               <FontScaleProvider>
-                <ConfirmProvider>{children}</ConfirmProvider>
-                <Toaster richColors closeButton position="top-right" />
+                <FontFamilyProvider>
+                  <ConfirmProvider>{children}</ConfirmProvider>
+                  <Toaster richColors closeButton position="top-right" />
+                </FontFamilyProvider>
               </FontScaleProvider>
             </ThemeProvider>
           </TooltipProvider>
