@@ -39,6 +39,9 @@ from application.workflow_use_cases.trigger_artifact_tag_aggregation_use_case im
 from application.workflow_use_cases.trigger_compound_extraction_use_case import (
     TriggerCompoundExtractionUseCase,
 )
+from application.workflow_use_cases.trigger_compound_label_reconciliation_use_case import (
+    TriggerCompoundLabelReconciliationUseCase,
+)
 from application.workflow_use_cases.trigger_doc_metadata_extraction_use_case import (
     TriggerDocMetadataExtractionUseCase,
 )
@@ -50,9 +53,6 @@ from application.workflow_use_cases.trigger_page_summarization_use_case import (
 )
 from application.workflow_use_cases.trigger_page_summary_embedding_use_case import (
     TriggerPageSummaryEmbeddingUseCase,
-)
-from application.workflow_use_cases.trigger_compound_label_reconciliation_use_case import (
-    TriggerCompoundLabelReconciliationUseCase,
 )
 from application.workflow_use_cases.trigger_smiles_embedding_use_case import (
     TriggerSmilesEmbeddingUseCase,

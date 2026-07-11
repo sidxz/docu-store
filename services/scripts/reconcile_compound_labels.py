@@ -49,7 +49,8 @@ def classify_change(before: str, after: str) -> str:
 
 async def _artifact_names_and_pages(db, artifact_id: UUID) -> tuple[list[str], list[UUID]]:
     """Per-artifact candidate names (NER compound_name tags, all pages) and the
-    page_ids that carry compound_mentions — read from page_read_models."""
+    page_ids that carry compound_mentions — read from page_read_models.
+    """
     names: list[str] = []
     page_ids: list[UUID] = []
     cursor = db[settings.mongo_pages_collection].find(
@@ -110,12 +111,11 @@ async def run(artifact_ids: list[str] | None, apply: bool) -> None:
 
         mode = "APPLIED" if apply else "DRY-RUN (no writes)"
         logger.info(
-            "reconcile_summary", mode=mode, total_changed=total_changed, by_class=dict(report),
+            "reconcile_summary",
+            mode=mode,
+            total_changed=total_changed,
+            by_class=dict(report.most_common()),
         )
-        print(f"\n=== {mode} ===")
-        print(f"labels changed: {total_changed}")
-        for cls, count in report.most_common():
-            print(f"  {cls}: {count}")
     finally:
         mongo.close()
 

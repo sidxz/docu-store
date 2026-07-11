@@ -82,10 +82,10 @@ from application.use_cases.page_use_cases import (
     UpdateSummaryCandidateUseCase as UpdatePageSummaryCandidateUseCase,
 )
 from application.use_cases.parse_artifact_use_case import ParseArtifactUseCase
-from application.use_cases.search_use_cases import HierarchicalSearchUseCase, SearchSummariesUseCase
 from application.use_cases.reconcile_compound_labels_use_case import (
     ReconcileCompoundLabelsUseCase,
 )
+from application.use_cases.search_use_cases import HierarchicalSearchUseCase, SearchSummariesUseCase
 from application.use_cases.smiles_embedding_use_cases import EmbedCompoundSmilesUseCase
 from application.use_cases.smiles_search_use_cases import SearchSimilarCompoundsUseCase
 from application.use_cases.summarization_use_cases import (
@@ -115,6 +115,9 @@ from application.workflow_use_cases.trigger_artifact_tag_aggregation_use_case im
 from application.workflow_use_cases.trigger_compound_extraction_use_case import (
     TriggerCompoundExtractionUseCase,
 )
+from application.workflow_use_cases.trigger_compound_label_reconciliation_use_case import (
+    TriggerCompoundLabelReconciliationUseCase,
+)
 from application.workflow_use_cases.trigger_doc_metadata_extraction_use_case import (
     TriggerDocMetadataExtractionUseCase,
 )
@@ -124,9 +127,6 @@ from application.workflow_use_cases.trigger_ner_extraction_use_case import (
 )
 from application.workflow_use_cases.trigger_page_summarization_use_case import (
     TriggerPageSummarizationUseCase,
-)
-from application.workflow_use_cases.trigger_compound_label_reconciliation_use_case import (
-    TriggerCompoundLabelReconciliationUseCase,
 )
 from application.workflow_use_cases.trigger_page_summary_embedding_use_case import (
     TriggerPageSummaryEmbeddingUseCase,

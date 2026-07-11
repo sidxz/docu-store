@@ -27,7 +27,8 @@ _FOLD = {ch: grp[0] for grp in _CONFUSABLE_GROUPS for ch in grp}
 
 def glyph_skeleton(label: str) -> str:
     """Uppercase, strip hyphens/spaces, fold each confusable glyph to its group's
-    canonical digit. Two labels are glyph-equal iff their skeletons are equal."""
+    canonical digit. Two labels are glyph-equal iff their skeletons are equal.
+    """
     normalized = label.strip().upper().replace("-", "").replace(" ", "")
     return "".join(_FOLD.get(ch, ch) for ch in normalized)
 

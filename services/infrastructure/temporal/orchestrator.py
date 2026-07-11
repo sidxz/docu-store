@@ -138,6 +138,8 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         page_id: UUID,
     ) -> None:
         """Start the compound-label reconciliation workflow for a page."""
+        from temporalio.common import WorkflowIDReusePolicy
+
         await self._ensure_client()
 
         workflow_id = f"reconcile-compound-labels-{page_id}"
