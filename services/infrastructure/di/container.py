@@ -64,6 +64,7 @@ from application.use_cases.chat_use_cases import (
     RecordFeedbackUseCase,
     SendMessageUseCase,
 )
+from application.use_cases.compound_profile_use_case import GetCompoundProfileUseCase
 from application.use_cases.compound_use_cases import ExtractCompoundMentionsUseCase
 from application.use_cases.embedding_use_cases import (
     GeneratePageEmbeddingUseCase,
@@ -899,6 +900,13 @@ def create_container() -> Container:
         tool_llm=tool_calling_llm,
         tool_registry=c[ToolRegistry],
         prompt_repository=c[PromptRepositoryPort],
+    )
+
+    container[GetCompoundProfileUseCase] = lambda c: GetCompoundProfileUseCase(
+        tag_dictionary=c[TagDictionaryReadModel],
+        page_read_model=c[PageReadModel],
+        artifact_read_model=c[ArtifactReadModel],
+        compound_vector_store=c[CompoundVectorStore],
     )
 
     container[ContextAssemblyNode] = lambda _: ContextAssemblyNode()
