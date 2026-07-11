@@ -1,4 +1,5 @@
 import re
+from itertools import product
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 import structlog
@@ -57,6 +58,40 @@ def _compound_name_variants(name: str) -> list[str]:
     _add(spaced.upper())
 
     return variants
+
+
+# Glyph groups that OCR / CSER transcribe interchangeably in a compound id:
+# "CMX410" gets extracted as "CMX41O" (letter-O for zero). Members are visually
+# identical — deliberately NOT 0/1 or 2/Z, which would collide *distinct*
+# compounds in an analog series (CMX410 vs CMX411). Extend as fallback logs warrant.
+_CONFUSABLE_GROUPS = ("0Oo", "1IlL", "5S", "8B")
+_MAX_CONFUSABLE_POS = 4  # cap the per-base-form combinatorial expansion
+
+
+def _confusable_variants(name: str) -> list[str]:
+    """Visual-glyph-confusion variants of a compound id, for a miss-only fallback.
+
+    Folds each visually-confusable glyph (0/O, 1/I/l, ...) to the other members
+    of its group so an OCR mismatch between the query and the CSER-extracted label
+    still resolves. Bounded to ``_MAX_CONFUSABLE_POS`` swappable positions per base
+    form to avoid a 2**n blow-up on long ids.
+    """
+    group_of = {ch: grp for grp in _CONFUSABLE_GROUPS for ch in grp}
+    seen: set[str] = set()
+    out: list[str] = []
+    for base in _compound_name_variants(name):
+        positions = [i for i, ch in enumerate(base) if ch in group_of]
+        if not positions or len(positions) > _MAX_CONFUSABLE_POS:
+            continue
+        for combo in product(*(group_of[base[i]] for i in positions)):
+            chars = list(base)
+            for i, ch in zip(positions, combo, strict=True):
+                chars[i] = ch
+            variant = "".join(chars)
+            if variant not in seen:
+                seen.add(variant)
+                out.append(variant)
+    return out
 
 
 class CompoundQdrantStore(CompoundVectorStore):
@@ -365,22 +400,76 @@ class CompoundQdrantStore(CompoundVectorStore):
             raise ValueError(msg)
         client = await self._get_client()
 
-        # Generate normalised variants to handle common mismatches:
+        # Fast path: exact + formatting variants (hyphen / space / case).
         #   "GSK286" vs "GSK-286" vs "GSK 286" vs "gsk286"
         variants = _compound_name_variants(extracted_id)
+        results, raw = await self._fetch_by_variants(
+            client, variants, extracted_id, workspace_id, allowed_artifact_ids, limit,
+        )
+        if results:
+            logger.info(
+                "compound_lookup_by_name_completed",
+                extracted_id=extracted_id,
+                raw_matches=raw,
+                unique_structures=len(results),
+                matched="exact",
+            )
+            return results
 
-        must_conditions = [
+        # Miss → fold visually-confusable glyphs (CSER OCR reads "CMX410" as
+        # "CMX41O": letter-O for zero). Miss-only, so a present id is never
+        # widened into a same-skeleton neighbour.
+        fuzzy = _confusable_variants(extracted_id)
+        if fuzzy:
+            results, raw = await self._fetch_by_variants(
+                client, fuzzy, extracted_id, workspace_id, allowed_artifact_ids, limit,
+            )
+            if results:
+                logger.info(
+                    "compound_lookup_glyph_fallback",
+                    extracted_id=extracted_id,
+                    variants_tried=len(fuzzy),
+                    matched_ids=sorted({r.extracted_id for r in results if r.extracted_id}),
+                    unique_structures=len(results),
+                )
+                return results
+
+        logger.info(
+            "compound_lookup_by_name_completed",
+            extracted_id=extracted_id,
+            raw_matches=0,
+            unique_structures=0,
+            matched="none",
+        )
+        return []
+
+    async def _fetch_by_variants(
+        self,
+        client: AsyncQdrantClient,
+        variants: list[str],
+        extracted_id: str,
+        workspace_id: UUID,
+        allowed_artifact_ids: list[UUID] | None,
+        limit: int,
+    ) -> tuple[list[CompoundSearchResult], int]:
+        """Scroll for any of ``variants`` (workspace / artifact scoped), dedup by
+        canonical SMILES, and stash vectors for downstream similarity search.
+
+        Returns ``(results, raw_point_count)``.
+        """
+        if not variants:
+            return [], 0
+
+        must_conditions: list = [
             models.FieldCondition(
                 key="extracted_id",
                 match=models.MatchAny(any=variants),
             ),
-        ]
-        must_conditions.append(
             models.FieldCondition(
                 key="workspace_id",
                 match=models.MatchValue(value=str(workspace_id)),
             ),
-        )
+        ]
         if allowed_artifact_ids is not None:
             must_conditions.append(
                 models.FieldCondition(
@@ -408,7 +497,6 @@ class CompoundQdrantStore(CompoundVectorStore):
         # Deduplicate by canonical_smiles — same compound can appear on multiple pages
         seen_canonical: set[str] = set()
         results: list[CompoundSearchResult] = []
-
         for point in scroll_result:
             canonical = point.payload.get("canonical_smiles") or point.payload.get("smiles", "")
             if canonical in seen_canonical:
@@ -432,14 +520,7 @@ class CompoundQdrantStore(CompoundVectorStore):
                     metadata=metadata,
                 ),
             )
-
-        logger.info(
-            "compound_lookup_by_name_completed",
-            extracted_id=extracted_id,
-            raw_matches=len(scroll_result),
-            unique_structures=len(results),
-        )
-        return results
+        return results, len(scroll_result)
 
     async def get_compound_collection_info(self) -> dict:
         """Return basic stats about the compound collection."""
