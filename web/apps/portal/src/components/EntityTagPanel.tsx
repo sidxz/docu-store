@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import type { components } from "@docu-store/api-client";
 import type { Bioactivity } from "@docu-store/types";
+import { MoleculeStructure } from "@docu-store/ui";
 import { Card } from "@/components/ui/Card";
 import { BioactivityTable } from "@/components/ui/BioactivityTable";
 
@@ -22,6 +23,7 @@ interface EntityTagPanelProps {
   tagMentions: TagMentionItem[];
   workspace: string;
   artifactId: string;
+  compoundMentions?: { extracted_id?: string | null; smiles: string; canonical_smiles?: string | null }[];
 }
 
 function groupTags(tagMentions: TagMentionItem[]) {
@@ -146,11 +148,13 @@ function CompoundCard({
   expanded,
   workspace,
   artifactId,
+  structureSmiles,
 }: {
   tagMention: TagMentionItem;
   expanded: boolean;
   workspace: string;
   artifactId: string;
+  structureSmiles?: string;
 }) {
   const params = tagMention.additional_model_params as Record<string, unknown> | undefined;
   const activities = params?.bioactivities as Bioactivity[] | undefined;
@@ -170,6 +174,11 @@ function CompoundCard({
         </div>
         <SourceBadges sources={sources} workspace={workspace} artifactId={artifactId} />
       </div>
+      {structureSmiles && (
+        <div className="mt-2 flex justify-center border-t border-emerald-500/10 pt-2" title="Structure on file">
+          <MoleculeStructure smiles={structureSmiles} width={160} height={110} />
+        </div>
+      )}
       {expanded && activities && activities.length > 0 && (
         <BioactivityTable activities={activities} />
       )}
@@ -179,9 +188,21 @@ function CompoundCard({
 
 // ── Main panel ──
 
-export function EntityTagPanel({ tagMentions, workspace, artifactId }: EntityTagPanelProps) {
+export function EntityTagPanel({
+  tagMentions,
+  workspace,
+  artifactId,
+  compoundMentions = [],
+}: EntityTagPanelProps) {
   const { compounds, grouped } = groupTags(tagMentions);
   const [expanded, setExpanded] = useState(false);
+
+  const structureByLabel = new Map<string, string>();
+  for (const c of compoundMentions) {
+    const key = c.extracted_id?.trim().toLowerCase();
+    const smiles = c.canonical_smiles || c.smiles;
+    if (key && smiles && !structureByLabel.has(key)) structureByLabel.set(key, smiles);
+  }
 
   const hasDetails = compounds.some((tm) => {
     const params = tm.additional_model_params as Record<string, unknown> | undefined;
@@ -236,6 +257,7 @@ export function EntityTagPanel({ tagMentions, workspace, artifactId }: EntityTag
                   expanded={expanded}
                   workspace={workspace}
                   artifactId={artifactId}
+                  structureSmiles={structureByLabel.get(tm.tag.trim().toLowerCase())}
                 />
               ))}
             </div>

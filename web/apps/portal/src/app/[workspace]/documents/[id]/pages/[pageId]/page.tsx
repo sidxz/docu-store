@@ -227,6 +227,7 @@ export default function PageViewerPage() {
             tagMentions={page.tag_mentions}
             workspace={workspace}
             artifactId={id}
+            compoundMentions={page.compound_mentions ?? []}
           />
         </div>
       )}
