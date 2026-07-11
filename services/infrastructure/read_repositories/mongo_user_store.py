@@ -53,6 +53,7 @@ class MongoUserStore(UserPreferencesStore, UserActivityStore):
             sidebar_collapsed=doc.get("sidebar_collapsed", False),
             dev_mode=doc.get("dev_mode", False),
             default_scope=doc.get("default_scope", "workspace"),
+            font_family=doc.get("font_family", "plex"),
         )
 
     async def update_preferences(
@@ -79,6 +80,7 @@ class MongoUserStore(UserPreferencesStore, UserActivityStore):
             sidebar_collapsed=doc.get("sidebar_collapsed", False),
             dev_mode=doc.get("dev_mode", False),
             default_scope=doc.get("default_scope", "workspace"),
+            font_family=doc.get("font_family", "plex"),
         )
 
     async def ensure_indexes(self) -> None:

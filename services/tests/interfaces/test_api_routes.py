@@ -13,9 +13,11 @@ from sentinel_auth.authz_middleware import AuthzMiddleware
 from application.dtos.artifact_dtos import ArtifactResponse, CreateArtifactRequest
 from application.dtos.errors import AppError
 from application.dtos.page_dtos import AddCompoundMentionsRequest, CreatePageRequest, PageResponse
+from application.dtos.user_dtos import UserPreferencesDTO
 from application.ports.blob_store import BlobStore
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.ports.repositories.page_read_models import PageReadModel
+from application.ports.repositories.user_preferences_store import UserPreferencesStore
 from application.use_cases.artifact_use_cases import (
     CreateArtifactUseCase,
     UpdateTitleMentionUseCase,
@@ -79,6 +81,26 @@ class FakePageReadModel(PageReadModel):
         self, artifact_ids: list[UUID], workspace_id: UUID | None = None,
     ) -> list[PageResponse]:
         return [p for p in self._pages.values() if p.artifact_id in artifact_ids]
+
+
+class FakeUserPreferencesStore(UserPreferencesStore):
+    """In-memory preferences store, keyed like the Mongo doc: (workspace_id, user_id)."""
+
+    def __init__(self) -> None:
+        self._docs: dict[tuple[UUID, UUID], dict] = {}
+
+    async def get_preferences(self, workspace_id: UUID, user_id: UUID) -> UserPreferencesDTO:
+        return UserPreferencesDTO(**self._docs.get((workspace_id, user_id), {}))
+
+    async def update_preferences(
+        self, workspace_id: UUID, user_id: UUID, updates: dict,
+    ) -> UserPreferencesDTO:
+        doc = self._docs.setdefault((workspace_id, user_id), {})
+        doc.update(updates)
+        return UserPreferencesDTO(**doc)
+
+    async def ensure_indexes(self) -> None:
+        pass
 
 
 class FakeUseCase:
@@ -326,3 +348,20 @@ class TestPageRoutes:
         response = client.delete(f"/pages/{page_id}")
 
         assert response.status_code == 204
+
+
+class TestUserPreferencesRoutes:
+    def test_font_family_round_trips(self, make_client) -> None:
+        client = make_client({UserPreferencesStore: FakeUserPreferencesStore()})
+
+        response = client.get("/user/preferences")
+        assert response.status_code == 200
+        assert response.json()["font_family"] == "plex"
+
+        response = client.patch("/user/preferences", json={"font_family": "inter"})
+        assert response.status_code == 200
+        assert response.json()["font_family"] == "inter"
+
+        response = client.get("/user/preferences")
+        assert response.status_code == 200
+        assert response.json()["font_family"] == "inter"

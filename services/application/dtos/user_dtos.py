@@ -8,6 +8,7 @@ class UserPreferencesDTO(BaseModel):
     sidebar_collapsed: bool = Field(default=False)
     dev_mode: bool = Field(default=False)
     default_scope: str = Field(default="workspace")
+    font_family: str = Field(default="plex")
 
 
 class UpdatePreferencesRequest(BaseModel):
@@ -17,6 +18,7 @@ class UpdatePreferencesRequest(BaseModel):
     sidebar_collapsed: bool | None = None
     dev_mode: bool | None = None
     default_scope: str | None = None
+    font_family: str | None = None
 
 
 class SearchHistoryEntry(BaseModel):
