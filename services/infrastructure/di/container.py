@@ -83,6 +83,9 @@ from application.use_cases.page_use_cases import (
 )
 from application.use_cases.parse_artifact_use_case import ParseArtifactUseCase
 from application.use_cases.search_use_cases import HierarchicalSearchUseCase, SearchSummariesUseCase
+from application.use_cases.reconcile_compound_labels_use_case import (
+    ReconcileCompoundLabelsUseCase,
+)
 from application.use_cases.smiles_embedding_use_cases import EmbedCompoundSmilesUseCase
 from application.use_cases.smiles_search_use_cases import SearchSimilarCompoundsUseCase
 from application.use_cases.summarization_use_cases import (
@@ -121,6 +124,9 @@ from application.workflow_use_cases.trigger_ner_extraction_use_case import (
 )
 from application.workflow_use_cases.trigger_page_summarization_use_case import (
     TriggerPageSummarizationUseCase,
+)
+from application.workflow_use_cases.trigger_compound_label_reconciliation_use_case import (
+    TriggerCompoundLabelReconciliationUseCase,
 )
 from application.workflow_use_cases.trigger_page_summary_embedding_use_case import (
     TriggerPageSummaryEmbeddingUseCase,
@@ -614,6 +620,14 @@ def create_container() -> Container:
     )
     container[TriggerSmilesEmbeddingUseCase] = lambda c: TriggerSmilesEmbeddingUseCase(
         workflow_orchestrator=c[WorkflowOrchestrator],
+    )
+    container[ReconcileCompoundLabelsUseCase] = lambda c: ReconcileCompoundLabelsUseCase(
+        page_repository=c[PageRepository],
+    )
+    container[TriggerCompoundLabelReconciliationUseCase] = (
+        lambda c: TriggerCompoundLabelReconciliationUseCase(
+            workflow_orchestrator=c[WorkflowOrchestrator],
+        )
     )
 
     # LLM Infrastructure (shared — provider selected via LLM_PROVIDER config)

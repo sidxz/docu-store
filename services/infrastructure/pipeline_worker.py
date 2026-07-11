@@ -51,6 +51,9 @@ from application.workflow_use_cases.trigger_page_summarization_use_case import (
 from application.workflow_use_cases.trigger_page_summary_embedding_use_case import (
     TriggerPageSummaryEmbeddingUseCase,
 )
+from application.workflow_use_cases.trigger_compound_label_reconciliation_use_case import (
+    TriggerCompoundLabelReconciliationUseCase,
+)
 from application.workflow_use_cases.trigger_smiles_embedding_use_case import (
     TriggerSmilesEmbeddingUseCase,
 )
@@ -87,6 +90,9 @@ async def run(worker_name: str = "pipeline_worker") -> None:
     trigger_artifact_parse_use_case = container[TriggerArtifactParseUseCase]
     trigger_compound_extraction_use_case = container[TriggerCompoundExtractionUseCase]
     trigger_smiles_embedding_use_case = container[TriggerSmilesEmbeddingUseCase]
+    trigger_compound_label_reconciliation_use_case = container[
+        TriggerCompoundLabelReconciliationUseCase
+    ]
     trigger_page_summarization_use_case = container[TriggerPageSummarizationUseCase]
     trigger_artifact_summarization_use_case = container[TriggerArtifactSummarizationUseCase]
     trigger_page_summary_embedding_use_case = container[TriggerPageSummaryEmbeddingUseCase]
@@ -303,6 +309,12 @@ async def run(worker_name: str = "pipeline_worker") -> None:
                                     tracking_id=tracking.notification_id,
                                 )
 
+                                # Reverse-race + bulk-reprocess self-heal: reconcile
+                                # once NER tags are (or later become) present.
+                                await trigger_compound_label_reconciliation_use_case.execute(
+                                    page_id=domain_event.originator_id,
+                                )
+
                             case Page.TagMentionsUpdated():
                                 logger.info(
                                     "pipeline_tag_mentions_updated",
@@ -317,6 +329,12 @@ async def run(worker_name: str = "pipeline_worker") -> None:
 
                                 # Sync tags to Qdrant payloads (page_embeddings + summary_embeddings)
                                 await sync_page_tags_use_case.execute(
+                                    page_id=domain_event.originator_id,
+                                )
+
+                                # Common case: NER finished last — reconcile CSER
+                                # labels against the compound_name tags just landed.
+                                await trigger_compound_label_reconciliation_use_case.execute(
                                     page_id=domain_event.originator_id,
                                 )
 
