@@ -46,6 +46,9 @@ export const queryKeys = {
     enrichments: (plugin: string, pageId: string) =>
       ["plugins", plugin, "enrichments", pageId] as const,
   },
+  compounds: {
+    detail: (name: string) => ["compounds", "detail", name] as const,
+  },
   search: {
     all: ["search"] as const,
     text: (query: string, tags?: string[], tagMatchMode?: string) =>
