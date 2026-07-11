@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { MoleculeStructure } from "@docu-store/ui";
+import type { Bioactivity } from "@docu-store/types";
+import { BioactivityTable } from "@/components/ui/BioactivityTable";
 
 interface MoleculeBlockProps {
   smiles: string;
@@ -9,9 +12,10 @@ interface MoleculeBlockProps {
   pageId?: string;
   artifactId?: string;
   workspace?: string;
+  bioactivities?: Bioactivity[];
 }
 
-export function MoleculeBlock({ smiles, label, pageId, artifactId, workspace }: MoleculeBlockProps) {
+export function MoleculeBlock({ smiles, label, pageId, artifactId, workspace, bioactivities }: MoleculeBlockProps) {
   const isExactMatch = Boolean(pageId && artifactId);
   const href =
     workspace && artifactId && pageId
@@ -43,6 +47,26 @@ export function MoleculeBlock({ smiles, label, pageId, artifactId, workspace }: 
           View source page
         </Link>
       )}
+      {bioactivities && bioactivities.length > 0 && (
+        <ActivityDisclosure activities={bioactivities} />
+      )}
+    </div>
+  );
+}
+
+function ActivityDisclosure({ activities }: { activities: Bioactivity[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-1.5">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="mx-auto block text-xs text-primary hover:underline"
+      >
+        {open ? "Hide activity" : `Show activity (${activities.length})`}
+      </button>
+      {open && <BioactivityTable activities={activities} />}
     </div>
   );
 }

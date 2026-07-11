@@ -2,6 +2,8 @@
  * Chat domain types — mirrors backend chat DTOs.
  */
 
+import type { Bioactivity } from "./extraction";
+
 // --- Source citations ---
 
 export interface SourceCitation {
@@ -29,6 +31,7 @@ export interface ContentBlock {
   sources: SourceCitation[] | null;
   page_id: string | null;
   artifact_id: string | null;
+  bioactivities: Bioactivity[] | null;
 }
 
 // --- Agent tracing ---

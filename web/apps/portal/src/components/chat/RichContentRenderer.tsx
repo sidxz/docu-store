@@ -85,6 +85,7 @@ function RenderBlock({ block, workspace }: { block: ContentBlock; workspace: str
             pageId={block.page_id ?? undefined}
             artifactId={block.artifact_id ?? undefined}
             workspace={workspace}
+            bioactivities={block.bioactivities ?? undefined}
           />
         );
       }
