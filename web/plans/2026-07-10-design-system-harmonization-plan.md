@@ -4,13 +4,13 @@
 
 **Goal:** Make chem-cellar, prot-cellar, docu-store, and daikon-gen3 read as one product suite — shared color tokens (docu-store's blue/slate), a user-switchable font preference (IBM Plex ⇄ Inter), Radix everywhere — distributed via one public npm package.
 
-**Architecture:** A CSS-only package `@daikon/design-tokens` ships the canonical `--ds-*` primitive layer + a superset shadcn bridge + a `@theme` map, keyed to `data-theme` (light/dark) and `data-font` (plex/inter) attributes on `<html>`. Each app `@import`s it, deletes its local token block, drives the two attributes with a small persisted store, and loads both font families via `next/font`. daikon-gen3 additionally migrates its one base-ui component to Radix.
+**Architecture:** A CSS-only package `@structflo/daikon-design-tokens` ships the canonical `--ds-*` primitive layer + a superset shadcn bridge + a `@theme` map, keyed to `data-theme` (light/dark) and `data-font` (plex/inter) attributes on `<html>`. Each app `@import`s it, deletes its local token block, drives the two attributes with a small persisted store, and loads both font families via `next/font`. daikon-gen3 additionally migrates its one base-ui component to Radix.
 
 **Tech Stack:** Next.js 16, React 19, Tailwind CSS v4, shadcn/ui (Radix), next-themes / zustand, next/font (IBM Plex + Inter), npm (public registry).
 
 ## Global Constraints
 
-- **Registry:** `@daikon/design-tokens`, **public npm**, published `--access public` (mirrors `@sentinel-auth/*` — zero Docker/CI/dev auth changes). Requires the `@daikon` npm org to exist with publish rights.
+- **Registry:** `@structflo/daikon-design-tokens`, **public npm**, published `--access public` (mirrors `@sentinel-auth/*` — zero Docker/CI/dev auth changes). Requires the `@structflo` npm org to exist with publish rights.
 - **Dark selector:** `[data-theme="dark"]` for ALL apps. next-themes apps use `attribute="data-theme"`.
 - **Font attribute:** `data-font` on `<html>`, values `plex` | `inter`, **default `plex`**. Persisted to `localStorage['ds-font']`.
 - **Mono font:** always IBM Plex Mono. The preference switches the **sans/body** family only.
@@ -34,7 +34,7 @@ In a scratch dir:
 ```bash
 mkdir -p /tmp/dst-spike && cd /tmp/dst-spike
 cat > package.json <<'JSON'
-{ "name": "@daikon/design-tokens", "version": "0.0.0", "exports": { "./tokens.css": "./tokens.css" }, "files": ["tokens.css"] }
+{ "name": "@structflo/daikon-design-tokens", "version": "0.0.0", "exports": { "./tokens.css": "./tokens.css" }, "files": ["tokens.css"] }
 JSON
 cat > tokens.css <<'CSS'
 @theme inline { --color-spiketest: #ff00ff; }
@@ -47,7 +47,7 @@ In `chem-vault2/frontend`: `pnpm add file:/tmp/dst-spike`
 
 Prepend to `chem-vault2/frontend/src/app/globals.css` (after `@import "tailwindcss";`):
 ```css
-@import "@daikon/design-tokens/tokens.css";
+@import "@structflo/daikon-design-tokens/tokens.css";
 ```
 Add `className="bg-spiketest"` to any element on a rendered page.
 
@@ -64,7 +64,7 @@ If absent → **FALLBACK:** the package ships only `:root`/`[data-theme]`/`[data
 - [ ] **Step 4: Revert the spike**
 
 ```bash
-cd chem-vault2/frontend && pnpm remove @daikon/design-tokens && git checkout src/app/globals.css
+cd chem-vault2/frontend && pnpm remove @structflo/daikon-design-tokens && git checkout src/app/globals.css
 rm -rf /tmp/dst-spike
 ```
 Revert the test className edit. Nothing from this task is committed.
@@ -79,7 +79,7 @@ Revert the test className edit. Nothing from this task is committed.
 - Create: `daikon-design-tokens/.gitignore`
 
 **Interfaces:**
-- Produces: package `@daikon/design-tokens` with export `"./tokens.css"`.
+- Produces: package `@structflo/daikon-design-tokens` with export `"./tokens.css"`.
 
 - [ ] **Step 1: Create the repo and package.json**
 
@@ -89,7 +89,7 @@ mkdir -p /Users/sidx/workspace/daikon-design-tokens && cd /Users/sidx/workspace/
 Create `package.json`:
 ```json
 {
-  "name": "@daikon/design-tokens",
+  "name": "@structflo/daikon-design-tokens",
   "version": "1.0.0",
   "description": "Canonical design tokens for the DAIKON app suite (colors, fonts, radius).",
   "license": "UNLICENSED",
@@ -105,13 +105,13 @@ Create `package.json`:
 
 Create `README.md`:
 ```markdown
-# @daikon/design-tokens
+# @structflo/daikon-design-tokens
 
 Canonical design tokens for the DAIKON suite. Palette source of truth: docu-store.
 
 ## Usage
 1. In your Tailwind v4 entry CSS, after `@import "tailwindcss";`:
-   `@import "@daikon/design-tokens/tokens.css";`
+   `@import "@structflo/daikon-design-tokens/tokens.css";`
    Then delete your local `:root` / `.dark` token block and `@custom-variant dark`.
 2. Define the three font-family CSS vars via `next/font` in `layout.tsx`:
    `--font-plex-sans`, `--font-plex-mono`, `--font-inter`.
@@ -126,7 +126,7 @@ Canonical design tokens for the DAIKON suite. Palette source of truth: docu-stor
 
 ```bash
 printf "node_modules/\n" > .gitignore
-git add -A && git commit -m "chore: scaffold @daikon/design-tokens package"
+git add -A && git commit -m "chore: scaffold @structflo/daikon-design-tokens package"
 ```
 
 ---
@@ -144,7 +144,7 @@ git add -A && git commit -m "chore: scaffold @daikon/design-tokens package"
 Create `daikon-design-tokens/tokens.css` with exactly this content:
 ```css
 /*
- * @daikon/design-tokens — canonical design system for the DAIKON app suite.
+ * @structflo/daikon-design-tokens — canonical design system for the DAIKON app suite.
  * Palette source of truth: docu-store. Consumed by chem-cellar, prot-cellar,
  * docu-store, daikon-gen3.
  *
@@ -453,11 +453,11 @@ git add test/contract.mjs && git commit -m "test: token contract check"
 
 ---
 
-## Task 4: Publish `@daikon/design-tokens@1.0.0` to public npm
+## Task 4: Publish `@structflo/daikon-design-tokens@1.0.0` to public npm
 
 **Files:** none (publish + optional CI workflow).
 
-**Prerequisite:** the `@daikon` npm org must exist and the publishing user must be a member. If not ready, apps can consume `file:/Users/sidx/workspace/daikon-design-tokens` locally until publish is possible — note the switch-back in each app task.
+**Prerequisite:** the `@structflo` npm org must exist and the publishing user must be a member. If not ready, apps can consume `file:/Users/sidx/workspace/daikon-design-tokens` locally until publish is possible — note the switch-back in each app task.
 
 - [ ] **Step 1: Dry-run the pack**
 
@@ -467,7 +467,7 @@ Expected: the tarball lists exactly `package.json`, `README.md`, `tokens.css` (n
 - [ ] **Step 2: Publish**
 
 Run: `npm publish --access public`
-Expected: `+ @daikon/design-tokens@1.0.0`. Verify: `npm view @daikon/design-tokens version` → `1.0.0`.
+Expected: `+ @structflo/daikon-design-tokens@1.0.0`. Verify: `npm view @structflo/daikon-design-tokens version` → `1.0.0`.
 
 - [ ] **Step 3: Add release workflow and commit**
 
@@ -502,21 +502,21 @@ git add .github/workflows/publish.yml && git commit -m "ci: publish on tag"
 - Modify: `docu-store/web/apps/portal/src/app/globals.css:31-165` (replace `:root` + `[data-theme="dark"]` token blocks and the shadcn bridge lines within `@theme inline` with the import; KEEP feature-* colors, citation-flash, page transitions, streamdown `@source`, scrollbar/selection if desired)
 
 **Interfaces:**
-- Consumes: `@daikon/design-tokens/tokens.css`.
+- Consumes: `@structflo/daikon-design-tokens/tokens.css`.
 
 - [ ] **Step 1: Install the package**
 
 ```bash
-cd /Users/sidx/workspace/docu-store/web && pnpm --filter portal add @daikon/design-tokens
+cd /Users/sidx/workspace/docu-store/web && pnpm --filter portal add @structflo/daikon-design-tokens
 ```
 (If not yet published: `pnpm --filter portal add file:/Users/sidx/workspace/daikon-design-tokens`.)
 
 - [ ] **Step 2: Replace the token blocks with the import**
 
 In `docu-store/web/apps/portal/src/app/globals.css`:
-- After line 19 (`@import "tw-animate-css";`), add: `@import "@daikon/design-tokens/tokens.css";`
+- After line 19 (`@import "tw-animate-css";`), add: `@import "@structflo/daikon-design-tokens/tokens.css";`
 - Delete the `:root { … }` block (lines 31–108) and the `[data-theme="dark"] { … }` block (lines 110–165) — these now come from the package.
-- In the `@theme inline` block, delete the shadcn-standard and surface/text/accent/sidebar/ds/score/shadow lines that the package now provides (they duplicate). **KEEP** the `--color-feature-search/compounds/folder` lines (docu-store-local).
+- In the `@theme inline` block, delete ALL the token lines (`--color-*`, `--shadow-ds-*`, `--radius-*`, `--font-*`) — the package now ships the COMPLETE union, **including `--color-feature-search/compounds/folder` and `--color-surface-primary`** (added after review). No keep-list; also delete the `--ds-feature-*` primitive defs from `:root`/dark since the package provides them.
 - Delete the `@custom-variant dark (…)` line (line 17) — the package defines it.
 - **KEEP** the `@layer base { *{border-color} }`, body, citation-flash, page transitions, `@source` streamdown lines.
 
@@ -530,7 +530,7 @@ Expected: build succeeds. Visually this should be a **near no-op** (docu-store w
 ```bash
 cd /Users/sidx/workspace/docu-store
 git add web/apps/portal/package.json web/apps/portal/src/app/globals.css web/pnpm-lock.yaml
-git commit -m "refactor(portal): consume @daikon/design-tokens for colors"
+git commit -m "refactor(portal): consume @structflo/daikon-design-tokens for colors"
 ```
 
 ---
@@ -708,7 +708,7 @@ Run: `pnpm --filter portal build` and confirm no CSS warnings about unknown util
 - [ ] **Step 1: Install the package**
 
 ```bash
-cd /Users/sidx/workspace/chem-vault2/frontend && pnpm add @daikon/design-tokens
+cd /Users/sidx/workspace/chem-vault2/frontend && pnpm add @structflo/daikon-design-tokens
 ```
 
 - [ ] **Step 2: Replace globals.css token blocks with the import**
@@ -716,7 +716,7 @@ cd /Users/sidx/workspace/chem-vault2/frontend && pnpm add @daikon/design-tokens
 Replace `chem-vault2/frontend/src/app/globals.css` lines 1–128 with:
 ```css
 @import "tailwindcss";
-@import "@daikon/design-tokens/tokens.css";
+@import "@structflo/daikon-design-tokens/tokens.css";
 ```
 Delete the local `@custom-variant dark`, `:root`, `.dark`, `@theme`, and `@theme inline` blocks (all now from the package). **Keep** the `@keyframes auth-enter` block (lines 142–153) and the `@layer base` body/border block only if you want app-local overrides — otherwise delete it too (the package provides border/body). Keep `auth-enter`.
 
@@ -824,7 +824,7 @@ Expected: succeeds, no unknown-utility warnings (the union bridge covers `sideba
 ```bash
 cd /Users/sidx/workspace/chem-vault2
 git add frontend/package.json frontend/pnpm-lock.yaml frontend/src
-git commit -m "feat(frontend): adopt @daikon/design-tokens + font preference"
+git commit -m "feat(frontend): adopt @structflo/daikon-design-tokens + font preference"
 ```
 
 ---
@@ -845,7 +845,7 @@ Confirm: blue accents (was already blue — subtle shift to `#3b82f6`), slate da
 - [ ] **Step 1: Install package**
 
 ```bash
-cd /Users/sidx/workspace/prot-cellar/frontend && pnpm add @daikon/design-tokens
+cd /Users/sidx/workspace/prot-cellar/frontend && pnpm add @structflo/daikon-design-tokens
 ```
 
 - [ ] **Step 2: Replace globals.css top with the import** (drop the teal OKLCH block)
@@ -853,7 +853,7 @@ cd /Users/sidx/workspace/prot-cellar/frontend && pnpm add @daikon/design-tokens
 Replace `prot-cellar/frontend/src/app/globals.css` lines 1–2 + the `:root`/`.dark`/`@theme`/`@theme inline` blocks with:
 ```css
 @import "tailwindcss";
-@import "@daikon/design-tokens/tokens.css";
+@import "@structflo/daikon-design-tokens/tokens.css";
 ```
 Keep any app-local `@keyframes`. **This is where prot-cellar's teal accent disappears — the package's blue takes over. Expected and intended.**
 
@@ -876,7 +876,7 @@ Repeat Task 9 Step 5 verbatim, under `prot-cellar/frontend/src/…` (same three 
 cd /Users/sidx/workspace/prot-cellar/frontend && pnpm build   # expect success
 cd /Users/sidx/workspace/prot-cellar
 git add frontend/package.json frontend/pnpm-lock.yaml frontend/src
-git commit -m "feat(frontend): adopt @daikon/design-tokens + font preference (teal→blue)"
+git commit -m "feat(frontend): adopt @structflo/daikon-design-tokens + font preference (teal→blue)"
 ```
 
 - [ ] **Step 7: Verify**
@@ -888,7 +888,7 @@ git commit -m "feat(frontend): adopt @daikon/design-tokens + font preference (te
 ## Task 12: daikon-gen3 — colors + fonts + base-ui→radix
 
 **Files:**
-- Modify: `daikon-gen3/frontend/package.json` (remove `@base-ui/react` + `shadcn`; add `@daikon/design-tokens`, `@radix-ui/react-slot`)
+- Modify: `daikon-gen3/frontend/package.json` (remove `@base-ui/react` + `shadcn`; add `@structflo/daikon-design-tokens`, `@radix-ui/react-slot`)
 - Modify: `daikon-gen3/frontend/src/app/globals.css` (replace all tokens + drop `@import "shadcn/tailwind.css"`)
 - Modify: `daikon-gen3/frontend/components.json` (`style: base-nova` → `new-york`; drop base-ui fields)
 - Modify: `daikon-gen3/frontend/src/components/ui/button.tsx` (base-ui → radix)
@@ -903,7 +903,7 @@ git commit -m "feat(frontend): adopt @daikon/design-tokens + font preference (te
 ```bash
 cd /Users/sidx/workspace/daikon-gen3/frontend
 pnpm remove @base-ui/react shadcn
-pnpm add @daikon/design-tokens @radix-ui/react-slot
+pnpm add @structflo/daikon-design-tokens @radix-ui/react-slot
 ```
 
 - [ ] **Step 2: Rewrite globals.css to consume the package**
@@ -912,7 +912,7 @@ Replace `daikon-gen3/frontend/src/app/globals.css` entirely with:
 ```css
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "@daikon/design-tokens/tokens.css";
+@import "@structflo/daikon-design-tokens/tokens.css";
 
 @layer base {
   html { font-family: var(--font-sans); }
@@ -983,7 +983,7 @@ Expected: succeeds.
 ```bash
 cd /Users/sidx/workspace/daikon-gen3
 git add frontend/package.json frontend/pnpm-lock.yaml frontend/components.json frontend/src/components/ui/button.tsx frontend/src/app/globals.css
-git commit -m "refactor(frontend): migrate base-ui→radix + adopt @daikon/design-tokens"
+git commit -m "refactor(frontend): migrate base-ui→radix + adopt @structflo/daikon-design-tokens"
 ```
 
 ---
@@ -1126,7 +1126,7 @@ Run all four `pnpm dev` (different ports). Put them side by side in light+plex, 
 
 - [ ] **Step 2: Update each repo's CLAUDE.md / stack docs**
 
-Where a repo documents its frontend stack (e.g., chem-vault2 `CLAUDE.md` "Frontend" line), add a note that colors/fonts come from `@daikon/design-tokens` and fonts are a `data-font` user preference. Commit per repo.
+Where a repo documents its frontend stack (e.g., chem-vault2 `CLAUDE.md` "Frontend" line), add a note that colors/fonts come from `@structflo/daikon-design-tokens` and fonts are a `data-font` user preference. Commit per repo.
 
 - [ ] **Step 3: Move this spec + plan into the tokens repo (optional)**
 

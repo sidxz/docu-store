@@ -1,8 +1,9 @@
 /*
  * DESIGN SYSTEM: Tailwind v4 is the sole utility CSS framework.
- * All layout/spacing/color utilities come from Tailwind + the --ds-*
- * token system below. shadcn/ui + AI Elements are the sole component
- * layer (no PrimeReact — removed in Task 23).
+ * All layout/spacing/color utilities come from Tailwind + the design
+ * tokens shipped by @structflo/daikon-design-tokens (imported below).
+ * shadcn/ui + AI Elements are the sole component layer (no PrimeReact —
+ * removed in Task 23).
  *
  * CSS Layer ordering (lowest → highest specificity):
  *   theme → base (Tailwind preflight) → components → utilities
@@ -13,10 +14,8 @@
 @import "tailwindcss/theme" layer(theme);
 @import "tailwindcss/utilities" layer(utilities);
 
-/* Bind Tailwind's dark: variant to the data-theme attribute used by ThemeProvider */
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
-
 @import "tw-animate-css";
+@import "@structflo/daikon-design-tokens/tokens.css";
 
 /* Streamdown ships its own Tailwind classes (markdown typography, tables,
    code blocks) — they only compile if Tailwind scans its dist. */
@@ -24,268 +23,10 @@
 @source "../../node_modules/@streamdown/math/dist/*.js";
 
 /* ---------------------------------------------------------------------------
- * Design Tokens
- * Light (default) and dark variants via data-theme attribute
- * ------------------------------------------------------------------------- */
-
-:root {
-  /* Surfaces */
-  --ds-surface: #ffffff;
-  --ds-surface-elevated: #ffffff;
-  --ds-surface-sunken: #f8fafc;
-  --ds-surface-overlay: #ffffff;
-  --ds-surface-hover: #f1f5f9;
-
-  /* Borders */
-  --ds-border: #e2e8f0;
-  --ds-border-subtle: #f1f5f9;
-
-  /* Text */
-  --ds-text-primary: #0f172a;
-  --ds-text-secondary: #475569;
-  --ds-text-muted: #94a3b8;
-  --ds-text-inverse: #ffffff;
-
-  /* Accent — Blue */
-  --ds-accent: #3b82f6;
-  --ds-accent-hover: #2563eb;
-  --ds-accent-light: #eff6ff;
-  --ds-accent-muted: #dbeafe;
-  --ds-accent-text: #2563eb;
-  --ds-accent-subtle: #f5f9ff;
-
-  /* Sidebar — light panel in light mode, dark in dark (overridden below) */
-  --ds-sidebar: #f1f5f9;
-  --ds-sidebar-text: #475569;
-  --ds-sidebar-text-active: #0f172a;
-  --ds-sidebar-hover: rgba(15, 23, 42, 0.05);
-  --ds-sidebar-active: rgba(59, 130, 246, 0.12);
-  --ds-sidebar-border: #e2e8f0;
-
-  /* Semantic — AA-contrast (≥4.5:1) darkened for light-mode text use */
-  --ds-success: #15803d;
-  --ds-warning: #a16207;
-  --ds-error: #b91c1c;
-  --ds-info: #1d4ed8;
-
-  /* Score severity — for ScoreBadge and similar */
-  --ds-score-excellent: #16a34a;
-  --ds-score-good: #0d9488;
-  --ds-score-fair: #d97706;
-  --ds-score-poor: #ef4444;
-
-  /* Feature accent colors */
-  --ds-feature-search: #8b5cf6;
-  --ds-feature-compounds: #16a34a;
-  --ds-feature-folder: #14b8a6;
-
-  /* Shadows */
-  --ds-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --ds-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
-  --ds-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-
-  /* shadcn/ui token bridge — aliases onto --ds-* so components stay theme-reactive */
-  --radius: 0.5rem;
-  --background: var(--ds-surface);
-  --foreground: var(--ds-text-primary);
-  --card: var(--ds-surface-elevated);
-  --card-foreground: var(--ds-text-primary);
-  --popover: var(--ds-surface-overlay);
-  --popover-foreground: var(--ds-text-primary);
-  --primary: var(--ds-accent);
-  --primary-foreground: var(--ds-text-inverse);
-  --secondary: var(--ds-surface-sunken);
-  --secondary-foreground: var(--ds-text-secondary);
-  --muted: var(--ds-surface-sunken);
-  --muted-foreground: var(--ds-text-muted);
-  --accent: var(--ds-accent-light);
-  --accent-foreground: var(--ds-accent-text);
-  --destructive: var(--ds-error);
-  --destructive-foreground: #ffffff;
-  --border: var(--ds-border);
-  --input: var(--ds-border);
-  --ring: var(--ds-accent);
-}
-
-[data-theme="dark"] {
-  /* Surfaces */
-  --ds-surface: #0f172a;
-  --ds-surface-elevated: #1e293b;
-  --ds-surface-sunken: #020617;
-  --ds-surface-overlay: #1e293b;
-  --ds-surface-hover: rgba(148, 163, 184, 0.08); /* translucent: must lighten over both #0f172a and #1e293b bases */
-
-  /* Borders */
-  --ds-border: #334155;
-  --ds-border-subtle: #1e293b;
-
-  /* Text */
-  --ds-text-primary: #f1f5f9;
-  --ds-text-secondary: #94a3b8;
-  --ds-text-muted: #64748b;
-  --ds-text-inverse: #0f172a;
-
-  /* Accent — Blue */
-  --ds-accent: #60a5fa;
-  --ds-accent-hover: #93bbfd;
-  --ds-accent-light: rgba(59, 130, 246, 0.15);
-  --ds-accent-muted: rgba(59, 130, 246, 0.1);
-  --ds-accent-text: #60a5fa;
-  --ds-accent-subtle: rgba(59, 130, 246, 0.08);
-
-  /* Semantic */
-  --ds-success: #22c55e;
-  --ds-warning: #f59e0b;
-  --ds-error: #ef4444;
-  --ds-info: #60a5fa;
-
-  /* Score severity */
-  --ds-score-excellent: #22c55e;
-  --ds-score-good: #2dd4bf;
-  --ds-score-fair: #f59e0b;
-  --ds-score-poor: #f87171;
-
-  /* Feature accent colors */
-  --ds-feature-search: #a78bfa;
-  --ds-feature-compounds: #22c55e;
-  --ds-feature-folder: #2dd4bf;
-
-  /* Sidebar — dark panel (light-mode defaults live in :root) */
-  --ds-sidebar: #0f172a;
-  --ds-sidebar-text: #cbd5e1;
-  --ds-sidebar-text-active: #ffffff;
-  --ds-sidebar-hover: rgba(255, 255, 255, 0.05);
-  --ds-sidebar-active: rgba(255, 255, 255, 0.1);
-  --ds-sidebar-border: rgba(255, 255, 255, 0.06);
-
-  /* Shadows */
-  --ds-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
-  --ds-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.3);
-  --ds-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
-}
-
-/* ---------------------------------------------------------------------------
- * Tailwind v4 theme mapping — @theme inline makes these available as
- * Tailwind color utilities (bg-surface, text-primary, border-default, etc.)
- * ------------------------------------------------------------------------- */
-
-@theme inline {
-  --color-surface: var(--ds-surface);
-  --color-surface-elevated: var(--ds-surface-elevated);
-  --color-surface-sunken: var(--ds-surface-sunken);
-  --color-surface-overlay: var(--ds-surface-overlay);
-  --color-surface-hover: var(--ds-surface-hover);
-  --color-surface-primary: var(--ds-surface);
-  --color-surface-default: var(--ds-surface);
-  --color-surface-raised: var(--ds-surface-elevated);
-
-  --color-border-default: var(--ds-border);
-  --color-border-subtle: var(--ds-border-subtle);
-
-  --color-text-primary: var(--ds-text-primary);
-  --color-text-secondary: var(--ds-text-secondary);
-  --color-text-muted: var(--ds-text-muted);
-  --color-text-inverse: var(--ds-text-inverse);
-
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent-hover: var(--ds-accent-hover);
-  --color-accent-light: var(--ds-accent-light);
-  --color-accent-muted: var(--ds-accent-muted);
-  --color-accent-text: var(--ds-accent-text);
-  --color-accent-subtle: var(--ds-accent-subtle);
-
-  --color-sidebar: var(--ds-sidebar);
-  --color-sidebar-text: var(--ds-sidebar-text);
-  --color-sidebar-text-active: var(--ds-sidebar-text-active);
-  --color-sidebar-hover: var(--ds-sidebar-hover);
-  --color-sidebar-active: var(--ds-sidebar-active);
-  --color-sidebar-border: var(--ds-sidebar-border);
-
-  --color-ds-success: var(--ds-success);
-  --color-ds-warning: var(--ds-warning);
-  --color-ds-error: var(--ds-error);
-  --color-ds-info: var(--ds-info);
-
-  --color-score-excellent: var(--ds-score-excellent);
-  --color-score-good: var(--ds-score-good);
-  --color-score-fair: var(--ds-score-fair);
-  --color-score-poor: var(--ds-score-poor);
-
-  --color-feature-search: var(--ds-feature-search);
-  --color-feature-compounds: var(--ds-feature-compounds);
-  --color-feature-folder: var(--ds-feature-folder);
-
-  --shadow-ds-sm: var(--ds-shadow-sm);
-  --shadow-ds: var(--ds-shadow);
-  --shadow-ds-md: var(--ds-shadow-md);
-
-  /* shadcn/ui semantic tokens */
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-}
-
-/* ---------------------------------------------------------------------------
- * Base — default border color
- *
- * shadcn/ui + the table primitive use the bare `border` / `border-b` utility
- * (width only). Tailwind v4 defaults that color to `currentColor`, so any
- * border that doesn't name a color renders as the dark text color — the harsh
- * "wireframe" borders on buttons, dropdowns, popovers, and table rows.
- *
- * This one rule restores the token default (Tailwind v3 preflight behaviour)
- * so every bare border/divide across the app uses --ds-border. Explicit color
- * utilities (border-border-default, border-transparent, …) live in the higher
- * `utilities` layer and still win, so nothing that names a color is affected.
- * ------------------------------------------------------------------------- */
-
-@layer base {
-  *,
-  ::before,
-  ::after {
-    border-color: var(--border);
-  }
-}
-
-/* ---------------------------------------------------------------------------
  * Global styles
  * ------------------------------------------------------------------------- */
 
 @layer components {
-  body {
-    font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    background-color: var(--ds-surface);
-    color: var(--ds-text-primary);
-    transition: background-color 0.2s ease, color 0.2s ease;
-  }
-
-  /* Focus ring — blue accent */
-  *:focus-visible {
-    outline: 2px solid var(--ds-accent);
-    outline-offset: 2px;
-  }
-
   /* Citation highlight flash — used when clicking [N] in chat answers */
   @keyframes citation-flash {
     0% { background-color: var(--ds-accent-muted); }
@@ -293,31 +34,6 @@
   }
   .citation-highlight {
     animation: citation-flash 1.5s ease-out;
-  }
-
-  /* Selection color */
-  ::selection {
-    background-color: var(--ds-accent-muted);
-    color: var(--ds-text-primary);
-  }
-
-  /* Scrollbar styling */
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background-color: var(--ds-text-muted);
-    border-radius: 3px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background-color: var(--ds-text-secondary);
   }
 
   /* Page transitions */

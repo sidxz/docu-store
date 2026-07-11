@@ -9,12 +9,14 @@ import { useThemeStore } from "@/lib/stores/theme-store";
 import { useDevModeStore } from "@/lib/stores/dev-mode-store";
 import { useSidebarStore } from "@/lib/stores/sidebar-store";
 import { useScopeStore } from "@/lib/stores/scope-store";
+import { useFontFamilyStore } from "@/lib/stores/font-family-store";
 
 interface ServerPreferences {
   theme: string;
   sidebar_collapsed: boolean;
   dev_mode: boolean;
   default_scope: string;
+  font_family: string;
 }
 
 /**
@@ -74,6 +76,7 @@ export function usePreferencesSync() {
       useDevModeStore.getState().setEnabled(serverPrefs.dev_mode);
       useSidebarStore.getState().setCollapsed(serverPrefs.sidebar_collapsed);
       useScopeStore.getState().setDefaultScope(scope);
+      useFontFamilyStore.getState().setFont(serverPrefs.font_family === "inter" ? "inter" : "plex");
       syncing.current = false;
       setHydrated(true);
     }
@@ -103,6 +106,11 @@ export function usePreferencesSync() {
       useScopeStore.subscribe((s) => {
         if (syncing.current) return;
         pendingRef.current.default_scope = s.defaultScope;
+        scheduleFlush();
+      }),
+      useFontFamilyStore.subscribe((s) => {
+        if (syncing.current) return;
+        pendingRef.current.font_family = s.font;
         scheduleFlush();
       }),
     ];

@@ -1,6 +1,6 @@
 "use client";
 
-import { Settings, Sun, Moon, Globe, Lock, Plug, CheckCircle, Code, Loader2 } from "lucide-react";
+import { Settings, Sun, Moon, Globe, Lock, Plug, CheckCircle, Code, Loader2, Type } from "lucide-react";
 
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader } from "@/components/ui/Card";
@@ -9,12 +9,18 @@ import { ReasoningSettings } from "@/components/chat/ReasoningSettings";
 import { useThemeStore } from "@/lib/stores/theme-store";
 import { useScopeStore } from "@/lib/stores/scope-store";
 import { useDevModeStore } from "@/lib/stores/dev-mode-store";
+import { useFontFamilyStore } from "@/lib/stores/font-family-store";
 import { useSession } from "@/lib/auth";
 import { usePlugins } from "@/plugins";
 
 const THEME_OPTIONS = [
   { label: "Light", value: "light" as const, icon: Sun },
   { label: "Dark", value: "dark" as const, icon: Moon },
+];
+
+const FONT_OPTIONS = [
+  { label: "IBM Plex", value: "plex" as const, icon: Type },
+  { label: "Inter", value: "inter" as const, icon: Type },
 ];
 
 const SCOPE_OPTIONS = [
@@ -26,6 +32,7 @@ export default function SettingsPage() {
   const { theme, setTheme } = useThemeStore();
   const { defaultScope, setDefaultScope } = useScopeStore();
   const { enabled: devMode, setEnabled: setDevMode } = useDevModeStore();
+  const { font, setFont } = useFontFamilyStore();
   const { workspace } = useSession();
   const { plugins, isLoading: pluginsLoading } = usePlugins();
 
@@ -51,6 +58,26 @@ export default function SettingsPage() {
             }}
           >
             {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
+              <ToggleGroupItem key={value} value={value}>
+                <span className="flex items-center gap-2">
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </span>
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            className="mt-4"
+            value={font}
+            onValueChange={(nv) => {
+              if (nv) setFont(nv as "plex" | "inter");
+            }}
+          >
+            {FONT_OPTIONS.map(({ value, label, icon: Icon }) => (
               <ToggleGroupItem key={value} value={value}>
                 <span className="flex items-center gap-2">
                   <Icon className="h-4 w-4" />

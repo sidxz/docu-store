@@ -38,6 +38,9 @@ importers:
       '@streamdown/math':
         specifier: ^1.0.2
         version: 1.0.2(react@19.2.4)
+      '@structflo/daikon-design-tokens':
+        specifier: ^1.0.0
+        version: 1.0.0
       '@tanstack/react-query':
         specifier: ^5.90.0
         version: 5.90.21(react@19.2.4)
@@ -1408,6 +1411,9 @@ packages:
     resolution: {integrity: sha512-r8Ur9/lBuFnzZAFdEWrLUF2s/gRwRRRwruqltdZibyjbCBnuW7SJbFm26nXqvpJPW/gzpBUMrBVBzd88z05D5g==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
+
+  '@structflo/daikon-design-tokens@1.0.0':
+    resolution: {integrity: sha512-iL9/OsIf3fa3+Ev76m2p0ishtVKfKfB9F0F0MqT/k1xCXFLke2P1JFTtIDKIUPggmI3x0tpjPDkNhdCJIIvA4A==}
 
   '@swc/helpers@0.5.15':
     resolution: {integrity: sha512-JQ5TuMi45Owi4/BIMAJBoSQoOJu12oOk/gADqlcUL9JEdHB8vyjUSsxqeNXnmXHjYKMi2WcYtezGEEhqUI/E2g==}
@@ -4927,6 +4933,8 @@ snapshots:
       remark-math: 6.0.0
     transitivePeerDependencies:
       - supports-color
+
+  '@structflo/daikon-design-tokens@1.0.0': {}
 
   '@swc/helpers@0.5.15':
     dependencies:
