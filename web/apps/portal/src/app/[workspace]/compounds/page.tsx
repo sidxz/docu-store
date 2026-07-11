@@ -1,20 +1,18 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { Atom, Search, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-import { MoleculeStructure, StructureInput } from "@docu-store/ui";
+import { StructureInput } from "@docu-store/ui";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
-import { ScoreBadge } from "@/components/ui/ScoreBadge";
-import { CopySmiles } from "@/components/ui/CopySmiles";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { CompoundSearchResultDTO } from "@docu-store/types";
 import { useSearchCompounds } from "@/hooks/use-search";
+import { CompoundResultCard } from "@/components/compounds/CompoundResultCard";
 
 export default function CompoundsPage() {
   const { workspace } = useParams<{ workspace: string }>();
@@ -81,50 +79,7 @@ export default function CompoundsPage() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {(search.data.results as CompoundSearchResultDTO[]).map((r, i) => (
-              <Card key={`${r.smiles}-${i}`}>
-                <div className="flex justify-center border-b border-border-subtle pb-3 mb-3">
-                  <MoleculeStructure
-                    smiles={r.smiles}
-                    width={200}
-                    height={140}
-                  />
-                </div>
-                <div className="space-y-2 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-text-muted">Similarity</span>
-                    <ScoreBadge score={r.similarity_score} variant="pill" />
-                  </div>
-                  <CopySmiles smiles={r.smiles} maxWidth="max-w-[160px]" />
-                  {r.extracted_id && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-text-muted">ID</span>
-                      <span className="font-mono font-medium text-text-primary">
-                        {r.extracted_id}
-                      </span>
-                    </div>
-                  )}
-                  {r.confidence != null && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-text-muted">Confidence</span>
-                      <ScoreBadge score={r.confidence} variant="pill" />
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between pt-1 border-t border-border-subtle">
-                    <Link
-                      href={`/${workspace}/documents/${r.artifact_id}`}
-                      className="text-accent-text hover:underline"
-                    >
-                      {r.artifact_name ?? "Document"}
-                    </Link>
-                    <Link
-                      href={`/${workspace}/documents/${r.artifact_id}/pages/${r.page_id}`}
-                      className="text-text-muted hover:text-text-secondary"
-                    >
-                      Page {r.page_index}
-                    </Link>
-                  </div>
-                </div>
-              </Card>
+              <CompoundResultCard key={`${r.smiles}-${i}`} r={r} workspace={workspace} />
             ))}
           </div>
         </div>
