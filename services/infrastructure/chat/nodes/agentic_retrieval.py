@@ -22,12 +22,26 @@ from infrastructure.config import settings
 if TYPE_CHECKING:
     from uuid import UUID
 
-    from application.dtos.chat_dtos import SourceCitationDTO
+    from application.dtos.chat_dtos import ContentBlockDTO, SourceCitationDTO
+    from application.dtos.compound_dtos import BioactivityDTO
     from application.ports.prompt_repository import PromptRepositoryPort
     from application.ports.tool_calling_llm import ToolCallingLLMPort
     from infrastructure.chat.tools.retrieval_tools import ToolRegistry
 
 log = structlog.get_logger(__name__)
+
+
+def attach_bioactivities_to_molecule_blocks(
+    blocks: list[ContentBlockDTO],
+    bios_by_name: dict[str, list[BioactivityDTO]],
+) -> list[ContentBlockDTO]:
+    """Attach prefetched bioactivities to molecule blocks by (lowercased) label."""
+    for block in blocks:
+        if block.type == "molecule" and block.label:
+            bios = bios_by_name.get(block.label.strip().lower())
+            if bios:
+                block.bioactivities = bios
+    return blocks
 
 
 class AgenticRetrievalNode:
@@ -165,6 +179,11 @@ class AgenticRetrievalNode:
 
         # ── 1b. Deterministic bioactivity pre-fetch for compound NER ──
         bioactivity_count = 0
+        # ponytail: search_structured_bioactivity returns RetrievalResult (markdown
+        # table text), not structured {assay_type, value, unit, raw_text} records, so
+        # this stays empty until that tool (or a swap to GetCompoundProfileUseCase)
+        # exposes structured data. Wiring below is ready for whenever it does.
+        bios_by_name: dict[str, list[BioactivityDTO]] = {}
         compound_entities = [f for f in plan.ner_entity_filters if f.entity_type == "compound_name"]
         target_entities = [
             f for f in plan.ner_entity_filters if f.entity_type in ("target", "gene_name")
@@ -268,6 +287,10 @@ class AgenticRetrievalNode:
                     {"compound_name": compound.entity_text},
                     workspace_id,
                     allowed_artifact_ids,
+                )
+                attach_bioactivities_to_molecule_blocks(
+                    [evt.block for evt in struct_events if evt.block is not None],
+                    bios_by_name,
                 )
                 for evt in struct_events:
                     yield ("event", evt)

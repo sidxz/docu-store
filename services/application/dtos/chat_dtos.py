@@ -8,6 +8,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from application.dtos.compound_dtos import BioactivityDTO
+
 # --- Agent Events (streaming) ---
 
 
@@ -89,6 +91,7 @@ class ContentBlockDTO(BaseModel):
     sources: list[SourceCitationDTO] | None = None
     page_id: UUID | None = None
     artifact_id: UUID | None = None
+    bioactivities: list[BioactivityDTO] | None = None
 
 
 # --- Thinking Blocks ---
