@@ -19,7 +19,7 @@ quality, with the domain profile set for pharmaceutical/biology:
 
 | Entity Type    | Examples                                     |
 |----------------|----------------------------------------------|
-| `compound`     | SACC-123, Rifampicin, ethionamide            |
+| `compound_name` | SACC-123, Rifampicin, ethionamide           |
 | `target`       | NadD, InhA, KasA                             |
 | `disease`      | tuberculosis, TB, MDR-TB                     |
 | `gene`         | Rv3138, nadD                                 |
@@ -42,7 +42,7 @@ To store entity type alongside the tag, we add one optional field:
 ```python
 class TagMention(ExtractionMetadata):
     tag: str
-    entity_type: str | None = None   # NEW: "compound", "target", "disease", etc.
+    entity_type: str | None = None   # NEW: "compound_name", "target", "disease", etc.
 ```
 
 This is backwards-compatible — existing generic tags (entity_type=None) remain valid.
@@ -170,7 +170,7 @@ class NERExtractor(Protocol):
 @dataclass
 class NEREntity:
     text: str          # extracted entity string (e.g. "SACC-123", "NadD")
-    entity_type: str   # "compound", "target", "disease", etc.
+    entity_type: str   # "compound_name", "target", "disease", etc.
     confidence: float | None = None
 ```
 
