@@ -34,7 +34,7 @@ run-all: stop-all ## Start all services (API, read models, workflow worker, temp
 	@echo "Starting all services..."
 	@bash -c '\
 		trap "kill 0" SIGINT SIGTERM; \
-		uv run uvicorn interfaces.api.main:app --host 0.0.0.0 --port 8000 --reload & \
+		uv run uvicorn interfaces.api.main:app --host 0.0.0.0 --port $(or $(PORT),8000) --reload & \
 		uv run python -m infrastructure.read_worker & \
 		uv run python -m infrastructure.pipeline_worker & \
 		uv run python -m infrastructure.temporal.worker & \

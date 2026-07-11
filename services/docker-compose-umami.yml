@@ -5,7 +5,7 @@ services:
     image: ghcr.io/umami-software/umami:postgresql-latest
     container_name: docu_store-umami
     ports:
-      - "3001:3000"
+      - "3101:3000"  # host 3101 (3001 already in use on host)
     environment:
       DATABASE_URL: postgresql://umami:umami@umami-db:5432/umami
       TRACKER_SCRIPT_NAME: ds-analytics
