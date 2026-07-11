@@ -24,6 +24,9 @@ from application.use_cases.batch_reembed_use_cases import (
 from application.use_cases.compound_use_cases import ExtractCompoundMentionsUseCase
 from application.use_cases.embedding_use_cases import GeneratePageEmbeddingUseCase
 from application.use_cases.parse_artifact_use_case import ParseArtifactUseCase
+from application.use_cases.reconcile_compound_labels_use_case import (
+    ReconcileCompoundLabelsUseCase,
+)
 from application.use_cases.smiles_embedding_use_cases import EmbedCompoundSmilesUseCase
 from application.use_cases.summary_embedding_use_cases import (
     EmbedArtifactSummaryUseCase,
@@ -52,6 +55,9 @@ from infrastructure.temporal.activities.ner_activities import (
     create_aggregate_artifact_tags_activity,
 )
 from infrastructure.temporal.activities.parse_activities import create_parse_artifact_activity
+from infrastructure.temporal.activities.reconcile_compound_labels_activities import (
+    create_reconcile_compound_labels_activity,
+)
 from infrastructure.temporal.activities.smiles_embedding_activities import (
     create_embed_compound_smiles_activity,
 )
@@ -74,6 +80,9 @@ from infrastructure.temporal.workflows.ner_workflow import (
     ArtifactTagAggregationWorkflow,
 )
 from infrastructure.temporal.workflows.parse_workflow import ParseArtifactWorkflow
+from infrastructure.temporal.workflows.reconcile_compound_labels_workflow import (
+    ReconcileCompoundLabelsWorkflow,
+)
 from infrastructure.temporal.workflows.smiles_embedding_workflow import EmbedCompoundSmilesWorkflow
 from infrastructure.temporal.workflows.summary_embedding_workflow import (
     ArtifactSummaryEmbeddingWorkflow,
@@ -121,6 +130,7 @@ async def run() -> None:
     batch_reembed_smiles_use_case = container[BatchReEmbedSmilesUseCase]
     batch_reembed_summaries_use_case = container[BatchReEmbedSummariesUseCase]
     parse_artifact_use_case = container[ParseArtifactUseCase]
+    reconcile_compound_labels_use_case = container[ReconcileCompoundLabelsUseCase]
 
     # Create activities with dependencies injected
     generate_page_embedding_activity = create_generate_page_embedding_activity(
@@ -151,6 +161,9 @@ async def run() -> None:
         use_case=batch_reembed_summaries_use_case,
     )
     parse_artifact_activity = create_parse_artifact_activity(use_case=parse_artifact_use_case)
+    reconcile_compound_labels_activity = create_reconcile_compound_labels_activity(
+        use_case=reconcile_compound_labels_use_case,
+    )
 
     client = await Client.connect(settings.temporal_address)
 
@@ -168,6 +181,7 @@ async def run() -> None:
             BatchReEmbedArtifactPagesWorkflow,
             BatchReEmbedSmilesWorkflow,
             BatchReEmbedSummariesWorkflow,
+            ReconcileCompoundLabelsWorkflow,
         ],
         activities=[
             generate_page_embedding_activity,
@@ -181,6 +195,7 @@ async def run() -> None:
             batch_reembed_smiles_activity,
             batch_reembed_summaries_activity,
             parse_artifact_activity,
+            reconcile_compound_labels_activity,
         ],
         max_concurrent_activities=settings.temporal_max_concurrent_activities,
     )
