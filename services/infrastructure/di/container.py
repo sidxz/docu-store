@@ -32,6 +32,7 @@ from application.ports.vector_store import VectorStore
 from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.ports.workflow_status_cache import WorkflowStatusCache
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
+from application.services.compound_activity_query import CompoundActivityQuery
 from application.use_cases.aggregate_artifact_tags_use_case import AggregateArtifactTagsUseCase
 from application.use_cases.artifact_use_cases import (
     AddPagesUseCase,
@@ -892,9 +893,9 @@ def create_container() -> Container:
         hierarchical_search=c[HierarchicalSearchUseCase],
         summary_search=c[SearchSummariesUseCase],
         page_read_model=c[PageReadModel],
-        tag_dictionary=c[TagDictionaryReadModel],
         artifact_read_model=c[ArtifactReadModel],
         compound_vector_store=c[CompoundVectorStore],
+        compound_activity_query=c[CompoundActivityQuery],
     )
     container[AgenticRetrievalNode] = lambda c: AgenticRetrievalNode(
         tool_llm=tool_calling_llm,
@@ -902,10 +903,14 @@ def create_container() -> Container:
         prompt_repository=c[PromptRepositoryPort],
     )
 
-    container[GetCompoundProfileUseCase] = lambda c: GetCompoundProfileUseCase(
+    container[CompoundActivityQuery] = lambda c: CompoundActivityQuery(
         tag_dictionary=c[TagDictionaryReadModel],
         page_read_model=c[PageReadModel],
         artifact_read_model=c[ArtifactReadModel],
+    )
+
+    container[GetCompoundProfileUseCase] = lambda c: GetCompoundProfileUseCase(
+        activity_query=c[CompoundActivityQuery],
         compound_vector_store=c[CompoundVectorStore],
     )
 

@@ -179,10 +179,9 @@ class AgenticRetrievalNode:
 
         # ── 1b. Deterministic bioactivity pre-fetch for compound NER ──
         bioactivity_count = 0
-        # ponytail: search_structured_bioactivity returns RetrievalResult (markdown
-        # table text), not structured {assay_type, value, unit, raw_text} records, so
-        # this stays empty until that tool (or a swap to GetCompoundProfileUseCase)
-        # exposes structured data. Wiring below is ready for whenever it does.
+        # search_structured_bioactivity rides the structured bioactivities on the
+        # table-carrying RetrievalResult.bioactivities; we collect them here so the
+        # already-wired attach_bioactivities_to_molecule_blocks (step 1d) feeds F3.
         bios_by_name: dict[str, list[BioactivityDTO]] = {}
         compound_entities = [f for f in plan.ner_entity_filters if f.entity_type == "compound_name"]
         target_entities = [
@@ -199,6 +198,13 @@ class AgenticRetrievalNode:
                     workspace_id,
                     allowed_artifact_ids,
                 )
+                # Structured bioactivities ride on the table-carrying result →
+                # populate bios_by_name so molecule blocks (F3) get attached below.
+                structured = next(
+                    (r.bioactivities for r in bio_results if r.bioactivities), None,
+                )
+                if structured:
+                    bios_by_name[compound.entity_text.strip().lower()] = structured
                 new_bio = accumulator.add_results(
                     bio_results,
                     f"bioactivity:{compound.entity_text}",

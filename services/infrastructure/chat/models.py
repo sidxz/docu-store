@@ -11,6 +11,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from application.dtos.compound_dtos import BioactivityDTO
+
 
 class ResolvedCompound(BaseModel):
     """A SMILES string that was resolved against the compound vector store."""
@@ -112,6 +114,9 @@ class RetrievalResult(BaseModel):
     similarity_score: float
     rerank_score: float | None = None
     query_source: str = "primary"  # primary, sub_query_0, sub_query_1, hyde
+    # Structured bioactivities ride on the synthetic table result from
+    # search_structured_bioactivity → feed the chat molecule block (F3).
+    bioactivities: list[BioactivityDTO] | None = None
 
 
 class ContextMetadata(BaseModel):

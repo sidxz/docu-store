@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 from application.dtos.compound_dtos import CompoundProfileDTO
+from application.services.compound_activity_query import CompoundActivityQuery
 from application.use_cases.compound_profile_use_case import GetCompoundProfileUseCase
 
 
@@ -49,10 +50,13 @@ class FakeCompounds:
 
 
 def _make(structures, tag_ids, pages):
-    return GetCompoundProfileUseCase(
+    activity = CompoundActivityQuery(
         tag_dictionary=FakeTagDict(tag_ids),
         page_read_model=FakePages(pages),
         artifact_read_model=FakeArtifacts(),
+    )
+    return GetCompoundProfileUseCase(
+        activity_query=activity,
         compound_vector_store=FakeCompounds(structures),
     )
 

@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from application.ports.compound_vector_store import CompoundVectorStore
     from application.ports.repositories.artifact_read_models import ArtifactReadModel
     from application.ports.repositories.page_read_models import PageReadModel
-    from application.ports.repositories.tag_dictionary_read_model import TagDictionaryReadModel
+    from application.services.compound_activity_query import CompoundActivityQuery
     from application.use_cases.search_use_cases import (
         HierarchicalSearchUseCase,
         SearchSummariesUseCase,
@@ -379,16 +379,21 @@ SEARCH_STRUCTURED_BIOACTIVITY_DEF = ToolDefinition(
 
 
 class SearchStructuredBioactivityTool:
-    """Searches pre-extracted bioactivity data from compound tag mentions."""
+    """Searches pre-extracted bioactivity data from compound tag mentions.
+
+    Delegates the compound page-walk to the shared ``CompoundActivityQuery``
+    (same assembly that feeds ``/compounds/{name}/profile``), then renders the
+    structured bioactivities as the markdown table the LLM already consumes and
+    rides the structured list on ``RetrievalResult.bioactivities`` for the chat
+    molecule block (F3).
+    """
 
     def __init__(
         self,
-        tag_dictionary: TagDictionaryReadModel,
-        page_read_model: PageReadModel,
+        activity_query: CompoundActivityQuery,
         artifact_read_model: ArtifactReadModel | None = None,
     ) -> None:
-        self._tag_dict = tag_dictionary
-        self._pages = page_read_model
+        self._activity = activity_query
         self._artifacts = artifact_read_model
 
     @property
@@ -407,39 +412,14 @@ class SearchStructuredBioactivityTool:
         if not compound:
             return [], "No compound name provided.", []
 
-        # 1. Find artifacts with this compound
-        compound_artifact_ids = await self._tag_dict.get_artifact_ids_for_tag(
+        bios, _synonyms, refs = await self._activity.collect(
             compound,
-            entity_type="compound_name",
-            workspace_id=workspace_id,
+            workspace_id,
+            allowed_artifact_ids,
+            target=target,
         )
-        if not compound_artifact_ids:
-            return [], f"No documents found containing compound '{compound}'.", []
 
-        # 2. If target specified, intersect with target artifacts
-        matched_ids = set(compound_artifact_ids)
-        if target:
-            target_ids = await self._tag_dict.get_artifact_ids_for_tag(
-                target,
-                entity_type="target",
-                workspace_id=workspace_id,
-            )
-            if not target_ids:
-                # Fallback: try gene_name
-                target_ids = await self._tag_dict.get_artifact_ids_for_tag(
-                    target,
-                    entity_type="gene_name",
-                    workspace_id=workspace_id,
-                )
-            if target_ids:
-                matched_ids &= set(target_ids)
-
-        # 3. Access control
-        if allowed_artifact_ids:
-            allowed_set = {str(aid) for aid in allowed_artifact_ids}
-            matched_ids &= allowed_set
-
-        if not matched_ids:
+        if not refs:
             return (
                 [],
                 f"No accessible documents with compound '{compound}'"
@@ -448,14 +428,30 @@ class SearchStructuredBioactivityTool:
                 [],
             )
 
-        # 4. Look up artifact metadata (title, authors, date)
-        matched_uuids = [UUID(aid) for aid in matched_ids]
-        artifact_meta: dict[str, tuple[str | None, list[str], str | None]] = {}
-        if self._artifacts:
-            for aid_uuid in matched_uuids:
+        # Markdown table — same shape the LLM already consumes. The Target cell
+        # stays blank exactly as before (the reducer never writes a per-bio
+        # target, so the old bio_target was always "").
+        bio_target = ""
+        table_rows = [
+            f"| {compound} | {bio_target} | {b.assay_type} | {b.value} {b.unit or ''} |"
+            for b in bios
+        ]
+        if table_rows:
+            header = "| Compound | Target | Assay | Value |"
+            separator = "|----------|--------|-------|-------|"
+            table_text = "\n".join([header, separator, *table_rows[:30]])
+        else:
+            table_text = f"No structured bioactivity data found for {compound}."
+
+        n_docs = len({r.artifact_id for r in refs})
+        results: list[RetrievalResult] = []
+        if table_rows:
+            anchor = refs[0]
+            title, authors, pdate = anchor.artifact_title, [], None
+            if self._artifacts:
                 try:
                     art = await self._artifacts.get_artifact_by_id(
-                        aid_uuid,
+                        anchor.artifact_id,
                         workspace_id=workspace_id,
                     )
                     if art:
@@ -470,104 +466,31 @@ class SearchStructuredBioactivityTool:
                             if art.presentation_date
                             else None
                         )
-                        artifact_meta[str(aid_uuid)] = (title, authors, pdate)
                 except Exception:
                     log.warning(
                         "tool.bioactivity.artifact_lookup_failed",
-                        artifact_id=str(aid_uuid),
+                        artifact_id=str(anchor.artifact_id),
                         exc_info=True,
                     )
 
-        def _get_meta(aid: UUID) -> tuple[str | None, list[str], str | None]:
-            return artifact_meta.get(str(aid), (None, [], None))
-
-        # 5. Get pages from matched artifacts
-        pages = await self._pages.get_pages_by_artifact_ids(
-            matched_uuids,
-            workspace_id=workspace_id,
-        )
-
-        # 6. Extract bioactivity data from compound tag_mentions
-        retrieval_results: list[RetrievalResult] = []
-        table_rows: list[str] = []
-        co_targets: set[str] = set()
-
-        for page in pages:
-            page_matched = False
-            for tm in page.tag_mentions:
-                if tm.entity_type == "compound_name" and tm.tag.lower() == compound.lower():
-                    page_matched = True
-                    bioactivities = (tm.additional_model_params or {}).get("bioactivities", [])
-                    for bio in bioactivities:
-                        assay_type = bio.get("assay_type", "")
-                        value = bio.get("value", "")
-                        unit = bio.get("unit", "")
-                        bio_target = bio.get("target", "")
-
-                        if target and bio_target and target.lower() not in bio_target.lower():
-                            continue
-
-                        row = f"| {compound} | {bio_target} | {assay_type} | {value} {unit} |"
-                        table_rows.append(row)
-
-                # Collect co-occurring targets for context
-                if not target and tm.entity_type in ("target", "gene_name"):
-                    co_targets.add(tm.tag)
-
-            # Only include page summary for pages that matched the compound
-            if page_matched and page.summary_candidate and page.summary_candidate.summary:
-                art_title, art_authors, art_date = _get_meta(page.artifact_id)
-                retrieval_results.append(
-                    RetrievalResult(
-                        source_type="chunk",
-                        artifact_id=page.artifact_id,
-                        artifact_title=art_title,
-                        authors=art_authors,
-                        presentation_date=art_date,
-                        page_id=page.page_id,
-                        page_index=page.index,
-                        page_name=page.name,
-                        expanded_text=page.summary_candidate.summary[:1500],
-                        matched_text=page.summary_candidate.summary[:500],
-                        similarity_score=0.8,
-                        query_source=f"tool_bioactivity:{compound}",
-                    ),
-                )
-
-        # 7. Format as structured text
-        if table_rows:
-            header = "| Compound | Target | Assay | Value |"
-            separator = "|----------|--------|-------|-------|"
-            table_text = "\n".join([header, separator, *table_rows[:30]])
-        else:
-            table_text = f"No structured bioactivity data found for {compound}."
-
-        if co_targets and not target:
-            table_text += f"\n\nCo-occurring targets: {', '.join(sorted(co_targets)[:10])}"
-
-        # Add a synthetic result with the table for the LLM
-        if table_rows:
-            first_aid = UUID(next(iter(matched_ids)))
-            art_title, art_authors, art_date = _get_meta(first_aid)
-
-            retrieval_results.insert(
-                0,
+            results.append(
                 RetrievalResult(
                     source_type="chunk",
-                    artifact_id=first_aid,
-                    artifact_title=art_title,
-                    authors=art_authors,
-                    presentation_date=art_date,
+                    artifact_id=anchor.artifact_id,
+                    artifact_title=title,
+                    authors=authors,
+                    presentation_date=pdate,
                     page_name="Bioactivity Data",
                     expanded_text=table_text,
                     matched_text=table_text[:500],
                     similarity_score=0.9,
                     query_source=f"tool_bioactivity:{compound}",
+                    bioactivities=bios,
                 ),
             )
 
-        summary = f"Bioactivity search for '{compound}': {len(table_rows)} data points from {len(matched_ids)} documents."
-        return retrieval_results, summary, []
+        summary = f"Bioactivity search for '{compound}': {len(table_rows)} data points from {n_docs} documents."
+        return results, summary, []
 
 
 SEARCH_COMPOUND_STRUCTURE_DEF = ToolDefinition(
@@ -753,9 +676,9 @@ class ToolRegistry:
         hierarchical_search: HierarchicalSearchUseCase,
         summary_search: SearchSummariesUseCase,
         page_read_model: PageReadModel,
-        tag_dictionary: TagDictionaryReadModel | None = None,
         artifact_read_model: ArtifactReadModel | None = None,
         compound_vector_store: CompoundVectorStore | None = None,
+        compound_activity_query: CompoundActivityQuery | None = None,
     ) -> None:
         self._tools: dict[
             str,
@@ -769,10 +692,9 @@ class ToolRegistry:
             "search_summaries": SearchSummariesTool(summary_search),
             "get_page_content": GetPageContentTool(page_read_model),
         }
-        if tag_dictionary is not None:
+        if compound_activity_query is not None:
             self._tools["search_structured_bioactivity"] = SearchStructuredBioactivityTool(
-                tag_dictionary=tag_dictionary,
-                page_read_model=page_read_model,
+                activity_query=compound_activity_query,
                 artifact_read_model=artifact_read_model,
             )
         if compound_vector_store is not None:
