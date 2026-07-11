@@ -133,6 +133,31 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
                 error=str(e),
             )
 
+    async def start_reconcile_compound_labels_workflow(
+        self,
+        page_id: UUID,
+    ) -> None:
+        """Start the compound-label reconciliation workflow for a page."""
+        await self._ensure_client()
+
+        workflow_id = f"reconcile-compound-labels-{page_id}"
+
+        try:
+            await self._client.start_workflow(
+                "ReconcileCompoundLabelsWorkflow",
+                str(page_id),
+                id=workflow_id,
+                task_queue="artifact_processing",
+                id_reuse_policy=WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+            )
+            logger.info("reconcile_compound_labels_workflow_started", page_id=str(page_id))
+        except Exception as e:
+            logger.exception(
+                "failed_to_start_reconcile_compound_labels_workflow",
+                page_id=str(page_id),
+                error=str(e),
+            )
+
     async def start_page_summarization_workflow(
         self,
         page_id: UUID,

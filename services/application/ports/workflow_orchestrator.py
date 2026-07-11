@@ -71,6 +71,22 @@ class WorkflowOrchestrator(Protocol):
         ...
 
     @abstractmethod
+    async def start_reconcile_compound_labels_workflow(
+        self,
+        page_id: UUID,
+    ) -> None:
+        """Start the compound-label reconciliation workflow for a page.
+
+        Reconciles CSER extracted_ids against the page's NER compound_name tags.
+        Uses ALLOW_DUPLICATE so it re-runs when triggered by either ingestion branch.
+
+        Args:
+            page_id: Unique identifier of the page to reconcile.
+
+        """
+        ...
+
+    @abstractmethod
     async def start_page_summarization_workflow(
         self,
         page_id: UUID,
