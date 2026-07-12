@@ -34,7 +34,9 @@ Document intelligence for drug discovery. Event-sourced, AI-enriched, built to k
 
 **Backend** (`services/`): Python, FastAPI, event sourcing (EventStoreDB), CQRS (MongoDB), Temporal workflows, Qdrant vector search, Kafka event streaming.
 
-**Frontend** (`web/`): Next.js 16, PrimeReact, TanStack Query, pnpm monorepo.
+**Frontend** (`web/`): Next.js 16, shadcn/ui + AI Elements, Tailwind v4, TanStack Query, pnpm monorepo.
+
+**CLI** (`cli/`): [`@docu-store/cli`](https://www.npmjs.com/package/@docu-store/cli) — upload, search, and chat with documents from the terminal.
 
 **6 backend processes** from a single image:
 
@@ -96,11 +98,13 @@ cd services && make docker-build-web  # frontend
 
 ### Publish (via GitHub Actions)
 
-Tag pushes trigger image builds:
+Use the release helper — it bumps the version file, commits, tags, and pushes (CI rejects tags that don't match the version file):
 
 ```bash
-git tag services-v0.2.0 && git push origin services-v0.2.0  # backend
-git tag web-v0.2.0 && git push origin web-v0.2.0            # frontend
+./scripts/release.sh                    # interactive
+./scripts/release.sh services patch     # backend
+./scripts/release.sh web minor          # frontend
+./scripts/release.sh cli patch          # CLI (publishes to npm)
 ```
 
 ## Deployment
@@ -190,6 +194,8 @@ APP_GITHUB_CLIENT_ID=Iv1_...         # OAuth app from GitHub Settings
 
 The backend `SENTINEL_URL` and frontend `APP_SENTINEL_URL` usually point to the same Sentinel instance. The difference: backend reads it as a server-side env var, frontend reads it at runtime via `/api/config`.
 
+> **Note**: Uploading documents requires the `artifacts:create` action, and Sentinel grants no actions by default — grant it to a role in the Sentinel admin panel after deploying. Workspace admins/owners bypass this check.
+
 #### Frontend ↔ Backend connection
 
 The frontend needs to know where the API lives. Set `APP_API_URL` to the backend's public URL:
@@ -208,7 +214,7 @@ In Docker Compose, both the `api` and `web` services read from the same `.env.pr
 #### LLM Provider
 
 ```env
-LLM_PROVIDER=ollama                        # ollama | openai | gemini
+LLM_PROVIDER=ollama                        # ollama | openai | anthropic | gemini
 LLM_MODEL_NAME=gemma3:27b
 LLM_BASE_URL=http://ollama:11434           # Ollama service URL (internal Docker DNS)
 # LLM_API_KEY=sk-...                       # Required for openai/gemini, not for ollama
@@ -256,6 +262,7 @@ See `.env.prod.example` for every available variable with documentation and gene
 | `tests.yml` | Push/PR to `main` | Lint (ruff), tests (pytest), Trivy container scan |
 | `publish-services.yml` | `services-v*` tag | Build + push backend to GHCR |
 | `publish-web.yml` | `web-v*` tag | Build + push frontend to GHCR |
+| `publish-cli.yml` | `cli-v*` tag | Publish `@docu-store/cli` to npm |
 
 All workflows use GitHub Actions Docker layer caching for fast rebuilds.
 
@@ -275,6 +282,8 @@ docu-store/
 │   ├── apps/portal/             #   Main web application
 │   ├── packages/                #   Shared: api-client, types, ui, tsconfig
 │   └── Dockerfile               #   Frontend image
+├── cli/                         # @docu-store/cli (npm) — terminal client
+├── scripts/release.sh           # Version bump + tag + push helper
 ├── docker-compose.infra.yml     # Production infrastructure
 ├── docker-compose.prod.yml      # Production application
 └── .env.prod.example            # Production config template
