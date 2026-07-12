@@ -133,7 +133,10 @@ async def run(worker_name: str = "pipeline_worker") -> None:
 
     logger.info("pipeline_worker_started", worker_name=worker_name, topics=topics)
 
-    # Heartbeat reporter — no ML models, just reports system/GPU info
+    # Heartbeat reporter — no ML models, just reports system/GPU info.
+    # Daemon-thread mode (not an asyncio task): the subscription below is a
+    # SYNC blocking iterator, so on an idle stream an event-loop heartbeat
+    # never gets scheduled → liveness file goes stale → Swarm kills the task.
     from infrastructure.health.heartbeat_reporter import HeartbeatReporter
 
     reporter = HeartbeatReporter(
@@ -143,7 +146,7 @@ async def run(worker_name: str = "pipeline_worker") -> None:
         worker_name="Pipeline Worker",
         interval_seconds=settings.worker_heartbeat_interval_seconds,
     )
-    heartbeat_task = asyncio.create_task(reporter.run_forever())
+    reporter.start_sync_background()
 
     pipeline_tracking = PipelineWorkerTracking(worker_name=worker_name)
 
@@ -418,7 +421,7 @@ async def run(worker_name: str = "pipeline_worker") -> None:
         logger.exception("pipeline_worker_error")
         raise
     finally:
-        heartbeat_task.cancel()
+        reporter.stop()
         logger.info("pipeline_worker_stopped")
 
 
