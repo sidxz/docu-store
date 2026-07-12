@@ -15,11 +15,17 @@ class FakeAuth:
         role: str = "editor",
         user_id: UUID | None = None,
         workspace_id: UUID | None = None,
+        actions: set[str] | None = None,
     ) -> None:
         self.user_id = user_id or uuid4()
         self.workspace_id = workspace_id or uuid4()
         self.workspace_role = role
         self.is_admin = role in ("admin", "owner")
+        self._actions = actions
+
+    async def check_action(self, action: str) -> bool:
+        """Allow all actions by default; pass `actions` to restrict."""
+        return self._actions is None or action in self._actions
 
     def has_role(self, minimum_role: str) -> bool:
         return _ROLE_HIERARCHY.get(self.workspace_role, -1) >= _ROLE_HIERARCHY.get(

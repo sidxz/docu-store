@@ -81,6 +81,22 @@ async def require_workspace_artifact(
     return artifact
 
 
+async def require_action(auth: RequestAuth, action: str) -> None:
+    """Check workspace RBAC action, raise 403 if the user's roles don't grant it.
+
+    Workspace admins/owners bypass, mirroring entity-level resolution (see
+    Sentinel check_permission); without this, a fresh workspace has no role
+    granting any action and every member would be locked out.
+    """
+    if auth.is_admin:
+        return
+    if not await auth.check_action(action):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"You do not have permission to perform this action ({action})",
+        )
+
+
 async def require_artifact_permission(
     artifact_id: UUID,
     auth: RequestAuth,

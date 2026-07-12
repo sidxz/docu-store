@@ -7,6 +7,7 @@ from qdrant_client import AsyncQdrantClient, models
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from application.ports.compound_vector_store import CompoundSearchResult, CompoundVectorStore
+from domain.services.compound_label_matcher import CONFUSABLE_GROUPS
 from domain.value_objects.text_embedding import TextEmbedding
 
 logger = structlog.get_logger()
@@ -61,10 +62,9 @@ def _compound_name_variants(name: str) -> list[str]:
 
 
 # Glyph groups that OCR / CSER transcribe interchangeably in a compound id:
-# "CMX410" gets extracted as "CMX41O" (letter-O for zero). Members are visually
-# identical — deliberately NOT 0/1 or 2/Z, which would collide *distinct*
-# compounds in an analog series (CMX410 vs CMX411). Extend as fallback logs warrant.
-_CONFUSABLE_GROUPS = ("0Oo", "1IlL", "5S", "8B")
+# "CMX410" gets extracted as "CMX41O" (letter-O for zero). Canonical set lives in
+# the domain matcher and is imported so this fallback and the label reconciler
+# never bridge a different set of glyphs.
 _MAX_CONFUSABLE_POS = 4  # cap the per-base-form combinatorial expansion
 
 
@@ -76,7 +76,7 @@ def _confusable_variants(name: str) -> list[str]:
     still resolves. Bounded to ``_MAX_CONFUSABLE_POS`` swappable positions per base
     form to avoid a 2**n blow-up on long ids.
     """
-    group_of = {ch: grp for grp in _CONFUSABLE_GROUPS for ch in grp}
+    group_of = {ch: grp for grp in CONFUSABLE_GROUPS for ch in grp}
     seen: set[str] = set()
     out: list[str] = []
     for base in _compound_name_variants(name):

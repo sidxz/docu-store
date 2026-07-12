@@ -122,3 +122,16 @@ def test_collect_acl_filters_out_non_allowed_artifacts():
     )
     bios, _, refs = asyncio.run(q.collect("CMX410", uuid4(), [uuid4()]))  # allowed excludes aid
     assert bios == [] and refs == []
+
+
+def test_collect_empty_allowed_list_fails_closed():
+    # allowed_artifact_ids == [] means "no accessible artifacts", NOT "no filter".
+    # Regression guard: a truthy check ([] is falsy) would leak the whole workspace.
+    aid = uuid4()
+    q = _make(
+        {"compound_name": [str(aid)]},
+        pages=[_page(uuid4(), 1, aid, [_tm("compound_name", "CMX410",
+                                           bioactivities=[{"assay_type": "x", "value": "1"}])])],
+    )
+    bios, _, refs = asyncio.run(q.collect("CMX410", uuid4(), []))
+    assert bios == [] and refs == []

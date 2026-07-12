@@ -75,7 +75,9 @@ class CompoundActivityQuery:
             if target_ids:
                 matched &= set(target_ids)
 
-        if allowed_artifact_ids:
+        # Fail closed: an empty allowed list means "no accessible artifacts", not
+        # "no filter" — match the `is not None` gate every vector/read store uses.
+        if allowed_artifact_ids is not None:
             matched &= {str(a) for a in allowed_artifact_ids}
         if not matched:
             return [], [], []

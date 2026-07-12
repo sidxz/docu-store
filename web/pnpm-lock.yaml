@@ -27,14 +27,14 @@ importers:
         specifier: ^1.2.3
         version: 1.2.3(@types/react@19.2.14)(react@19.2.4)
       '@sentinel-auth/js':
-        specifier: ^0.13.1
-        version: 0.13.1
+        specifier: ^0.15.0
+        version: 0.15.0
       '@sentinel-auth/nextjs':
-        specifier: ^0.13.1
-        version: 0.13.1(@sentinel-auth/js@0.13.1)(@sentinel-auth/react@0.13.1(@sentinel-auth/js@0.13.1)(react@19.2.4))(next@16.1.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)
+        specifier: ^0.15.0
+        version: 0.15.0(@sentinel-auth/js@0.15.0)(@sentinel-auth/react@0.15.0(@sentinel-auth/js@0.15.0)(react@19.2.4))(next@16.1.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)
       '@sentinel-auth/react':
-        specifier: ^0.13.1
-        version: 0.13.1(@sentinel-auth/js@0.13.1)(react@19.2.4)
+        specifier: ^0.15.0
+        version: 0.15.0(@sentinel-auth/js@0.15.0)(react@19.2.4)
       '@streamdown/math':
         specifier: ^1.0.2
         version: 1.0.2(react@19.2.4)
@@ -1384,21 +1384,21 @@ packages:
       react-redux:
         optional: true
 
-  '@sentinel-auth/js@0.13.1':
-    resolution: {integrity: sha512-VJuplaMLocx3sMcR6ur2xLwVusl9Y/UWeJcPblGLnZ3raeUOc5TgAADW+eIzdf8WqI8O2zPwt2Ohx+KVHESETA==}
+  '@sentinel-auth/js@0.15.0':
+    resolution: {integrity: sha512-5n5/2Ttm9YOutXPksniw/YWT80Uj5UjPgZobHtp2bY2MOWF0Ubxzj7FV3w6HtzHsBf2dmiPl+gsx9PWdB7EBvA==}
 
-  '@sentinel-auth/nextjs@0.13.1':
-    resolution: {integrity: sha512-FWpD30VJHwCUf1D922rfg1dxPgXatQqdmWl2RjIOy6z3KqtkripYrKM+vrMbno1Lpqpg2s+mbSgQwid+HWgxlw==}
+  '@sentinel-auth/nextjs@0.15.0':
+    resolution: {integrity: sha512-e+eY2CkpAM4ZXyx4kAcu9V8L7Tfl6kEHXww+oHkH/8P7YFVIRh3/clonopuCgxkE/vwlkuf4UDd9Pm3fxN/3tA==}
     peerDependencies:
-      '@sentinel-auth/js': ^0.13.1
-      '@sentinel-auth/react': ^0.13.1
+      '@sentinel-auth/js': ^0.15.0
+      '@sentinel-auth/react': ^0.15.0
       next: ^14.0.0 || ^15.0.0 || ^16.0.0
       react: ^18.0.0 || ^19.0.0
 
-  '@sentinel-auth/react@0.13.1':
-    resolution: {integrity: sha512-tqQfO+4ZlvhIP8Dffs4OFPnclBRjyGEVFFL6IXGbi0iQoHJDsrSPy6q68QHHvqq/RP9ghjyt8aiflHUBo1QFLA==}
+  '@sentinel-auth/react@0.15.0':
+    resolution: {integrity: sha512-JZX9aqWA7arx6IBEW4uhLLXIgxkalWMHD9XlHytWMJCiWKQuhL4fIiYXKa03oJ28Aj8vLaHVG83DBybdqhVXnQ==}
     peerDependencies:
-      '@sentinel-auth/js': ^0.13.1
+      '@sentinel-auth/js': ^0.15.0
       react: ^18.0.0 || ^19.0.0
 
   '@standard-schema/spec@1.1.0':
@@ -4905,20 +4905,20 @@ snapshots:
       react: 19.2.4
       react-redux: 9.2.0(@types/react@19.2.14)(react@19.2.4)(redux@5.0.1)
 
-  '@sentinel-auth/js@0.13.1':
+  '@sentinel-auth/js@0.15.0':
     dependencies:
       jose: 5.10.0
 
-  '@sentinel-auth/nextjs@0.13.1(@sentinel-auth/js@0.13.1)(@sentinel-auth/react@0.13.1(@sentinel-auth/js@0.13.1)(react@19.2.4))(next@16.1.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)':
+  '@sentinel-auth/nextjs@0.15.0(@sentinel-auth/js@0.15.0)(@sentinel-auth/react@0.15.0(@sentinel-auth/js@0.15.0)(react@19.2.4))(next@16.1.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)':
     dependencies:
-      '@sentinel-auth/js': 0.13.1
-      '@sentinel-auth/react': 0.13.1(@sentinel-auth/js@0.13.1)(react@19.2.4)
+      '@sentinel-auth/js': 0.15.0
+      '@sentinel-auth/react': 0.15.0(@sentinel-auth/js@0.15.0)(react@19.2.4)
       next: 16.1.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       react: 19.2.4
 
-  '@sentinel-auth/react@0.13.1(@sentinel-auth/js@0.13.1)(react@19.2.4)':
+  '@sentinel-auth/react@0.15.0(@sentinel-auth/js@0.15.0)(react@19.2.4)':
     dependencies:
-      '@sentinel-auth/js': 0.13.1
+      '@sentinel-auth/js': 0.15.0
       react: 19.2.4
 
   '@standard-schema/spec@1.1.0': {}

@@ -18,6 +18,7 @@ from application.ports.blob_store import BlobStore
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.user_preferences_store import UserPreferencesStore
+from application.sagas.artifact_upload_saga import ArtifactUploadSaga
 from application.use_cases.artifact_use_cases import (
     CreateArtifactUseCase,
     UpdateTitleMentionUseCase,
@@ -120,10 +121,12 @@ def _strip_authz_middleware() -> None:
 @pytest.fixture
 def make_client() -> Callable[[dict[type, object]], TestClient]:
     _strip_authz_middleware()
-    fake_auth = FakeAuth(role="editor")
 
-    def _make_client(overrides: dict[type, object]) -> TestClient:
+    def _make_client(
+        overrides: dict[type, object], auth: FakeAuth | None = None,
+    ) -> TestClient:
         container = FakeContainer(overrides)
+        fake_auth = auth or FakeAuth(role="editor")
         app.dependency_overrides[get_container] = lambda: container
         app.dependency_overrides[get_auth] = lambda: fake_auth
         return TestClient(app)
@@ -160,6 +163,56 @@ class TestArtifactRoutes:
         data = response.json()
         assert data["artifact_id"] == str(artifact_id)
         assert data["source_filename"] == "paper.pdf"
+
+    def test_upload_denied_without_create_action(self, make_client) -> None:
+        client = make_client({}, auth=FakeAuth(role="viewer", actions=set()))
+
+        response = client.post(
+            "/artifacts/upload",
+            files={"file": ("paper.pdf", b"%PDF", "application/pdf")},
+            data={"artifact_type": "RESEARCH_ARTICLE"},
+        )
+
+        assert response.status_code == 403
+
+    def test_create_denied_without_create_action(self, make_client) -> None:
+        client = make_client({}, auth=FakeAuth(role="editor", actions=set()))
+
+        request = CreateArtifactRequest(
+            source_uri="https://example.com/paper.pdf",
+            source_filename="paper.pdf",
+            artifact_type=ArtifactType.RESEARCH_ARTICLE,
+            mime_type=MimeType.PDF,
+            storage_location="/storage/paper.pdf",
+        )
+        response = client.post("/artifacts/", json=request.model_dump())
+
+        assert response.status_code == 403
+
+    def test_upload_admin_bypasses_action_check(self, make_client) -> None:
+        artifact_id = uuid4()
+        response_dto = ArtifactResponse(
+            artifact_id=artifact_id,
+            source_uri="https://example.com/paper.pdf",
+            source_filename="paper.pdf",
+            artifact_type=ArtifactType.RESEARCH_ARTICLE,
+            mime_type=MimeType.PDF,
+            storage_location="/storage/paper.pdf",
+        )
+        saga = FakeUseCase(Success(response_dto))
+        client = make_client(
+            {ArtifactUploadSaga: saga},
+            auth=FakeAuth(role="admin", actions=set()),
+        )
+
+        response = client.post(
+            "/artifacts/upload",
+            files={"file": ("paper.pdf", b"%PDF", "application/pdf")},
+            data={"artifact_type": "RESEARCH_ARTICLE"},
+        )
+
+        assert response.status_code == 201
+        assert response.json()["artifact_id"] == str(artifact_id)
 
     def test_get_artifact_not_found(self, make_client) -> None:
         read_model = FakeArtifactReadModel({})

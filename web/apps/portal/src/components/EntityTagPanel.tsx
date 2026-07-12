@@ -174,7 +174,7 @@ function CompoundCard({
         </div>
         <SourceBadges sources={sources} workspace={workspace} artifactId={artifactId} />
       </div>
-      {structureSmiles && (
+      {expanded && structureSmiles && (
         <div className="mt-2 flex justify-center border-t border-emerald-500/10 pt-2" title="Structure on file">
           <MoleculeStructure smiles={structureSmiles} width={160} height={110} />
         </div>

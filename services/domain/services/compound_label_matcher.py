@@ -7,9 +7,9 @@ are treated as the same compound iff they share a *glyph skeleton* — each
 confusable glyph folded to one canonical digit. The skeleton never merges two
 distinct digits, so analog-series neighbours (CMX410 vs CMX411) stay distinct.
 
-Same confusable groups as the #1 lookup fallback
-(infrastructure/vector_stores/compound_qdrant_store.py). Kept independent for
-now; a later cleanup may point #1 at this domain service.
+``CONFUSABLE_GROUPS`` is the single source of truth for which glyphs bridge; the
+#1 lookup fallback (infrastructure/vector_stores/compound_qdrant_store.py) imports
+it from here so the two matching paths can never drift.
 """
 
 from __future__ import annotations
@@ -21,8 +21,11 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
 # Visually-confusable glyph groups; group[0] is the canonical fold target.
-_CONFUSABLE_GROUPS = ("0Oo", "1IlL", "5S", "8B")
-_FOLD = {ch: grp[0] for grp in _CONFUSABLE_GROUPS for ch in grp}
+# Public: the infra compound-lookup fallback imports this to stay in lockstep.
+# Deliberately NOT 0/1 or 2/Z — those would collide *distinct* analog-series
+# compounds (CMX410 vs CMX411). Extend as fallback logs warrant.
+CONFUSABLE_GROUPS = ("0Oo", "1IlL", "5S", "8B")
+_FOLD = {ch: grp[0] for grp in CONFUSABLE_GROUPS for ch in grp}
 
 
 def glyph_skeleton(label: str) -> str:
