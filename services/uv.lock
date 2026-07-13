@@ -1056,7 +1056,7 @@ requires-dist = [
     { name = "sentence-transformers", specifier = ">=3.3.0" },
     { name = "sentinel-auth-sdk", specifier = ">=0.15.0" },
     { name = "structflo-cser", specifier = ">=0.4.1" },
-    { name = "structflo-ner", specifier = ">=0.3.0" },
+    { name = "structflo-ner", specifier = ">=0.4.0" },
     { name = "structlog", specifier = ">=25.5.0" },
     { name = "temporalio", specifier = ">=1.3.0" },
     { name = "torch", specifier = ">=2.5.0" },
@@ -5546,16 +5546,16 @@ wheels = [
 
 [[package]]
 name = "structflo-ner"
-version = "0.3.0"
+version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "langextract" },
     { name = "pyyaml" },
     { name = "rapidfuzz" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d6/ef/3c57f4d6367382c16c928ef70e2addfa9f9ae5b6e86a14c8e23fd7c798dd/structflo_ner-0.3.0.tar.gz", hash = "sha256:a2c71ffe0b8c0ed2ab8cbce29f53caf4bb16d2f82fb43cd670c3a59c26040871", size = 2693788, upload-time = "2026-03-02T16:25:14.927Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/05/95/d06eb2a47a8b959345c51c5c21269c22ed80130cdcd26b75d70a2bcf8787/structflo_ner-0.4.0.tar.gz", hash = "sha256:245a21020a0ad6797f4789487339778d3cde68e48460dbdb3d8fa085c73e0802", size = 2694486, upload-time = "2026-07-13T21:22:56.202Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bb/bc/7aa821b4d5587bea6980b544740e7771a2422dfe64b3f6da1ceb6a28e915/structflo_ner-0.3.0-py3-none-any.whl", hash = "sha256:0c3efdafc394f1635aeb2fd6b75ea1929cd92fd9de7a304a64f616bbcebb2f5a", size = 257477, upload-time = "2026-03-02T16:25:13.152Z" },
+    { url = "https://files.pythonhosted.org/packages/87/f0/5a60bb32abd4c5e9266e12bb01aa7e52e4f04584d984c96ea15306d0c510/structflo_ner-0.4.0-py3-none-any.whl", hash = "sha256:ddcda49558aa01f29c45c25dd3416282ec2fff31d13c1805aa705cdb0565e1d3", size = 257932, upload-time = "2026-07-13T21:22:54.214Z" },
 ]
 
 [[package]]

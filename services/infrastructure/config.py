@@ -210,6 +210,31 @@ class Settings(BaseSettings):
         validation_alias="NER_MAX_CHAR_BUFFER",
         description="Max chars per LLM chunk in NER extraction. Higher = fewer LLM calls but more tokens per call.",
     )
+    # NER LLM (separate from batch LLM — langextract supports ollama/openai/gemini
+    # only, NOT anthropic/azure. Each field falls back to the matching llm_* field.
+    # If the resolved provider is one langextract can't route, NER degrades to
+    # dictionary-only extraction.)
+    ner_llm_provider: Literal["ollama", "openai", "gemini"] | None = Field(
+        default=None,
+        validation_alias="NER_LLM_PROVIDER",
+        description="Provider for LLM NER. Falls back to llm_provider. langextract "
+        "supports ollama/openai/gemini only; anthropic/azure → dictionary-only NER.",
+    )
+    ner_llm_model_name: str | None = Field(
+        default=None,
+        validation_alias="NER_LLM_MODEL_NAME",
+        description="Model for LLM NER. Falls back to llm_model_name.",
+    )
+    ner_llm_base_url: str | None = Field(
+        default=None,
+        validation_alias="NER_LLM_BASE_URL",
+        description="Base URL for Ollama NER. Falls back to llm_base_url. Ignored for cloud providers.",
+    )
+    ner_llm_api_key: str | None = Field(
+        default=None,
+        validation_alias="NER_LLM_API_KEY",
+        description="API key for cloud NER provider. Falls back to the provider's key / llm_api_key.",
+    )
 
     # GLiNER2 (structured extraction for document metadata)
     gliner2_model_name: str = Field(

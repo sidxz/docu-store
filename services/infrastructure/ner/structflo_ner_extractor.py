@@ -26,32 +26,59 @@ FAST_TARGET_TYPES: frozenset[str] = frozenset(
     {"accession_number", "gene_name", "screening_method", "target"},
 )
 
+# Providers langextract can route for NER. Anything else (anthropic, azure)
+# → dictionary-only NER, since langextract has no provider for them.
+LANGEXTRACT_PROVIDERS: frozenset[str] = frozenset({"ollama", "openai", "gemini"})
+
 
 class StructfloNERExtractor(NERExtractorPort):
     """Runs fast + LLM NER and merges results.
 
     Args:
-        model_id:  Ollama model name (e.g. "gemma3:27b")
-        model_url: Ollama base URL (e.g. "http://localhost:11434")
+        model_id:  Model name (e.g. "gemma3:27b", "gpt-4o")
+        provider:  langextract provider ("ollama"/"openai"/"gemini"). Providers
+            outside that set degrade to dictionary-only NER.
+        api_key:   API key for cloud providers (None for Ollama).
+        model_url: Ollama base URL; ignored for cloud providers.
 
     """
 
-    def __init__(self, model_id: str, model_url: str, max_char_buffer: int = 5000) -> None:
-        from structflo.ner import TB, NERExtractor
+    def __init__(
+        self,
+        model_id: str,
+        provider: str = "ollama",
+        api_key: str | None = None,
+        model_url: str | None = None,
+        max_char_buffer: int = 5000,
+    ) -> None:
+        from structflo.ner import TB
         from structflo.ner.fast import FastNERExtractor
 
-        self._llm_extractor = NERExtractor(
-            model_id=model_id,
-            model_url=model_url,
-            profile=TB,
-            langextract_kwargs={"max_char_buffer": max_char_buffer},
-        )
         self._fast_extractor = FastNERExtractor(fuzzy_threshold=0)
         self._tb_profile = TB
+
+        if provider in LANGEXTRACT_PROVIDERS:
+            from structflo.ner import NERExtractor
+
+            self._llm_extractor = NERExtractor(
+                model_id=model_id,
+                provider=provider,
+                api_key=api_key,
+                model_url=model_url if provider == "ollama" else None,
+                profile=TB,
+                langextract_kwargs={"max_char_buffer": max_char_buffer},
+            )
+        else:
+            # langextract can't route this provider — run dictionary-only NER
+            # rather than crashing on the first extract() call.
+            self._llm_extractor = None
+            logger.warning("structflo_ner_llm_provider_unsupported", provider=provider)
+
         logger.info(
             "structflo_ner_extractor_initialized",
             model_id=model_id,
-            model_url=model_url,
+            provider=provider,
+            llm_enabled=self._llm_extractor is not None,
             max_char_buffer=max_char_buffer,
         )
 
@@ -86,6 +113,8 @@ class StructfloNERExtractor(NERExtractorPort):
             return []
 
     async def _run_llm(self, text: str) -> list[NEREntity]:
+        if self._llm_extractor is None:
+            return []
         try:
             result = await asyncio.to_thread(
                 self._llm_extractor.extract,

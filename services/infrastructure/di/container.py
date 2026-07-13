@@ -169,6 +169,7 @@ from infrastructure.file_services.subprocess_parse import SubprocessParser
 from infrastructure.kafka.kafka_external_event_streamer import KafkaExternalEventPublisher
 from infrastructure.kafka.kafka_publisher import KafkaPublisher
 from infrastructure.llm.factory import (
+    _resolve_api_key,
     create_chat_llm_client,
     create_llm_client,
     create_prompt_repository,
@@ -356,10 +357,15 @@ def create_container() -> Container:
         model_name=settings.gliner2_model_name,
     )
 
-    # Register NER Extractor (dual-mode: fast + LLM, reuses configured LLM settings)
+    # Register NER Extractor (dual-mode: fast + LLM). NER LLM config is separate
+    # from the batch LLM (NER_LLM_*), each field falling back to the llm_* field.
+    _ner_provider = settings.ner_llm_provider or settings.llm_provider
+    _ner_api_key = settings.ner_llm_api_key or _resolve_api_key(_ner_provider, settings)
     container[NERExtractorPort] = lambda _: StructfloNERExtractor(
-        model_id=settings.llm_model_name,
-        model_url=settings.llm_base_url,
+        model_id=settings.ner_llm_model_name or settings.llm_model_name,
+        provider=_ner_provider,
+        api_key=_ner_api_key,
+        model_url=settings.ner_llm_base_url or settings.llm_base_url,
         max_char_buffer=settings.ner_max_char_buffer,
     )
 
