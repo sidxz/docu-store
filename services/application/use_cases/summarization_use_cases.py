@@ -10,6 +10,7 @@ from returns.result import Failure, Result, Success
 from application.dtos.errors import AppError
 from application.mappers.artifact_mappers import ArtifactMapper
 from application.mappers.page_mappers import PageMapper
+from application.services.usage_recording import ingestion_counter, record_ingestion_usage
 from domain.exceptions import AggregateNotFoundError, ConcurrencyError, ValidationError
 from domain.value_objects.summary_candidate import SummaryCandidate
 
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
     from application.ports.prompt_repository import PromptRepositoryPort
     from application.ports.repositories.artifact_repository import ArtifactRepository
     from application.ports.repositories.page_repository import PageRepository
+    from application.ports.token_usage_store import TokenUsageStore
 
 log = structlog.get_logger(__name__)
 
@@ -50,6 +52,7 @@ class SummarizePageUseCase:
         prompt_repository: PromptRepositoryPort,
         blob_store: BlobStore,
         external_event_publisher: ExternalEventPublisher | None = None,
+        token_usage_store: TokenUsageStore | None = None,
     ) -> None:
         self.page_repository = page_repository
         self.artifact_repository = artifact_repository
@@ -57,6 +60,7 @@ class SummarizePageUseCase:
         self.prompt_repository = prompt_repository
         self.blob_store = blob_store
         self.external_event_publisher = external_event_publisher
+        self.token_usage_store = token_usage_store
 
     async def execute(self, page_id: UUID) -> Result[PageResponse, AppError]:
         try:
@@ -81,45 +85,65 @@ class SummarizePageUseCase:
             image_key = f"artifacts/{artifact.id}/pages/{page.index}.png"
             image_exists = self.blob_store.exists(image_key)
 
-            # Determine mode and call the appropriate LLM path
-            if len(slide_text) >= _TEXT_THRESHOLD:
-                mode = "hybrid"
-                rendered = await self.prompt_repository.render_prompt(
-                    "page_summarization_hybrid",
-                    slide_text=slide_text,
-                    artifact_title=artifact_title,
-                    page_index=str(page_index),
-                )
-                image_b64 = _load_image_b64(self.blob_store, image_key) if image_exists else None
-                if image_b64:
-                    summary_text = await self.llm_client.complete_with_image(rendered, image_b64)
-                else:
-                    summary_text = await self.llm_client.complete(rendered)
-
-            elif image_exists:
-                mode = "image_only"
-                rendered = await self.prompt_repository.render_prompt(
-                    "page_summarization_image_only",
-                    artifact_title=artifact_title,
-                    page_index=str(page_index),
-                )
-                image_b64 = _load_image_b64(self.blob_store, image_key)
-                summary_text = await self.llm_client.complete_with_image(rendered, image_b64)
-
-            else:
-                mode = "text_only"
-                rendered = await self.prompt_repository.render_prompt(
-                    "page_summarization_text_only",
-                    slide_text=slide_text,
-                    artifact_title=artifact_title,
-                    page_index=str(page_index),
-                )
-                summary_text = await self.llm_client.complete(rendered)
-
             model_info = await self.llm_client.get_model_info()
             model_name = (
                 f"{model_info.get('provider', 'unknown')}/{model_info.get('model_name', 'unknown')}"
             )
+
+            # Determine mode and call the appropriate LLM path
+            counter = ingestion_counter(artifact, source="page_summary")
+            try:
+                with counter:
+                    if len(slide_text) >= _TEXT_THRESHOLD:
+                        mode = "hybrid"
+                        rendered = await self.prompt_repository.render_prompt(
+                            "page_summarization_hybrid",
+                            slide_text=slide_text,
+                            artifact_title=artifact_title,
+                            page_index=str(page_index),
+                        )
+                        image_b64 = (
+                            _load_image_b64(self.blob_store, image_key) if image_exists else None
+                        )
+                        if image_b64:
+                            summary_text = await self.llm_client.complete_with_image(
+                                rendered,
+                                image_b64,
+                            )
+                        else:
+                            summary_text = await self.llm_client.complete(rendered)
+
+                    elif image_exists:
+                        mode = "image_only"
+                        rendered = await self.prompt_repository.render_prompt(
+                            "page_summarization_image_only",
+                            artifact_title=artifact_title,
+                            page_index=str(page_index),
+                        )
+                        image_b64 = _load_image_b64(self.blob_store, image_key)
+                        summary_text = await self.llm_client.complete_with_image(
+                            rendered,
+                            image_b64,
+                        )
+
+                    else:
+                        mode = "text_only"
+                        rendered = await self.prompt_repository.render_prompt(
+                            "page_summarization_text_only",
+                            slide_text=slide_text,
+                            artifact_title=artifact_title,
+                            page_index=str(page_index),
+                        )
+                        summary_text = await self.llm_client.complete(rendered)
+            finally:
+                await record_ingestion_usage(
+                    self.token_usage_store,
+                    counter,
+                    artifact=artifact,
+                    source="page_summary",
+                    ref=str(page_id),
+                    model=model_name,
+                )
 
             log.info(
                 "summarize_page.llm_done",
@@ -189,6 +213,7 @@ class SummarizeArtifactUseCase:
         prompt_repository: PromptRepositoryPort,
         external_event_publisher: ExternalEventPublisher | None = None,
         batch_size: int = 10,
+        token_usage_store: TokenUsageStore | None = None,
     ) -> None:
         self.artifact_repository = artifact_repository
         self.page_repository = page_repository
@@ -196,6 +221,7 @@ class SummarizeArtifactUseCase:
         self.prompt_repository = prompt_repository
         self.external_event_publisher = external_event_publisher
         self.batch_size = batch_size
+        self.token_usage_store = token_usage_store
 
     async def execute(self, artifact_id: UUID) -> Result[ArtifactResponse, AppError]:
         try:
@@ -229,28 +255,42 @@ class SummarizeArtifactUseCase:
                 batch_size=self.batch_size,
             )
 
-            # Sliding-window chain
-            if len(page_summaries) <= self.batch_size:
-                combined = await self._synthesize(page_summaries, artifact_title)
-            else:
-                batches = _make_batches(page_summaries, self.batch_size)
-                batch_summaries = []
-                for i, batch in enumerate(batches):
-                    log.info(
-                        "summarize_artifact.batch",
-                        artifact_id=str(artifact_id),
-                        batch=i + 1,
-                        total=len(batches),
-                    )
-                    batch_summaries.append(await self._summarize_batch(batch, artifact_title))
-                combined = await self._synthesize(batch_summaries, artifact_title)
-
-            final_summary = await self._refine(combined, artifact_title)
-
             model_info = await self.llm_client.get_model_info()
             model_name = (
                 f"{model_info.get('provider', 'unknown')}/{model_info.get('model_name', 'unknown')}"
             )
+
+            # Sliding-window chain
+            counter = ingestion_counter(artifact, source="artifact_summary")
+            try:
+                with counter:
+                    if len(page_summaries) <= self.batch_size:
+                        combined = await self._synthesize(page_summaries, artifact_title)
+                    else:
+                        batches = _make_batches(page_summaries, self.batch_size)
+                        batch_summaries = []
+                        for i, batch in enumerate(batches):
+                            log.info(
+                                "summarize_artifact.batch",
+                                artifact_id=str(artifact_id),
+                                batch=i + 1,
+                                total=len(batches),
+                            )
+                            batch_summaries.append(
+                                await self._summarize_batch(batch, artifact_title),
+                            )
+                        combined = await self._synthesize(batch_summaries, artifact_title)
+
+                    final_summary = await self._refine(combined, artifact_title)
+            finally:
+                await record_ingestion_usage(
+                    self.token_usage_store,
+                    counter,
+                    artifact=artifact,
+                    source="artifact_summary",
+                    ref=str(artifact_id),
+                    model=model_name,
+                )
 
             log.info(
                 "summarize_artifact.llm_done",

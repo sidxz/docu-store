@@ -439,22 +439,32 @@ class MockLLMClient:
         self,
         response: str = "Mock summary text.",
         raise_on_call: Exception | None = None,
+        usage: tuple[int, int] | None = None,
     ) -> None:
         self._response = response
         self.raise_on_call = raise_on_call
+        self._usage = usage
         self.complete_calls: list[str] = []
         self.complete_with_image_calls: list[tuple[str, str]] = []
+
+    def _record(self) -> None:
+        if self._usage:
+            from infrastructure.llm.token_counter import record_usage
+
+            record_usage(*self._usage)
 
     async def complete(self, prompt: str, **kwargs: Any) -> str:
         if self.raise_on_call:
             raise self.raise_on_call
         self.complete_calls.append(prompt)
+        self._record()
         return self._response
 
     async def complete_with_image(self, prompt: str, image_b64: str, **kwargs: Any) -> str:
         if self.raise_on_call:
             raise self.raise_on_call
         self.complete_with_image_calls.append((prompt, image_b64))
+        self._record()
         return self._response
 
     async def complete_structured(
@@ -463,6 +473,7 @@ class MockLLMClient:
         if self.raise_on_call:
             raise self.raise_on_call
         self.complete_calls.append(prompt)
+        self._record()
         return {"result": self._response}
 
     async def stream(self, prompt: str, **kwargs: Any) -> Any:

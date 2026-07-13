@@ -564,6 +564,7 @@ def create_container() -> Container:
         title_extractor=c[TitleExtractorPort],
         blob_store=c[BlobStore],
         external_event_publisher=c[ExternalEventPublisher],
+        token_usage_store=c[TokenUsageStore],
     )
     container[TriggerDocMetadataExtractionUseCase] = lambda c: TriggerDocMetadataExtractionUseCase(
         page_repository=c[PageRepository],
@@ -650,6 +651,7 @@ def create_container() -> Container:
         prompt_repository=c[PromptRepositoryPort],
         blob_store=c[BlobStore],
         external_event_publisher=c[ExternalEventPublisher],
+        token_usage_store=c[TokenUsageStore],
     )
     container[TriggerPageSummarizationUseCase] = lambda c: TriggerPageSummarizationUseCase(
         workflow_orchestrator=c[WorkflowOrchestrator],
@@ -663,6 +665,7 @@ def create_container() -> Container:
         prompt_repository=c[PromptRepositoryPort],
         external_event_publisher=c[ExternalEventPublisher],
         batch_size=settings.artifact_summarization_batch_size,
+        token_usage_store=c[TokenUsageStore],
     )
     container[TriggerArtifactSummarizationUseCase] = lambda c: TriggerArtifactSummarizationUseCase(
         artifact_repository=c[ArtifactRepository],

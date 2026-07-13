@@ -10,6 +10,7 @@ import structlog
 from returns.result import Failure, Result, Success
 
 from application.dtos.errors import AppError
+from application.services.usage_recording import ingestion_counter, record_ingestion_usage
 from application.use_cases.storage_keys import render_pdf_key
 from domain.value_objects.author_mention import AuthorMention
 from domain.value_objects.presentation_date import PresentationDate
@@ -26,6 +27,8 @@ if TYPE_CHECKING:
     from application.ports.repositories.page_repository import PageRepository
     from application.ports.structured_extractor import ExtractedField, StructuredExtractorPort
     from application.ports.title_extractor import TitleExtractorPort
+    from application.ports.token_usage_store import TokenUsageStore
+    from domain.aggregates.artifact import Artifact
     from domain.aggregates.page import Page
 
 logger = structlog.get_logger()
@@ -110,6 +113,7 @@ class ExtractDocumentMetadataUseCase:
         title_extractor: TitleExtractorPort,
         blob_store: BlobStore,
         external_event_publisher: ExternalEventPublisher | None = None,
+        token_usage_store: TokenUsageStore | None = None,
     ) -> None:
         self.page_repository = page_repository
         self.artifact_repository = artifact_repository
@@ -119,6 +123,7 @@ class ExtractDocumentMetadataUseCase:
         self.title_extractor = title_extractor
         self.blob_store = blob_store
         self.external_event_publisher = external_event_publisher
+        self.token_usage_store = token_usage_store
 
     async def execute(self, artifact_id: UUID, page_id: UUID) -> Result[dict, AppError]:
         try:
@@ -194,7 +199,7 @@ class ExtractDocumentMetadataUseCase:
 
             # LLM fallback for any still-missing fields
             if not raw.is_complete and first_page_text:
-                await self._apply_llm_fallback(raw, first_page_text)
+                await self._apply_llm_fallback(raw, first_page_text, artifact)
 
             # Filename date fallback — many files contain dates in their name
             if not raw.has_date and artifact.source_filename:
@@ -313,14 +318,25 @@ class ExtractDocumentMetadataUseCase:
             target.date_from_llm = source.date_from_llm
             target.date_source = source.date_source
 
-    async def _apply_llm_fallback(self, raw: _RawMetadata, text: str) -> None:
+    async def _apply_llm_fallback(self, raw: _RawMetadata, text: str, artifact: Artifact) -> None:
         logger.info(
             "extract_doc_metadata.llm_fallback",
             title_conf=raw.title_confidence,
             author_count=len(raw.authors),
             date_conf=raw.date_confidence,
         )
-        llm_result = await self._llm_extract(text)
+        counter = ingestion_counter(artifact, source="doc_metadata")
+        try:
+            with counter:
+                llm_result = await self._llm_extract(text)
+        finally:
+            await record_ingestion_usage(
+                self.token_usage_store,
+                counter,
+                artifact=artifact,
+                source="doc_metadata",
+                ref=str(artifact.id),
+            )
         if not llm_result:
             return
 
