@@ -77,6 +77,10 @@ class Settings(BaseSettings):
         default="user_activity",
         validation_alias="MONGO_USER_ACTIVITY_COLLECTION",
     )
+    mongo_token_usage_collection: str = Field(
+        default="token_usage_events",
+        validation_alias="MONGO_TOKEN_USAGE_COLLECTION",
+    )
 
     # Blob Storage
     blob_base_url: str = Field(

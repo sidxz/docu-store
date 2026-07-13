@@ -90,6 +90,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             await chat_repo.ensure_indexes()
             logger.info("mongodb_chat_indexes_initialized")
 
+            # Ensure token usage ledger indexes
+            from application.ports.token_usage_store import TokenUsageStore
+
+            usage_store = container[TokenUsageStore]
+            await usage_store.ensure_indexes()
+            logger.info("mongodb_token_usage_indexes_initialized")
+
             # Ensure workflow status cache indexes
             from application.ports.workflow_status_cache import WorkflowStatusCache
 
