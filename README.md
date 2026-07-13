@@ -14,7 +14,7 @@ Document intelligence for drug discovery. Event-sourced, AI-enriched, built to k
   <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-16-000000?logo=next.js&logoColor=white" alt="Next.js 16" /></a>
 </p>
 
-![DocuStore — extract compounds and entities from research documents, search with chemical awareness, ask questions with citations](docs/assets/home.png)
+![DocuStore pipeline — extract structures and entities, index dense/sparse/chemical vectors, entity-aware search, cited chat](docs/assets/home.png)
 
 ## Architecture
 
