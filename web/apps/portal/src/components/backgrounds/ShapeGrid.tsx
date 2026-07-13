@@ -4,15 +4,36 @@ import { useEffect, useRef } from "react";
 
 interface ShapeGridProps {
   cellSize?: number;
-  color?: [number, number, number];
   glowRadius?: number;
 }
 
-export function ShapeGrid({
-  cellSize = 48,
-  color = [59, 130, 246],
-  glowRadius = 200,
-}: ShapeGridProps) {
+// Cool half of the docustore.io spectrum: cyan → blue → app accent.
+// First tuple element is the stop position as a fraction of viewport width.
+const STOPS: Array<[number, number, number, number]> = [
+  [0.05, 0x37, 0xd7, 0xfa],
+  [0.55, 0x4b, 0x72, 0xfe],
+  [1.0, 0x3b, 0x82, 0xf6],
+];
+
+function spectrumAt(t: number): [number, number, number] {
+  if (t <= STOPS[0][0]) return [STOPS[0][1], STOPS[0][2], STOPS[0][3]];
+  for (let i = 0; i < STOPS.length - 1; i++) {
+    const a = STOPS[i];
+    const b = STOPS[i + 1];
+    if (t <= b[0]) {
+      const f = (t - a[0]) / (b[0] - a[0]);
+      return [
+        Math.round(a[1] + (b[1] - a[1]) * f),
+        Math.round(a[2] + (b[2] - a[2]) * f),
+        Math.round(a[3] + (b[3] - a[3]) * f),
+      ];
+    }
+  }
+  const last = STOPS[STOPS.length - 1];
+  return [last[1], last[2], last[3]];
+}
+
+export function ShapeGrid({ cellSize = 48, glowRadius = 200 }: ShapeGridProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -36,10 +57,8 @@ export function ShapeGrid({
     };
 
     const h = cellSize * 0.866;
-    const [r, g, b] = color;
 
-    const render = () => {
-      t += 0.004;
+    const drawFrame = () => {
       const w = window.innerWidth;
       const ht = window.innerHeight;
 
@@ -57,29 +76,33 @@ export function ShapeGrid({
           // Up-pointing triangle
           drawTriangle(
             ctx,
-            r, g, b,
             x, y + h,
             x + cellSize / 2, y,
             x + cellSize, y + h,
             mouse,
             glowRadius,
             t, col, row,
+            w,
           );
 
           // Down-pointing triangle
           drawTriangle(
             ctx,
-            r, g, b,
             x + cellSize / 2, y,
             x + cellSize, y + h,
             x + cellSize * 1.5, y,
             mouse,
             glowRadius,
             t, col + 0.5, row + 0.5,
+            w,
           );
         }
       }
+    };
 
+    const render = () => {
+      t += 0.004;
+      drawFrame();
       frame = requestAnimationFrame(render);
     };
 
@@ -103,6 +126,18 @@ export function ShapeGrid({
     };
 
     resize();
+
+    // Reduced motion: draw the resting lattice once — no loop, no spotlight.
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      drawFrame();
+      const onStaticResize = () => {
+        resize();
+        drawFrame();
+      };
+      window.addEventListener("resize", onStaticResize);
+      return () => window.removeEventListener("resize", onStaticResize);
+    }
+
     render();
 
     window.addEventListener("resize", resize);
@@ -119,14 +154,13 @@ export function ShapeGrid({
       window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("touchend", onTouchEnd);
     };
-  }, [cellSize, color, glowRadius]);
+  }, [cellSize, glowRadius]);
 
   return <canvas ref={canvasRef} className="pointer-events-none fixed inset-0" />;
 }
 
 function drawTriangle(
   ctx: CanvasRenderingContext2D,
-  r: number, g: number, b: number,
   x1: number, y1: number,
   x2: number, y2: number,
   x3: number, y3: number,
@@ -134,22 +168,19 @@ function drawTriangle(
   glowRadius: number,
   t: number,
   col: number, row: number,
+  viewportWidth: number,
 ) {
   const cx = (x1 + x2 + x3) / 3;
   const cy = (y1 + y2 + y3) / 3;
 
   const dist = Math.hypot(cx - mouse.x, cy - mouse.y);
 
-  // Ambient sine wave
-  const wave = Math.sin(t + col * 0.4 + row * 0.6) * 0.025;
-  const base = 0.04 + wave;
+  // Ambient sine shimmer — resting lattice
+  const wave = Math.sin(t + col * 0.4 + row * 0.6) * 0.02;
+  const base = 0.07 + wave;
 
-  // Mouse proximity glow (quadratic falloff)
-  const hover = dist < glowRadius
-    ? (1 - dist / glowRadius) ** 2 * 0.5
-    : 0;
-
-  const opacity = Math.max(0.01, Math.min(1, base + hover));
+  // Mouse proximity (quadratic falloff)
+  const hover = dist < glowRadius ? (1 - dist / glowRadius) ** 2 : 0;
 
   ctx.beginPath();
   ctx.moveTo(x1, y1);
@@ -157,11 +188,17 @@ function drawTriangle(
   ctx.lineTo(x3, y3);
   ctx.closePath();
 
-  if (hover > 0.02) {
-    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${hover * 0.18})`;
-    ctx.fill();
+  if (hover > 0.01) {
+    // Spotlight reveals the spectrum color for this x-position
+    const [r, g, b] = spectrumAt(cx / viewportWidth);
+    if (hover > 0.03) {
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${hover * 0.16})`;
+      ctx.fill();
+    }
+    ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${Math.min(1, base + hover * 0.85)})`;
+  } else {
+    // slate-500 — blue-leaning gray so the resting lattice reads cool
+    ctx.strokeStyle = `rgba(100, 116, 139, ${base})`;
   }
-
-  ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${opacity})`;
   ctx.stroke();
 }
