@@ -10,7 +10,6 @@ from application.dtos.chat_dtos import (
     ChatFolderDTO,
     ChatMessageDTO,
     ConversationDTO,
-    TokenUsageDTO,
 )
 
 
@@ -48,12 +47,6 @@ class ChatRepository(Protocol):
         owner_id: UUID,
         limit: int,
     ) -> list[ConversationDTO]: ...
-
-    async def get_user_token_usage(
-        self,
-        workspace_id: UUID,
-        owner_id: UUID,
-    ) -> TokenUsageDTO: ...
 
     async def delete_conversation(
         self,

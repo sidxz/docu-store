@@ -986,7 +986,7 @@ def create_container() -> Container:
         chat_repository=c[ChatRepository],
     )
     container[GetUserTokenUsageUseCase] = lambda c: GetUserTokenUsageUseCase(
-        chat_repository=c[ChatRepository],
+        token_usage_store=c[TokenUsageStore],
     )
     container[DeleteConversationUseCase] = lambda c: DeleteConversationUseCase(
         chat_repository=c[ChatRepository],

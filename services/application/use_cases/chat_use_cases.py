@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import re
 from collections.abc import AsyncGenerator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Literal
 from uuid import UUID, uuid4
 
@@ -190,20 +190,22 @@ class ListRecentConversationsUseCase:
 
 
 class GetUserTokenUsageUseCase:
-    """Aggregate total token usage across a user's conversations."""
+    """Per-user token totals from the usage ledger (optionally windowed)."""
 
-    def __init__(self, chat_repository: ChatRepository) -> None:
-        self._repo = chat_repository
+    def __init__(self, token_usage_store: TokenUsageStore) -> None:
+        self._usage = token_usage_store
 
     async def execute(
         self,
         workspace_id: UUID,
         owner_id: UUID,
+        days: int | None = None,
+        kind: str | None = None,
     ) -> Result[TokenUsageDTO, AppError]:
         try:
-            usage = await self._repo.get_user_token_usage(
-                workspace_id=workspace_id,
-                owner_id=owner_id,
+            since = datetime.now(UTC) - timedelta(days=days) if days else None
+            usage = await self._usage.sum_for_user(
+                workspace_id, owner_id, since=since, kind=kind,
             )
             return Success(usage)
         except Exception as e:

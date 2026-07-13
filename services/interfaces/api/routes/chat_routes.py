@@ -9,7 +9,7 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import StreamingResponse
 from lagom import Container
 from pydantic import BaseModel, Field
@@ -125,12 +125,16 @@ async def list_conversations(
 async def get_user_token_usage(
     container: Annotated[Container, Depends(get_container)],
     auth: Annotated[RequestAuth, Depends(get_auth)],
+    days: Annotated[int | None, Query(ge=1, le=365)] = None,
+    kind: Annotated[str | None, Query(pattern="^(chat|ingestion)$")] = None,
 ) -> TokenUsageDTO:
-    """Total token usage across the current user's conversations (usage badge)."""
+    """Current user's token usage from the ledger (all-time unless ``days`` given)."""
     use_case = container[GetUserTokenUsageUseCase]
     return await use_case.execute(
         workspace_id=auth.workspace_id,
         owner_id=auth.user_id,
+        days=days,
+        kind=kind,
     )
 
 
