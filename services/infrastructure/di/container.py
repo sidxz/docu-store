@@ -994,6 +994,7 @@ def create_container() -> Container:
     container[SendMessageUseCase] = lambda c: SendMessageUseCase(
         chat_repository=c[ChatRepository],
         chat_agent=c[ChatAgentPort],
+        token_usage_store=c[TokenUsageStore],
     )
     container[RecordFeedbackUseCase] = lambda c: RecordFeedbackUseCase(
         chat_repository=c[ChatRepository],

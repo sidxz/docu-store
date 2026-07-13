@@ -25,7 +25,7 @@ import structlog
 from application.dtos.chat_dtos import AgentEvent
 from infrastructure.chat.utils import extract_cited_indices
 from infrastructure.config import settings
-from infrastructure.llm.token_counter import TokenCounter
+from infrastructure.llm.token_counter import get_active_counter
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -84,7 +84,6 @@ class ThinkingAgent:
         total_tokens = 0
         citations: list[SourceCitationDTO] = []
         _debug = settings.chat_debug
-        token_counter = TokenCounter()
 
         if _debug:
             log.info(
@@ -95,9 +94,6 @@ class ThinkingAgent:
                 has_previous_citations=previous_citations is not None,
                 previous_citation_count=len(previous_citations) if previous_citations else 0,
             )
-
-        # Activate token counter for the entire pipeline run
-        token_counter.__enter__()
 
         try:
             # ── Stage 1: Query Planning ──
@@ -455,17 +451,18 @@ class ThinkingAgent:
                 used=len(used_citations),
             )
 
-            # Use real API token counts if available, fall back to streamed count
-            api_tokens = token_counter.total_tokens
+            # Provider-reported counts only (no streamed-chunk estimates); the
+            # ambient counter is owned by SendMessageUseCase.
+            counter = get_active_counter()
             yield AgentEvent(
                 type="done",
                 message_id=message_id,
-                total_tokens=api_tokens if api_tokens > 0 else total_tokens,
+                total_tokens=counter.total_tokens if counter else 0,
                 duration_ms=elapsed_ms,
                 sources=used_citations,
                 # Carry prompt/completion breakdown for persistence
-                prompt_tokens=token_counter.prompt_tokens,
-                completion_tokens=token_counter.completion_tokens,
+                prompt_tokens=counter.prompt_tokens if counter else 0,
+                completion_tokens=counter.completion_tokens if counter else 0,
             )
 
         except Exception as exc:
@@ -474,8 +471,6 @@ class ThinkingAgent:
                 type="error",
                 error_message=f"An error occurred: {exc!s}",
             )
-        finally:
-            token_counter.__exit__(None, None, None)
 
     async def _expand_author_mentions(
         self,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
@@ -29,6 +30,9 @@ from application.dtos.chat_dtos import (
     TokenUsageDTO,
 )
 from application.dtos.errors import AppError
+from application.dtos.usage_dtos import TokenUsageEvent
+from application.ports.token_usage_store import TokenUsageStore
+from infrastructure.llm.token_counter import TokenCounter
 
 if TYPE_CHECKING:
     from application.ports.chat_agent import ChatAgentPort
@@ -282,9 +286,11 @@ class SendMessageUseCase:
         self,
         chat_repository: ChatRepository,
         chat_agent: ChatAgentPort,
+        token_usage_store: TokenUsageStore,
     ) -> None:
         self._repo = chat_repository
         self._agent = chat_agent
+        self._usage = token_usage_store
 
     async def execute(
         self,
@@ -366,119 +372,178 @@ class SendMessageUseCase:
             structured_blocks: list[ContentBlockDTO] = []
             reasoning_parts: list[str] = []
 
-            async for event in self._agent.run(
-                message=message,
-                conversation_history=history,
-                workspace_id=workspace_id,
-                allowed_artifact_ids=allowed_artifact_ids,
-                mode=mode,
-                previous_citations=previous_citations,
-            ):
-                if event.type == "token":
-                    draft_answer += event.delta or ""
-                elif event.type == "reasoning_token":
-                    reasoning_parts.append(event.delta or "")
-                elif event.type == "step_started" and event.step:
-                    trace_steps[event.step] = AgentStepDTO(
-                        step=event.step,
-                        status="started",
-                        started_at=datetime.now(UTC),
-                        output_summary=event.description,
-                    )
-                elif event.type == "step_completed" and event.step:
-                    if event.step in trace_steps:
-                        s = trace_steps[event.step]
-                        if event.status != "started":
-                            s.status = "completed"
-                            s.completed_at = datetime.now(UTC)
-                        s.output_summary = event.output
-                        if event.thinking_content:
-                            if s.thinking_content:
-                                s.thinking_content += "\n\n---\n\n" + event.thinking_content
-                            else:
-                                s.thinking_content = event.thinking_content
-                            thinking_blocks.append(
-                                ThinkingBlockDTO(
-                                    label=event.thinking_label or f"{event.step} thought",
-                                    step=event.step or "unknown",
-                                    content=event.thinking_content,
-                                ),
+            # The counter is ambient for the whole pipeline: every LLM call the
+            # agent makes (planning, tool loop, synthesis, formatting) records
+            # provider-reported usage here, and Langfuse traces inherit the
+            # user/conversation identity.
+            counter = TokenCounter(
+                user_id=str(owner_id),
+                session_id=str(conversation_id),
+                workspace_id=str(workspace_id),
+                tags=["chat"],
+            )
+            try:
+                with counter:
+                    async for event in self._agent.run(
+                        message=message,
+                        conversation_history=history,
+                        workspace_id=workspace_id,
+                        allowed_artifact_ids=allowed_artifact_ids,
+                        mode=mode,
+                        previous_citations=previous_citations,
+                    ):
+                        if event.type == "token":
+                            draft_answer += event.delta or ""
+                        elif event.type == "reasoning_token":
+                            reasoning_parts.append(event.delta or "")
+                        elif event.type == "step_started" and event.step:
+                            trace_steps[event.step] = AgentStepDTO(
+                                step=event.step,
+                                status="started",
+                                started_at=datetime.now(UTC),
+                                output_summary=event.description,
                             )
-                elif event.type == "query_context":
-                    query_context = QueryContextDTO(
-                        ner_entities=event.query_context_entities or [],
-                        authors=event.query_context_authors or [],
-                        query_type=event.query_context_type or "",
-                        reformulated_query=event.query_context_reformulated or "",
-                        smiles_detected=event.query_context_smiles or [],
-                        smiles_resolved=event.query_context_smiles_resolved or [],
+                        elif event.type == "step_completed" and event.step:
+                            if event.step in trace_steps:
+                                s = trace_steps[event.step]
+                                if event.status != "started":
+                                    s.status = "completed"
+                                    s.completed_at = datetime.now(UTC)
+                                s.output_summary = event.output
+                                if event.thinking_content:
+                                    if s.thinking_content:
+                                        s.thinking_content += "\n\n---\n\n" + event.thinking_content
+                                    else:
+                                        s.thinking_content = event.thinking_content
+                                    thinking_blocks.append(
+                                        ThinkingBlockDTO(
+                                            label=event.thinking_label or f"{event.step} thought",
+                                            step=event.step or "unknown",
+                                            content=event.thinking_content,
+                                        ),
+                                    )
+                        elif event.type == "query_context":
+                            query_context = QueryContextDTO(
+                                ner_entities=event.query_context_entities or [],
+                                authors=event.query_context_authors or [],
+                                query_type=event.query_context_type or "",
+                                reformulated_query=event.query_context_reformulated or "",
+                                smiles_detected=event.query_context_smiles or [],
+                                smiles_resolved=event.query_context_smiles_resolved or [],
+                            )
+                        elif event.type == "structured_block" and event.block:
+                            structured_blocks.append(event.block)
+                        elif event.type == "grounding_result":
+                            grounding_is_grounded = event.grounding_is_grounded
+                            grounding_confidence = event.grounding_confidence
+                        elif event.type == "done":
+                            final_event = event
+                            if event.sources:
+                                final_sources = event.sources
+                        yield event
+
+                # Update query_context grounded flag from grounding result
+                if query_context is not None:
+                    query_context.grounded = grounding_is_grounded or False
+                    log.info(
+                        "chat.send_message.query_context_captured",
+                        entities=[e.get("entity_text") for e in query_context.ner_entities],
+                        authors=query_context.authors,
+                        query_type=query_context.query_type,
+                        grounded=query_context.grounded,
                     )
-                elif event.type == "structured_block" and event.block:
-                    structured_blocks.append(event.block)
-                elif event.type == "grounding_result":
-                    grounding_is_grounded = event.grounding_is_grounded
-                    grounding_confidence = event.grounding_confidence
-                elif event.type == "done":
-                    final_event = event
-                    if event.sources:
-                        final_sources = event.sources
-                yield event
 
-            # Update query_context grounded flag from grounding result
-            if query_context is not None:
-                query_context.grounded = grounding_is_grounded or False
-                log.info(
-                    "chat.send_message.query_context_captured",
-                    entities=[e.get("entity_text") for e in query_context.ner_entities],
-                    authors=query_context.authors,
-                    query_type=query_context.query_type,
-                    grounded=query_context.grounded,
-                )
+                # Update title with reformulated query from planning (more descriptive)
+                if query_context and query_context.reformulated_query:
+                    await self._repo.update_conversation(
+                        conversation_id,
+                        title=query_context.reformulated_query[:100],
+                    )
 
-            # Update title with reformulated query from planning (more descriptive)
-            if query_context and query_context.reformulated_query:
-                await self._repo.update_conversation(
+                # Save assistant response with full step trace + grounding result
+                # Sources are already filtered to cited-only by the agent's done event
+                if draft_answer:
+                    agent_trace = AgentTraceDTO(
+                        steps=list(trace_steps.values()),
+                        thinking_blocks=thinking_blocks,
+                        reasoning_content="".join(reasoning_parts) or None,
+                        total_duration_ms=final_event.duration_ms if final_event else None,
+                        retry_count=0,
+                        grounding_is_grounded=grounding_is_grounded,
+                        grounding_confidence=grounding_confidence,
+                    )
+
+                    # Build token usage from agent's done event
+                    token_usage = None
+                    if final_event and final_event.total_tokens and final_event.total_tokens > 0:
+                        token_usage = TokenUsageDTO(
+                            prompt=final_event.prompt_tokens or 0,
+                            completion=final_event.completion_tokens or 0,
+                            total=final_event.total_tokens,
+                        )
+
+                    assistant_msg = ChatMessageDTO(
+                        conversation_id=conversation_id,
+                        message_id=final_event.message_id if final_event else uuid4(),
+                        role="assistant",
+                        content=draft_answer,
+                        sources=final_sources,
+                        agent_trace=agent_trace,
+                        structured_content=structured_blocks or None,
+                        token_usage=token_usage,
+                        query_context=query_context,
+                        created_at=datetime.now(UTC),
+                    )
+                    await self._repo.append_message(assistant_msg)
+            finally:
+                await self._record_chat_usage(
+                    counter,
+                    workspace_id,
+                    owner_id,
                     conversation_id,
-                    title=query_context.reformulated_query[:100],
+                    final_event,
                 )
-
-            # Save assistant response with full step trace + grounding result
-            # Sources are already filtered to cited-only by the agent's done event
-            if draft_answer:
-                agent_trace = AgentTraceDTO(
-                    steps=list(trace_steps.values()),
-                    thinking_blocks=thinking_blocks,
-                    reasoning_content="".join(reasoning_parts) or None,
-                    total_duration_ms=final_event.duration_ms if final_event else None,
-                    retry_count=0,
-                    grounding_is_grounded=grounding_is_grounded,
-                    grounding_confidence=grounding_confidence,
-                )
-
-                # Build token usage from agent's done event
-                token_usage = None
-                if final_event and final_event.total_tokens and final_event.total_tokens > 0:
-                    token_usage = TokenUsageDTO(
-                        prompt=final_event.prompt_tokens or 0,
-                        completion=final_event.completion_tokens or 0,
-                        total=final_event.total_tokens,
-                    )
-
-                assistant_msg = ChatMessageDTO(
-                    conversation_id=conversation_id,
-                    message_id=final_event.message_id if final_event else uuid4(),
-                    role="assistant",
-                    content=draft_answer,
-                    sources=final_sources,
-                    agent_trace=agent_trace,
-                    structured_content=structured_blocks or None,
-                    token_usage=token_usage,
-                    query_context=query_context,
-                    created_at=datetime.now(UTC),
-                )
-                await self._repo.append_message(assistant_msg)
         finally:
             reasoning_context.reset_reasoning_override(_reasoning_token)
+
+    async def _record_chat_usage(
+        self,
+        counter: TokenCounter,
+        workspace_id: UUID,
+        owner_id: UUID,
+        conversation_id: UUID,
+        final_event: AgentEvent | None,
+    ) -> None:
+        """Single write point for chat token accounting.
+
+        Runs in ``finally`` so errors and client disconnects still record.
+        Shielded: a disconnect cancels this generator mid-write, but the
+        ledger write must land — quota must not be evadable by hanging up.
+        """
+        if counter.total_tokens <= 0:
+            return
+        message_id = final_event.message_id if final_event else None
+        event = TokenUsageEvent(
+            event_id=f"chat:{message_id}" if message_id else None,
+            workspace_id=workspace_id,
+            user_id=owner_id,
+            kind="chat",
+            source="chat_message",
+            prompt=counter.prompt_tokens,
+            completion=counter.completion_tokens,
+            total=counter.total_tokens,
+            ref=str(conversation_id),
+            created_at=datetime.now(UTC),
+        )
+        try:
+            await asyncio.shield(self._usage.record(event))
+        except asyncio.CancelledError:
+            pass  # our await was cancelled; the shielded write completes anyway
+        except Exception:
+            log.exception(
+                "chat.usage.record_failed",
+                conversation_id=str(conversation_id),
+            )
 
 
 class RecordFeedbackUseCase:
