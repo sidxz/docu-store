@@ -1,10 +1,20 @@
-# DocuStore
+<p align="center">
+  <img src="docs/assets/logo.svg" alt="DocuStore logo" width="96" />
+</p>
 
+<h1 align="center">DocuStore</h1>
+
+<p align="center">
 Document intelligence for drug discovery. Event-sourced, AI-enriched, built to keep scientific work explainable, searchable, and ready for the next breakthrough.
+</p>
 
-[![CI](https://github.com/sidxz/docu-store/actions/workflows/tests.yml/badge.svg)](https://github.com/sidxz/docu-store/actions/workflows/tests.yml)
-[![Python 3.12+](https://img.shields.io/badge/Python-3.12+-3776ab?logo=python&logoColor=white)](https://www.python.org/)
-[![Next.js 16](https://img.shields.io/badge/Next.js-16-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
+<p align="center">
+  <a href="https://github.com/sidxz/docu-store/actions/workflows/tests.yml"><img src="https://github.com/sidxz/docu-store/actions/workflows/tests.yml/badge.svg" alt="CI" /></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.12+-3776ab?logo=python&logoColor=white" alt="Python 3.12+" /></a>
+  <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-16-000000?logo=next.js&logoColor=white" alt="Next.js 16" /></a>
+</p>
+
+![DocuStore — extract compounds and entities from research documents, search with chemical awareness, ask questions with citations](docs/assets/home.png)
 
 ## Architecture
 
