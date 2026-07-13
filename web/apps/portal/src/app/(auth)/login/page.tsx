@@ -7,6 +7,12 @@ import { useAuthz } from "@sentinel-auth/react";
 import { useAppConfig } from "@/lib/app-config";
 import { ShapeGrid } from "@/components/backgrounds/ShapeGrid";
 
+const mono = { fontFamily: "var(--font-plex-mono), ui-monospace, monospace" };
+
+// docustore.io button language: sharp, mono-labelled, flat hovers
+const btnBase =
+  "flex h-11 w-full items-center justify-center gap-3 rounded-none px-4 text-[11px] font-medium uppercase tracking-[0.1em] transition-colors";
+
 export default function LoginPage() {
   const { login, isAuthenticated, isLoading } = useAuthz();
   const { googleClientId, githubClientId, entraIdClientId } = useAppConfig();
@@ -19,17 +25,7 @@ export default function LoginPage() {
   }, [isAuthenticated, isLoading, router]);
 
   return (
-    <div className="fixed inset-0 overflow-hidden" style={{ background: "#030712" }}>
-      {/* Ambient glow — left-center for branding area */}
-      <div
-        className="absolute top-1/2 h-[600px] w-[600px] -translate-y-1/2"
-        style={{
-          left: "20%",
-          background:
-            "radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%)",
-        }}
-      />
-
+    <div className="fixed inset-0 overflow-hidden" style={{ background: "#f6f8fb" }}>
       {/* Animated triangle grid */}
       <ShapeGrid />
 
@@ -44,29 +40,26 @@ export default function LoginPage() {
 
           <div>
             <div
-              className="flex h-14 w-14 items-center justify-center rounded-2xl"
-              style={{
-                background: "rgba(59, 130, 246, 0.12)",
-                boxShadow: "0 0 30px rgba(59, 130, 246, 0.2)",
-              }}
+              className="flex h-14 w-14 items-center justify-center rounded-xl border bg-white"
+              style={{ borderColor: "#e2e8f0" }}
             >
-              <FlaskConical className="h-7 w-7" style={{ color: "#60a5fa" }} />
+              <FlaskConical className="h-7 w-7" style={{ color: "#3b82f6" }} />
             </div>
 
             <h1
-              className="mt-6 text-4xl font-bold"
-              style={{ color: "#f1f5f9", letterSpacing: "0.06em" }}
+              className="mt-6 text-5xl font-semibold xl:text-6xl"
+              style={{ color: "#0f172a", letterSpacing: "0.02em" }}
             >
               DocuStore
             </h1>
 
             <div
-              className="mt-4 h-px w-12"
-              style={{ background: "rgba(59, 130, 246, 0.4)" }}
+              className="mt-5 h-[1.5px] w-14"
+              style={{ background: "linear-gradient(90deg, #37d7fa, #4b72fe)" }}
             />
 
             <p
-              className="mt-4 max-w-xs text-lg leading-relaxed"
+              className="mt-5 max-w-xs text-xl leading-relaxed"
               style={{ color: "#64748b" }}
             >
               Document intelligence
@@ -81,11 +74,11 @@ export default function LoginPage() {
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm transition-colors hover:underline"
-              style={{ color: "#475569" }}
+              style={{ color: "#64748b" }}
             >
               docustore.io
             </a>
-            <p className="mt-1 text-xs" style={{ color: "#1e293b" }}>
+            <p className="mt-1 text-xs" style={{ ...mono, color: "#94a3b8" }}>
               &copy; 2026 DocuStore. All rights reserved.
             </p>
           </div>
@@ -94,14 +87,12 @@ export default function LoginPage() {
         {/* Right: Login panel */}
         <div
           className="relative flex w-full flex-shrink-0 items-center justify-center px-8 md:w-[460px]"
-          style={{
-            background: "rgba(8, 14, 27, 0.95)",
-          }}
+          style={{ background: "rgba(255, 255, 255, 0.94)" }}
         >
           {/* Left edge line — desktop only */}
           <div
             className="absolute inset-y-0 left-0 hidden w-px md:block"
-            style={{ background: "rgba(148, 163, 184, 0.06)" }}
+            style={{ background: "#e2e8f0" }}
           />
 
           <div className="w-full max-w-[320px]">
@@ -111,20 +102,14 @@ export default function LoginPage() {
               style={{ animation: "auth-enter 0.6s ease-out 0.05s both" }}
             >
               <div
-                className="flex h-12 w-12 items-center justify-center rounded-xl"
-                style={{
-                  background: "rgba(59, 130, 246, 0.12)",
-                  boxShadow: "0 0 24px rgba(59, 130, 246, 0.2)",
-                }}
+                className="flex h-12 w-12 items-center justify-center rounded-xl border bg-white"
+                style={{ borderColor: "#e2e8f0" }}
               >
-                <FlaskConical
-                  className="h-6 w-6"
-                  style={{ color: "#60a5fa" }}
-                />
+                <FlaskConical className="h-6 w-6" style={{ color: "#3b82f6" }} />
               </div>
               <h1
-                className="mt-3 text-xl font-semibold"
-                style={{ color: "#f1f5f9", letterSpacing: "0.08em" }}
+                className="mt-3 text-2xl font-semibold"
+                style={{ color: "#0f172a", letterSpacing: "0.02em" }}
               >
                 DocuStore
               </h1>
@@ -138,10 +123,7 @@ export default function LoginPage() {
               className="mb-8 hidden md:block"
               style={{ animation: "auth-enter 0.6s ease-out 0.1s both" }}
             >
-              <h2
-                className="text-xl font-semibold"
-                style={{ color: "#f1f5f9" }}
-              >
+              <h2 className="text-xl font-semibold" style={{ color: "#0f172a" }}>
                 Sign in
               </h2>
               <p className="mt-1 text-sm" style={{ color: "#64748b" }}>
@@ -155,12 +137,8 @@ export default function LoginPage() {
               <button
                 disabled={!googleClientId}
                 onClick={() => login("google")}
-                className="flex w-full cursor-pointer items-center justify-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 hover:-translate-y-px hover:shadow-lg active:translate-y-0"
-                style={{
-                  background: "rgba(255, 255, 255, 0.95)",
-                  color: "#1f2937",
-                  animation: "auth-enter 0.5s ease-out 0.2s both",
-                }}
+                className={`${btnBase} cursor-pointer border border-[#0f172a] bg-white text-[#0f172a] hover:bg-[#f1f5f9]`}
+                style={{ ...mono, animation: "auth-enter 0.5s ease-out 0.2s both" }}
               >
                 <GoogleIcon />
                 Continue with Google
@@ -170,12 +148,8 @@ export default function LoginPage() {
               <button
                 disabled={!githubClientId}
                 onClick={() => login("github")}
-                className="flex w-full cursor-pointer items-center justify-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 hover:-translate-y-px hover:shadow-lg active:translate-y-0"
-                style={{
-                  background: "#161b22",
-                  color: "#ffffff",
-                  animation: "auth-enter 0.5s ease-out 0.25s both",
-                }}
+                className={`${btnBase} cursor-pointer bg-[#0f172a] text-white hover:opacity-85`}
+                style={{ ...mono, animation: "auth-enter 0.5s ease-out 0.25s both" }}
               >
                 <GitHubIcon />
                 Continue with GitHub
@@ -184,29 +158,13 @@ export default function LoginPage() {
               {/* Entra ID (disabled) */}
               <button
                 disabled={!entraIdClientId}
-                className="flex w-full cursor-not-allowed items-center justify-center gap-3 rounded-xl border px-4 py-2.5 text-sm font-medium opacity-40"
-                style={{
-                  background: "rgba(30, 41, 59, 0.4)",
-                  color: "#94a3b8",
-                  borderColor: "rgba(148, 163, 184, 0.06)",
-                  animation: "auth-enter 0.5s ease-out 0.3s both",
-                }}
+                className={`${btnBase} cursor-not-allowed border border-[#e2e8f0] bg-white text-[#94a3b8] opacity-60`}
+                style={{ ...mono, animation: "auth-enter 0.5s ease-out 0.3s both" }}
               >
                 <MicrosoftIcon />
                 Continue with Entra ID
               </button>
             </div>
-
-            {/* Footer */}
-            <p
-              className="mt-6 text-center text-xs"
-              style={{
-                color: "#475569",
-                animation: "auth-enter 0.5s ease-out 0.35s both",
-              }}
-            >
-              
-            </p>
 
             {/* Mobile-only: footer */}
             <div
@@ -218,11 +176,11 @@ export default function LoginPage() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs transition-colors hover:underline"
-                style={{ color: "#475569" }}
+                style={{ color: "#64748b" }}
               >
                 docustore.io
               </a>
-              <p className="mt-1 text-xs" style={{ color: "#1e293b" }}>
+              <p className="mt-1 text-xs" style={{ ...mono, color: "#94a3b8" }}>
                 &copy; 2026 DocuStore
               </p>
             </div>
