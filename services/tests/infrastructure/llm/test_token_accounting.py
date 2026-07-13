@@ -107,3 +107,33 @@ async def test_native_tool_adapter_counts_via_callback(monkeypatch) -> None:
         await adapter.invoke_with_tools([{"role": "user", "content": "hi"}], tools=[])
     assert counter.prompt_tokens == 500
     assert counter.completion_tokens == 120
+
+
+from infrastructure.llm.token_counter import call_config
+
+
+def test_call_config_includes_langfuse_metadata_from_active_counter() -> None:
+    counter = TokenCounter(
+        user_id="u-1", session_id="conv-1", workspace_id="ws-1", tags=["chat"],
+    )
+    with counter:
+        cfg = call_config(None)
+    assert cfg["metadata"] == {
+        "langfuse_user_id": "u-1",
+        "langfuse_session_id": "conv-1",
+        "langfuse_tags": ["chat"],
+        "workspace_id": "ws-1",
+    }
+
+
+def test_call_config_omits_metadata_without_identity() -> None:
+    with TokenCounter():  # anonymous counter (identity-less)
+        assert "metadata" not in call_config(None)
+    assert "metadata" not in call_config(None)  # no active counter at all
+
+
+def test_call_config_keeps_token_and_langfuse_handlers() -> None:
+    sentinel = object()
+    cfg = call_config(sentinel)
+    assert sentinel in cfg["callbacks"]
+    assert any(isinstance(cb, TokenCountingCallbackHandler) for cb in cfg["callbacks"])

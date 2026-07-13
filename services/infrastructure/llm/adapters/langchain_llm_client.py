@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import structlog
 
-from infrastructure.llm.token_counter import callbacks_for
+from infrastructure.llm.token_counter import call_config
 
 if TYPE_CHECKING:
     from langchain_core.language_models.chat_models import BaseChatModel
@@ -95,9 +95,9 @@ class LangChainLLMClient:
         return self._models[key]
 
     def _config(self) -> dict:
-        # The token-counting handler is always attached; usage is recorded via
-        # on_llm_end (one collection point for every path), not imperatively.
-        return {"callbacks": callbacks_for(self._langfuse_handler)}
+        # Counting callback is always attached; Langfuse trace attribution
+        # comes from the active TokenCounter's identity (chat/ingestion scopes).
+        return call_config(self._langfuse_handler)
 
     @staticmethod
     def _text_messages(prompt: str, system_prompt: str | None) -> list:

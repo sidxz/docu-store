@@ -26,15 +26,40 @@ _active_counter: ContextVar[TokenCounter | None] = ContextVar("_active_counter",
 
 
 class TokenCounter:
-    """Accumulates prompt/completion token counts across multiple LLM calls."""
+    """Accumulates prompt/completion token counts across multiple LLM calls.
 
-    __slots__ = ("_token", "completion_tokens", "prompt_tokens", "total_tokens")
+    Optional identity fields attribute the scope's work: they feed Langfuse
+    trace metadata (via ``call_config``) and let the owner of the scope write
+    a ledger event afterwards. Identity-less counters behave exactly as before.
+    """
 
-    def __init__(self) -> None:
+    __slots__ = (
+        "_token",
+        "completion_tokens",
+        "prompt_tokens",
+        "session_id",
+        "tags",
+        "total_tokens",
+        "user_id",
+        "workspace_id",
+    )
+
+    def __init__(
+        self,
+        *,
+        user_id: str | None = None,
+        session_id: str | None = None,
+        workspace_id: str | None = None,
+        tags: list[str] | None = None,
+    ) -> None:
         self.prompt_tokens: int = 0
         self.completion_tokens: int = 0
         self.total_tokens: int = 0
         self._token = None
+        self.user_id = user_id
+        self.session_id = session_id
+        self.workspace_id = workspace_id
+        self.tags = tags
 
     def add(self, prompt: int, completion: int) -> None:
         self.prompt_tokens += prompt
@@ -136,3 +161,26 @@ def callbacks_for(langfuse_handler: object | None = None) -> list:
     if langfuse_handler is not None:
         callbacks.append(langfuse_handler)
     return callbacks
+
+
+def call_config(langfuse_handler: object | None = None) -> dict:
+    """LangChain call config: counting+tracing callbacks, plus Langfuse v3
+    trace attribution (``langfuse_*`` metadata keys) when the active counter
+    carries identity. The single construction point for every adapter.
+    """
+    config: dict = {"callbacks": callbacks_for(langfuse_handler)}
+    counter = _active_counter.get()
+    if counter is None:
+        return config
+    metadata: dict = {}
+    if counter.user_id:
+        metadata["langfuse_user_id"] = counter.user_id
+    if counter.session_id:
+        metadata["langfuse_session_id"] = counter.session_id
+    if counter.tags:
+        metadata["langfuse_tags"] = list(counter.tags)
+    if counter.workspace_id:
+        metadata["workspace_id"] = counter.workspace_id
+    if metadata:
+        config["metadata"] = metadata
+    return config
