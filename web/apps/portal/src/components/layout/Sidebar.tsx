@@ -14,7 +14,6 @@ import {
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
-  FlaskConical,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAuthzHasRole } from "@sentinel-auth/react";
@@ -24,6 +23,7 @@ import { useSidebarStore } from "@/lib/stores/sidebar-store";
 import { useAnalytics } from "@/hooks/use-analytics";
 
 import { SidebarNavItem } from "./SidebarNavItem";
+import { LogoMark } from "@/components/ui/LogoMark";
 
 interface NavItem {
   label: string;
@@ -65,13 +65,14 @@ export function Sidebar({ workspaceSlug }: { workspaceSlug: string }) {
     >
       {/* Brand */}
       <div className="flex h-14 items-center gap-3 border-b border-sidebar-border px-4">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-blue-400 shadow-sm">
-          <FlaskConical className="h-4 w-4 text-white" />
-        </div>
+        <LogoMark className="h-8 w-8 shrink-0 text-sidebar-text-active" />
         {!collapsed && (
           <div className="flex flex-col">
-            <span className="text-sm font-bold tracking-wide text-sidebar-text-active">
-              DocuStore.io
+            <span
+              className="text-[15px] font-medium tracking-tight text-sidebar-text-active"
+              style={{ fontFamily: "var(--font-overused-grotesk), ui-sans-serif, sans-serif" }}
+            >
+              DocuStore<span className="opacity-40">.io</span>
             </span>
             <span className="text-xs uppercase tracking-widest text-sidebar-text opacity-60">
               {workspaceSlug}

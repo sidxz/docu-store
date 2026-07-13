@@ -22,6 +22,13 @@
 @source "../../node_modules/streamdown/dist/*.js";
 @source "../../node_modules/@streamdown/math/dist/*.js";
 
+/* Third font option (docustore.io brand font). Mirrors tokens.css's
+   [data-font="inter"] rule — move upstream into daikon-design-tokens when
+   the package gets its next release. Mono intentionally stays IBM Plex Mono. */
+[data-font="grotesk"] {
+  --font-sans: var(--font-overused-grotesk, ui-sans-serif, system-ui, sans-serif);
+}
+
 /* ---------------------------------------------------------------------------
  * Global styles
  * ------------------------------------------------------------------------- */

@@ -19,6 +19,7 @@ const THEME_OPTIONS = [
 ];
 
 const FONT_OPTIONS = [
+  { label: "Overused Grotesk", value: "grotesk" as const, icon: Type },
   { label: "IBM Plex", value: "plex" as const, icon: Type },
   { label: "Inter", value: "inter" as const, icon: Type },
 ];
@@ -74,7 +75,7 @@ export default function SettingsPage() {
             className="mt-4"
             value={font}
             onValueChange={(nv) => {
-              if (nv) setFont(nv as "plex" | "inter");
+              if (nv) setFont(nv as "plex" | "inter" | "grotesk");
             }}
           >
             {FONT_OPTIONS.map(({ value, label, icon: Icon }) => (

@@ -2,16 +2,19 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { FlaskConical } from "lucide-react";
 import { useAuthz } from "@sentinel-auth/react";
 import { useAppConfig } from "@/lib/app-config";
 import { ShapeGrid } from "@/components/backgrounds/ShapeGrid";
+import { LogoMark } from "@/components/ui/LogoMark";
 
-const mono = { fontFamily: "var(--font-plex-mono), ui-monospace, monospace" };
+// Wordmark is always the brand font, regardless of the user's app font setting
+const wordmark = {
+  fontFamily: "var(--font-overused-grotesk), ui-sans-serif, sans-serif",
+};
 
-// docustore.io button language: sharp, mono-labelled, flat hovers
+// docustore.io button shape (sharp, flat hovers), app typography (Plex Sans)
 const btnBase =
-  "flex h-11 w-full items-center justify-center gap-3 rounded-none px-4 text-[11px] font-medium uppercase tracking-[0.1em] transition-colors";
+  "flex h-11 w-full items-center justify-center gap-3 rounded-none px-4 text-sm font-medium transition-colors";
 
 export default function LoginPage() {
   const { login, isAuthenticated, isLoading } = useAuthz();
@@ -39,19 +42,17 @@ export default function LoginPage() {
           <div />
 
           <div>
-            <div
-              className="flex h-14 w-14 items-center justify-center rounded-xl border bg-white"
-              style={{ borderColor: "#e2e8f0" }}
-            >
-              <FlaskConical className="h-7 w-7" style={{ color: "#3b82f6" }} />
+            {/* Site logo lockup at hero scale: bare mark left, .io muted to 30% ink */}
+            <div className="flex items-center gap-3" style={{ color: "#0f172a" }}>
+              <LogoMark className="h-12 w-12 xl:h-14 xl:w-14" />
+              <h1
+                className="text-4xl xl:text-5xl"
+                style={{ ...wordmark, fontWeight: 500, letterSpacing: "-0.02em" }}
+              >
+                DocuStore
+                <span style={{ color: "rgba(15, 23, 42, 0.3)" }}>.io</span>
+              </h1>
             </div>
-
-            <h1
-              className="mt-6 text-5xl font-semibold xl:text-6xl"
-              style={{ color: "#0f172a", letterSpacing: "0.02em" }}
-            >
-              DocuStore
-            </h1>
 
             <div
               className="mt-5 h-[1.5px] w-14"
@@ -78,7 +79,7 @@ export default function LoginPage() {
             >
               docustore.io
             </a>
-            <p className="mt-1 text-xs" style={{ ...mono, color: "#94a3b8" }}>
+            <p className="mt-1 text-xs" style={{ color: "#94a3b8" }}>
               &copy; 2026 DocuStore. All rights reserved.
             </p>
           </div>
@@ -101,18 +102,16 @@ export default function LoginPage() {
               className="mb-10 flex flex-col items-center md:hidden"
               style={{ animation: "auth-enter 0.6s ease-out 0.05s both" }}
             >
-              <div
-                className="flex h-12 w-12 items-center justify-center rounded-xl border bg-white"
-                style={{ borderColor: "#e2e8f0" }}
-              >
-                <FlaskConical className="h-6 w-6" style={{ color: "#3b82f6" }} />
+              <div className="flex items-center gap-2" style={{ color: "#0f172a" }}>
+                <LogoMark className="h-9 w-9" />
+                <h1
+                  className="text-2xl"
+                  style={{ ...wordmark, fontWeight: 500, letterSpacing: "-0.02em" }}
+                >
+                  DocuStore
+                  <span style={{ color: "rgba(15, 23, 42, 0.3)" }}>.io</span>
+                </h1>
               </div>
-              <h1
-                className="mt-3 text-2xl font-semibold"
-                style={{ color: "#0f172a", letterSpacing: "0.02em" }}
-              >
-                DocuStore
-              </h1>
               <p className="mt-1 text-sm" style={{ color: "#64748b" }}>
                 Document intelligence for drug discovery
               </p>
@@ -138,7 +137,7 @@ export default function LoginPage() {
                 disabled={!googleClientId}
                 onClick={() => login("google")}
                 className={`${btnBase} cursor-pointer border border-[#0f172a] bg-white text-[#0f172a] hover:bg-[#f1f5f9]`}
-                style={{ ...mono, animation: "auth-enter 0.5s ease-out 0.2s both" }}
+                style={{ animation: "auth-enter 0.5s ease-out 0.2s both" }}
               >
                 <GoogleIcon />
                 Continue with Google
@@ -149,7 +148,7 @@ export default function LoginPage() {
                 disabled={!githubClientId}
                 onClick={() => login("github")}
                 className={`${btnBase} cursor-pointer bg-[#0f172a] text-white hover:opacity-85`}
-                style={{ ...mono, animation: "auth-enter 0.5s ease-out 0.25s both" }}
+                style={{ animation: "auth-enter 0.5s ease-out 0.25s both" }}
               >
                 <GitHubIcon />
                 Continue with GitHub
@@ -159,7 +158,7 @@ export default function LoginPage() {
               <button
                 disabled={!entraIdClientId}
                 className={`${btnBase} cursor-not-allowed border border-[#e2e8f0] bg-white text-[#94a3b8] opacity-60`}
-                style={{ ...mono, animation: "auth-enter 0.5s ease-out 0.3s both" }}
+                style={{ animation: "auth-enter 0.5s ease-out 0.3s both" }}
               >
                 <MicrosoftIcon />
                 Continue with Entra ID
@@ -180,7 +179,7 @@ export default function LoginPage() {
               >
                 docustore.io
               </a>
-              <p className="mt-1 text-xs" style={{ ...mono, color: "#94a3b8" }}>
+              <p className="mt-1 text-xs" style={{ color: "#94a3b8" }}>
                 &copy; 2026 DocuStore
               </p>
             </div>

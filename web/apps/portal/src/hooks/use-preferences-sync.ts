@@ -76,7 +76,11 @@ export function usePreferencesSync() {
       useDevModeStore.getState().setEnabled(serverPrefs.dev_mode);
       useSidebarStore.getState().setCollapsed(serverPrefs.sidebar_collapsed);
       useScopeStore.getState().setDefaultScope(scope);
-      useFontFamilyStore.getState().setFont(serverPrefs.font_family === "inter" ? "inter" : "plex");
+      useFontFamilyStore.getState().setFont(
+        serverPrefs.font_family === "plex" || serverPrefs.font_family === "grotesk"
+          ? serverPrefs.font_family
+          : "inter",
+      );
       syncing.current = false;
       setHydrated(true);
     }

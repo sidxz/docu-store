@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- DocuStore favicon — the hexagon+leader+node fragment of the "cited
+       compound" mark (src/components/layout/logo.tsx); the full mark is
+       illegible at 16px. Ink parts flip to paper on dark tab strips. -->
+  <style>
+    .k { fill: #0b0b0d; }
+    .s { stroke: #0b0b0d; }
+    @media (prefers-color-scheme: dark) {
+      .k { fill: #fafafa; }
+      .s { stroke: #fafafa; }
+    }
+  </style>
+  <defs>
+    <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="13.5" y1="22.5" x2="26.5" y2="7.5">
+      <stop offset="0" stop-color="#37d7fa"/>
+      <stop offset="0.4" stop-color="#4b72fe"/>
+      <stop offset="0.68" stop-color="#ff8df2"/>
+      <stop offset="1" stop-color="#ff8705"/>
+    </linearGradient>
+  </defs>
+  <polygon points="20,7.5 26.5,11.25 26.5,18.75 20,22.5 13.5,18.75 13.5,11.25" fill="none" stroke="url(#g)" stroke-width="2.2"/>
+  <line class="s" x1="14.4" y1="18.3" x2="10.3" y2="20.65" stroke-width="2"/>
+  <circle class="k" cx="8.5" cy="21.7" r="2.4"/>
+</svg>
