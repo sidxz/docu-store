@@ -124,6 +124,9 @@ class MongoTokenUsageStore:
                 },
             },
         ]
+        # ponytail: hard 1000-group cap (~500 users/workspace) with no $sort, so an
+        # oversized workspace truncates arbitrarily. Add $sort + $limit (top-N by
+        # total) if a workspace ever approaches that size.
         rows = await self._coll.aggregate(pipeline).to_list(length=1000)
         return _rows_to_members(rows)
 
