@@ -45,17 +45,19 @@ async def backfill(dry_run: bool) -> None:
             if not tu.get("total"):
                 skipped_no_usage += 1
                 continue
+            ws = conv.get("workspace_id")
+            owner = conv.get("owner_id")
             doc = {
                 "_id": f"chat:{msg['message_id']}",
-                "workspace_id": conv.get("workspace_id"),
-                "user_id": conv.get("owner_id"),
+                "workspace_id": str(ws) if ws else None,
+                "user_id": str(owner) if owner else None,
                 "kind": "chat",
                 "source": "chat_message",
                 "prompt": int(tu.get("prompt", 0)),
                 "completion": int(tu.get("completion", 0)),
                 "total": int(tu.get("total", 0)),
                 "model": None,
-                "ref": conv["conversation_id"],
+                "ref": str(conv["conversation_id"]),
                 "created_at": msg["created_at"],
             }
             if not dry_run:
@@ -68,6 +70,7 @@ async def backfill(dry_run: bool) -> None:
         skipped_no_usage=skipped_no_usage,
         dry_run=dry_run,
     )
+    client.close()
 
 
 if __name__ == "__main__":
