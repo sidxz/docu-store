@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRecentChats, useCreateConversation } from "@/hooks/use-chat";
 import { useFolders, useFolderChats } from "@/hooks/use-folders";
-import { useChatStore } from "@/lib/stores/chat-store";
 import { FolderStrip } from "@/components/folders/FolderStrip";
 import { ChatRow } from "@/components/folders/ChatRow";
 import { RecentChatCard } from "./RecentChatCard";
@@ -16,7 +15,6 @@ export function RecentChatsPanel({ workspace }: { workspace: string }) {
   const router = useRouter();
   const { data: chats, isLoading } = useRecentChats(5);
   const createConversation = useCreateConversation();
-  const resetChat = useChatStore((s) => s.reset);
 
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const { data: folders } = useFolders();
@@ -38,7 +36,6 @@ export function RecentChatsPanel({ workspace }: { workspace: string }) {
   }, [folders, selectedFolderId, selectedFolder]);
 
   const handleNew = async () => {
-    resetChat();
     const conv = await createConversation.mutateAsync(undefined);
     router.push(`/${workspace}/chat/${conv.conversation_id}`);
   };

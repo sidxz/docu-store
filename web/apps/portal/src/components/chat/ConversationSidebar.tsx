@@ -29,7 +29,6 @@ export function ConversationSidebar({
   const resetChat = useChatStore((s) => s.reset);
 
   const handleNew = async () => {
-    resetChat();
     const conv = await createConversation.mutateAsync(undefined);
     router.push(`/${workspace}/chat/${conv.conversation_id}`);
   };
@@ -54,7 +53,6 @@ export function ConversationSidebar({
   };
 
   const handleSelect = (id: string) => {
-    resetChat();
     router.push(`/${workspace}/chat/${id}`);
   };
 
