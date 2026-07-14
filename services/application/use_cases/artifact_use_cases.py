@@ -29,7 +29,6 @@ if TYPE_CHECKING:
     from application.ports.summary_vector_store import SummaryVectorStore
     from application.ports.vector_store import VectorStore
     from domain.value_objects.summary_candidate import SummaryCandidate
-    from domain.value_objects.title_mention import TitleMention
 
 logger = structlog.get_logger()
 
@@ -160,51 +159,6 @@ class RemovePagesUseCase:
         return Success(result)
 
 
-class UpdateTitleMentionUseCase:
-    """Update title mention for an artifact."""
-
-    def __init__(
-        self,
-        artifact_repository: ArtifactRepository,
-        external_event_publisher: ExternalEventPublisher | None = None,
-    ) -> None:
-        self.artifact_repository = artifact_repository
-        self.external_event_publisher = external_event_publisher
-
-    @handle_domain_errors
-    async def execute(
-        self,
-        artifact_id: UUID,
-        title_mention: TitleMention | None,
-        auth: AuthContext | None = None,
-    ) -> Result[ArtifactResponse, AppError]:
-        require_editor(auth)
-
-        logger.info(
-            "update_title_mention_use_case_start",
-            artifact_id=str(artifact_id),
-            title_mention=title_mention,
-            title_mention_type=type(title_mention).__name__ if title_mention else "None",
-        )
-
-        artifact = self.artifact_repository.get_by_id(artifact_id)
-        require_artifact_workspace(auth, artifact)
-
-        artifact.update_title_mention(title_mention)
-        self.artifact_repository.save(artifact)
-
-        result = ArtifactMapper.to_artifact_response(artifact)
-
-        if self.external_event_publisher:
-            await self.external_event_publisher.notify_artifact_updated(
-                result,
-                sub_type="TitleMentionUpdated",
-            )
-
-        logger.info("update_title_mention_use_case_success", artifact_id=str(artifact_id))
-        return Success(result)
-
-
 class UpdateSummaryCandidateUseCase:
     """Update summary candidate for an artifact."""
 
@@ -237,43 +191,6 @@ class UpdateSummaryCandidateUseCase:
             await self.external_event_publisher.notify_artifact_updated(
                 result,
                 sub_type="SummaryCandidateUpdated",
-            )
-
-        return Success(result)
-
-
-class UpdateTagMentionsUseCase:
-    """Update tag mentions for an artifact."""
-
-    def __init__(
-        self,
-        artifact_repository: ArtifactRepository,
-        external_event_publisher: ExternalEventPublisher | None = None,
-    ) -> None:
-        self.artifact_repository = artifact_repository
-        self.external_event_publisher = external_event_publisher
-
-    @handle_domain_errors
-    async def execute(
-        self,
-        artifact_id: UUID,
-        tag_mentions: list,
-        auth: AuthContext | None = None,
-    ) -> Result[ArtifactResponse, AppError]:
-        require_editor(auth)
-
-        artifact = self.artifact_repository.get_by_id(artifact_id)
-        require_artifact_workspace(auth, artifact)
-
-        artifact.update_tag_mentions(tag_mentions)
-        self.artifact_repository.save(artifact)
-
-        result = ArtifactMapper.to_artifact_response(artifact)
-
-        if self.external_event_publisher:
-            await self.external_event_publisher.notify_artifact_updated(
-                result,
-                sub_type="TagMentionsUpdated",
             )
 
         return Success(result)

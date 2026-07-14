@@ -18,14 +18,17 @@ from application.ports.repositories.artifact_read_models import ArtifactReadMode
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.user_preferences_store import UserPreferencesStore
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
-from application.use_cases.artifact_use_cases import (
-    CreateArtifactUseCase,
-    UpdateTitleMentionUseCase,
+from application.use_cases.artifact_use_cases import CreateArtifactUseCase
+from application.use_cases.correct_metadata_use_cases import (
+    CorrectArtifactMetadataUseCase,
+    CorrectPageCompoundMentionsUseCase,
 )
 from application.use_cases.page_use_cases import CreatePageUseCase, DeletePageUseCase
 from application.use_cases.token_limit_use_cases import CheckTokenQuotaUseCase
 from domain.value_objects.artifact_type import ArtifactType
+from domain.value_objects.compound_mention import CompoundMention
 from domain.value_objects.mime_type import MimeType
+from domain.value_objects.title_mention import TitleMention
 from interfaces.api.main import app
 from interfaces.dependencies import get_auth, get_container
 from tests.conftest import strip_authz_middleware
@@ -45,7 +48,9 @@ class FakeArtifactReadModel(ArtifactReadModel):
         self._artifacts = artifacts
 
     async def get_artifact_by_id(
-        self, artifact_id: UUID, workspace_id: UUID | None = None,
+        self,
+        artifact_id: UUID,
+        workspace_id: UUID | None = None,
     ) -> ArtifactResponse | None:
         return self._artifacts.get(artifact_id)
 
@@ -67,12 +72,16 @@ class FakePageReadModel(PageReadModel):
         self._pages = pages
 
     async def get_page_by_id(
-        self, page_id: UUID, workspace_id: UUID | None = None,
+        self,
+        page_id: UUID,
+        workspace_id: UUID | None = None,
     ) -> PageResponse | None:
         return self._pages.get(page_id)
 
     async def get_pages_by_id(
-        self, page_ids: list[UUID], workspace_id: UUID | None = None,
+        self,
+        page_ids: list[UUID],
+        workspace_id: UUID | None = None,
     ) -> list[PageResponse]:
         return [self._pages[pid] for pid in page_ids if pid in self._pages]
 
@@ -80,7 +89,9 @@ class FakePageReadModel(PageReadModel):
         return 0
 
     async def get_pages_by_artifact_ids(
-        self, artifact_ids: list[UUID], workspace_id: UUID | None = None,
+        self,
+        artifact_ids: list[UUID],
+        workspace_id: UUID | None = None,
     ) -> list[PageResponse]:
         return [p for p in self._pages.values() if p.artifact_id in artifact_ids]
 
@@ -95,7 +106,10 @@ class FakeUserPreferencesStore(UserPreferencesStore):
         return UserPreferencesDTO(**self._docs.get((workspace_id, user_id), {}))
 
     async def update_preferences(
-        self, workspace_id: UUID, user_id: UUID, updates: dict,
+        self,
+        workspace_id: UUID,
+        user_id: UUID,
+        updates: dict,
     ) -> UserPreferencesDTO:
         doc = self._docs.setdefault((workspace_id, user_id), {})
         doc.update(updates)
@@ -118,7 +132,8 @@ def make_client() -> Callable[[dict[type, object]], TestClient]:
     strip_authz_middleware(app)
 
     def _make_client(
-        overrides: dict[type, object], auth: FakeAuth | None = None,
+        overrides: dict[type, object],
+        auth: FakeAuth | None = None,
     ) -> TestClient:
         container = FakeContainer(overrides)
         fake_auth = auth or FakeAuth(role="editor")
@@ -284,13 +299,26 @@ class TestArtifactRoutes:
         assert blob.get_keys == [derived]
         assert all("source.pptx" not in k for k in blob.exists_keys)
 
-    def test_update_title_mention_validation_error(self, make_client) -> None:
+
+class TestArtifactMetadataCorrection:
+    """hiledit: PATCH /artifacts/{id}/metadata, gated on artifacts:hiledit."""
+
+    def test_denied_without_hiledit_action(self, make_client) -> None:
+        client = make_client({}, auth=FakeAuth(role="editor", actions=set()))
+
+        response = client.patch(
+            f"/artifacts/{uuid4()}/metadata",
+            json={"title": "Corrected Title"},
+        )
+
+        assert response.status_code == 403
+
+    def test_correct_metadata_success(self, make_client) -> None:
         artifact_id = uuid4()
         read_model = FakeArtifactReadModel(
             {
                 artifact_id: ArtifactResponse(
                     artifact_id=artifact_id,
-                    source_uri="https://example.com/paper.pdf",
                     source_filename="paper.pdf",
                     artifact_type=ArtifactType.RESEARCH_ARTICLE,
                     mime_type=MimeType.PDF,
@@ -298,19 +326,83 @@ class TestArtifactRoutes:
                 ),
             },
         )
-        error_result = Failure(AppError("validation", "bad payload"))
-        use_case = FakeUseCase(error_result)
+        response_dto = ArtifactResponse(
+            artifact_id=artifact_id,
+            source_filename="paper.pdf",
+            artifact_type=ArtifactType.RESEARCH_ARTICLE,
+            mime_type=MimeType.PDF,
+            storage_location="/storage/paper.pdf",
+            title_mention=TitleMention(title="Corrected Title"),
+        )
         client = make_client(
             {
-                UpdateTitleMentionUseCase: use_case,
+                CorrectArtifactMetadataUseCase: FakeUseCase(Success(response_dto)),
                 ArtifactReadModel: read_model,
             },
         )
 
         response = client.patch(
-            f"/artifacts/{artifact_id}/title_mention",
-            json={"title": "Title", "confidence": 0.9},
+            f"/artifacts/{artifact_id}/metadata",
+            json={"title": "Corrected Title"},
         )
+
+        assert response.status_code == 200
+        assert response.json()["title_mention"]["title"] == "Corrected Title"
+
+    def test_admin_bypasses_hiledit_action_check(self, make_client) -> None:
+        artifact_id = uuid4()
+        read_model = FakeArtifactReadModel(
+            {
+                artifact_id: ArtifactResponse(
+                    artifact_id=artifact_id,
+                    source_filename="paper.pdf",
+                    artifact_type=ArtifactType.RESEARCH_ARTICLE,
+                    mime_type=MimeType.PDF,
+                    storage_location="/storage/paper.pdf",
+                ),
+            },
+        )
+        response_dto = ArtifactResponse(
+            artifact_id=artifact_id,
+            source_filename="paper.pdf",
+            artifact_type=ArtifactType.RESEARCH_ARTICLE,
+            mime_type=MimeType.PDF,
+            storage_location="/storage/paper.pdf",
+        )
+        client = make_client(
+            {
+                CorrectArtifactMetadataUseCase: FakeUseCase(Success(response_dto)),
+                ArtifactReadModel: read_model,
+            },
+            auth=FakeAuth(role="admin", actions=set()),
+        )
+
+        response = client.patch(f"/artifacts/{artifact_id}/metadata", json={"title": "X"})
+
+        assert response.status_code == 200
+
+    def test_empty_correction_request_returns_400(self, make_client) -> None:
+        artifact_id = uuid4()
+        read_model = FakeArtifactReadModel(
+            {
+                artifact_id: ArtifactResponse(
+                    artifact_id=artifact_id,
+                    source_filename="paper.pdf",
+                    artifact_type=ArtifactType.RESEARCH_ARTICLE,
+                    mime_type=MimeType.PDF,
+                    storage_location="/storage/paper.pdf",
+                ),
+            },
+        )
+        error_result = Failure(AppError("validation", "No fields to correct"))
+        client = make_client(
+            {
+                CorrectArtifactMetadataUseCase: FakeUseCase(error_result),
+                ArtifactReadModel: read_model,
+            },
+        )
+
+        response = client.patch(f"/artifacts/{artifact_id}/metadata", json={})
 
         assert response.status_code == 400
 
@@ -406,6 +498,96 @@ class TestPageRoutes:
         response = client.delete(f"/pages/{page_id}")
 
         assert response.status_code == 204
+
+
+class TestPageCompoundMentionsCorrection:
+    """hiledit: PUT /pages/{id}/compound_mentions, gated on artifacts:hiledit."""
+
+    def test_denied_without_hiledit_action(self, make_client) -> None:
+        client = make_client({}, auth=FakeAuth(role="editor", actions=set()))
+
+        response = client.put(
+            f"/pages/{uuid4()}/compound_mentions",
+            json={"compound_mentions": []},
+        )
+
+        assert response.status_code == 403
+
+    def test_correct_compound_mentions_success(self, make_client) -> None:
+        page_id = uuid4()
+        artifact_id = uuid4()
+        read_model = FakePageReadModel(
+            {
+                page_id: PageResponse(
+                    page_id=page_id,
+                    artifact_id=artifact_id,
+                    name="Page",
+                    index=0,
+                    compound_mentions=[],
+                    tag_mentions=[],
+                ),
+            },
+        )
+        response_dto = PageResponse(
+            page_id=page_id,
+            artifact_id=artifact_id,
+            name="Page",
+            index=0,
+            compound_mentions=[CompoundMention(smiles="C1=CC=CC=C1")],
+            tag_mentions=[],
+        )
+        client = make_client(
+            {
+                CorrectPageCompoundMentionsUseCase: FakeUseCase(Success(response_dto)),
+                PageReadModel: read_model,
+            },
+        )
+
+        response = client.put(
+            f"/pages/{page_id}/compound_mentions",
+            json={"compound_mentions": [{"smiles": "C1=CC=CC=C1"}]},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["compound_mentions"][0]["smiles"] == "C1=CC=CC=C1"
+
+    def test_admin_bypasses_hiledit_action_check(self, make_client) -> None:
+        page_id = uuid4()
+        artifact_id = uuid4()
+        read_model = FakePageReadModel(
+            {
+                page_id: PageResponse(
+                    page_id=page_id,
+                    artifact_id=artifact_id,
+                    name="Page",
+                    index=0,
+                    compound_mentions=[],
+                    tag_mentions=[],
+                ),
+            },
+        )
+        response_dto = PageResponse(
+            page_id=page_id,
+            artifact_id=artifact_id,
+            name="Page",
+            index=0,
+            compound_mentions=[],
+            tag_mentions=[],
+        )
+        client = make_client(
+            {
+                CorrectPageCompoundMentionsUseCase: FakeUseCase(Success(response_dto)),
+                PageReadModel: read_model,
+            },
+            auth=FakeAuth(role="admin", actions=set()),
+        )
+
+        response = client.put(
+            f"/pages/{page_id}/compound_mentions",
+            json={"compound_mentions": []},
+        )
+
+        assert response.status_code == 200
 
 
 class TestUserPreferencesRoutes:

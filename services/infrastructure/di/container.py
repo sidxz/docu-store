@@ -40,13 +40,9 @@ from application.use_cases.artifact_use_cases import (
     CreateArtifactUseCase,
     DeleteArtifactUseCase,
     RemovePagesUseCase,
-    UpdateTitleMentionUseCase,
 )
 from application.use_cases.artifact_use_cases import (
     UpdateSummaryCandidateUseCase as UpdateArtifactSummaryCandidateUseCase,
-)
-from application.use_cases.artifact_use_cases import (
-    UpdateTagMentionsUseCase as UpdateArtifactTagMentionsUseCase,
 )
 from application.use_cases.blob_use_cases import UploadBlobUseCase
 from application.use_cases.chat_folder_use_cases import (
@@ -68,6 +64,10 @@ from application.use_cases.chat_use_cases import (
 )
 from application.use_cases.compound_profile_use_case import GetCompoundProfileUseCase
 from application.use_cases.compound_use_cases import ExtractCompoundMentionsUseCase
+from application.use_cases.correct_metadata_use_cases import (
+    CorrectArtifactMetadataUseCase,
+    CorrectPageCompoundMentionsUseCase,
+)
 from application.use_cases.embedding_use_cases import (
     GeneratePageEmbeddingUseCase,
     SearchSimilarPagesUseCase,
@@ -518,18 +518,19 @@ def create_container() -> Container:
         artifact_repository=c[ArtifactRepository],
         external_event_publisher=c[ExternalEventPublisher],
     )
-    container[UpdateTitleMentionUseCase] = lambda c: UpdateTitleMentionUseCase(
-        artifact_repository=c[ArtifactRepository],
-        external_event_publisher=c[ExternalEventPublisher],
-    )
     container[UpdateArtifactSummaryCandidateUseCase] = (
         lambda c: UpdateArtifactSummaryCandidateUseCase(
             artifact_repository=c[ArtifactRepository],
             external_event_publisher=c[ExternalEventPublisher],
         )
     )
-    container[UpdateArtifactTagMentionsUseCase] = lambda c: UpdateArtifactTagMentionsUseCase(
+    container[CorrectArtifactMetadataUseCase] = lambda c: CorrectArtifactMetadataUseCase(
         artifact_repository=c[ArtifactRepository],
+        external_event_publisher=c[ExternalEventPublisher],
+    )
+    container[CorrectPageCompoundMentionsUseCase] = lambda c: CorrectPageCompoundMentionsUseCase(
+        page_repository=c[PageRepository],
+        smiles_validator=c[SmilesValidator],
         external_event_publisher=c[ExternalEventPublisher],
     )
     container[DeleteArtifactUseCase] = lambda c: DeleteArtifactUseCase(

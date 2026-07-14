@@ -4,14 +4,13 @@ from pathlib import PurePosixPath
 from typing import Annotated
 from uuid import UUID
 
-import structlog
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
-from returns.result import Success
 from sentinel_auth import RequestAuth
 
 from application.dtos.artifact_dtos import ArtifactResponse, CreateArtifactRequest
 from application.dtos.blob_dtos import UploadBlobRequest
+from application.dtos.correction_dtos import CorrectArtifactMetadataRequest
 from application.dtos.permission_dtos import (
     ResourceACLResponse,
     ShareActionResponse,
@@ -34,16 +33,11 @@ from application.use_cases.artifact_use_cases import (
     DeleteArtifactUseCase,
     RemovePagesUseCase,
     UpdateSummaryCandidateUseCase,
-    UpdateTitleMentionUseCase,
 )
-from application.use_cases.artifact_use_cases import (
-    UpdateTagMentionsUseCase as UpdateArtifactTagMentionsUseCase,
-)
+from application.use_cases.correct_metadata_use_cases import CorrectArtifactMetadataUseCase
 from application.use_cases.storage_keys import render_pdf_key
 from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.summary_candidate import SummaryCandidate
-from domain.value_objects.tag_mention import TagMention
-from domain.value_objects.title_mention import TitleMention
 from interfaces.api.middleware import handle_use_case_errors
 from interfaces.api.routes.helpers import (
     ensure_within_quota,
@@ -55,8 +49,6 @@ from interfaces.api.routes.helpers import (
     get_allowed_artifact_ids as _get_allowed_artifact_ids,
 )
 from interfaces.dependencies import get_auth, get_container
-
-logger = structlog.get_logger()
 
 router = APIRouter(prefix="/artifacts", tags=["artifacts"])
 
@@ -173,38 +165,20 @@ async def remove_pages(
     return await use_case.execute(artifact_id=artifact_id, page_ids=page_ids, auth=auth)
 
 
-@router.patch("/{artifact_id}/title_mention", status_code=status.HTTP_200_OK)
+@router.patch("/{artifact_id}/metadata", status_code=status.HTTP_200_OK)
 @handle_use_case_errors
-async def update_title_mention(
+async def correct_artifact_metadata(
     artifact_id: UUID,
-    title_mention: Annotated[TitleMention | None, Body(...)],
+    request: CorrectArtifactMetadataRequest,
     container: Annotated[Container, Depends(get_container)],
     auth: Annotated[RequestAuth, Depends(get_auth)],
 ) -> ArtifactResponse:
-    """Update title mention for an artifact."""
+    """hiledit: human correction of title/date/tags/authors with provenance."""
+    await require_action(auth, "artifacts:hiledit")
     await require_workspace_artifact(artifact_id, auth, container)
     await require_artifact_permission(artifact_id, auth, "edit")
-    logger.info(
-        "update_title_mention_endpoint_called",
-        artifact_id=str(artifact_id),
-        title_mention=title_mention,
-        title_mention_type=type(title_mention).__name__,
-    )
-    use_case = container[UpdateTitleMentionUseCase]
-
-    logger.info(
-        "executing_use_case",
-        artifact_id=str(artifact_id),
-        title_mention=title_mention,
-    )
-    result = await use_case.execute(artifact_id=artifact_id, title_mention=title_mention, auth=auth)
-    logger.info(
-        "use_case_result",
-        result_type=type(result).__name__,
-        is_success=isinstance(result, Success),
-    )
-
-    return result
+    use_case = container[CorrectArtifactMetadataUseCase]
+    return await use_case.execute(artifact_id=artifact_id, request=request, auth=auth)
 
 
 @router.patch("/{artifact_id}/summary_candidate", status_code=status.HTTP_200_OK)
@@ -224,21 +198,6 @@ async def update_summary_candidate(
         summary_candidate=summary_candidate,
         auth=auth,
     )
-
-
-@router.patch("/{artifact_id}/tag_mentions", status_code=status.HTTP_200_OK)
-@handle_use_case_errors
-async def update_tag_mentions(
-    artifact_id: UUID,
-    tag_mentions: Annotated[list[TagMention], Body(...)],
-    container: Annotated[Container, Depends(get_container)],
-    auth: Annotated[RequestAuth, Depends(get_auth)],
-) -> ArtifactResponse:
-    """Update tag mentions for an artifact."""
-    await require_workspace_artifact(artifact_id, auth, container)
-    await require_artifact_permission(artifact_id, auth, "edit")
-    use_case = container[UpdateArtifactTagMentionsUseCase]
-    return await use_case.execute(artifact_id=artifact_id, tag_mentions=tag_mentions, auth=auth)
 
 
 @router.delete("/{artifact_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -405,7 +364,11 @@ async def stream_artifact_pdf(
 
     pdf_bytes = blob_store.get_bytes(pdf_key)
     # Always a PDF here — name it .pdf even when the source was .pptx/.docx.
-    stem = PurePosixPath(artifact.source_filename).stem if artifact.source_filename else str(artifact_id)
+    stem = (
+        PurePosixPath(artifact.source_filename).stem
+        if artifact.source_filename
+        else str(artifact_id)
+    )
     filename = f"{stem}.pdf"
 
     return StreamingResponse(

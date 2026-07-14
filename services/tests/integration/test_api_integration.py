@@ -14,10 +14,7 @@ from application.dtos.artifact_dtos import ArtifactResponse
 from application.dtos.page_dtos import PageResponse
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.ports.repositories.page_read_models import PageReadModel
-from application.use_cases.artifact_use_cases import (
-    CreateArtifactUseCase,
-    UpdateTitleMentionUseCase,
-)
+from application.use_cases.artifact_use_cases import CreateArtifactUseCase
 from application.use_cases.page_use_cases import AddCompoundMentionsUseCase, CreatePageUseCase
 from application.use_cases.token_limit_use_cases import CheckTokenQuotaUseCase
 from domain.value_objects.artifact_type import ArtifactType
@@ -50,7 +47,9 @@ class RepoBackedArtifactReadModel:
         self._repo = repo
 
     async def get_artifact_by_id(
-        self, artifact_id: UUID, workspace_id: UUID | None = None,
+        self,
+        artifact_id: UUID,
+        workspace_id: UUID | None = None,
     ) -> ArtifactResponse | None:
         try:
             a = self._repo.get_by_id(artifact_id)
@@ -84,7 +83,9 @@ class RepoBackedPageReadModel:
         self._repo = repo
 
     async def get_page_by_id(
-        self, page_id: UUID, workspace_id: UUID | None = None,
+        self,
+        page_id: UUID,
+        workspace_id: UUID | None = None,
     ) -> PageResponse | None:
         try:
             p = self._repo.get_by_id(page_id)
@@ -133,7 +134,6 @@ def _build_use_cases() -> tuple[dict[type, object], MockArtifactRepository, Mock
 
     use_cases: dict[type, object] = {
         CreateArtifactUseCase: CreateArtifactUseCase(artifact_repo),
-        UpdateTitleMentionUseCase: UpdateTitleMentionUseCase(artifact_repo),
         CreatePageUseCase: CreatePageUseCase(page_repo, artifact_repo),
         AddCompoundMentionsUseCase: AddCompoundMentionsUseCase(page_repo),
         ArtifactReadModel: RepoBackedArtifactReadModel(artifact_repo),
@@ -142,33 +142,6 @@ def _build_use_cases() -> tuple[dict[type, object], MockArtifactRepository, Mock
     }
 
     return use_cases, artifact_repo, page_repo
-
-
-def test_create_artifact_and_update_title_mention(client) -> None:
-    use_cases, artifact_repo, _ = _build_use_cases()
-    api = client(use_cases)
-
-    create_payload = {
-        "source_uri": "https://example.com/paper.pdf",
-        "source_filename": "paper.pdf",
-        "artifact_type": ArtifactType.RESEARCH_ARTICLE,
-        "mime_type": MimeType.PDF,
-        "storage_location": "/storage/paper.pdf",
-    }
-
-    create_response = api.post("/artifacts/", json=create_payload)
-    assert create_response.status_code == 201
-    artifact_id = UUID(create_response.json()["artifact_id"])
-
-    # ensure the artifact exists in repo
-    assert artifact_repo.get_by_id(artifact_id).source_filename == "paper.pdf"
-
-    update_response = api.patch(
-        f"/artifacts/{artifact_id}/title_mention",
-        json={"title": "Important Paper", "confidence": 0.95},
-    )
-    assert update_response.status_code == 200
-    assert update_response.json()["title_mention"]["title"] == "Important Paper"
 
 
 def test_create_page_and_add_compound_mentions(client) -> None:

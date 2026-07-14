@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from lagom import Container
 from sentinel_auth import RequestAuth
 
+from application.dtos.correction_dtos import CorrectPageCompoundMentionsRequest
 from application.dtos.page_dtos import AddCompoundMentionsRequest, CreatePageRequest, PageResponse
 from application.dtos.workflow_dtos import (
     SummaryDetailResponse,
@@ -12,6 +13,7 @@ from application.dtos.workflow_dtos import (
     WorkflowStatusMapResponse,
 )
 from application.ports.workflow_orchestrator import WorkflowOrchestrator
+from application.use_cases.correct_metadata_use_cases import CorrectPageCompoundMentionsUseCase
 from application.use_cases.page_use_cases import (
     AddCompoundMentionsUseCase,
     CreatePageUseCase,
@@ -39,6 +41,7 @@ from domain.value_objects.text_mention import TextMention
 from interfaces.api.middleware import handle_use_case_errors
 from interfaces.api.routes.helpers import (
     ensure_within_quota,
+    require_action,
     require_page_permission,
     require_workspace_page,
 )
@@ -159,6 +162,22 @@ async def update_compound_mentions(
 
     use_case = container[AddCompoundMentionsUseCase]
     return await use_case.execute(request=request, auth=auth)
+
+
+@router.put("/{page_id}/compound_mentions", status_code=status.HTTP_200_OK)
+@handle_use_case_errors
+async def correct_page_compound_mentions(
+    page_id: UUID,
+    request: CorrectPageCompoundMentionsRequest,
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> PageResponse:
+    """hiledit: replace compound mentions (labels/SMILES) with human corrections."""
+    await require_action(auth, "artifacts:hiledit")
+    page = await require_workspace_page(page_id, auth, container)
+    await require_page_permission(page, auth, "edit")
+    use_case = container[CorrectPageCompoundMentionsUseCase]
+    return await use_case.execute(page_id=page_id, request=request, auth=auth)
 
 
 @router.post("/{page_id}/embeddings/generate", status_code=status.HTTP_202_ACCEPTED)

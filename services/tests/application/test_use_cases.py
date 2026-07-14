@@ -14,13 +14,10 @@ from application.use_cases.artifact_use_cases import (
     DeleteArtifactUseCase,
     RemovePagesUseCase,
     UpdateSummaryCandidateUseCase,
-    UpdateTagMentionsUseCase,
-    UpdateTitleMentionUseCase,
 )
 from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.mime_type import MimeType
 from domain.value_objects.summary_candidate import SummaryCandidate
-from domain.value_objects.title_mention import TitleMention
 from tests.mocks import MockArtifactRepository, MockExternalEventPublisher, MockPageRepository
 
 
@@ -187,62 +184,6 @@ class TestRemovePagesUseCase:
         assert error.category == "not_found"
 
 
-class TestUpdateTitleMentionUseCase:
-    """Test UpdateTitleMentionUseCase."""
-
-    @pytest.mark.asyncio
-    async def test_update_title_mention_success(
-        self,
-        sample_artifact,
-        sample_title_mention,
-    ) -> None:
-        """Test successfully updating title mention."""
-        artifact_repo = MockArtifactRepository()
-        artifact_repo.save(sample_artifact)
-
-        use_case = UpdateTitleMentionUseCase(artifact_repo)
-
-        result = await use_case.execute(sample_artifact.id, sample_title_mention)
-
-        assert isinstance(result, Success)
-        response = result.unwrap()
-        assert response.title_mention == sample_title_mention
-
-    @pytest.mark.asyncio
-    async def test_update_title_mention_to_none(
-        self,
-        sample_artifact,
-        sample_title_mention,
-    ) -> None:
-        """Test updating title mention to None."""
-        artifact_repo = MockArtifactRepository()
-        sample_artifact.update_title_mention(sample_title_mention)
-        artifact_repo.save(sample_artifact)
-
-        use_case = UpdateTitleMentionUseCase(artifact_repo)
-
-        result = await use_case.execute(sample_artifact.id, None)
-
-        assert isinstance(result, Success)
-        response = result.unwrap()
-        assert response.title_mention is None
-
-    @pytest.mark.asyncio
-    async def test_update_title_mention_artifact_not_found(self) -> None:
-        """Test updating title mention when artifact doesn't exist."""
-        artifact_repo = MockArtifactRepository()
-        use_case = UpdateTitleMentionUseCase(artifact_repo)
-
-        result = await use_case.execute(
-            uuid4(),
-            TitleMention(title="test", confidence=0.9),
-        )
-
-        assert isinstance(result, Failure)
-        error = result.failure()
-        assert error.category == "not_found"
-
-
 class TestUpdateSummaryCandidateUseCase:
     """Test UpdateSummaryCandidateUseCase."""
 
@@ -274,51 +215,6 @@ class TestUpdateSummaryCandidateUseCase:
             uuid4(),
             SummaryCandidate(summary="test", page_number=1, confidence=0.9),
         )
-
-        assert isinstance(result, Failure)
-        error = result.failure()
-        assert error.category == "not_found"
-
-
-class TestUpdateTagMentionsUseCase:
-    """Test UpdateTagMentionsUseCase."""
-
-    @pytest.mark.asyncio
-    async def test_update_tag_mentions_success(self, sample_artifact, sample_tag_mention) -> None:
-        """Test successfully updating tag mentions."""
-        artifact_repo = MockArtifactRepository()
-        artifact_repo.save(sample_artifact)
-
-        use_case = UpdateTagMentionsUseCase(artifact_repo)
-
-        result = await use_case.execute(sample_artifact.id, [sample_tag_mention])
-
-        assert isinstance(result, Success)
-        response = result.unwrap()
-        assert len(response.tag_mentions) == 1
-        assert response.tag_mentions[0] == sample_tag_mention
-
-    @pytest.mark.asyncio
-    async def test_update_tag_mentions_empty(self, sample_artifact) -> None:
-        """Test updating with empty tag mentions."""
-        artifact_repo = MockArtifactRepository()
-        artifact_repo.save(sample_artifact)
-
-        use_case = UpdateTagMentionsUseCase(artifact_repo)
-
-        result = await use_case.execute(sample_artifact.id, [])
-
-        assert isinstance(result, Success)
-        response = result.unwrap()
-        assert response.tag_mentions == []
-
-    @pytest.mark.asyncio
-    async def test_update_tag_mentions_artifact_not_found(self, sample_tag_mention) -> None:
-        """Test updating tag mentions when artifact doesn't exist."""
-        artifact_repo = MockArtifactRepository()
-        use_case = UpdateTagMentionsUseCase(artifact_repo)
-
-        result = await use_case.execute(uuid4(), [sample_tag_mention])
 
         assert isinstance(result, Failure)
         error = result.failure()

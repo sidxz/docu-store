@@ -13,8 +13,6 @@ from application.use_cases.artifact_use_cases import (
     AddPagesUseCase,
     CreateArtifactUseCase,
     DeleteArtifactUseCase,
-    UpdateTagMentionsUseCase,
-    UpdateTitleMentionUseCase,
 )
 from application.use_cases.page_use_cases import (
     CreatePageUseCase,
@@ -24,9 +22,7 @@ from domain.aggregates.artifact import Artifact
 from domain.aggregates.page import Page
 from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.mime_type import MimeType
-from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.text_mention import TextMention
-from domain.value_objects.title_mention import TitleMention
 from tests.fakes.fake_auth import FakeAuth
 from tests.mocks import MockArtifactRepository, MockPageRepository
 
@@ -102,20 +98,6 @@ class TestRoleBasedAccess:
         assert result.failure().category == "forbidden"
 
     @pytest.mark.asyncio
-    async def test_viewer_cannot_update_tags(self) -> None:
-        auth = FakeAuth(role="viewer")
-        artifact = _create_artifact(workspace_id=auth.workspace_id)
-        repo = MockArtifactRepository()
-        repo.save(artifact)
-
-        use_case = UpdateTagMentionsUseCase(repo)
-        tag = TagMention(tag="tag", confidence=0.9)
-        result = await use_case.execute(artifact.id, [tag], auth=auth)
-
-        assert isinstance(result, Failure)
-        assert result.failure().category == "forbidden"
-
-    @pytest.mark.asyncio
     async def test_viewer_cannot_create_page(self) -> None:
         auth = FakeAuth(role="viewer")
         artifact = _create_artifact(workspace_id=auth.workspace_id)
@@ -157,25 +139,6 @@ class TestWorkspaceIsolation:
         assert result.failure().category == "not_found"
 
     @pytest.mark.asyncio
-    async def test_cannot_update_title_in_other_workspace(self) -> None:
-        workspace_a = uuid4()
-        auth = FakeAuth(role="editor", workspace_id=uuid4())
-
-        artifact = _create_artifact(workspace_id=workspace_a)
-        repo = MockArtifactRepository()
-        repo.save(artifact)
-
-        use_case = UpdateTitleMentionUseCase(repo)
-        result = await use_case.execute(
-            artifact.id,
-            TitleMention(title="new", confidence=0.9),
-            auth=auth,
-        )
-
-        assert isinstance(result, Failure)
-        assert result.failure().category == "not_found"
-
-    @pytest.mark.asyncio
     async def test_cannot_update_text_mention_in_other_workspace(self) -> None:
         workspace_a = uuid4()
         auth = FakeAuth(role="editor", workspace_id=uuid4())
@@ -198,21 +161,6 @@ class TestWorkspaceIsolation:
 
         assert isinstance(result, Failure)
         assert result.failure().category == "not_found"
-
-    @pytest.mark.asyncio
-    async def test_can_update_artifact_in_same_workspace(self) -> None:
-        workspace_id = uuid4()
-        auth = FakeAuth(role="editor", workspace_id=workspace_id)
-
-        artifact = _create_artifact(workspace_id=workspace_id)
-        repo = MockArtifactRepository()
-        repo.save(artifact)
-
-        use_case = UpdateTagMentionsUseCase(repo)
-        tag = TagMention(tag="tag1", confidence=0.9)
-        result = await use_case.execute(artifact.id, [tag], auth=auth)
-
-        assert isinstance(result, Success)
 
     @pytest.mark.asyncio
     async def test_can_add_pages_in_same_workspace(self) -> None:

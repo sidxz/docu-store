@@ -13,6 +13,10 @@ SERVICE_ACTIONS = [
     {"action": "artifacts:create", "description": "Create artifacts"},
     {"action": "artifacts:delete", "description": "Delete artifacts"},
     {"action": "artifacts:export", "description": "Export artifacts"},
+    {
+        "action": "artifacts:hiledit",
+        "description": "Human-in-the-loop correction of extracted metadata",
+    },
 ]
 
 sentinel = Sentinel(
