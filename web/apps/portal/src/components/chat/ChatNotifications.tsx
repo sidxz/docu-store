@@ -26,6 +26,11 @@ export function ChatNotifications() {
     if (typeof Notification === "undefined") return; // unsupported browser
     if (!isStreaming) return;
 
+    // Freeze the workspace segment at stream start: the cleanup below runs
+    // arbitrarily later, and pathnameRef tracks wherever the user has since
+    // navigated — possibly a different workspace.
+    const workspace = (pathnameRef.current ?? "").split("/")[1] ?? "";
+
     // Rising edge: one-time permission offer if the answer is slow.
     const timer = setTimeout(() => {
       const s = useChatStore.getState();
@@ -56,7 +61,6 @@ export function ChatNotifications() {
       const path = pathnameRef.current ?? "";
       const viewing = !document.hidden && path.includes(`/chat/${convId}`);
       if (viewing) return;
-      const workspace = path.split("/")[1] ?? "";
       const n = new Notification("Answer ready", {
         body: s.streamingContent.slice(0, 120) || "Your chat answer is ready.",
         tag: convId, // replaces stale notifications for the same conversation
