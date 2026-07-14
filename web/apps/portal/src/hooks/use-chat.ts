@@ -118,6 +118,44 @@ export function useSendMessage(conversationId: string | undefined) {
   const store = useChatStore();
   const { trackEvent } = useAnalytics();
   const abortRef = useRef<AbortController | null>(null);
+  const resumingRef = useRef(false);
+
+  /** Reattach to a server-side run (after reload or a 409). Replays buffered
+   *  events into the store, then tails live. Idempotent: no-ops when this
+   *  conversation is already streaming locally. */
+  const resume = async () => {
+    if (!conversationId || resumingRef.current) return;
+    const s = useChatStore.getState();
+    if (s.isStreaming && s.streamingConversationId === conversationId) return;
+    resumingRef.current = true;
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    useChatStore.getState().resumeStreaming(conversationId);
+    try {
+      const res = await authFetch(`/chat/${conversationId}/messages/stream`, {
+        signal: controller.signal,
+      });
+      // 404 = run finished (or evicted) before we attached — the refetch
+      // below picks up the persisted answer.
+      if (res.ok) {
+        await processSSEStream(res, store, controller.signal, trackEvent);
+      }
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) throw error;
+    } finally {
+      resumingRef.current = false;
+      // A newer send/resume may have taken over the stream — only the
+      // owner of the current controller may finish and refetch.
+      if (abortRef.current === controller) {
+        useChatStore.getState().finishStreaming();
+        queryClient.invalidateQueries({ queryKey: queryKeys.chat.detail(conversationId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.chat.all });
+      }
+    }
+  };
 
   const mutation = useMutation({
     mutationFn: async (message: string) => {
@@ -156,6 +194,14 @@ export function useSendMessage(conversationId: string | undefined) {
       });
 
       if (!res.ok) {
+        if (res.status === 409) {
+          // Another client (or tab) is already generating in this
+          // conversation — reattach to that run instead of erroring.
+          // The message we tried to send was not accepted.
+          store.finishStreaming();
+          await resume();
+          return;
+        }
         const detail = await readErrorDetail(res);
         const message = detail ?? `Chat failed: ${res.statusText}`;
         // Render in-thread via the same path SSE error events use.
@@ -217,7 +263,7 @@ export function useSendMessage(conversationId: string | undefined) {
     store.finishStreaming();
   };
 
-  return { ...mutation, abort, stop };
+  return { ...mutation, abort, stop, resume };
 }
 
 // ── SSE Parser ─────────────────────────────────────────────────────────────

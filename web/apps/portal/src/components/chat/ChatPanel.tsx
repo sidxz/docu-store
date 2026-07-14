@@ -143,6 +143,13 @@ export function ChatPanel({
     }
   }, [conversationId, queuedMessage]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Reattach to a server-side run after a reload (or a 409): the detail
+  // endpoint says one is active and no local stream owns this conversation.
+  // resume() itself is idempotent, so firing on refetches is harmless.
+  useEffect(() => {
+    if (data?.active_run) void sendMessage.resume();
+  }, [data?.active_run, conversationId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleSend = async (message: string) => {
     if (!conversationId) {
       // Queue the message, create conversation, then navigate — message auto-sends on mount

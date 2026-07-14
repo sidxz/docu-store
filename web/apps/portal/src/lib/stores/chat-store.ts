@@ -88,6 +88,7 @@ interface ChatState {
   setActiveSourcesMessageId: (id: string | null) => void;
   setQueuedMessage: (msg: string | null) => void;
   startStreaming: (userMessage: string, conversationId: string | null) => void;
+  resumeStreaming: (conversationId: string) => void;
   appendToken: (delta: string) => void;
   addStep: (step: AgentStep) => void;
   updateStep: (stepName: string, update: Partial<AgentStep>) => void;
@@ -176,6 +177,24 @@ export const useChatStore = create<ChatState>()(
       streamingSources: [],
       finalSources: null,
       pendingUserMessage: userMessage,
+      streamingConversationId: conversationId,
+      streamingThinkingBlocks: [],
+      streamingReasoning: "",
+      streamingStructuredBlocks: [],
+      groundingResult: null,
+      stepTimings: [],
+      rawEvents: [],
+      doneEvent: null,
+    }),
+
+  resumeStreaming: (conversationId) =>
+    set({
+      isStreaming: true,
+      streamingContent: "",
+      streamingSteps: [],
+      streamingSources: [],
+      finalSources: null,
+      pendingUserMessage: null,
       streamingConversationId: conversationId,
       streamingThinkingBlocks: [],
       streamingReasoning: "",
