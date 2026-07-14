@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from application.dtos.usage_dtos import MemberTokenUsage
+
 
 class WorkflowTypeStats(BaseModel):
     workflow_type: str
@@ -169,3 +171,11 @@ class CitationFrequencyResponse(BaseModel):
     never_cited: list[UncitedArtifactEntry]
     never_cited_count: int
     total_artifacts: int
+
+
+# --- Per-member token usage (admin) ---
+
+
+class MemberUsageStatsResponse(BaseModel):
+    members: list[MemberTokenUsage]
+    period_days: int

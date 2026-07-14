@@ -1,7 +1,7 @@
 """Pipeline stats routes for admin monitoring."""
 
 from collections import defaultdict
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 import structlog
@@ -18,6 +18,7 @@ from application.dtos.stats_dtos import (
     FailedWorkflow,
     GroundingStatsResponse,
     KnowledgeGapsResponse,
+    MemberUsageStatsResponse,
     PipelineStatsResponse,
     SearchQualityStatsResponse,
     TokenUsageStatsResponse,
@@ -344,6 +345,25 @@ async def get_token_usage_stats(
 
     analytics = container[AnalyticsReadModel]
     return await analytics.get_token_usage(_period_to_days(period), workspace_id=auth.workspace_id)
+
+
+@router.get("/member-usage", status_code=status.HTTP_200_OK)
+async def get_member_usage_stats(
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+    period: str = Query("month", pattern="^(day|week|month)$"),
+) -> MemberUsageStatsResponse:
+    """Per-member token usage from the ledger, chat vs ingestion (admin only)."""
+    if not auth.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
+    from application.ports.token_usage_store import TokenUsageStore
+
+    store = container[TokenUsageStore]
+    days = _period_to_days(period)
+    since = datetime.now(UTC) - timedelta(days=days)
+    members = await store.usage_by_member(auth.workspace_id, since=since)
+    return MemberUsageStatsResponse(members=members, period_days=days)
 
 
 @router.get("/chat-latency", status_code=status.HTTP_200_OK)
