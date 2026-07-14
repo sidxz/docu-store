@@ -3,6 +3,7 @@ from uuid import UUID
 import structlog
 from fastapi import HTTPException, status
 from lagom import Container
+from returns.result import Failure
 from sentinel_auth import RequestAuth
 
 from application.dtos.artifact_dtos import ArtifactResponse
@@ -14,7 +15,7 @@ from application.ports.repositories.page_read_models import PageReadModel
 logger = structlog.get_logger()
 
 
-def _map_app_error_to_http_exception(error: AppError) -> HTTPException:
+def _map_app_error_to_http_exception(error: AppError) -> HTTPException:  # noqa: PLR0911 — one branch per error category, a dispatch table would be less readable
     """Map application layer errors to appropriate HTTP exceptions."""
     if error.category == "validation":
         return HTTPException(
@@ -39,6 +40,11 @@ def _map_app_error_to_http_exception(error: AppError) -> HTTPException:
     if error.category == "concurrency":
         return HTTPException(
             status_code=status.HTTP_409_CONFLICT,
+            detail=error.message,
+        )
+    if error.category == "rate_limited":
+        return HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=error.message,
         )
     # Unknown error category
@@ -131,3 +137,19 @@ async def require_workspace_page(
     if page is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
     return page
+
+
+async def ensure_within_quota(auth: RequestAuth, container: Container) -> None:
+    """Pre-flight monthly token quota gate (chat send + upload/create).
+
+    Admins are exempt. Raises 429 with a human-readable detail when the
+    caller is over their effective monthly limit; the check itself fails
+    open on infrastructure errors (see CheckTokenQuotaUseCase).
+    """
+    if auth.is_admin:
+        return
+    from application.use_cases.token_limit_use_cases import CheckTokenQuotaUseCase
+
+    result = await container[CheckTokenQuotaUseCase].execute(auth.workspace_id, auth.user_id)
+    if isinstance(result, Failure):
+        raise _map_app_error_to_http_exception(result.failure())

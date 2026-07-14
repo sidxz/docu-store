@@ -23,6 +23,7 @@ from application.use_cases.artifact_use_cases import (
     UpdateTitleMentionUseCase,
 )
 from application.use_cases.page_use_cases import CreatePageUseCase, DeletePageUseCase
+from application.use_cases.token_limit_use_cases import CheckTokenQuotaUseCase
 from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.mime_type import MimeType
 from interfaces.api.main import app
@@ -142,7 +143,12 @@ class TestArtifactRoutes:
         )
         create_use_case = FakeUseCase(Success(response_dto))
 
-        client = make_client({CreateArtifactUseCase: create_use_case})
+        client = make_client(
+            {
+                CreateArtifactUseCase: create_use_case,
+                CheckTokenQuotaUseCase: FakeUseCase(Success(None)),
+            },
+        )
 
         request = CreateArtifactRequest(
             source_uri="https://example.com/paper.pdf",

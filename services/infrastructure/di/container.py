@@ -868,6 +868,13 @@ def create_container() -> Container:
         collection_name=settings.mongo_token_limits_collection,
     )
 
+    from application.use_cases.token_limit_use_cases import CheckTokenQuotaUseCase
+
+    container[CheckTokenQuotaUseCase] = lambda c: CheckTokenQuotaUseCase(
+        token_limit_store=c[TokenLimitStore],
+        token_usage_store=c[TokenUsageStore],
+    )
+
     # --- Quick Mode nodes (existing pipeline) ---
     container[QuestionAnalysisNode] = lambda c: QuestionAnalysisNode(
         llm_client=chat_llm_client,

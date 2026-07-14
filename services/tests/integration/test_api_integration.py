@@ -7,6 +7,7 @@ from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
+from returns.result import Success
 from sentinel_auth.authz_middleware import AuthzMiddleware
 
 from application.dtos.artifact_dtos import ArtifactResponse
@@ -18,12 +19,20 @@ from application.use_cases.artifact_use_cases import (
     UpdateTitleMentionUseCase,
 )
 from application.use_cases.page_use_cases import AddCompoundMentionsUseCase, CreatePageUseCase
+from application.use_cases.token_limit_use_cases import CheckTokenQuotaUseCase
 from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.mime_type import MimeType
 from interfaces.api.main import app
 from interfaces.dependencies import get_auth, get_container
 from tests.fakes.fake_auth import FakeAuth
 from tests.mocks import MockArtifactRepository, MockPageRepository
+
+
+class _AllowAllQuota:
+    """Fake CheckTokenQuotaUseCase — integration tests don't exercise quota limits."""
+
+    async def execute(self, workspace_id: UUID, user_id: UUID) -> Success:
+        return Success(None)
 
 
 class SimpleContainer:
@@ -129,6 +138,7 @@ def _build_use_cases() -> tuple[dict[type, object], MockArtifactRepository, Mock
         AddCompoundMentionsUseCase: AddCompoundMentionsUseCase(page_repo),
         ArtifactReadModel: RepoBackedArtifactReadModel(artifact_repo),
         PageReadModel: RepoBackedPageReadModel(page_repo),
+        CheckTokenQuotaUseCase: _AllowAllQuota(),
     }
 
     return use_cases, artifact_repo, page_repo

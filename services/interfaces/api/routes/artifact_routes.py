@@ -46,12 +46,13 @@ from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.title_mention import TitleMention
 from interfaces.api.middleware import handle_use_case_errors
 from interfaces.api.routes.helpers import (
-    get_allowed_artifact_ids as _get_allowed_artifact_ids,
-)
-from interfaces.api.routes.helpers import (
+    ensure_within_quota,
     require_action,
     require_artifact_permission,
     require_workspace_artifact,
+)
+from interfaces.api.routes.helpers import (
+    get_allowed_artifact_ids as _get_allowed_artifact_ids,
 )
 from interfaces.dependencies import get_auth, get_container
 
@@ -110,6 +111,7 @@ async def create_artifact(
 
     """
     await require_action(auth, "artifacts:create")
+    await ensure_within_quota(auth, container)
     use_case = container[CreateArtifactUseCase]
     return await use_case.execute(request=request, auth=auth)
 
@@ -126,6 +128,7 @@ async def upload_blob(
 ) -> ArtifactResponse:
     """Upload a blob to the blob store and create an artifact."""
     await require_action(auth, "artifacts:create")
+    await ensure_within_quota(auth, container)
     saga = container[ArtifactUploadSaga]
     return await saga.execute(
         stream=file.file,

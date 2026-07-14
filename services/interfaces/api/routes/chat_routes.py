@@ -34,6 +34,7 @@ from application.use_cases.chat_use_cases import (
     SendMessageUseCase,
 )
 from interfaces.api.middleware import handle_use_case_errors
+from interfaces.api.routes.helpers import ensure_within_quota
 from interfaces.api.routes.helpers import get_allowed_artifact_ids as _get_allowed_artifact_ids
 from interfaces.dependencies import get_auth, get_container
 
@@ -223,6 +224,7 @@ async def send_message(
     - done: Final event with message ID and metadata
     - error: Error event
     """
+    await ensure_within_quota(auth, container)
     allowed_artifact_ids = await _get_allowed_artifact_ids(auth)
 
     use_case = container[SendMessageUseCase]
