@@ -47,3 +47,13 @@ class MemberTokenUsage(BaseModel):
     chat: KindUsage = KindUsage()
     ingestion: KindUsage = KindUsage()
     total_tokens: int = 0
+
+
+class TokenLimitEntry(BaseModel):
+    """One token-limit row: a per-user override, or the workspace default when user_id is None.
+
+    ``limit`` semantics: None = unlimited, 0 = fully blocked.
+    """
+
+    user_id: UUID | None = None
+    limit: int | None = None

@@ -859,6 +859,15 @@ def create_container() -> Container:
         collection_name=settings.mongo_token_usage_collection,
     )
 
+    from application.ports.token_limit_store import TokenLimitStore
+    from infrastructure.read_repositories.mongo_token_limit_store import MongoTokenLimitStore
+
+    container[TokenLimitStore] = lambda c: MongoTokenLimitStore(
+        client=c[AsyncIOMotorClient],
+        db_name=settings.mongo_db,
+        collection_name=settings.mongo_token_limits_collection,
+    )
+
     # --- Quick Mode nodes (existing pipeline) ---
     container[QuestionAnalysisNode] = lambda c: QuestionAnalysisNode(
         llm_client=chat_llm_client,

@@ -81,6 +81,10 @@ class Settings(BaseSettings):
         default="token_usage_events",
         validation_alias="MONGO_TOKEN_USAGE_COLLECTION",
     )
+    mongo_token_limits_collection: str = Field(
+        default="token_limits",
+        validation_alias="MONGO_TOKEN_LIMITS_COLLECTION",
+    )
 
     # Blob Storage
     blob_base_url: str = Field(

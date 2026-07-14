@@ -97,6 +97,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             await usage_store.ensure_indexes()
             logger.info("mongodb_token_usage_indexes_initialized")
 
+            # Ensure token limit indexes
+            from application.ports.token_limit_store import TokenLimitStore
+
+            limit_store = container[TokenLimitStore]
+            await limit_store.ensure_indexes()
+            logger.info("mongodb_token_limits_indexes_initialized")
+
             # Ensure workflow status cache indexes
             from application.ports.workflow_status_cache import WorkflowStatusCache
 
