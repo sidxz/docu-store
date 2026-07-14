@@ -27,6 +27,7 @@ export function ConversationSidebar({
   const confirm = useConfirm();
 
   const resetChat = useChatStore((s) => s.reset);
+  const unreadAnswers = useChatStore((s) => s.unreadAnswers);
 
   const handleNew = async () => {
     const conv = await createConversation.mutateAsync(undefined);
@@ -46,6 +47,7 @@ export function ConversationSidebar({
       return;
     }
     await deleteConversation.mutateAsync(id);
+    useChatStore.getState().clearUnread(id);
     if (id === activeConversationId) {
       resetChat();
       router.push(`/${workspace}/chat`);
@@ -98,6 +100,7 @@ export function ConversationSidebar({
                 key={conv.conversation_id}
                 conversation={conv}
                 isActive={conv.conversation_id === activeConversationId}
+                isUnread={unreadAnswers.includes(conv.conversation_id)}
                 onSelect={handleSelect}
                 onDelete={handleDelete}
               />
@@ -112,11 +115,13 @@ export function ConversationSidebar({
 function ConversationItem({
   conversation,
   isActive,
+  isUnread,
   onSelect,
   onDelete,
 }: {
   conversation: Conversation;
   isActive: boolean;
+  isUnread: boolean;
   onSelect: (id: string) => void;
   onDelete: (e: React.MouseEvent, id: string) => void;
 }) {
@@ -143,6 +148,13 @@ function ConversationItem({
           {date} · {conversation.message_count} msgs
         </p>
       </div>
+      {isUnread && (
+        <span
+          className="size-2 shrink-0 rounded-full bg-accent-text"
+          role="status"
+          aria-label="Unread answer"
+        />
+      )}
       <button
         onClick={(e) => onDelete(e, conversation.conversation_id)}
         className="rounded p-1 opacity-0 transition-opacity hover:bg-surface-hover group-hover:opacity-100"

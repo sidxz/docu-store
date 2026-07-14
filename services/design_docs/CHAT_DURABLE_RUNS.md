@@ -61,7 +61,10 @@ SSE frames gain an `id: <seq>` line — additive; the existing frontend parser i
 Null-rendering `<ChatNotifications/>` mounted in the **workspace layout** (must outlive the chat routes):
 
 - **Prompt:** when a stream passes ~12s and `Notification.permission === "default"` and no prior dismissal (localStorage flag): one-time toast — "Still working — want a notification when the answer is ready?" → button calls `Notification.requestPermission()` (satisfies the user-gesture requirement). Never re-prompt after dismissal or OS-level denial.
-- **Fire:** on done (not error/stop): if permission granted AND (`document.hidden` OR current route ≠ that conversation) → `new Notification("Answer ready", {body: first ~100 chars, tag: conversationId})`; click → `window.focus()` + route to the conversation.
+- **Fire** (revised 2026-07-14 after the OS channel proved suppressible — macOS app-level permission/Focus can silently eat banners): on done (not error/stop), split by visibility:
+  - **In-app channel (primary, permission-free):** if the user is NOT on that conversation's route → sticky sonner toast (`duration: Infinity`, `id: chat-ready-{convId}` so newer replaces older, "View" action routes to the conversation) AND the conversation is marked unread — a persisted `unreadAnswers: string[]` in the chat store (in the `persist` partialize, so it survives reloads) rendered as an accent dot on the row in `ConversationSidebar`.
+  - **OS channel (enhancement):** only when `document.hidden` AND permission granted → `new Notification("Answer ready", {body: first ~120 chars, tag: conversationId})`; click → `window.focus()` + route to the conversation. A visible tab never relies on the suppressible OS path.
+  - **Consumption:** landing on `/chat/{id}` (any way — View button, sidebar, reload) dismisses that conversation's toast and clears its unread flag, via a pathname effect in `ChatNotifications`. Deleting a conversation clears its flag.
 - The done signal is the still-running mutation or the resume stream — both flow through the store, so one `isStreaming` transition covers both. A fully closed tab gets no notification (Web Push out of scope).
 
 ## Coverage matrix

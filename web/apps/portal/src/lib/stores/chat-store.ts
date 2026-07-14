@@ -65,6 +65,11 @@ interface ChatState {
   // Message queued for send after navigation (new conversation flow)
   queuedMessage: string | null;
 
+  // Conversations whose answer completed while the user wasn't looking.
+  // Cross-conversation state: NOT part of the streaming slot, survives
+  // reset(), and persists across reloads (see partialize).
+  unreadAnswers: string[];
+
   // Citation highlight (click [N] in answer → flash in sources panel)
   highlightedCitation: number | null;
   // Which message's sources are shown in the panel (null = latest)
@@ -87,6 +92,8 @@ interface ChatState {
   highlightCitation: (index: number, messageId?: string) => void;
   setActiveSourcesMessageId: (id: string | null) => void;
   setQueuedMessage: (msg: string | null) => void;
+  markUnread: (conversationId: string) => void;
+  clearUnread: (conversationId: string) => void;
   startStreaming: (userMessage: string, conversationId: string | null) => void;
   resumeStreaming: (conversationId: string) => void;
   appendToken: (delta: string) => void;
@@ -118,6 +125,7 @@ export const useChatStore = create<ChatState>()(
   pendingUserMessage: null,
   streamingConversationId: null,
   queuedMessage: null,
+  unreadAnswers: [],
   streamingThinkingBlocks: [],
   streamingReasoning: "",
   streamingStructuredBlocks: [],
@@ -168,6 +176,20 @@ export const useChatStore = create<ChatState>()(
   setActiveSourcesMessageId: (id) => set({ activeSourcesMessageId: id }),
 
   setQueuedMessage: (msg) => set({ queuedMessage: msg }),
+
+  markUnread: (conversationId) =>
+    set((state) =>
+      state.unreadAnswers.includes(conversationId)
+        ? state
+        : { unreadAnswers: [...state.unreadAnswers, conversationId] },
+    ),
+
+  clearUnread: (conversationId) =>
+    set((state) =>
+      state.unreadAnswers.includes(conversationId)
+        ? { unreadAnswers: state.unreadAnswers.filter((id) => id !== conversationId) }
+        : state,
+    ),
 
   startStreaming: (userMessage, conversationId) =>
     set({
@@ -309,7 +331,10 @@ export const useChatStore = create<ChatState>()(
     {
       name: "docu-store-chat-reasoning",
       storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({ reasoningDefaults: s.reasoningDefaults }),
+      partialize: (s) => ({
+        reasoningDefaults: s.reasoningDefaults,
+        unreadAnswers: s.unreadAnswers,
+      }),
       skipHydration: true,
     },
   ),
