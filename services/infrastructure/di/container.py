@@ -153,6 +153,7 @@ from domain.value_objects.text_mention import TextMention
 from domain.value_objects.title_mention import TitleMention
 from infrastructure.auth import sentinel
 from infrastructure.blob_stores.fsspec_blob_store import FsspecBlobStore
+from infrastructure.chat.run_registry import ChatRunRegistry
 from infrastructure.chemistry.rdkit_smiles_validator import RdkitSmilesValidator
 from infrastructure.config import settings
 from infrastructure.cser.cser_pipeline_service import CserPipelineService
@@ -1026,6 +1027,7 @@ def create_container() -> Container:
     container[DeleteConversationUseCase] = lambda c: DeleteConversationUseCase(
         chat_repository=c[ChatRepository],
     )
+    container[ChatRunRegistry] = ChatRunRegistry()
     container[SendMessageUseCase] = lambda c: SendMessageUseCase(
         chat_repository=c[ChatRepository],
         chat_agent=c[ChatAgentPort],

@@ -11,6 +11,7 @@ from application.dtos.chat_dtos import AgentEvent
 from application.dtos.errors import AppError
 from application.use_cases.chat_use_cases import SendMessageUseCase
 from application.use_cases.token_limit_use_cases import CheckTokenQuotaUseCase
+from infrastructure.chat.run_registry import ChatRunRegistry
 from interfaces.api.main import app
 from interfaces.dependencies import get_auth, get_container
 from tests.conftest import strip_authz_middleware
@@ -46,7 +47,11 @@ class FakeContainer:
 def _client(*, quota: FakeQuota, role: str = "editor") -> TestClient:
     strip_authz_middleware(app)
     app.dependency_overrides[get_container] = lambda: FakeContainer(
-        {CheckTokenQuotaUseCase: quota, SendMessageUseCase: FakeSendUseCase()},
+        {
+            CheckTokenQuotaUseCase: quota,
+            SendMessageUseCase: FakeSendUseCase(),
+            ChatRunRegistry: ChatRunRegistry(),
+        },
     )
     app.dependency_overrides[get_auth] = lambda: FakeAuth(
         role=role, user_id=uuid4(), workspace_id=uuid4(),

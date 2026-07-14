@@ -195,6 +195,7 @@ class ConversationDetailDTO(ConversationDTO):
     """Conversation with its messages."""
 
     messages: list[ChatMessageDTO] = Field(default_factory=list)
+    active_run: bool = False
 
 
 class EntityRefDTO(BaseModel):

@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
-import json
-import time
 from datetime import UTC, datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from lagom import Container
 from pydantic import BaseModel, Field
+from returns.result import Failure, Success
 from sentinel_auth import RequestAuth
 
 from application.dtos.chat_dtos import (
@@ -33,14 +32,21 @@ from application.use_cases.chat_use_cases import (
     RecordFeedbackUseCase,
     SendMessageUseCase,
 )
+from infrastructure.chat.run_registry import ChatRunRegistry, RunAlreadyActive
 from interfaces.api.middleware import handle_use_case_errors
-from interfaces.api.routes.helpers import ensure_within_quota
+from interfaces.api.routes.helpers import _map_app_error_to_http_exception, ensure_within_quota
 from interfaces.api.routes.helpers import get_allowed_artifact_ids as _get_allowed_artifact_ids
 from interfaces.dependencies import get_auth, get_container
 
 logger = structlog.get_logger()
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+
+_SSE_HEADERS = {
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+}
 
 
 class CreateConversationRequest(BaseModel):
@@ -157,7 +163,6 @@ async def list_recent_conversations(
 
 
 @router.get("/{conversation_id}", status_code=status.HTTP_200_OK)
-@handle_use_case_errors
 async def get_conversation(
     conversation_id: UUID,
     container: Annotated[Container, Depends(get_container)],
@@ -167,12 +172,21 @@ async def get_conversation(
 ) -> ConversationDetailDTO:
     """Get a conversation with its messages."""
     use_case = container[GetConversationUseCase]
-    return await use_case.execute(
+    result = await use_case.execute(
         conversation_id=conversation_id,
         workspace_id=auth.workspace_id,
         skip=skip,
         limit=limit,
     )
+    # execute() returns a Result in production (Success is immutable, so we
+    # unwrap before setting active_run below); test doubles may hand back the
+    # DTO directly.
+    if isinstance(result, Failure):
+        raise _map_app_error_to_http_exception(result.failure())
+    detail = result.unwrap() if isinstance(result, Success) else result
+    run = container[ChatRunRegistry].active(conversation_id)
+    detail.active_run = run is not None and not run.done
+    return detail
 
 
 @router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -217,6 +231,10 @@ async def send_message(
 ) -> StreamingResponse:
     """Send a message and stream the agent response via SSE.
 
+    Generation is decoupled from this connection: a background run keeps
+    going (and persists its answer) even if the client disconnects. Frames
+    carry ``id: <seq>`` so ``GET .../messages/stream`` can replay and tail.
+
     Returns a text/event-stream with the following event types:
     - agent_step: Step progress (started/completed)
     - retrieval_results: Retrieved source citations
@@ -224,18 +242,20 @@ async def send_message(
     - structured_block: Rich content blocks (table, molecule, etc.)
     - done: Final event with message ID and metadata
     - error: Error event
+
+    Raises 409 if a response is already being generated for this conversation.
     """
     await ensure_within_quota(auth, container)
     allowed_artifact_ids = await _get_allowed_artifact_ids(auth)
 
     use_case = container[SendMessageUseCase]
-
-    async def event_stream():
-        t0 = time.monotonic()
-        step_count = 0
-        effective_mode = request.mode or "thinking"
-        try:
-            async for event in use_case.execute(
+    registry = container[ChatRunRegistry]
+    try:
+        registry.start(
+            conversation_id=conversation_id,
+            workspace_id=auth.workspace_id,
+            owner_id=auth.user_id,
+            agen=use_case.execute(
                 conversation_id=conversation_id,
                 workspace_id=auth.workspace_id,
                 owner_id=auth.user_id,
@@ -243,35 +263,63 @@ async def send_message(
                 allowed_artifact_ids=allowed_artifact_ids,
                 mode=request.mode,
                 reasoning=request.reasoning,
-            ):
-                if event.type == "step_started":
-                    step_count += 1
-                event_type = _map_event_type(event.type)
-                data = event.model_dump(mode="json", exclude_none=True)
-                yield f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
-        except Exception as exc:
-            logger.exception("chat.stream.error", error=str(exc))
-            error_data = {"type": "error", "error_message": str(exc)}
-            yield f"event: error\ndata: {json.dumps(error_data)}\n\n"
-        finally:
-            duration_ms = round((time.monotonic() - t0) * 1000, 2)
-            logger.info(
-                "chat.response_completed",
-                duration_ms=duration_ms,
-                mode=effective_mode,
-                step_count=step_count,
-                conversation_id=str(conversation_id),
-            )
+            ),
+        )
+    except RunAlreadyActive:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A response is already being generated for this conversation.",
+        ) from None
 
     return StreamingResponse(
-        event_stream(),
+        registry.subscribe(conversation_id),
         media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
+        headers=_SSE_HEADERS,
     )
+
+
+def _owned_run(registry: ChatRunRegistry, conversation_id: UUID, auth: RequestAuth):
+    """The caller's run for this conversation, or raise 404."""
+    run = registry.active(conversation_id)
+    if run is None or run.workspace_id != auth.workspace_id or run.owner_id != auth.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active run for this conversation.",
+        )
+    return run
+
+
+@router.get("/{conversation_id}/messages/stream", status_code=status.HTTP_200_OK)
+async def resume_message_stream(
+    conversation_id: UUID,
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+    after: int = -1,
+) -> StreamingResponse:
+    """Reattach to an in-flight (or just-finished) run: replay frames past
+    ``after``, then tail live until done.
+    """
+    registry = container[ChatRunRegistry]
+    _owned_run(registry, conversation_id, auth)
+    return StreamingResponse(
+        registry.subscribe(conversation_id, after=after),
+        media_type="text/event-stream",
+        headers=_SSE_HEADERS,
+    )
+
+
+@router.delete("/{conversation_id}/run", status_code=status.HTTP_204_NO_CONTENT)
+async def stop_message_run(
+    conversation_id: UUID,
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> None:
+    """Stop an in-flight run. Discards the partial answer (nothing persists);
+    needed because disconnecting no longer cancels generation.
+    """
+    registry = container[ChatRunRegistry]
+    _owned_run(registry, conversation_id, auth)
+    registry.stop(conversation_id)
 
 
 @router.post(
@@ -297,20 +345,3 @@ async def record_feedback(
         created_at=datetime.now(UTC),
     )
     return await use_case.execute(feedback)
-
-
-def _map_event_type(event_type: str) -> str:
-    """Map internal event types to SSE event names."""
-    mapping = {
-        "step_started": "agent_step",
-        "step_completed": "agent_step",
-        "retrieval_results": "retrieval_results",
-        "token": "token",
-        "reasoning_token": "reasoning_token",
-        "structured_block": "structured_block",
-        "grounding_result": "grounding_result",
-        "query_context": "query_context",
-        "done": "done",
-        "error": "error",
-    }
-    return mapping.get(event_type, event_type)
