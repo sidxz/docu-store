@@ -29,9 +29,15 @@ async def test_execute_sets_and_resets_override() -> None:
                 yield  # make it an async generator
             return
 
-    uc = object.__new__(SendMessageUseCase)
-    uc._repo = _FakeRepo()
-    uc._agent = _FakeAgent()
+    class _FakeUsageStore:
+        async def record(self, event) -> None:  # pragma: no cover - never hit at zero usage
+            return None
+
+    uc = SendMessageUseCase(
+        chat_repository=_FakeRepo(),
+        chat_agent=_FakeAgent(),
+        token_usage_store=_FakeUsageStore(),
+    )
 
     from uuid import uuid4
     async for _ in uc.execute(

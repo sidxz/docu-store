@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import re
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
@@ -508,6 +509,19 @@ class SendMessageUseCase:
         finally:
             reasoning_context.reset_reasoning_override(_reasoning_token)
 
+    async def _safe_record(self, event: TokenUsageEvent, conversation_id: UUID) -> None:
+        """Write the usage event, logging any failure with context.
+
+        Runs *inside* the shield in ``_record_chat_usage`` so a write failure
+        is caught here even if the outer await was already cancelled by a
+        client disconnect — otherwise it would only surface as an
+        unretrieved-task GC warning with no context.
+        """
+        try:
+            await self._usage.record(event)
+        except Exception:
+            log.exception("chat.usage.record_failed", conversation_id=str(conversation_id))
+
     async def _record_chat_usage(
         self,
         counter: TokenCounter,
@@ -537,15 +551,9 @@ class SendMessageUseCase:
             ref=str(conversation_id),
             created_at=datetime.now(UTC),
         )
-        try:
-            await asyncio.shield(self._usage.record(event))
-        except asyncio.CancelledError:
-            pass  # our await was cancelled; the shielded write completes anyway
-        except Exception:
-            log.exception(
-                "chat.usage.record_failed",
-                conversation_id=str(conversation_id),
-            )
+        with contextlib.suppress(asyncio.CancelledError):
+            # our await was cancelled; the shielded write completes anyway
+            await asyncio.shield(self._safe_record(event, conversation_id))
 
 
 class RecordFeedbackUseCase:
