@@ -4,6 +4,7 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { Coins, Globe, Lock, LogOut, Moon, Sun } from "lucide-react";
 import { useAuthz } from "@sentinel-auth/react";
+import type { MonthTokenUsage } from "@docu-store/types";
 
 import { useSession } from "@/lib/auth";
 import { useBreadcrumbs } from "@/hooks/use-breadcrumbs";
@@ -96,14 +97,8 @@ export function Topbar() {
       {/* Right section */}
       <div className="flex items-center gap-1">
         {/* User token usage total */}
-        {usage.data && usage.data.total > 0 && (
-          <span
-            className="hidden md:inline-flex items-center gap-1 px-2 text-xs font-mono text-text-muted tabular-nums"
-            title={`${usage.data.total.toLocaleString()} tokens used — ${usage.data.prompt.toLocaleString()} prompt + ${usage.data.completion.toLocaleString()} completion`}
-          >
-            <Coins className="size-3 text-amber-500" />
-            {formatTokens(usage.data.total)} tokens
-          </span>
+        {usage.data && (usage.data.month.total > 0 || usage.data.month.limit !== null) && (
+          <TokenBadge month={usage.data.month} />
         )}
 
         {/* Scope toggle */}
@@ -181,5 +176,27 @@ export function Topbar() {
         </div>
       </div>
     </header>
+  );
+}
+
+function TokenBadge({ month }: { month: MonthTokenUsage }) {
+  const pct = month.limit ? month.total / month.limit : null;
+  const color =
+    pct !== null && pct >= 1
+      ? "text-red-500"
+      : pct !== null && pct >= 0.8
+        ? "text-amber-500"
+        : "text-text-muted";
+  return (
+    <span
+      className={`hidden md:inline-flex items-center gap-1 px-2 text-xs font-mono tabular-nums ${color}`}
+      title={`${month.total.toLocaleString()} tokens this month${
+        month.limit !== null ? ` of ${month.limit.toLocaleString()} limit` : ""
+      } — resets on the 1st (UTC)`}
+    >
+      <Coins className="size-3 text-amber-500" />
+      {formatTokens(month.total)}
+      {month.limit !== null && ` / ${formatTokens(month.limit)}`}
+    </span>
   );
 }

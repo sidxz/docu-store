@@ -70,6 +70,18 @@ export interface TokenUsage {
   total: number;
 }
 
+export interface MonthTokenUsage {
+  chat: number;
+  ingestion: number;
+  total: number;
+  limit: number | null;
+}
+
+/** GET /chat/usage — requested-window totals + current-calendar-month block. */
+export interface UserTokenUsage extends TokenUsage {
+  month: MonthTokenUsage;
+}
+
 // --- Messages & conversations ---
 
 export interface ChatMessage {

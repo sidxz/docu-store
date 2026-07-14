@@ -15,6 +15,7 @@ interface SettingsTab {
 const TABS: SettingsTab[] = [
   { label: "General", segment: "general" },
   { label: "Chat", segment: "chat" },
+  { label: "Usage", segment: "usage" },
   { label: "Workspace", segment: "workspace" },
 ];
 
