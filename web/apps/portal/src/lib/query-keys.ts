@@ -74,6 +74,7 @@ export const queryKeys = {
     grounding: (period: string) => [...queryKeys.stats.all, "grounding", period] as const,
     knowledgeGaps: (period: string) => [...queryKeys.stats.all, "knowledge-gaps", period] as const,
     citationFrequency: (period: string) => [...queryKeys.stats.all, "citation-frequency", period] as const,
+    memberUsage: (period: string) => [...queryKeys.stats.all, "member-usage", period] as const,
   },
   user: {
     all: ["user"] as const,
@@ -109,5 +110,9 @@ export const queryKeys = {
       [...queryKeys.browse.all, "artifacts", entityType, tagValue] as const,
     popularTags: (entityType?: string) =>
       [...queryKeys.browse.all, "popularTags", entityType ?? "all"] as const,
+  },
+  workspace: {
+    all: ["workspace"] as const,
+    members: () => [...queryKeys.workspace.all, "members"] as const,
   },
 };

@@ -48,6 +48,8 @@ import {
   useGroundingStats,
   useKnowledgeGaps,
   useCitationFrequency,
+  useMemberUsageStats,
+  useWorkspaceMembers,
 } from "@/hooks/use-stats";
 import { useDashboardStats } from "@/hooks/use-dashboard";
 
@@ -592,6 +594,8 @@ function AnalyticsSection() {
   const { data: groundingData } = useGroundingStats(period);
   const { data: gapsData } = useKnowledgeGaps(period);
   const { data: citationData } = useCitationFrequency(period);
+  const { data: memberUsageData } = useMemberUsageStats(period);
+  const { data: workspaceMembers } = useWorkspaceMembers();
 
   // Token chart: aggregate by date (sum across modes)
   const tokenChartData = useMemo(() => {
@@ -768,6 +772,48 @@ function AnalyticsSection() {
               No search activity in this period.
             </p>
           )}
+        </Card>
+
+        {/* Token usage by member (admin, from the usage ledger) */}
+        <Card className="lg:col-span-3" padding={false}>
+          <div className="p-5">
+            <CardHeader title="Token Usage by Member" />
+            {!memberUsageData || memberUsageData.members.length === 0 ? (
+              <p className="py-8 text-center text-sm text-text-muted">
+                No recorded usage in this period.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border-default text-left text-xs text-text-muted">
+                      <th className="py-2 pr-4 font-medium">Member</th>
+                      <th className="py-2 pr-4 text-right font-medium">Chat</th>
+                      <th className="py-2 pr-4 text-right font-medium">Uploads</th>
+                      <th className="py-2 text-right font-medium">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {memberUsageData.members.map((m) => {
+                      const member = (workspaceMembers ?? []).find(
+                        (wm) => (wm.user_id ?? wm.id) === m.user_id,
+                      );
+                      const label =
+                        member?.name ?? member?.email ?? m.user_id ?? "Unattributed";
+                      return (
+                        <tr key={m.user_id ?? "unattributed"} className="border-b border-border-default/50">
+                          <td className="py-2 pr-4">{label}</td>
+                          <td className="py-2 pr-4 text-right tabular-nums">{fmtNumber(m.chat.total)}</td>
+                          <td className="py-2 pr-4 text-right tabular-nums">{fmtNumber(m.ingestion.total)}</td>
+                          <td className="py-2 text-right font-medium tabular-nums">{fmtNumber(m.total_tokens)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </Card>
       </div>
 

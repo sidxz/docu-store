@@ -237,6 +237,55 @@ export function useCitationFrequency(period = "week") {
   });
 }
 
+// ---------- Member usage & workspace members types ----------
+
+interface MemberKindUsage {
+  prompt: number;
+  completion: number;
+  total: number;
+  event_count: number;
+}
+
+interface MemberTokenUsage {
+  user_id: string | null;
+  chat: MemberKindUsage;
+  ingestion: MemberKindUsage;
+  total_tokens: number;
+}
+
+interface MemberUsageStatsResponse {
+  members: MemberTokenUsage[];
+  period_days: number;
+}
+
+// Sentinel's member record shape isn't in the OpenAPI spec's typed schema (returns
+// `list[dict]`), so fields are optional here and consumers must fall back gracefully.
+interface WorkspaceMember {
+  user_id?: string;
+  id?: string;
+  name?: string;
+  email?: string;
+}
+
+// ---------- Member usage & workspace members hooks ----------
+
+export function useMemberUsageStats(period = "month") {
+  return useQuery({
+    queryKey: queryKeys.stats.memberUsage(period),
+    queryFn: () =>
+      authFetchJson<MemberUsageStatsResponse>(`/stats/member-usage?period=${period}`),
+    refetchInterval: 60_000,
+  });
+}
+
+export function useWorkspaceMembers() {
+  return useQuery({
+    queryKey: queryKeys.workspace.members(),
+    queryFn: () => authFetchJson<WorkspaceMember[]>("/workspace/members?limit=50"),
+    staleTime: 300_000,
+  });
+}
+
 // ---------- Re-exports for page consumption ----------
 
 export type {
@@ -260,4 +309,8 @@ export type {
   CitedArtifactEntry,
   UncitedArtifactEntry,
   CitationFrequencyResponse,
+  MemberKindUsage,
+  MemberTokenUsage,
+  MemberUsageStatsResponse,
+  WorkspaceMember,
 };
