@@ -39,8 +39,10 @@ export function useWorkspaceTokenLimits() {
 
 function useInvalidateLimits() {
   const queryClient = useQueryClient();
-  return () =>
+  return () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.workspace.tokenLimits() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.chat.usage() });
+  };
 }
 
 export function useSetDefaultTokenLimit() {
