@@ -102,6 +102,30 @@ def test_put_rejects_negative_limit() -> None:
         app.dependency_overrides.clear()
 
 
+def test_put_rejects_missing_limit_field() -> None:
+    """{} must 422, not silently mean unlimited — explicit null is the only unlimited."""
+    try:
+        client = _client(FakeLimitStore())
+        assert client.put("/workspace/token-limits/default", json={}).status_code == 422
+        assert client.put(f"/workspace/token-limits/{USER_A}", json={}).status_code == 422
+        assert client.put(
+            "/workspace/token-limits/default", json={"limit": None},
+        ).status_code == 204
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_put_rejects_limit_beyond_int64() -> None:
+    """Values past Mongo's 8-byte int ceiling must 422, not 500 in BSON encoding."""
+    try:
+        resp = _client(FakeLimitStore()).put(
+            "/workspace/token-limits/default", json={"limit": 2**63},
+        )
+        assert resp.status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_mutations_require_admin() -> None:
     try:
         client = _client(FakeLimitStore(), is_admin=False)

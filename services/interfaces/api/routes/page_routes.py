@@ -37,7 +37,11 @@ from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.text_mention import TextMention
 from interfaces.api.middleware import handle_use_case_errors
-from interfaces.api.routes.helpers import require_page_permission, require_workspace_page
+from interfaces.api.routes.helpers import (
+    ensure_within_quota,
+    require_page_permission,
+    require_workspace_page,
+)
 from interfaces.dependencies import get_auth, get_container
 
 router = APIRouter(prefix="/pages", tags=["pages"])
@@ -70,6 +74,8 @@ async def create_page(
         500 Internal Server Error: Infrastructure failure (DB unavailable, etc.)
 
     """
+    # Page creation cascades into LLM enrichment (NER/summarization) — quota-gated.
+    await ensure_within_quota(auth, container)
     use_case = container[CreatePageUseCase]
     return await use_case.execute(request=request, auth=auth)
 
@@ -234,6 +240,7 @@ async def trigger_page_summarization(
     """
     page = await require_workspace_page(page_id, auth, container)
     await require_page_permission(page, auth, "edit")
+    await ensure_within_quota(auth, container)
     use_case = container[TriggerPageSummarizationUseCase]
     try:
         return await use_case.execute(page_id=page_id)
@@ -257,6 +264,7 @@ async def trigger_ner_extraction(
     """
     page = await require_workspace_page(page_id, auth, container)
     await require_page_permission(page, auth, "edit")
+    await ensure_within_quota(auth, container)
     use_case = container[TriggerNERExtractionUseCase]
     try:
         return await use_case.execute(page_id=page_id)

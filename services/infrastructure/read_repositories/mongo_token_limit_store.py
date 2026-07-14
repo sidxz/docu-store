@@ -7,6 +7,7 @@ from uuid import UUID
 
 import structlog
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.errors import DuplicateKeyError
 
 from application.dtos.usage_dtos import TokenLimitEntry
 
@@ -54,7 +55,16 @@ class MongoTokenLimitStore:
         return _doc_to_entry(doc) if doc else None
 
     async def list_for_workspace(self, workspace_id: UUID) -> list[TokenLimitEntry]:
-        docs = await self._coll.find({"workspace_id": str(workspace_id)}).to_list(length=1000)
+        # Sort user_id asc: null (the workspace default) sorts first, so the cap
+        # can never silently drop it. ponytail: 1000-row cap, page if a workspace
+        # ever accumulates that many overrides.
+        docs = (
+            await self._coll.find({"workspace_id": str(workspace_id)})
+            .sort("user_id", 1)
+            .to_list(length=1000)
+        )
+        if len(docs) == 1000:
+            log.warning("token_limits.list_truncated", workspace_id=str(workspace_id))
         return [_doc_to_entry(d) for d in docs]
 
     async def set(
@@ -65,11 +75,13 @@ class MongoTokenLimitStore:
         updated_by: UUID,
     ) -> None:
         query = {"workspace_id": str(workspace_id), "user_id": str(user_id) if user_id else None}
-        await self._coll.replace_one(
-            query,
-            _entry_doc(workspace_id, user_id, limit, updated_by),
-            upsert=True,
-        )
+        doc = _entry_doc(workspace_id, user_id, limit, updated_by)
+        try:
+            await self._coll.replace_one(query, doc, upsert=True)
+        except DuplicateKeyError:
+            # Two concurrent first-time upserts raced on the unique index;
+            # the row exists now, so the retry takes the replace path.
+            await self._coll.replace_one(query, doc, upsert=True)
 
     async def delete(self, workspace_id: UUID, user_id: UUID) -> None:
         await self._coll.delete_one(

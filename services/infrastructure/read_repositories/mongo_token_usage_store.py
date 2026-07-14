@@ -106,6 +106,37 @@ class MongoTokenUsageStore:
             total=int(d.get("total", 0)),
         )
 
+    async def sum_for_user_by_kind(
+        self,
+        workspace_id: UUID,
+        user_id: UUID,
+        *,
+        since: datetime | None = None,
+    ) -> dict[str, TokenUsageDTO]:
+        match: dict = {"workspace_id": str(workspace_id), "user_id": str(user_id)}
+        if since is not None:
+            match["created_at"] = {"$gte": since}
+        pipeline = [
+            {"$match": match},
+            {
+                "$group": {
+                    "_id": "$kind",
+                    "prompt": {"$sum": "$prompt"},
+                    "completion": {"$sum": "$completion"},
+                    "total": {"$sum": "$total"},
+                },
+            },
+        ]
+        rows = await self._coll.aggregate(pipeline).to_list(length=100)
+        return {
+            r["_id"]: TokenUsageDTO(
+                prompt=int(r.get("prompt", 0)),
+                completion=int(r.get("completion", 0)),
+                total=int(r.get("total", 0)),
+            )
+            for r in rows
+        }
+
     async def usage_by_member(
         self,
         workspace_id: UUID,

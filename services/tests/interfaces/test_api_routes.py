@@ -329,7 +329,12 @@ class TestPageRoutes:
         )
         create_use_case = FakeUseCase(Success(response_dto))
 
-        client = make_client({CreatePageUseCase: create_use_case})
+        client = make_client(
+            {
+                CreatePageUseCase: create_use_case,
+                CheckTokenQuotaUseCase: FakeUseCase(Success(None)),
+            },
+        )
 
         request = CreatePageRequest(artifact_id=artifact_id, name="Intro", index=0)
         response = client.post("/pages/", json=request.model_dump(mode="json"))

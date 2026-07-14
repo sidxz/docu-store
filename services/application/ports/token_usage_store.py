@@ -32,6 +32,16 @@ class TokenUsageStore(Protocol):
         """Sum a user's usage, optionally windowed and filtered by kind."""
         ...
 
+    async def sum_for_user_by_kind(
+        self,
+        workspace_id: UUID,
+        user_id: UUID,
+        *,
+        since: datetime | None = None,
+    ) -> dict[str, TokenUsageDTO]:
+        """Per-kind sums for a user in one query, optionally windowed."""
+        ...
+
     async def usage_by_member(
         self,
         workspace_id: UUID,

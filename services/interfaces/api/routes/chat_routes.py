@@ -136,6 +136,7 @@ async def get_user_token_usage(
         owner_id=auth.user_id,
         days=days,
         kind=kind,
+        exempt=auth.is_admin,  # admins bypass enforcement; don't render a limit for them
     )
 
 

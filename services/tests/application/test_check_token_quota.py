@@ -32,16 +32,24 @@ class FakeLimitStore:
 
 
 class FakeUsageStore:
-    def __init__(self, total: int = 0, *, raises: bool = False) -> None:
-        self._total = total
+    """by_kind: per-kind totals for the month query; `total` is shorthand for all-chat."""
+
+    def __init__(
+        self,
+        total: int = 0,
+        *,
+        by_kind: dict[str, int] | None = None,
+        raises: bool = False,
+    ) -> None:
+        self._by_kind = by_kind if by_kind is not None else {"chat": total}
         self._raises = raises
         self.last_since = None
 
-    async def sum_for_user(self, workspace_id, user_id, *, since=None, kind=None):
+    async def sum_for_user_by_kind(self, workspace_id, user_id, *, since=None):
         if self._raises:
             raise RuntimeError("mongo down")
         self.last_since = since
-        return TokenUsageDTO(prompt=0, completion=0, total=self._total)
+        return {k: TokenUsageDTO(total=v) for k, v in self._by_kind.items()}
 
 
 def _uc(rows: dict | None, usage: FakeUsageStore) -> CheckTokenQuotaUseCase:
@@ -104,6 +112,14 @@ async def test_zero_limit_blocks_immediately() -> None:
 async def test_fails_open_on_infrastructure_error() -> None:
     result = await _uc({None: 100}, FakeUsageStore(raises=True)).execute(WS, USER)
     assert isinstance(result, Success)
+
+
+@pytest.mark.asyncio
+async def test_all_kinds_count_toward_the_limit() -> None:
+    """Enforcement totals every ledger kind, not just chat+ingestion."""
+    usage = FakeUsageStore(by_kind={"chat": 40, "ingestion": 40, "future_lane": 40})
+    result = await _uc({None: 100}, usage).execute(WS, USER)
+    assert isinstance(result, Failure)
 
 
 @pytest.mark.asyncio

@@ -119,3 +119,17 @@ def test_create_artifact_blocked_over_limit() -> None:
         assert resp.status_code == 429
     finally:
         app.dependency_overrides.clear()
+
+
+def test_create_page_blocked_over_limit() -> None:
+    """LLM enrichment cascades off page creation — it must be gated too."""
+    quota = FakeQuota(OVER_LIMIT)
+    try:
+        resp = _client(quota=quota).post(
+            "/pages/",
+            json={"artifact_id": str(uuid4()), "name": "p1", "index": 0},
+        )
+        assert resp.status_code == 429
+        assert resp.json()["detail"] == DETAIL
+    finally:
+        app.dependency_overrides.clear()

@@ -272,6 +272,7 @@ async def trigger_artifact_summarization(
     """
     await require_workspace_artifact(artifact_id, auth, container)
     await require_artifact_permission(artifact_id, auth, "edit")
+    await ensure_within_quota(auth, container)
     orchestrator = container[WorkflowOrchestrator]
     await orchestrator.start_artifact_summarization_workflow(artifact_id=artifact_id)
     return WorkflowStartedResponse(workflow_id=f"artifact-summarization-{artifact_id}")
@@ -291,6 +292,7 @@ async def trigger_doc_metadata_extraction(
     """
     artifact = await require_workspace_artifact(artifact_id, auth, container)
     await require_artifact_permission(artifact_id, auth, "edit")
+    await ensure_within_quota(auth, container)
 
     if not artifact.pages:
         raise HTTPException(

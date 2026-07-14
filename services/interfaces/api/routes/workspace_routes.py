@@ -40,7 +40,10 @@ async def list_groups(
 
 
 class TokenLimitBody(BaseModel):
-    limit: int | None = Field(default=None, ge=0)
+    # Required (no default) so PUT {} or a typoed key 422s instead of silently
+    # meaning "unlimited"; explicit null is still how you say unlimited.
+    # le = Mongo's int64 ceiling — larger values crash BSON encoding with a 500.
+    limit: int | None = Field(ge=0, le=2**63 - 1)
 
 
 class WorkspaceTokenLimitsResponse(BaseModel):

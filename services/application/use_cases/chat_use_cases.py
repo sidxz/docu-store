@@ -34,7 +34,11 @@ from application.dtos.errors import AppError
 from application.dtos.usage_dtos import MonthUsage, TokenUsageEvent, UserTokenUsageResponse
 from application.ports.token_limit_store import TokenLimitStore
 from application.ports.token_usage_store import TokenUsageStore
-from application.use_cases.token_limit_use_cases import effective_limit, utc_month_start
+from application.use_cases.token_limit_use_cases import (
+    effective_limit,
+    month_total,
+    month_usage_by_kind,
+)
 from infrastructure.llm.token_counter import TokenCounter
 
 if TYPE_CHECKING:
@@ -203,36 +207,40 @@ class GetUserTokenUsageUseCase:
         self._usage = token_usage_store
         self._limits = token_limit_store
 
+    async def _limit_or_none(self, workspace_id: UUID, owner_id: UUID) -> int | None:
+        """Limits are display garnish here — a broken limits read must not 500 the ledger totals."""
+        try:
+            return await effective_limit(self._limits, workspace_id, owner_id)
+        except Exception as e:
+            log.warning("chat.usage.limit_read_failed", error=str(e))
+            return None
+
     async def execute(
         self,
         workspace_id: UUID,
         owner_id: UUID,
         days: int | None = None,
         kind: str | None = None,
+        exempt: bool = False,
     ) -> Result[UserTokenUsageResponse, AppError]:
         try:
             since = datetime.now(UTC) - timedelta(days=days) if days else None
-            usage = await self._usage.sum_for_user(
-                workspace_id, owner_id, since=since, kind=kind,
+            usage, by_kind, limit = await asyncio.gather(
+                self._usage.sum_for_user(workspace_id, owner_id, since=since, kind=kind),
+                month_usage_by_kind(self._usage, workspace_id, owner_id),
+                self._limit_or_none(workspace_id, owner_id),
             )
-            month_since = utc_month_start()
-            month_chat = await self._usage.sum_for_user(
-                workspace_id, owner_id, since=month_since, kind="chat",
-            )
-            month_ingestion = await self._usage.sum_for_user(
-                workspace_id, owner_id, since=month_since, kind="ingestion",
-            )
-            limit = await effective_limit(self._limits, workspace_id, owner_id)
             return Success(
                 UserTokenUsageResponse(
                     prompt=usage.prompt,
                     completion=usage.completion,
                     total=usage.total,
                     month=MonthUsage(
-                        chat=month_chat.total,
-                        ingestion=month_ingestion.total,
-                        total=month_chat.total + month_ingestion.total,
-                        limit=limit,
+                        chat=by_kind.get("chat", TokenUsageDTO()).total,
+                        ingestion=by_kind.get("ingestion", TokenUsageDTO()).total,
+                        total=month_total(by_kind),
+                        # Exempt (admin) callers are never enforced — don't render a limit.
+                        limit=None if exempt else limit,
                     ),
                 ),
             )

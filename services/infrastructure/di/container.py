@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
 from eventsourcing.application import Application
@@ -271,8 +272,22 @@ def create_container() -> Container:
     )
 
     # Register MongoDB Client and Read Repository
+    # One client per event loop: lagom re-invokes factories on every resolution,
+    # which built (and never closed) a fresh Motor client per request on hot paths.
+    # Motor clients are loop-bound, so a plain singleton would break tests/workers
+    # that each run their own loop — cache per loop instead.
+    mongo_clients_by_loop: dict[int, AsyncIOMotorClient] = {}
+
     def mongo_client_factory(_: object) -> AsyncIOMotorClient:
-        return AsyncIOMotorClient(settings.mongo_uri)
+        try:
+            loop_id = id(asyncio.get_running_loop())
+        except RuntimeError:  # resolved outside a loop (sync startup paths)
+            return AsyncIOMotorClient(settings.mongo_uri)
+        client = mongo_clients_by_loop.get(loop_id)
+        if client is None:
+            client = AsyncIOMotorClient(settings.mongo_uri)
+            mongo_clients_by_loop[loop_id] = client
+        return client
 
     container[AsyncIOMotorClient] = mongo_client_factory
 
