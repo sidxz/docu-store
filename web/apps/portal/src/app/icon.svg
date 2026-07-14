@@ -1,7 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- DocuStore favicon — the hexagon+leader+node fragment of the "cited
-       compound" mark (src/components/layout/logo.tsx); the full mark is
-       illegible at 16px. Ink parts flip to paper on dark tab strips. -->
+  <!-- DocuStore favicon — full "cited compound" mark (page + passage node +
+       leader + gradient hexagon; see src/components/ui/LogoMark.tsx).
+       The page box is deliberately included: a sister app uses the bare
+       hexagon fragment, so the document is the tab-strip differentiator.
+       Geometry is chunked up vs the logo to stay legible at 16px.
+       Ink parts flip to paper on dark tab strips. -->
   <style>
     .k { fill: #0b0b0d; }
     .s { stroke: #0b0b0d; }
@@ -11,14 +14,19 @@
     }
   </style>
   <defs>
-    <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="13.5" y1="22.5" x2="26.5" y2="7.5">
+    <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="19.6" y1="16.4" x2="29.4" y2="5.2">
       <stop offset="0" stop-color="#37d7fa"/>
       <stop offset="0.4" stop-color="#4b72fe"/>
       <stop offset="0.68" stop-color="#ff8df2"/>
       <stop offset="1" stop-color="#ff8705"/>
     </linearGradient>
   </defs>
-  <polygon points="20,7.5 26.5,11.25 26.5,18.75 20,22.5 13.5,18.75 13.5,11.25" fill="none" stroke="url(#g)" stroke-width="2.2"/>
-  <line class="s" x1="14.4" y1="18.3" x2="10.3" y2="20.65" stroke-width="2"/>
-  <circle class="k" cx="8.5" cy="21.7" r="2.4"/>
+  <!-- page, right edge broken where the leader exits -->
+  <path class="s" d="M17 14.8 V5 H4 V27 H17 V18.2" fill="none" stroke-width="2.2"/>
+  <rect class="k" x="7.5" y="9.5" width="6.5" height="2.2"/>
+  <rect class="k" x="7.5" y="13.5" width="4" height="2.2"/>
+  <!-- the passage → the extracted compound -->
+  <circle class="k" cx="10" cy="20.5" r="2.3"/>
+  <line class="s" x1="12.1" y1="19.2" x2="21" y2="14.3" stroke-width="2"/>
+  <polygon points="24.5,5.2 29.35,8 29.35,13.6 24.5,16.4 19.65,13.6 19.65,8" fill="none" stroke="url(#g)" stroke-width="2.4"/>
 </svg>
