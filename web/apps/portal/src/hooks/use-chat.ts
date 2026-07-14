@@ -160,7 +160,9 @@ export function useSendMessage(conversationId: string | undefined) {
         try {
           const body = (await res.json()) as { detail?: unknown };
           if (typeof body?.detail === "string") detail = body.detail;
-        } catch {
+        } catch (e) {
+          // Abort mid-read: preserve the DOMException so onError's abort guard works.
+          if (e instanceof DOMException && e.name === "AbortError") throw e;
           // non-JSON error body — fall back to statusText
         }
         const message = detail ?? `Chat failed: ${res.statusText}`;
