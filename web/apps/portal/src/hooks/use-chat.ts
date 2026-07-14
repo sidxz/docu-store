@@ -156,8 +156,18 @@ export function useSendMessage(conversationId: string | undefined) {
       });
 
       if (!res.ok) {
+        let detail: string | undefined;
+        try {
+          const body = (await res.json()) as { detail?: unknown };
+          if (typeof body?.detail === "string") detail = body.detail;
+        } catch {
+          // non-JSON error body — fall back to statusText
+        }
+        const message = detail ?? `Chat failed: ${res.statusText}`;
+        // Render in-thread via the same path SSE error events use.
+        store.appendToken(`\n\n**Error:** ${message}`);
         store.finishStreaming();
-        throw new Error(`Chat failed: ${res.statusText}`);
+        throw new Error(message);
       }
 
       await processSSEStream(res, store, controller.signal, trackEvent);
