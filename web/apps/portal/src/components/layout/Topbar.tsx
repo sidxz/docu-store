@@ -97,7 +97,7 @@ export function Topbar() {
       {/* Right section */}
       <div className="flex items-center gap-1">
         {/* User token usage total */}
-        {usage.data && (usage.data.month.total > 0 || usage.data.month.limit !== null) && (
+        {usage.data?.month && (usage.data.month.total > 0 || usage.data.month.limit !== null) && (
           <TokenBadge month={usage.data.month} />
         )}
 
@@ -180,7 +180,7 @@ export function Topbar() {
 }
 
 function TokenBadge({ month }: { month: MonthTokenUsage }) {
-  const pct = month.limit ? month.total / month.limit : null;
+  const pct = month.limit === null ? null : month.limit === 0 ? 1 : month.total / month.limit;
   const color =
     pct !== null && pct >= 1
       ? "text-red-500"

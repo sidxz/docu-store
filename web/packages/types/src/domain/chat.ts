@@ -79,7 +79,7 @@ export interface MonthTokenUsage {
 
 /** GET /chat/usage — requested-window totals + current-calendar-month block. */
 export interface UserTokenUsage extends TokenUsage {
-  month: MonthTokenUsage;
+  month?: MonthTokenUsage;
 }
 
 // --- Messages & conversations ---

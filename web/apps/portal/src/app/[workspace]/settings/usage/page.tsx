@@ -10,7 +10,8 @@ export default function UsageSettingsPage() {
   const usage = useUserTokenUsage();
   const month = usage.data?.month;
 
-  const pct = month?.limit ? Math.min(month.total / month.limit, 1) : null;
+  const pct =
+    month?.limit == null ? null : month.limit === 0 ? 1 : Math.min(month.total / month.limit, 1);
   const barColor =
     pct === null
       ? ""
