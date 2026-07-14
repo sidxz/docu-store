@@ -93,6 +93,7 @@ class Page(Aggregate):
         self.summary_candidate: SummaryCandidate | None = None
         self.text_embedding_metadata: EmbeddingMetadata | None = None
         self.smiles_embedding_metadata: EmbeddingMetadata | None = None
+        self.human_corrections: dict[str, dict] = {}
         self.is_deleted: bool = False
         self.deleted_at: datetime | None = None
 
@@ -114,6 +115,8 @@ class Page(Aggregate):
         if self.is_deleted:
             msg = "Cannot update compound mentions on a deleted page"
             raise ValueError(msg)
+        if "compound_mentions" in self.human_corrections:
+            return  # human correction wins; machine update silently skipped
         self.trigger_event(
             self.CompoundMentionsUpdated,
             compound_mentions=compound_mentions,
@@ -130,6 +133,61 @@ class Page(Aggregate):
     ) -> None:
         # Update internal state, replace existing compound_mentions
         self.compound_mentions = compound_mentions
+
+    # ============================================================================
+    # COMMAND METHOD - Human-in-the-loop correction (hiledit)
+    # ============================================================================
+    class HumanCorrectionRecorded(Aggregate.Event):
+        corrected_fields: list[str]
+        corrected_by_id: str
+        corrected_by_name: str | None
+        corrected_at: datetime
+        artifact_id: UUID
+        workspace_id: UUID | None = None
+
+    def correct_compound_mentions(
+        self,
+        compound_mentions: list[CompoundMention],
+        *,
+        corrected_by_id: str,
+        corrected_by_name: str | None,
+    ) -> None:
+        """Human correction: replace compound mentions + record provenance, atomically."""
+        if self.is_deleted:
+            msg = "Cannot correct compound mentions on a deleted page"
+            raise ValueError(msg)
+        self.trigger_event(
+            self.CompoundMentionsUpdated,
+            compound_mentions=compound_mentions,
+            artifact_id=self.artifact_id,
+            workspace_id=self.workspace_id,
+        )
+        self.trigger_event(
+            self.HumanCorrectionRecorded,
+            corrected_fields=["compound_mentions"],
+            corrected_by_id=corrected_by_id,
+            corrected_by_name=corrected_by_name,
+            corrected_at=datetime.now(UTC),
+            artifact_id=self.artifact_id,
+            workspace_id=self.workspace_id,
+        )
+
+    @event(HumanCorrectionRecorded)
+    def _apply_human_correction_recorded(
+        self,
+        corrected_fields: list[str],
+        corrected_by_id: str,
+        corrected_by_name: str | None,
+        corrected_at: datetime,
+        artifact_id: UUID,
+        workspace_id: UUID | None = None,
+    ) -> None:
+        for field in corrected_fields:
+            self.human_corrections[field] = {
+                "corrected_by_id": corrected_by_id,
+                "corrected_by_name": corrected_by_name,
+                "corrected_at": corrected_at,
+            }
 
     # ============================================================================
     # COMMAND METHOD - Update TagMentions
