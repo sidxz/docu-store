@@ -16,11 +16,15 @@ class FakeAuth:
         user_id: UUID | None = None,
         workspace_id: UUID | None = None,
         actions: set[str] | None = None,
+        name: str = "Test User",
+        email: str = "test@example.com",
     ) -> None:
         self.user_id = user_id or uuid4()
         self.workspace_id = workspace_id or uuid4()
         self.workspace_role = role
         self.is_admin = role in ("admin", "owner")
+        self.name = name
+        self.email = email
         self._actions = actions
 
     async def check_action(self, action: str) -> bool:
