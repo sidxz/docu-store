@@ -351,17 +351,25 @@ async def get_token_usage_stats(
 async def get_member_usage_stats(
     container: Annotated[Container, Depends(get_container)],
     auth: Annotated[RequestAuth, Depends(get_auth)],
-    period: str = Query("month", pattern="^(day|week|month)$"),
+    period: str = Query("month", pattern="^(day|week|month|calendar_month)$"),
 ) -> MemberUsageStatsResponse:
-    """Per-member token usage from the ledger, chat vs ingestion (admin only)."""
+    """Per-member token usage from the ledger, chat vs ingestion (admin only).
+
+    `calendar_month` = since the 1st (UTC) — matches quota enforcement.
+    """
     if not auth.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
 
     from application.ports.token_usage_store import TokenUsageStore
+    from application.use_cases.token_limit_use_cases import utc_month_start
 
     store = container[TokenUsageStore]
-    days = _period_to_days(period)
-    since = datetime.now(UTC) - timedelta(days=days)
+    if period == "calendar_month":
+        since = utc_month_start()
+        days = max(1, (datetime.now(UTC) - since).days)
+    else:
+        days = _period_to_days(period)
+        since = datetime.now(UTC) - timedelta(days=days)
     members = await store.usage_by_member(auth.workspace_id, since=since)
     return MemberUsageStatsResponse(members=members, period_days=days)
 

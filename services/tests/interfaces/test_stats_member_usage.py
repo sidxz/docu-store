@@ -24,7 +24,11 @@ class FakeContainer:
 
 
 class FakeUsageStore:
+    def __init__(self) -> None:
+        self.last_since: datetime | None = None
+
     async def usage_by_member(self, workspace_id, *, since: datetime):
+        self.last_since = since
         return [
             MemberTokenUsage(
                 user_id="u1",
@@ -35,10 +39,10 @@ class FakeUsageStore:
         ]
 
 
-def _client(*, is_admin: bool) -> TestClient:
+def _client(*, is_admin: bool, store: FakeUsageStore | None = None) -> TestClient:
     strip_authz_middleware(app)
     app.dependency_overrides[get_container] = lambda: FakeContainer(
-        {TokenUsageStore: FakeUsageStore()},
+        {TokenUsageStore: store or FakeUsageStore()},
     )
     app.dependency_overrides[get_auth] = lambda: FakeAuth(
         role="admin" if is_admin else "viewer", user_id=uuid4(), workspace_id=uuid4(),
@@ -63,5 +67,19 @@ def test_member_usage_returns_split_per_member() -> None:
         assert body["members"][0]["user_id"] == "u1"
         assert body["members"][0]["chat"]["total"] == 12
         assert body["members"][0]["ingestion"]["total"] == 100
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_member_usage_calendar_month_windows_from_month_start() -> None:
+    from application.use_cases.token_limit_use_cases import utc_month_start
+
+    store = FakeUsageStore()
+    try:
+        resp = _client(is_admin=True, store=store).get(
+            "/stats/member-usage?period=calendar_month",
+        )
+        assert resp.status_code == 200
+        assert store.last_since == utc_month_start()
     finally:
         app.dependency_overrides.clear()

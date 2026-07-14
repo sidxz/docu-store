@@ -67,7 +67,7 @@ export default function TokenSettingsPage() {
   const isAdmin = useAuthzHasRole("admin");
   const limits = useWorkspaceTokenLimits();
   const members = useWorkspaceMembers();
-  const usage = useMemberUsageStats("month");
+  const usage = useMemberUsageStats("calendar_month");
   const setDefault = useSetDefaultTokenLimit();
   const setUser = useSetUserTokenLimit();
   const clearUser = useClearUserTokenLimit();
@@ -127,7 +127,7 @@ export default function TokenSettingsPage() {
 
       <Card>
         <CardHeader title="Member Limits" />
-        {members.isLoading || limits.isLoading ? (
+        {members.isLoading || limits.isLoading || usage.isLoading ? (
           <p className="text-sm text-text-muted">Loading members…</p>
         ) : (
           <table className="w-full text-sm">
@@ -151,7 +151,7 @@ export default function TokenSettingsPage() {
                       <div className="text-xs text-text-muted">{m.email ?? userId}</div>
                     </td>
                     <td className="py-2 font-mono text-text-primary">
-                      {formatTokens(usageByUser.get(userId) ?? 0)}
+                      {usage.isError ? "—" : formatTokens(usageByUser.get(userId) ?? 0)}
                     </td>
                     <td className="py-2">
                       <span className="font-mono text-text-primary">
