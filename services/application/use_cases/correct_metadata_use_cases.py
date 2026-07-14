@@ -10,13 +10,16 @@ from returns.result import Failure, Result, Success
 
 from application.dtos.errors import AppError
 from application.mappers.artifact_mappers import ArtifactMapper
+from application.mappers.page_mappers import PageMapper
 from application.use_cases._guards import (
     handle_domain_errors,
     require_artifact_workspace,
     require_editor,
+    require_page_workspace,
 )
 from domain.services.tag_mention_aggregator import _normalize
 from domain.value_objects.author_mention import AuthorMention
+from domain.value_objects.compound_mention import CompoundMention
 from domain.value_objects.presentation_date import PresentationDate
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.title_mention import TitleMention
@@ -25,10 +28,17 @@ if TYPE_CHECKING:
     from uuid import UUID
 
     from application.dtos.artifact_dtos import ArtifactResponse
-    from application.dtos.correction_dtos import CorrectArtifactMetadataRequest, CorrectedTagInput
+    from application.dtos.correction_dtos import (
+        CorrectArtifactMetadataRequest,
+        CorrectedTagInput,
+        CorrectPageCompoundMentionsRequest,
+    )
+    from application.dtos.page_dtos import PageResponse
     from application.ports.auth import AuthContext
     from application.ports.external_event_publisher import ExternalEventPublisher
     from application.ports.repositories.artifact_repository import ArtifactRepository
+    from application.ports.repositories.page_repository import PageRepository
+    from application.ports.smiles_validator import SmilesValidator
 
 logger = structlog.get_logger()
 
@@ -146,6 +156,78 @@ class CorrectArtifactMetadataUseCase:
         result = ArtifactMapper.to_artifact_response(artifact)
         if self.external_event_publisher:
             await self.external_event_publisher.notify_artifact_updated(
+                result,
+                sub_type="HumanCorrectionRecorded",
+            )
+        return Success(result)
+
+
+class CorrectPageCompoundMentionsUseCase:
+    """hiledit: replace a page's compound mentions with human-corrected ones."""
+
+    def __init__(
+        self,
+        page_repository: PageRepository,
+        smiles_validator: SmilesValidator,
+        external_event_publisher: ExternalEventPublisher | None = None,
+    ) -> None:
+        self.page_repository = page_repository
+        self.smiles_validator = smiles_validator
+        self.external_event_publisher = external_event_publisher
+
+    @handle_domain_errors
+    async def execute(
+        self,
+        page_id: UUID,
+        request: CorrectPageCompoundMentionsRequest,
+        auth: AuthContext | None = None,
+    ) -> Result[PageResponse, AppError]:
+        # Same rationale as CorrectArtifactMetadataUseCase: a human correction
+        # always needs a real actor to attribute it to — require_editor(None) is a
+        # no-op (it only rejects an insufficient *role*), so the None case needs
+        # its own explicit check.
+        if auth is None:
+            return Failure(AppError("unauthorized", "Authentication required"))
+        require_editor(auth)
+
+        page = self.page_repository.get_by_id(page_id)
+        require_page_workspace(auth, page)
+
+        now = datetime.now(UTC)
+        mentions: list[CompoundMention] = []
+        for item in request.compound_mentions:
+            if not self.smiles_validator.validate(item.smiles):
+                return Failure(AppError("validation", f"Invalid SMILES: {item.smiles!r}"))
+            mentions.append(
+                CompoundMention(
+                    smiles=item.smiles,
+                    canonical_smiles=self.smiles_validator.canonicalize(item.smiles),
+                    is_smiles_valid=True,
+                    extracted_id=item.extracted_id,
+                    internal_id=item.internal_id,
+                    cdd_id=item.cdd_id,
+                    chembl_id=item.chembl_id,
+                    pdb_id=item.pdb_id,
+                    date_extracted=now,
+                ),
+            )
+
+        page.correct_compound_mentions(
+            mentions,
+            corrected_by_id=str(auth.user_id),
+            corrected_by_name=auth.name,
+        )
+        self.page_repository.save(page)
+        logger.info(
+            "hiledit_page_compound_mentions_corrected",
+            page_id=str(page_id),
+            count=len(mentions),
+            corrected_by=str(auth.user_id),
+        )
+
+        result = PageMapper.to_page_response(page)
+        if self.external_event_publisher:
+            await self.external_event_publisher.notify_page_updated(
                 result,
                 sub_type="HumanCorrectionRecorded",
             )

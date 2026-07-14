@@ -1,4 +1,4 @@
-"""DTOs for human-in-the-loop artifact metadata corrections (hiledit)."""
+"""DTOs for human-in-the-loop corrections to artifact metadata and page compound mentions (hiledit)."""
 
 from datetime import date, datetime
 
@@ -26,6 +26,27 @@ class CorrectArtifactMetadataRequest(BaseModel):
     presentation_date: date | None = None
     tags: list[CorrectedTagInput] | None = None
     authors: list[str] | None = None
+
+
+class CorrectedCompoundInput(BaseModel):
+    """A single compound mention as submitted by a human reviewer."""
+
+    smiles: str
+    extracted_id: str | None = None
+    internal_id: str | None = None
+    cdd_id: str | None = None
+    chembl_id: str | None = None
+    pdb_id: str | None = None
+
+
+class CorrectPageCompoundMentionsRequest(BaseModel):
+    """Request DTO for correcting a page's compound mentions.
+
+    Full-replace semantics: the submitted list becomes the page's entire
+    ``compound_mentions``. An empty list is allowed and clears all mentions.
+    """
+
+    compound_mentions: list[CorrectedCompoundInput]
 
 
 class HumanCorrectionInfo(BaseModel):
