@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ShieldAlert } from "lucide-react";
+import { AlertTriangle, ShieldAlert } from "lucide-react";
 import { useAuthzHasRole } from "@sentinel-auth/react";
 
 import { Card, CardHeader } from "@/components/ui/Card";
@@ -78,6 +78,20 @@ export default function TokenSettingsPage() {
         icon={ShieldAlert}
         title="Access Denied"
         description="You need admin privileges to manage token limits."
+      />
+    );
+  }
+
+  if (limits.isError || members.isError) {
+    return (
+      <EmptyState
+        icon={AlertTriangle}
+        title="Failed to load token limits"
+        description={
+          (limits.error ?? members.error) instanceof Error
+            ? (limits.error ?? members.error)!.message
+            : "An unknown error occurred."
+        }
       />
     );
   }
