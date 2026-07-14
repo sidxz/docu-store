@@ -104,3 +104,15 @@ def sample_text_mention() -> TextMention:
         text="Notable result",
         confidence=0.90,
     )
+
+
+def strip_authz_middleware(app) -> None:
+    """Remove AuthzMiddleware so route tests can run without real tokens.
+
+    Without this, the real middleware 401s every request before
+    ``Depends(get_auth)`` runs, so dependency overrides never apply.
+    """
+    from sentinel_auth.authz_middleware import AuthzMiddleware
+
+    app.user_middleware = [m for m in app.user_middleware if m.cls is not AuthzMiddleware]
+    app.middleware_stack = app.build_middleware_stack()

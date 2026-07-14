@@ -1,11 +1,16 @@
-"""Workspace routes — proxy to Sentinel for workspace member/group lookups."""
+"""Workspace routes — Sentinel member/group proxies + admin token-limit config."""
 
 from typing import Annotated
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from lagom import Container
+from pydantic import BaseModel, Field
 from sentinel_auth import RequestAuth
 
-from interfaces.dependencies import get_auth
+from application.dtos.usage_dtos import TokenLimitEntry
+from application.ports.token_limit_store import TokenLimitStore
+from interfaces.dependencies import get_auth, get_container
 
 router = APIRouter(prefix="/workspace", tags=["workspace"])
 
@@ -29,3 +34,75 @@ async def list_groups(
 ) -> list[dict]:
     """List groups in the current workspace."""
     return await auth.list_groups()
+
+
+# ── Token limits (admin) ────────────────────────────────────────────────────
+
+
+class TokenLimitBody(BaseModel):
+    limit: int | None = Field(default=None, ge=0)
+
+
+class WorkspaceTokenLimitsResponse(BaseModel):
+    default_limit: int | None
+    overrides: list[TokenLimitEntry]
+
+
+def _require_admin(auth: RequestAuth) -> None:
+    if not auth.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
+
+@router.get("/token-limits", status_code=status.HTTP_200_OK)
+async def get_token_limits(
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> WorkspaceTokenLimitsResponse:
+    """Workspace-default + per-user monthly token limits (admin only)."""
+    _require_admin(auth)
+    rows = await container[TokenLimitStore].list_for_workspace(auth.workspace_id)
+    default = next((r for r in rows if r.user_id is None), None)
+    return WorkspaceTokenLimitsResponse(
+        default_limit=default.limit if default else None,
+        overrides=[r for r in rows if r.user_id is not None],
+    )
+
+
+# NOTE: /default must be declared before /{user_id} — otherwise "default"
+# matches the UUID path param and 422s instead of reaching this route.
+@router.put("/token-limits/default", status_code=status.HTTP_204_NO_CONTENT)
+async def set_default_token_limit(
+    body: TokenLimitBody,
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> None:
+    """Set the workspace-default monthly token limit (admin only). null = unlimited."""
+    _require_admin(auth)
+    await container[TokenLimitStore].set(
+        auth.workspace_id, None, body.limit, updated_by=auth.user_id,
+    )
+
+
+@router.put("/token-limits/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def set_user_token_limit(
+    user_id: UUID,
+    body: TokenLimitBody,
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> None:
+    """Set a per-user monthly token limit override (admin only). null = unlimited."""
+    _require_admin(auth)
+    await container[TokenLimitStore].set(
+        auth.workspace_id, user_id, body.limit, updated_by=auth.user_id,
+    )
+
+
+@router.delete("/token-limits/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user_token_limit(
+    user_id: UUID,
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> None:
+    """Remove a per-user override so the user falls back to the workspace default."""
+    _require_admin(auth)
+    await container[TokenLimitStore].delete(auth.workspace_id, user_id)

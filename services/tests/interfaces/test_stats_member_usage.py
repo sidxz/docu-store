@@ -6,12 +6,12 @@ from datetime import datetime
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from sentinel_auth.authz_middleware import AuthzMiddleware
 
 from application.dtos.usage_dtos import KindUsage, MemberTokenUsage
 from application.ports.token_usage_store import TokenUsageStore
 from interfaces.api.main import app
 from interfaces.dependencies import get_auth, get_container
+from tests.conftest import strip_authz_middleware
 from tests.fakes.fake_auth import FakeAuth
 
 
@@ -35,19 +35,8 @@ class FakeUsageStore:
         ]
 
 
-def _strip_authz_middleware() -> None:
-    """Remove AuthzMiddleware so tests can run without real tokens.
-
-    Mirrors ``tests/interfaces/test_api_routes.py`` — without this, the real
-    middleware 401s every request before ``Depends(get_auth)`` ever runs, so
-    the dependency override below would have no effect.
-    """
-    app.user_middleware = [m for m in app.user_middleware if m.cls is not AuthzMiddleware]
-    app.middleware_stack = app.build_middleware_stack()
-
-
 def _client(*, is_admin: bool) -> TestClient:
-    _strip_authz_middleware()
+    strip_authz_middleware(app)
     app.dependency_overrides[get_container] = lambda: FakeContainer(
         {TokenUsageStore: FakeUsageStore()},
     )

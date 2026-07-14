@@ -8,7 +8,6 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi.testclient import TestClient
 from returns.result import Failure, Success
-from sentinel_auth.authz_middleware import AuthzMiddleware
 
 from application.dtos.artifact_dtos import ArtifactResponse, CreateArtifactRequest
 from application.dtos.errors import AppError
@@ -28,6 +27,7 @@ from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.mime_type import MimeType
 from interfaces.api.main import app
 from interfaces.dependencies import get_auth, get_container
+from tests.conftest import strip_authz_middleware
 from tests.fakes.fake_auth import FakeAuth
 
 
@@ -112,15 +112,9 @@ class FakeUseCase:
         return self._result
 
 
-def _strip_authz_middleware() -> None:
-    """Remove AuthzMiddleware from the app so tests can run without tokens."""
-    app.user_middleware = [m for m in app.user_middleware if m.cls is not AuthzMiddleware]
-    app.middleware_stack = app.build_middleware_stack()
-
-
 @pytest.fixture
 def make_client() -> Callable[[dict[type, object]], TestClient]:
-    _strip_authz_middleware()
+    strip_authz_middleware(app)
 
     def _make_client(
         overrides: dict[type, object], auth: FakeAuth | None = None,
