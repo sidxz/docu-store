@@ -47,6 +47,10 @@ interface ChatState {
   // User message shown immediately while agent processes
   pendingUserMessage: string | null;
 
+  // Which conversation the streaming buffer belongs to — the store is global,
+  // so optimistic bubbles must only render inside their own conversation.
+  streamingConversationId: string | null;
+
   // Chronological thinking blocks (one per LLM thought)
   streamingThinkingBlocks: ThinkingBlock[];
 
@@ -83,7 +87,7 @@ interface ChatState {
   highlightCitation: (index: number, messageId?: string) => void;
   setActiveSourcesMessageId: (id: string | null) => void;
   setQueuedMessage: (msg: string | null) => void;
-  startStreaming: (userMessage: string) => void;
+  startStreaming: (userMessage: string, conversationId: string | null) => void;
   appendToken: (delta: string) => void;
   addStep: (step: AgentStep) => void;
   updateStep: (stepName: string, update: Partial<AgentStep>) => void;
@@ -111,6 +115,7 @@ export const useChatStore = create<ChatState>()(
   streamingSources: [],
   finalSources: null,
   pendingUserMessage: null,
+  streamingConversationId: null,
   queuedMessage: null,
   streamingThinkingBlocks: [],
   streamingReasoning: "",
@@ -163,7 +168,7 @@ export const useChatStore = create<ChatState>()(
 
   setQueuedMessage: (msg) => set({ queuedMessage: msg }),
 
-  startStreaming: (userMessage) =>
+  startStreaming: (userMessage, conversationId) =>
     set({
       isStreaming: true,
       streamingContent: "",
@@ -171,6 +176,7 @@ export const useChatStore = create<ChatState>()(
       streamingSources: [],
       finalSources: null,
       pendingUserMessage: userMessage,
+      streamingConversationId: conversationId,
       streamingThinkingBlocks: [],
       streamingReasoning: "",
       streamingStructuredBlocks: [],
@@ -269,6 +275,7 @@ export const useChatStore = create<ChatState>()(
       streamingSources: [],
       finalSources: null,
       pendingUserMessage: null,
+      streamingConversationId: null,
       streamingThinkingBlocks: [],
       streamingReasoning: "",
       streamingStructuredBlocks: [],

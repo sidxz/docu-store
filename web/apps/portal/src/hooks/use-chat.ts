@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
-import { authFetch, authFetchJson } from "@/lib/auth-fetch";
+import { authFetch, authFetchJson, readErrorDetail } from "@/lib/auth-fetch";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useAnalytics } from "@/hooks/use-analytics";
 import type {
@@ -144,7 +144,7 @@ export function useSendMessage(conversationId: string | undefined) {
         });
       }
 
-      store.startStreaming(message);
+      store.startStreaming(message, conversationId);
 
       const reasoning = store.effectiveReasoning();
       const streamStart = performance.now();
@@ -156,15 +156,7 @@ export function useSendMessage(conversationId: string | undefined) {
       });
 
       if (!res.ok) {
-        let detail: string | undefined;
-        try {
-          const body = (await res.json()) as { detail?: unknown };
-          if (typeof body?.detail === "string") detail = body.detail;
-        } catch (e) {
-          // Abort mid-read: preserve the DOMException so onError's abort guard works.
-          if (e instanceof DOMException && e.name === "AbortError") throw e;
-          // non-JSON error body — fall back to statusText
-        }
+        const detail = await readErrorDetail(res);
         const message = detail ?? `Chat failed: ${res.statusText}`;
         // Render in-thread via the same path SSE error events use.
         store.appendToken(`\n\n**Error:** ${message}`);
@@ -197,6 +189,9 @@ export function useSendMessage(conversationId: string | undefined) {
       // AbortError is expected on navigation — don't treat as a real error
       if (error instanceof DOMException && error.name === "AbortError") return;
       store.finishStreaming();
+      // A 429 means usage crossed the limit since the badge last fetched —
+      // refresh it so the UI stops claiming the user is under quota.
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.usage() });
       trackEvent("chat_error", {
         mode: store.chatMode,
         error_type: error instanceof Error ? error.message.slice(0, 100) : "unknown",

@@ -269,12 +269,15 @@ interface WorkspaceMember {
 
 // ---------- Member usage & workspace members hooks ----------
 
-export function useMemberUsageStats(period = "month") {
+export function useMemberUsageStats(
+  period = "month",
+  refetchInterval: number | false = 60_000,
+) {
   return useQuery({
     queryKey: queryKeys.stats.memberUsage(period),
     queryFn: () =>
       authFetchJson<MemberUsageStatsResponse>(`/stats/member-usage?period=${period}`),
-    refetchInterval: 60_000,
+    refetchInterval,
   });
 }
 

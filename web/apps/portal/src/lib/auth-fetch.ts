@@ -34,7 +34,23 @@ export async function authFetch(
 }
 
 /**
- * Convenience: authFetch + JSON parse. Throws on non-OK responses.
+ * Extract FastAPI's error `detail` from a non-OK response body.
+ * Re-throws AbortError (navigation mid-read must stay an abort); any other
+ * parse failure (non-JSON body) resolves to undefined.
+ */
+export async function readErrorDetail(res: Response): Promise<string | undefined> {
+  try {
+    const body = (await res.json()) as { detail?: unknown };
+    return typeof body?.detail === "string" ? body.detail : undefined;
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") throw e;
+    return undefined;
+  }
+}
+
+/**
+ * Convenience: authFetch + JSON parse. Throws ApiError on non-OK responses.
+ * 204/empty responses resolve to undefined.
  */
 export async function authFetchJson<T>(
   path: string,
@@ -42,15 +58,9 @@ export async function authFetchJson<T>(
 ): Promise<T> {
   const res = await authFetch(path, init);
   if (!res.ok) {
-    // Surface FastAPI's error `detail` as the message when present.
-    let detail: string | undefined;
-    try {
-      const body = (await res.json()) as { detail?: unknown };
-      if (typeof body?.detail === "string") detail = body.detail;
-    } catch {
-      // non-JSON error body — fall back to statusText
-    }
+    const detail = await readErrorDetail(res);
     throw new ApiError(detail ?? `API error: ${res.statusText}`, res.status, detail);
   }
+  if (res.status === 204) return undefined as T;
   return res.json();
 }

@@ -25,8 +25,16 @@ export default function UsageSettingsPage() {
     <div className="max-w-2xl space-y-6">
       <Card>
         <CardHeader title="This Month" />
-        {!month ? (
+        {usage.isError ? (
+          <p className="text-sm text-red-500">
+            Failed to load usage
+            {usage.error instanceof Error ? `: ${usage.error.message}` : "."}
+          </p>
+        ) : usage.isLoading ? (
           <p className="text-sm text-text-muted">Loading usage…</p>
+        ) : !month ? (
+          // Deploy skew: an older backend without the month block.
+          <p className="text-sm text-text-muted">Usage data unavailable.</p>
         ) : (
           <div className="space-y-4">
             <div className="flex items-baseline justify-between">

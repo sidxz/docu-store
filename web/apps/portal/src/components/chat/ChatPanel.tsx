@@ -61,7 +61,11 @@ export function ChatPanel({
       return null;
     }
   });
-  const pendingUserMessage = useChatStore((s) => s.pendingUserMessage);
+  // Only surface the pending message when its stream belongs to this
+  // conversation — the store is global and leaks across navigation otherwise.
+  const pendingUserMessage = useChatStore((s) =>
+    s.streamingConversationId === conversationId ? s.pendingUserMessage : null,
+  );
 
   const handleFeedback = useCallback(
     (messageId: string, feedback: "positive" | "negative") => {
@@ -259,6 +263,7 @@ export function ChatPanel({
             streamingSteps={streamingSteps}
             streamingSources={streamingSources}
             workspace={workspace}
+            conversationId={conversationId}
             onFeedback={handleFeedback}
           />
         </ConversationContent>

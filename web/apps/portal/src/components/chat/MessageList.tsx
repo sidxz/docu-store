@@ -14,6 +14,7 @@ interface MessageListProps {
   streamingSteps: AgentStep[];
   streamingSources: SourceCitation[];
   workspace: string;
+  conversationId?: string;
   onFeedback?: (messageId: string, feedback: "positive" | "negative") => void;
 }
 
@@ -25,6 +26,7 @@ export function MessageList({
   streamingSteps,
   streamingSources,
   workspace,
+  conversationId,
   onFeedback,
 }: MessageListProps) {
   const pendingUserMessage = useChatStore((s) => s.pendingUserMessage);
@@ -33,6 +35,7 @@ export function MessageList({
   const streamingStructuredBlocks = useChatStore((s) => s.streamingStructuredBlocks);
   const streamingReasoning = useChatStore((s) => s.streamingReasoning);
   const doneEvent = useChatStore((s) => s.doneEvent);
+  const streamingConversationId = useChatStore((s) => s.streamingConversationId);
 
   // Determine if the API data already includes the response we just streamed.
   // If the done event has a message_id, check if the messages array contains it.
@@ -40,10 +43,13 @@ export function MessageList({
     ? messages.some((m) => m.message_id === doneEvent.message_id)
     : false;
 
-  // Show the optimistic messages (pending user + streaming assistant) when:
+  // Show the optimistic messages (pending user + streaming assistant) when the
+  // buffered stream belongs to THIS conversation (the store is global — without
+  // this, another conversation's leftover stream/error ghost-renders here) and:
   // - Currently streaming, OR
   // - Streaming finished but the API refetch hasn't returned the new messages yet
-  const showOptimistic = isStreaming || (streamingContent && !apiHasCaughtUp);
+  const streamBelongsHere = streamingConversationId === conversationId;
+  const showOptimistic = streamBelongsHere && (isStreaming || (streamingContent && !apiHasCaughtUp));
 
   // Renders as fragment children of ConversationContent — its gap handles
   // message spacing, ChatPanel constrains the column width.
