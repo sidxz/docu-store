@@ -11,6 +11,9 @@ from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.title_mention import TitleMention
 
+_UNSET: object = object()
+"""Sentinel distinguishing 'field not being corrected' from 'correct to None'."""
+
 
 class Artifact(Aggregate):
     """The Aggregate Root for an Artifact."""
@@ -95,6 +98,7 @@ class Artifact(Aggregate):
         self.tag_mentions: list[TagMention] = []
         self.author_mentions: list[AuthorMention] = []
         self.presentation_date: PresentationDate | None = None
+        self.human_corrections: dict[str, dict] = {}
         self.is_deleted: bool = False
         self.deleted_at: datetime | None = None
 
@@ -180,6 +184,8 @@ class Artifact(Aggregate):
         if self.is_deleted:
             msg = "Cannot update title mention on a deleted artifact"
             raise ValueError(msg)
+        if "title_mention" in self.human_corrections:
+            return  # human correction wins; machine update silently skipped
         self.trigger_event(self.TitleMentionUpdated, title_mention=title_mention)
 
     @event(TitleMentionUpdated)
@@ -215,6 +221,8 @@ class Artifact(Aggregate):
         if self.is_deleted:
             msg = "Cannot update tag mentions on a deleted artifact"
             raise ValueError(msg)
+        if "tag_mentions" in self.human_corrections:
+            return  # human correction wins; machine update silently skipped
         self.trigger_event(self.TagMentionsUpdated, tag_mentions=tag_mentions)
 
     @event(TagMentionsUpdated)
@@ -231,6 +239,8 @@ class Artifact(Aggregate):
         if self.is_deleted:
             msg = "Cannot update author mentions on a deleted artifact"
             raise ValueError(msg)
+        if "author_mentions" in self.human_corrections:
+            return  # human correction wins; machine update silently skipped
         self.trigger_event(self.AuthorMentionsUpdated, author_mentions=author_mentions)
 
     @event(AuthorMentionsUpdated)
@@ -247,11 +257,74 @@ class Artifact(Aggregate):
         if self.is_deleted:
             msg = "Cannot update presentation date on a deleted artifact"
             raise ValueError(msg)
+        if "presentation_date" in self.human_corrections:
+            return  # human correction wins; machine update silently skipped
         self.trigger_event(self.PresentationDateUpdated, presentation_date=presentation_date)
 
     @event(PresentationDateUpdated)
     def _apply_presentation_date_updated(self, presentation_date: PresentationDate | None) -> None:
         self.presentation_date = presentation_date
+
+    # ============================================================================
+    # COMMAND METHOD - Human-in-the-loop correction (hiledit)
+    # ============================================================================
+    class HumanCorrectionRecorded(Aggregate.Event):
+        corrected_fields: list[str]
+        corrected_by_id: str
+        corrected_by_name: str | None
+        corrected_at: datetime
+
+    def correct_metadata(
+        self,
+        *,
+        corrected_by_id: str,
+        corrected_by_name: str | None,
+        title_mention: TitleMention | None | object = _UNSET,
+        tag_mentions: list[TagMention] | object = _UNSET,
+        author_mentions: list[AuthorMention] | object = _UNSET,
+        presentation_date: PresentationDate | None | object = _UNSET,
+    ) -> list[str]:
+        """Apply human corrections: value events + one provenance event, atomically."""
+        if self.is_deleted:
+            msg = "Cannot correct metadata on a deleted artifact"
+            raise ValueError(msg)
+        corrected: list[str] = []
+        if title_mention is not _UNSET:
+            self.trigger_event(self.TitleMentionUpdated, title_mention=title_mention)
+            corrected.append("title_mention")
+        if tag_mentions is not _UNSET:
+            self.trigger_event(self.TagMentionsUpdated, tag_mentions=tag_mentions)
+            corrected.append("tag_mentions")
+        if author_mentions is not _UNSET:
+            self.trigger_event(self.AuthorMentionsUpdated, author_mentions=author_mentions)
+            corrected.append("author_mentions")
+        if presentation_date is not _UNSET:
+            self.trigger_event(self.PresentationDateUpdated, presentation_date=presentation_date)
+            corrected.append("presentation_date")
+        if corrected:
+            self.trigger_event(
+                self.HumanCorrectionRecorded,
+                corrected_fields=corrected,
+                corrected_by_id=corrected_by_id,
+                corrected_by_name=corrected_by_name,
+                corrected_at=datetime.now(UTC),
+            )
+        return corrected
+
+    @event(HumanCorrectionRecorded)
+    def _apply_human_correction_recorded(
+        self,
+        corrected_fields: list[str],
+        corrected_by_id: str,
+        corrected_by_name: str | None,
+        corrected_at: datetime,
+    ) -> None:
+        for field in corrected_fields:
+            self.human_corrections[field] = {
+                "corrected_by_id": corrected_by_id,
+                "corrected_by_name": corrected_by_name,
+                "corrected_at": corrected_at,
+            }
 
     # ============================================================================
     # COMMAND METHOD - Delete Artifact
