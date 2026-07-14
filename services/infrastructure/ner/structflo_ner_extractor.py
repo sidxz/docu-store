@@ -59,7 +59,6 @@ class StructfloNERExtractor(NERExtractorPort):
 
         if provider in LANGEXTRACT_PROVIDERS:
             import langextract.providers as lx_providers
-
             from structflo.ner import NERExtractor
 
             # langextract 1.1.1: the explicit-provider factory path skips
