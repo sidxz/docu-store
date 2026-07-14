@@ -113,11 +113,19 @@ export function useChatFeedback(conversationId: string | undefined) {
 
 // ── SSE Message Streaming ──────────────────────────────────────────────────
 
+// The chat store has a single global streaming slot, and streams outlive
+// their component since the unmount abort was removed — so the controller
+// that owns the live stream must be module-scoped too. A per-instance ref
+// would let a stream orphaned by a ChatPanel remount (/chat <-> /chat/[id]
+// are different page components) keep writing into a slot another
+// conversation has claimed.
+const streamAbortRef: { current: AbortController | null } = { current: null };
+
 export function useSendMessage(conversationId: string | undefined) {
   const queryClient = useQueryClient();
   const store = useChatStore();
   const { trackEvent } = useAnalytics();
-  const abortRef = useRef<AbortController | null>(null);
+  const abortRef = streamAbortRef;
   const resumingRef = useRef(false);
 
   /** Reattach to a server-side run (after reload or a 409). Replays buffered
