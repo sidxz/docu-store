@@ -58,7 +58,16 @@ class StructfloNERExtractor(NERExtractorPort):
         self._tb_profile = TB
 
         if provider in LANGEXTRACT_PROVIDERS:
+            import langextract.providers as lx_providers
+
             from structflo.ner import NERExtractor
+
+            # langextract 1.1.1: the explicit-provider factory path skips
+            # load_builtins_once(), so a fresh process has an empty registry and
+            # resolve_provider("ollama") raises InferenceConfigError — every LLM
+            # extract silently degrades to dictionary-only. Register builtins
+            # here until structflo-ner does it itself at construction.
+            lx_providers.load_builtins_once()
 
             self._llm_extractor = NERExtractor(
                 model_id=model_id,

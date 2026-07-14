@@ -33,6 +33,28 @@ def test_ollama_forwards_model_url(stub_structflo):
     assert kwargs["model_url"] == "http://ollama:11434"
 
 
+def test_init_registers_langextract_providers_for_llm_path(stub_structflo, monkeypatch):
+    """langextract 1.1.1's explicit-provider factory path skips
+    load_builtins_once(), so a fresh worker process has an empty registry and
+    every LLM extract dies with InferenceConfigError("ollama"). Adapter init
+    must ensure the builtin providers are registered."""
+    import langextract.providers as lx_providers
+    from langextract.providers import router
+
+    # Simulate a fresh process: empty registry AND unset once-latch (clear()
+    # resets only the registry; the latch is a module global).
+    router.clear()
+    monkeypatch.setattr(lx_providers, "_builtins_loaded", False)
+    try:
+        StructfloNERExtractor(
+            model_id="gemma3:27b", provider="ollama", model_url="http://x"
+        )
+        assert router.resolve_provider("ollama") is not None
+    finally:
+        # Never leave the process-global registry empty for later tests.
+        lx_providers.load_builtins_once()
+
+
 def test_cloud_provider_passes_api_key_and_drops_model_url(stub_structflo):
     StructfloNERExtractor(
         model_id="gpt-4o", provider="openai", api_key="sk-x", model_url="http://ollama:11434"
