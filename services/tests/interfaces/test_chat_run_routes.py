@@ -9,6 +9,7 @@ from returns.result import Success
 
 from application.dtos.chat_dtos import AgentEvent
 from application.use_cases.chat_use_cases import (
+    DeleteConversationUseCase,
     GetConversationUseCase,
     SendMessageUseCase,
 )
@@ -32,6 +33,11 @@ class FakeSendUseCase:
     async def execute(self, **kwargs):
         yield AgentEvent(type="token", delta="hello")
         yield AgentEvent(type="done")
+
+
+class FakeDeleteConversation:
+    async def execute(self, **kwargs):
+        return Success(None)
 
 
 class FakeGetConversation:
@@ -71,6 +77,7 @@ def _client(registry: ChatRunRegistry) -> TestClient:
             CheckTokenQuotaUseCase: FakeQuota(),
             SendMessageUseCase: FakeSendUseCase(),
             GetConversationUseCase: FakeGetConversation(),
+            DeleteConversationUseCase: FakeDeleteConversation(),
             ChatRunRegistry: registry,
         },
     )
@@ -220,5 +227,17 @@ def test_conversation_detail_active_run_false_when_done() -> None:
     try:
         resp = _client(registry).get(f"/chat/{cid}")
         assert resp.json()["active_run"] is False
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_delete_conversation_stops_active_run() -> None:
+    registry = ChatRunRegistry()
+    cid = uuid4()
+    _seed_run(registry, cid, done=False)
+    try:
+        resp = _client(registry).delete(f"/chat/{cid}")
+        assert resp.status_code == 204
+        assert registry.active(cid) is None
     finally:
         app.dependency_overrides.clear()

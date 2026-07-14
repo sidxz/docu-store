@@ -198,10 +198,15 @@ async def delete_conversation(
 ) -> None:
     """Delete a conversation and all its messages."""
     use_case = container[DeleteConversationUseCase]
-    return await use_case.execute(
+    result = await use_case.execute(
         conversation_id=conversation_id,
         workspace_id=auth.workspace_id,
     )
+    if isinstance(result, Success):
+        # Only after a confirmed delete — a cross-workspace 404 must never
+        # be able to cancel another tenant's run.
+        container[ChatRunRegistry].stop(conversation_id)
+    return result
 
 
 @router.patch("/{conversation_id}", status_code=status.HTTP_200_OK)
