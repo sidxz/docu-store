@@ -20,8 +20,8 @@ from application.dtos.chat_dtos import (
     ConversationDetailDTO,
     ConversationDTO,
     RecentConversationDTO,
-    TokenUsageDTO,
 )
+from application.dtos.usage_dtos import UserTokenUsageResponse
 from application.use_cases.chat_folder_use_cases import SetConversationFolderUseCase
 from application.use_cases.chat_use_cases import (
     CreateConversationUseCase,
@@ -128,7 +128,7 @@ async def get_user_token_usage(
     auth: Annotated[RequestAuth, Depends(get_auth)],
     days: Annotated[int | None, Query(ge=1, le=365)] = None,
     kind: Annotated[str | None, Query(pattern="^(chat|ingestion)$")] = None,
-) -> TokenUsageDTO:
+) -> UserTokenUsageResponse:
     """Current user's token usage from the ledger (all-time unless ``days`` given)."""
     use_case = container[GetUserTokenUsageUseCase]
     return await use_case.execute(

@@ -31,8 +31,10 @@ from application.dtos.chat_dtos import (
     TokenUsageDTO,
 )
 from application.dtos.errors import AppError
-from application.dtos.usage_dtos import TokenUsageEvent
+from application.dtos.usage_dtos import MonthUsage, TokenUsageEvent, UserTokenUsageResponse
+from application.ports.token_limit_store import TokenLimitStore
 from application.ports.token_usage_store import TokenUsageStore
+from application.use_cases.token_limit_use_cases import effective_limit, utc_month_start
 from infrastructure.llm.token_counter import TokenCounter
 
 if TYPE_CHECKING:
@@ -191,10 +193,15 @@ class ListRecentConversationsUseCase:
 
 
 class GetUserTokenUsageUseCase:
-    """Per-user token totals from the usage ledger (optionally windowed)."""
+    """Per-user token totals from the usage ledger + current-month block with limit."""
 
-    def __init__(self, token_usage_store: TokenUsageStore) -> None:
+    def __init__(
+        self,
+        token_usage_store: TokenUsageStore,
+        token_limit_store: TokenLimitStore,
+    ) -> None:
         self._usage = token_usage_store
+        self._limits = token_limit_store
 
     async def execute(
         self,
@@ -202,13 +209,33 @@ class GetUserTokenUsageUseCase:
         owner_id: UUID,
         days: int | None = None,
         kind: str | None = None,
-    ) -> Result[TokenUsageDTO, AppError]:
+    ) -> Result[UserTokenUsageResponse, AppError]:
         try:
             since = datetime.now(UTC) - timedelta(days=days) if days else None
             usage = await self._usage.sum_for_user(
                 workspace_id, owner_id, since=since, kind=kind,
             )
-            return Success(usage)
+            month_since = utc_month_start()
+            month_chat = await self._usage.sum_for_user(
+                workspace_id, owner_id, since=month_since, kind="chat",
+            )
+            month_ingestion = await self._usage.sum_for_user(
+                workspace_id, owner_id, since=month_since, kind="ingestion",
+            )
+            limit = await effective_limit(self._limits, workspace_id, owner_id)
+            return Success(
+                UserTokenUsageResponse(
+                    prompt=usage.prompt,
+                    completion=usage.completion,
+                    total=usage.total,
+                    month=MonthUsage(
+                        chat=month_chat.total,
+                        ingestion=month_ingestion.total,
+                        total=month_chat.total + month_ingestion.total,
+                        limit=limit,
+                    ),
+                ),
+            )
         except Exception as e:
             log.exception("chat.usage.get_failed", error=str(e))
             return Failure(AppError("internal_error", f"Failed to get token usage: {e!s}"))

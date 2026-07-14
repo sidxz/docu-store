@@ -8,6 +8,8 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from application.dtos.chat_dtos import TokenUsageDTO
+
 
 class TokenUsageEvent(BaseModel):
     """One append-only ledger entry: real provider-reported tokens for one unit of work.
@@ -57,3 +59,18 @@ class TokenLimitEntry(BaseModel):
 
     user_id: UUID | None = None
     limit: int | None = None
+
+
+class MonthUsage(BaseModel):
+    """Current-calendar-month usage (UTC) + the caller's effective limit."""
+
+    chat: int = 0
+    ingestion: int = 0
+    total: int = 0
+    limit: int | None = None  # None = unlimited
+
+
+class UserTokenUsageResponse(TokenUsageDTO):
+    """GET /chat/usage: requested-window totals + current-month block."""
+
+    month: MonthUsage

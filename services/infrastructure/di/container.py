@@ -1006,6 +1006,7 @@ def create_container() -> Container:
     )
     container[GetUserTokenUsageUseCase] = lambda c: GetUserTokenUsageUseCase(
         token_usage_store=c[TokenUsageStore],
+        token_limit_store=c[TokenLimitStore],
     )
     container[DeleteConversationUseCase] = lambda c: DeleteConversationUseCase(
         chat_repository=c[ChatRepository],
