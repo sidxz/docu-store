@@ -114,5 +114,6 @@ export const queryKeys = {
   workspace: {
     all: ["workspace"] as const,
     members: () => [...queryKeys.workspace.all, "members"] as const,
+    tokenLimits: () => [...queryKeys.workspace.all, "token-limits"] as const,
   },
 };
