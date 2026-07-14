@@ -86,12 +86,12 @@ docker-up: ## Start all infrastructure services (core + Langfuse v3) and seed pr
 	@echo "  - Temporal Server: localhost:7233"
 	@echo "  - Temporal UI: http://localhost:8233"
 	@echo "  - Qdrant UI: http://localhost:6333/dashboard"
-	@echo "  - Langfuse UI: http://localhost:3000  (dev@docustore.local / devpassword)"
+	@echo "  - Langfuse UI: http://localhost:3100  (dev@docustore.local / devpassword)"
 	@echo "  - Umami Analytics: http://localhost:3001  (admin / umami)"
 	@$(MAKE) langfuse-seed
 
 langfuse-seed: ## Seed Langfuse with default prompts from infrastructure/llm/default_prompts/
-	uv run python scripts/seed_langfuse_prompts.py
+	uv run --env-file .env python scripts/seed_langfuse_prompts.py
 
 docker-down: ## Stop all infrastructure services
 	$(COMPOSE) down

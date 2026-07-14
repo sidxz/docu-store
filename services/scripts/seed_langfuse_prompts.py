@@ -10,6 +10,7 @@ Templates are stored as Langfuse text prompts using {{variable}} Mustache syntax
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 import time
@@ -19,7 +20,7 @@ import yaml
 
 PROMPTS_DIR = Path(__file__).resolve().parents[1] / "infrastructure" / "llm" / "default_prompts"
 
-LANGFUSE_HOST = "http://localhost:3000"
+LANGFUSE_HOST = os.environ.get("LANGFUSE_HOST", "http://localhost:3000")
 LANGFUSE_PUBLIC_KEY = "pk-lf-docu-store-dev"
 LANGFUSE_SECRET_KEY = "sk-lf-docu-store-dev"
 
@@ -82,7 +83,7 @@ def seed() -> None:
             # on a fresh DB this should always succeed.
             print(f"⚠️  Skipped '{name}': {exc}")
 
-    print("\nDone — all prompts available at http://localhost:3000")
+    print(f"\nDone — all prompts available at {LANGFUSE_HOST}")
 
 
 if __name__ == "__main__":
