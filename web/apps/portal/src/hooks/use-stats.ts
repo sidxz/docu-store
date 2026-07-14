@@ -258,8 +258,8 @@ interface MemberUsageStatsResponse {
   period_days: number;
 }
 
-// Sentinel's member record shape isn't in the OpenAPI spec's typed schema (returns
-// `list[dict]`), so fields are optional here and consumers must fall back gracefully.
+// The route returns `list[dict]` (proxied from Sentinel), so the generated OpenAPI
+// schema has no field names for it — keep these optional and fall back gracefully.
 interface WorkspaceMember {
   user_id?: string;
   id?: string;
