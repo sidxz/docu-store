@@ -45,11 +45,13 @@ export function ChatPanel({
   const createConversation = useCreateConversation();
   const sendMessage = useSendMessage(conversationId);
 
-  // Abort in-flight SSE stream on unmount (e.g. navigating away from chat)
-  useEffect(() => () => sendMessage.abort(), []); // eslint-disable-line react-hooks/exhaustive-deps
   const feedbackMutation = useChatFeedback(conversationId);
   const { isStreaming, streamingContent, streamingSteps, streamingSources, chatMode } =
     useChatStore();
+  const streamingConversationId = useChatStore((s) => s.streamingConversationId);
+  // The store is global and streams now outlive their page — only treat this
+  // conversation as busy when the live stream actually belongs to it.
+  const streamingHere = isStreaming && streamingConversationId === conversationId;
   const planningSummary = useChatStore((s) => {
     const step = s.streamingSteps.find((st) => st.step === "planning" && st.status === "completed");
     if (!step?.thinking_content) return null;
@@ -99,7 +101,7 @@ export function ChatPanel({
     }
 
     // 2. Answer complete — show only cited sources (finalSources from done event)
-    if (finalSources && finalSources.length > 0) {
+    if (streamingConversationId === conversationId && finalSources && finalSources.length > 0) {
       const apiHasCaughtUp = doneEvent?.message_id
         ? messages.some((m) => m.message_id === doneEvent.message_id)
         : false;
@@ -110,7 +112,7 @@ export function ChatPanel({
     }
 
     // 3. Still streaming — show all retrieved sources
-    if (isStreaming && streamingSources.length > 0) {
+    if (streamingHere && streamingSources.length > 0) {
       onSourcesChange(streamingSources);
       return;
     }
@@ -123,7 +125,7 @@ export function ChatPanel({
       }
     }
     onSourcesChange([]);
-  }, [isStreaming, streamingSources, finalSources, data?.messages, doneEvent, activeSourcesMessageId, onSourcesChange]);
+  }, [isStreaming, streamingHere, streamingConversationId, conversationId, streamingSources, finalSources, data?.messages, doneEvent, activeSourcesMessageId, onSourcesChange]);
 
   // Auto-send queued message after navigating to a new conversation
   const queuedMessage = useChatStore((s) => s.queuedMessage);
@@ -153,7 +155,7 @@ export function ChatPanel({
   };
 
   // Compute source count for the toggle badge
-  const sourceCount = isStreaming ? streamingSources.length : (() => {
+  const sourceCount = streamingHere ? streamingSources.length : (() => {
     const msgs = data?.messages ?? [];
     for (let i = msgs.length - 1; i >= 0; i--) {
       if (msgs[i].role === "assistant" && msgs[i].sources.length > 0) {
@@ -187,7 +189,7 @@ export function ChatPanel({
             description="Select an existing conversation or start a new one to chat with your documents."
           />
         </div>
-        <ChatInput onSend={handleSend} disabled={createConversation.isPending} onAbort={sendMessage.abort} />
+        <ChatInput onSend={handleSend} disabled={createConversation.isPending} onAbort={sendMessage.stop} />
       </div>
     );
   }
@@ -271,7 +273,7 @@ export function ChatPanel({
       </Conversation>
 
       {/* Input */}
-      <ChatInput onSend={handleSend} disabled={isStreaming} onAbort={sendMessage.abort} />
+      <ChatInput onSend={handleSend} disabled={streamingHere} onAbort={sendMessage.stop} />
     </div>
   );
 }

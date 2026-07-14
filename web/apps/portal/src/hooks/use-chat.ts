@@ -199,13 +199,25 @@ export function useSendMessage(conversationId: string | undefined) {
     },
   });
 
-  /** Abort any in-flight stream. Call on unmount. */
+  /** Client-only teardown: cancel the local fetch without touching the
+   *  server run (used before starting a new send — the old run keeps
+   *  generating and persists server-side). */
   const abort = () => {
     abortRef.current?.abort();
     abortRef.current = null;
   };
 
-  return { ...mutation, abort };
+  /** User-facing Stop: cancel locally AND cancel the server run (which
+   *  discards the partial answer). */
+  const stop = () => {
+    abort();
+    if (conversationId) {
+      authFetch(`/chat/${conversationId}/run`, { method: "DELETE" }).catch(() => {});
+    }
+    store.finishStreaming();
+  };
+
+  return { ...mutation, abort, stop };
 }
 
 // ── SSE Parser ─────────────────────────────────────────────────────────────

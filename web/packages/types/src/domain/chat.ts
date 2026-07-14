@@ -107,6 +107,8 @@ export interface Conversation {
   message_count: number;
   model_used: string | null;
   is_archived: boolean;
+  /** True while an answer is being generated server-side (detail endpoint only). */
+  active_run?: boolean;
 }
 
 // --- Chat folders (per-user, per-workspace, flat) ---
