@@ -7,8 +7,6 @@ import {
   Search,
   Atom,
   MessageSquare,
-  Activity,
-  BarChart3,
   Settings,
   Sun,
   Moon,
@@ -16,7 +14,6 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useAuthzHasRole } from "@sentinel-auth/react";
 
 import { useThemeStore } from "@/lib/stores/theme-store";
 import { useSidebarStore } from "@/lib/stores/sidebar-store";
@@ -30,7 +27,6 @@ interface NavItem {
   icon: LucideIcon;
   href: string;
   color: string;
-  requireAdmin?: boolean;
 }
 
 const mainNav: NavItem[] = [
@@ -39,15 +35,12 @@ const mainNav: NavItem[] = [
   { label: "Search", icon: Search, href: "/search", color: "text-violet-500" },
   { label: "Documents", icon: FileText, href: "/documents", color: "text-amber-500" },
   { label: "Compounds", icon: Atom, href: "/compounds", color: "text-emerald-500" },
-  { label: "Stats", icon: BarChart3, href: "/stats", color: "text-orange-500", requireAdmin: true },
-  { label: "Status", icon: Activity, href: "/status", color: "text-rose-500", requireAdmin: true },
 ];
 
 export function Sidebar({ workspaceSlug }: { workspaceSlug: string }) {
   const pathname = usePathname();
   const { theme, toggleTheme } = useThemeStore();
   const { collapsed, toggleCollapsed } = useSidebarStore();
-  const isAdmin = useAuthzHasRole("admin");
   const { trackEvent } = useAnalytics();
 
   const isActive = (href: string) => {
@@ -89,7 +82,7 @@ export function Sidebar({ workspaceSlug }: { workspaceSlug: string }) {
           </span>
         )}
         <div className="flex flex-col gap-0.5">
-          {mainNav.filter((item) => !item.requireAdmin || isAdmin).map((item) => (
+          {mainNav.map((item) => (
             <div key={item.label} onClick={() => trackEvent("nav_clicked", { section: item.label.toLowerCase() })}>
               <SidebarNavItem
                 icon={item.icon}

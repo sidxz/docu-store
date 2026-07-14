@@ -18,7 +18,10 @@ const TABS: SettingsTab[] = [
   { label: "Workspace", segment: "workspace" },
 ];
 
-const ADMIN_TABS: SettingsTab[] = [];
+const ADMIN_TABS: SettingsTab[] = [
+  { label: "Stats", segment: "stats" },
+  { label: "Status", segment: "status" },
+];
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
