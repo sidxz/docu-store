@@ -12,6 +12,7 @@ from application.dtos.correction_dtos import CorrectArtifactMetadataRequest, Cor
 from application.use_cases.correct_metadata_use_cases import CorrectArtifactMetadataUseCase
 from domain.aggregates.artifact import Artifact
 from domain.value_objects.artifact_type import ArtifactType
+from domain.value_objects.author_mention import AuthorMention
 from domain.value_objects.mime_type import MimeType
 from domain.value_objects.presentation_date import PresentationDate
 from domain.value_objects.tag_mention import TagMention, TagSource
@@ -45,6 +46,7 @@ def make_saved_artifact(fake_artifact_repo: MockArtifactRepository):
         with_title: bool = False,
         with_date: bool = False,
         tags: list[TagMention] | None = None,
+        authors: list[AuthorMention] | None = None,
     ) -> Artifact:
         artifact = Artifact.create(
             source_uri=None,
@@ -61,6 +63,8 @@ def make_saved_artifact(fake_artifact_repo: MockArtifactRepository):
             )
         if tags:
             artifact.update_tag_mentions(tags)
+        if authors:
+            artifact.update_author_mentions(authors)
         fake_artifact_repo.save(artifact)
         return artifact
 
@@ -154,6 +158,37 @@ class TestCorrectArtifactMetadataUseCase:
         assert saved.tag_mentions[0].sources == rich.sources  # provenance preserved
         assert saved.tag_mentions[1].tag == "autophagy"
         assert saved.tag_mentions[1].tag_normalized == "autophagy"
+
+    @pytest.mark.asyncio
+    async def test_author_merge_preserves_existing_rich_mentions(
+        self,
+        fake_artifact_repo: MockArtifactRepository,
+        make_saved_artifact,
+        auth_editor: FakeAuth,
+    ) -> None:
+        """Retained authors keep the original rich mention; new authors get a fresh one."""
+        rich = AuthorMention(
+            name="Jane Doe",
+            confidence=0.85,
+            date_extracted=datetime(2025, 1, 1, tzinfo=UTC),
+        )
+        artifact = make_saved_artifact(authors=[rich])
+        uc = CorrectArtifactMetadataUseCase(artifact_repository=fake_artifact_repo)
+
+        await uc.execute(
+            artifact_id=artifact.id,
+            request=CorrectArtifactMetadataRequest(
+                authors=["  JANE doe ", "New Author"],  # kept (case/space-insensitive) + added
+            ),
+            auth=auth_editor,
+        )
+
+        saved = fake_artifact_repo.get_by_id(artifact.id)
+        assert saved.author_mentions[0] is rich  # original rich mention preserved (identity)
+        assert saved.author_mentions[0].confidence == 0.85
+        assert saved.author_mentions[1].name == "New Author"
+        assert saved.author_mentions[1].date_extracted is not None
+        assert list(saved.human_corrections) == ["author_mentions"]
 
     @pytest.mark.asyncio
     async def test_date_normalized_to_utc_datetime_with_human_source(

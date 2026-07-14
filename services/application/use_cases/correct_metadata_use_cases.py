@@ -57,10 +57,13 @@ def _merge_authors(existing: list[AuthorMention], submitted: list[str]) -> list[
     """Keep the rich existing mention for authors the human retained; fresh mentions for additions."""
     now = datetime.now(UTC)
     by_name = {m.name.casefold().strip(): m for m in existing}
-    return [
-        by_name.get(name.casefold().strip()) or AuthorMention(name=name.strip(), date_extracted=now)
-        for name in submitted
-    ]
+    merged: list[AuthorMention] = []
+    for name in submitted:
+        kept = by_name.get(name.casefold().strip())
+        merged.append(
+            kept if kept is not None else AuthorMention(name=name.strip(), date_extracted=now),
+        )
+    return merged
 
 
 class CorrectArtifactMetadataUseCase:
