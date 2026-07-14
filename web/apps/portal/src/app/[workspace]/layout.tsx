@@ -4,6 +4,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { AuthGuardWrapper } from "@/components/providers/AuthGuardWrapper";
 import { AnalyticsProvider } from "@/components/providers/AnalyticsProvider";
+import { ChatNotifications } from "@/components/chat/ChatNotifications";
 
 /**
  * Persistent shell for all workspace routes: /[workspace]/**
@@ -27,6 +28,7 @@ export default async function WorkspaceLayout({
   return (
     <AuthGuardWrapper>
       <AnalyticsProvider />
+      <ChatNotifications />
       <div className="flex h-screen overflow-hidden">
         <Sidebar workspaceSlug={workspace} />
         <div className="flex flex-1 flex-col overflow-hidden transition-[margin] duration-200">
