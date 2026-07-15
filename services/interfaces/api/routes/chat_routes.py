@@ -32,7 +32,7 @@ from application.use_cases.chat_use_cases import (
     RecordFeedbackUseCase,
     SendMessageUseCase,
 )
-from infrastructure.chat.run_registry import ChatRunRegistry, RunAlreadyActive
+from infrastructure.chat.run_registry import ChatRunRegistry, RunAlreadyActiveError
 from interfaces.api.middleware import handle_use_case_errors
 from interfaces.api.routes.helpers import _map_app_error_to_http_exception, ensure_within_quota
 from interfaces.api.routes.helpers import get_allowed_artifact_ids as _get_allowed_artifact_ids
@@ -270,7 +270,7 @@ async def send_message(
                 reasoning=request.reasoning,
             ),
         )
-    except RunAlreadyActive:
+    except RunAlreadyActiveError:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="A response is already being generated for this conversation.",

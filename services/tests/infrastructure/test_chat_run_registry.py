@@ -10,7 +10,7 @@ import pytest
 from application.dtos.chat_dtos import AgentEvent
 from infrastructure.chat.run_registry import (
     ChatRunRegistry,
-    RunAlreadyActive,
+    RunAlreadyActiveError,
 )
 
 WS = uuid4()
@@ -107,7 +107,7 @@ async def test_duplicate_start_raises():
     cid = uuid4()
     gate = asyncio.Event()
     reg.start(cid, WS, OWNER, make_agen([DONE], gate=gate))
-    with pytest.raises(RunAlreadyActive):
+    with pytest.raises(RunAlreadyActiveError):
         reg.start(cid, WS, OWNER, make_agen([DONE]))
     gate.set()
 

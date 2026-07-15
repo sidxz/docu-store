@@ -42,7 +42,7 @@ def _serialize_frame(seq: int, event: AgentEvent) -> str:
     return f"id: {seq}\nevent: {map_event_type(event.type)}\ndata: {json.dumps(data)}\n\n"
 
 
-class RunAlreadyActive(Exception):
+class RunAlreadyActiveError(Exception):
     """A run is already generating for this conversation."""
 
 
@@ -79,7 +79,7 @@ class ChatRunRegistry:
     ) -> ChatRun:
         existing = self._runs.get(conversation_id)
         if existing is not None and not existing.done:
-            raise RunAlreadyActive(str(conversation_id))
+            raise RunAlreadyActiveError(str(conversation_id))
         run = ChatRun(
             run_id=uuid4(),
             conversation_id=conversation_id,
