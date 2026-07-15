@@ -79,3 +79,10 @@ export interface EmbeddingMetadata {
   algorithm: string | null;
   additional_params: Record<string, string> | null;
 }
+
+/** Mirrors services/application/dtos/correction_dtos.py:HumanCorrectionInfo */
+export interface HumanCorrectionInfo {
+  corrected_by_id: string;
+  corrected_by_name?: string | null;
+  corrected_at: string;
+}

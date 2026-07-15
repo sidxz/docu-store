@@ -87,6 +87,33 @@ export function usePageWorkflows(pageId: string) {
   });
 }
 
+export interface CorrectedCompoundInput {
+  smiles: string;
+  extracted_id?: string | null;
+  internal_id?: string | null;
+  cdd_id?: string | null;
+  chembl_id?: string | null;
+  pdb_id?: string | null;
+}
+
+/** hiledit: full-replace correction of a page's compound mentions, with provenance recorded server-side. */
+export function useCorrectPageCompounds(pageId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { compound_mentions: CorrectedCompoundInput[] }) => {
+      const { data, error, response } = await apiClient.PUT(
+        "/pages/{page_id}/compound_mentions",
+        { params: { path: { page_id: pageId } }, body },
+      );
+      if (error) throwApiError("Failed to save corrections", error, response.status);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.pages.detail(pageId) });
+    },
+  });
+}
+
 export function useRerunPageWorkflow(pageId: string) {
   const queryClient = useQueryClient();
 

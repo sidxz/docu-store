@@ -115,6 +115,32 @@ export function useDeleteArtifact() {
   });
 }
 
+export interface CorrectArtifactMetadataBody {
+  title?: string | null;
+  presentation_date?: string | null;
+  tags?: { tag: string; entity_type?: string | null }[] | null;
+  authors?: string[] | null;
+}
+
+/** hiledit: human correction of title/date/tags/authors, with provenance recorded server-side. */
+export function useCorrectArtifactMetadata(artifactId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: CorrectArtifactMetadataBody) => {
+      const { data, error, response } = await apiClient.PATCH(
+        "/artifacts/{artifact_id}/metadata",
+        { params: { path: { artifact_id: artifactId } }, body },
+      );
+      if (error) throwApiError("Failed to save corrections", error, response.status);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.artifacts.detail(artifactId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.artifacts.all });
+    },
+  });
+}
+
 export function useRerunArtifactWorkflow(artifactId: string) {
   const queryClient = useQueryClient();
 

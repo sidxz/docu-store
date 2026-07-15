@@ -2,7 +2,7 @@
  * Artifact types — mirrors backend artifact DTOs.
  * Mirrors: services/application/dtos/artifact_dtos.py
  */
-import type { AuthorMention, PresentationDate, SummaryCandidate, TagMention, TitleMention } from "./extraction";
+import type { AuthorMention, HumanCorrectionInfo, PresentationDate, SummaryCandidate, TagMention, TitleMention } from "./extraction";
 import type { PageResponse } from "./page";
 
 export type ArtifactType =
@@ -38,6 +38,7 @@ export interface ArtifactResponse {
   author_mentions: AuthorMention[];
   presentation_date: PresentationDate | null;
   summary_candidate: SummaryCandidate | null;
+  human_corrections?: Record<string, HumanCorrectionInfo>;
 }
 
 export interface CreateArtifactRequest {

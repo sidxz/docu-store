@@ -4,6 +4,7 @@
  */
 import type {
   CompoundMention,
+  HumanCorrectionInfo,
   SummaryCandidate,
   TagMention,
   TextMention,
@@ -18,6 +19,7 @@ export interface PageResponse {
   tag_mentions: TagMention[];
   text_mention: TextMention | null;
   summary_candidate: SummaryCandidate | null;
+  human_corrections?: Record<string, HumanCorrectionInfo>;
 }
 
 export interface CreatePageRequest {

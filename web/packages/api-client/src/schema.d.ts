@@ -117,7 +117,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/artifacts/{artifact_id}/title_mention": {
+    "/artifacts/{artifact_id}/metadata": {
         parameters: {
             query?: never;
             header?: never;
@@ -131,10 +131,10 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Update Title Mention
-         * @description Update title mention for an artifact.
+         * Correct Artifact Metadata
+         * @description hiledit: human correction of title/date/tags/authors with provenance.
          */
-        patch: operations["update_title_mention_artifacts__artifact_id__title_mention_patch"];
+        patch: operations["correct_artifact_metadata_artifacts__artifact_id__metadata_patch"];
         trace?: never;
     };
     "/artifacts/{artifact_id}/summary_candidate": {
@@ -155,26 +155,6 @@ export interface paths {
          * @description Update summary candidate for an artifact.
          */
         patch: operations["update_summary_candidate_artifacts__artifact_id__summary_candidate_patch"];
-        trace?: never;
-    };
-    "/artifacts/{artifact_id}/tag_mentions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update Tag Mentions
-         * @description Update tag mentions for an artifact.
-         */
-        patch: operations["update_tag_mentions_artifacts__artifact_id__tag_mentions_patch"];
         trace?: never;
     };
     "/artifacts/{artifact_id}/summarize": {
@@ -198,6 +178,54 @@ export interface paths {
          *     Locked summaries (human corrections) are preserved by the use case.
          */
         post: operations["trigger_artifact_summarization_artifacts__artifact_id__summarize_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artifacts/{artifact_id}/extract-metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Trigger Doc Metadata Extraction
+         * @description Trigger document metadata extraction for an artifact (non-blocking).
+         *
+         *     Starts the GLiNER2 + LLM extraction workflow for title, authors, and date.
+         *     Uses the first page (index 0) of the artifact. Useful for re-running after
+         *     manual corrections or when automated extraction missed fields.
+         */
+        post: operations["trigger_doc_metadata_extraction_artifacts__artifact_id__extract_metadata_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artifacts/{artifact_id}/reembed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Trigger Artifact Reembed
+         * @description Trigger batch re-embedding for all pages of an artifact (non-blocking).
+         *
+         *     Re-embeds every page with full contextual prefixes (title, tags, summary)
+         *     in a single batched workflow. Useful after fixing GPU/driver issues or
+         *     updating embedding models.
+         */
+        post: operations["trigger_artifact_reembed_artifacts__artifact_id__reembed_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -259,10 +287,10 @@ export interface paths {
         };
         /**
          * Stream Artifact Pdf
-         * @description Stream the source PDF for an artifact.
+         * @description Stream the PDF rendition of an artifact for in-browser viewing.
          *
-         *     Returns the raw PDF binary from blob storage. The artifact must exist
-         *     and have a valid storage_location.
+         *     For native PDFs this is the source blob; for converted Office formats
+         *     (PPTX/DOCX) it is the derived PDF produced during parsing.
          */
         get: operations["stream_artifact_pdf_artifacts__artifact_id__pdf_get"];
         put?: never;
@@ -282,10 +310,11 @@ export interface paths {
         };
         /**
          * Stream Page Image
-         * @description Stream the rendered PNG image for a specific page of an artifact.
+         * @description Stream the rendered page image for a specific page of an artifact.
          *
          *     Returns the pre-rendered page image from blob storage. Page images
-         *     are generated during PDF ingestion.
+         *     are generated during PDF ingestion. Pass ?size=thumb for a lightweight
+         *     JPEG thumbnail (~200px wide) suitable for table/list views.
          */
         get: operations["stream_page_image_artifacts__artifact_id__pages__page_index__image_get"];
         put?: never;
@@ -361,6 +390,472 @@ export interface paths {
          * @description Toggle artifact visibility between private and workspace.
          */
         patch: operations["update_artifact_visibility_artifacts__artifact_id__visibility_patch"];
+        trace?: never;
+    };
+    "/auth/mint": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mint Authz Token
+         * @description Forward an authz-token mint request to Sentinel with the service key.
+         */
+        post: operations["mint_authz_token_auth_mint_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/browse/tags/suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Suggest Tags
+         * @description Suggest tags matching a prefix query for autocomplete.
+         *
+         *     Returns distinct tag values (case-insensitive prefix match) with their
+         *     entity type. Searches both tag_mentions and author_mentions.
+         */
+        get: operations["suggest_tags_browse_tags_suggest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/browse/tags/popular": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Popular Tags
+         * @description Return the most popular tags, optionally filtered by entity_type.
+         */
+        get: operations["get_popular_tags_browse_tags_popular_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/browse/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Categories
+         * @description List tag categories with artifact counts for the browse UI.
+         */
+        get: operations["get_categories_browse_categories_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/browse/categories/{entity_type}/folders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Folders
+         * @description List folders (distinct tag values) within a category.
+         */
+        get: operations["get_folders_browse_categories__entity_type__folders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/browse/categories/{entity_type}/folders/{tag_value}/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Folder Artifacts
+         * @description List artifacts within a specific folder.
+         */
+        get: operations["get_folder_artifacts_browse_categories__entity_type__folders__tag_value__artifacts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Conversations
+         * @description List conversations for the current user. Pass ``folder_id`` for a folder view.
+         */
+        get: operations["list_conversations_chat_get"];
+        put?: never;
+        /**
+         * Create Conversation
+         * @description Create a new chat conversation.
+         */
+        post: operations["create_conversation_chat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chat/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get User Token Usage
+         * @description Current user's token usage from the ledger (all-time unless ``days`` given).
+         */
+        get: operations["get_user_token_usage_chat_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chat/recent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Recent Conversations
+         * @description Recent conversations enriched with a dashboard summary.
+         */
+        get: operations["list_recent_conversations_chat_recent_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chat/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Conversation
+         * @description Get a conversation with its messages.
+         */
+        get: operations["get_conversation_chat__conversation_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Conversation
+         * @description Delete a conversation and all its messages.
+         */
+        delete: operations["delete_conversation_chat__conversation_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Set Conversation Folder
+         * @description Move a conversation into a folder (``folder_id: null`` removes it from its folder).
+         */
+        patch: operations["set_conversation_folder_chat__conversation_id__patch"];
+        trace?: never;
+    };
+    "/chat/{conversation_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Message
+         * @description Send a message and stream the agent response via SSE.
+         *
+         *     Generation is decoupled from this connection: a background run keeps
+         *     going (and persists its answer) even if the client disconnects. Frames
+         *     carry ``id: <seq>`` so ``GET .../messages/stream`` can replay and tail.
+         *
+         *     Returns a text/event-stream with the following event types:
+         *     - agent_step: Step progress (started/completed)
+         *     - retrieval_results: Retrieved source citations
+         *     - token: Streaming answer tokens
+         *     - structured_block: Rich content blocks (table, molecule, etc.)
+         *     - done: Final event with message ID and metadata
+         *     - error: Error event
+         *
+         *     Raises 409 if a response is already being generated for this conversation.
+         */
+        post: operations["send_message_chat__conversation_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chat/{conversation_id}/messages/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resume Message Stream
+         * @description Reattach to an in-flight (or just-finished) run: replay frames past
+         *     ``after``, then tail live until done.
+         */
+        get: operations["resume_message_stream_chat__conversation_id__messages_stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chat/{conversation_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Stop Message Run
+         * @description Stop an in-flight run. Discards the partial answer (nothing persists);
+         *     needed because disconnecting no longer cancels generation.
+         */
+        delete: operations["stop_message_run_chat__conversation_id__run_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chat/{conversation_id}/messages/{message_id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record Feedback
+         * @description Record thumbs-up/thumbs-down feedback on a chat message.
+         */
+        post: operations["record_feedback_chat__conversation_id__messages__message_id__feedback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/compounds/{name}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Compound Profile
+         * @description Structure + workspace-wide activity profile for a compound name.
+         */
+        get: operations["get_compound_profile_compounds__name__profile_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Dashboard Stats
+         * @description Aggregate workspace statistics for the dashboard.
+         */
+        get: operations["get_dashboard_stats_dashboard_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/folders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Folders
+         * @description List the current user's chat folders with chat counts.
+         */
+        get: operations["list_folders_folders_get"];
+        put?: never;
+        /**
+         * Create Folder
+         * @description Create a chat folder.
+         */
+        post: operations["create_folder_folders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/folders/{folder_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Folder
+         * @description Delete a folder; its chats are unfiled, not deleted.
+         */
+        delete: operations["delete_folder_folders__folder_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Rename Folder
+         * @description Rename a chat folder.
+         */
+        patch: operations["rename_folder_folders__folder_id__patch"];
+        trace?: never;
+    };
+    "/system/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Detailed Health
+         * @description Comprehensive health check for all services, models, and infrastructure (admin only).
+         */
+        get: operations["get_detailed_health_system_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/reembed-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Trigger Reembed All
+         * @description Trigger batch re-embedding for ALL artifacts (admin only).
+         *
+         *     Accepts an optional request body with ``targets`` to select which
+         *     vector collections to re-embed.  When omitted, all collections
+         *     (text, smiles, summaries) are re-embedded.
+         */
+        post: operations["trigger_reembed_all_system_reembed_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/reprocess-compounds-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Trigger Reprocess Compounds All
+         * @description Re-run CSER compound extraction for ALL artifacts in the workspace (admin only).
+         *
+         *     Purges the workspace's compound vectors, then starts the compound extraction
+         *     workflow for every page. The event cascade re-embeds the extracted SMILES.
+         */
+        post: operations["trigger_reprocess_compounds_all_system_reprocess_compounds_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/pages/{page_id}": {
@@ -480,7 +975,11 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
+        /**
+         * Correct Page Compound Mentions
+         * @description hiledit: replace compound mentions (labels/SMILES) with human corrections.
+         */
+        put: operations["correct_page_compound_mentions_pages__page_id__compound_mentions_put"];
         /**
          * Update Compound Mentions
          * @description Add compound_mentions to an existing page.
@@ -874,6 +1373,318 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/stats/workflows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Workflow Stats
+         * @description Get Temporal workflow execution statistics (admin only).
+         */
+        get: operations["get_workflow_stats_stats_workflows_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stats/pipeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Pipeline Stats
+         * @description Get document pipeline processing statistics (admin only).
+         */
+        get: operations["get_pipeline_stats_stats_pipeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stats/vectors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Vector Stats
+         * @description Get vector store and embedding model statistics (admin only).
+         */
+        get: operations["get_vector_stats_stats_vectors_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stats/token-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Token Usage Stats
+         * @description Aggregate token usage from chat messages (admin only).
+         */
+        get: operations["get_token_usage_stats_stats_token_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stats/member-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Member Usage Stats
+         * @description Per-member token usage from the ledger, chat vs ingestion (admin only).
+         *
+         *     `calendar_month` = since the 1st (UTC) — matches quota enforcement.
+         */
+        get: operations["get_member_usage_stats_stats_member_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stats/chat-latency": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Chat Latency Stats
+         * @description Aggregate pipeline step latency from chat agent traces (admin only).
+         */
+        get: operations["get_chat_latency_stats_stats_chat_latency_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stats/search-quality": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Search Quality Stats
+         * @description Aggregate search quality metrics from user activity (admin only).
+         */
+        get: operations["get_search_quality_stats_stats_search_quality_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stats/grounding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Grounding Stats
+         * @description Aggregate grounding score distribution from chat messages (admin only).
+         */
+        get: operations["get_grounding_stats_stats_grounding_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stats/knowledge-gaps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Knowledge Gaps
+         * @description Entities detected in chat queries that the corpus couldn't ground (admin only).
+         */
+        get: operations["get_knowledge_gaps_stats_knowledge_gaps_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stats/citation-frequency": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Citation Frequency
+         * @description Document citation frequency from chat answers (admin only).
+         */
+        get: operations["get_citation_frequency_stats_citation_frequency_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/user/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Preferences */
+        get: operations["get_preferences_user_preferences_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Preferences */
+        patch: operations["update_preferences_user_preferences_patch"];
+        trace?: never;
+    };
+    "/user/activity/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record Search */
+        post: operations["record_search_user_activity_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/user/activity/document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record Document Open */
+        post: operations["record_document_open_user_activity_document_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/user/activity/searches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Recent Searches */
+        get: operations["get_recent_searches_user_activity_searches_get"];
+        put?: never;
+        post?: never;
+        /**
+         * Clear Search History
+         * @description Delete all search history for the authenticated user.
+         */
+        delete: operations["clear_search_history_user_activity_searches_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/user/activity/searches/{query_text}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Search Entry
+         * @description Delete a single search history entry by query text.
+         */
+        delete: operations["delete_search_entry_user_activity_searches__query_text__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/user/activity/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Recent Documents */
+        get: operations["get_recent_documents_user_activity_documents_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspace/members": {
         parameters: {
             query?: never;
@@ -916,6 +1727,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspace/token-limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Token Limits
+         * @description Workspace-default + per-user monthly token limits (admin only).
+         */
+        get: operations["get_token_limits_workspace_token_limits_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/token-limits/default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Default Token Limit
+         * @description Set the workspace-default monthly token limit (admin only). null = unlimited.
+         */
+        put: operations["set_default_token_limit_workspace_token_limits_default_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/token-limits/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set User Token Limit
+         * @description Set a per-user monthly token limit override (admin only). null = unlimited.
+         */
+        put: operations["set_user_token_limit_workspace_token_limits__user_id__put"];
+        post?: never;
+        /**
+         * Delete User Token Limit
+         * @description Remove a per-user override so the user falls back to the workspace default.
+         */
+        delete: operations["delete_user_token_limit_workspace_token_limits__user_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -940,6 +1815,13 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ActiveWorkflow */
+        ActiveWorkflow: {
+            /** Workflow Type */
+            workflow_type: string;
+            /** Count */
+            count: number;
+        };
         /** AddCompoundMentionsRequest */
         AddCompoundMentionsRequest: {
             /**
@@ -949,6 +1831,83 @@ export interface components {
             page_id: string;
             /** Compound Mentions */
             compound_mentions: components["schemas"]["CompoundMention"][];
+        };
+        /**
+         * AgentStepDTO
+         * @description A single step in the agent execution trace.
+         */
+        AgentStepDTO: {
+            /** Step */
+            step: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "started" | "completed" | "failed";
+            /** Started At */
+            started_at?: string | null;
+            /** Completed At */
+            completed_at?: string | null;
+            /** Input Summary */
+            input_summary?: string | null;
+            /** Output Summary */
+            output_summary?: string | null;
+            /** Thinking Content */
+            thinking_content?: string | null;
+        };
+        /**
+         * AgentTraceDTO
+         * @description Full execution trace of the agent pipeline.
+         */
+        AgentTraceDTO: {
+            /** Steps */
+            steps?: components["schemas"]["AgentStepDTO"][];
+            /** Thinking Blocks */
+            thinking_blocks?: components["schemas"]["ThinkingBlockDTO"][];
+            /** Reasoning Content */
+            reasoning_content?: string | null;
+            /** Total Duration Ms */
+            total_duration_ms?: number | null;
+            /**
+             * Retry Count
+             * @default 0
+             */
+            retry_count: number;
+            /** Grounding Is Grounded */
+            grounding_is_grounded?: boolean | null;
+            /** Grounding Confidence */
+            grounding_confidence?: number | null;
+        };
+        /**
+         * ArtifactBrowseItemDTO
+         * @description Lightweight artifact representation for folder listings.
+         */
+        ArtifactBrowseItemDTO: {
+            /**
+             * Artifact Id
+             * Format: uuid
+             */
+            artifact_id: string;
+            /** Title */
+            title?: string | null;
+            /** Source Filename */
+            source_filename?: string | null;
+            /** Artifact Type */
+            artifact_type: string;
+            /** Page Count */
+            page_count: number;
+            /**
+             * Presentation Date
+             * @description ISO formatted
+             */
+            presentation_date?: string | null;
+            /** Author Names */
+            author_names?: string[];
+            /**
+             * Tag Page Sources
+             * @description Pages where the browsed tag was found in this artifact
+             */
+            tag_page_sources?: components["schemas"]["TagPageSource"][];
         };
         /**
          * ArtifactDetailsDTO
@@ -1007,6 +1966,16 @@ export interface components {
              * @description Title mention extracted from the artifact
              */
             title?: string | null;
+            /**
+             * Authors
+             * @description Author names extracted from the artifact
+             */
+            authors?: string[];
+            /**
+             * Presentation Date
+             * @description Presentation/publication date (ISO format)
+             */
+            presentation_date?: string | null;
         };
         /**
          * ArtifactResponse
@@ -1060,14 +2029,80 @@ export interface components {
              * @description Structured tag mentions aggregated from all pages
              */
             tag_mentions?: components["schemas"]["TagMention"][];
+            /**
+             * Author Mentions
+             * @description Author mentions extracted from the document
+             */
+            author_mentions?: components["schemas"]["AuthorMention"][];
+            /** @description Presentation or publication date extracted from the document */
+            presentation_date?: components["schemas"]["PresentationDate"] | null;
             /** @description Summary candidate extracted from the artifact */
             summary_candidate?: components["schemas"]["SummaryCandidate"] | null;
+            /**
+             * Human Corrections
+             * @description Per-field human correction provenance (hiledit)
+             */
+            human_corrections?: {
+                [key: string]: components["schemas"]["HumanCorrectionInfo"];
+            };
         };
         /**
          * ArtifactType
          * @enum {string}
          */
-        ArtifactType: "GENERIC_PRESENTATION" | "SCIENTIFIC_PRESENTATION" | "RESEARCH_ARTICLE" | "SCIENTIFIC_DOCUMENT" | "DISCLOSURE_DOCUMENT" | "MINUTE_OF_MEETING" | "UNCLASSIFIED";
+        ArtifactType: "SCIENTIFIC_PRESENTATION" | "RESEARCH_ARTICLE" | "SCIENTIFIC_DOCUMENT" | "DISCLOSURE_DOCUMENT" | "MINUTE_OF_MEETING" | "UNCLASSIFIED";
+        /**
+         * AuthorMention
+         * @description Represents an author extracted from a document.
+         *
+         *     This value object captures the extracted author name and metadata
+         *     about the extraction process.
+         */
+        AuthorMention: {
+            /**
+             * Confidence
+             * @description Confidence score of the extraction (0.0 to 1.0)
+             */
+            confidence?: number | null;
+            /**
+             * Date Extracted
+             * @description Timestamp when the content was extracted
+             */
+            date_extracted?: string | null;
+            /**
+             * Model Name
+             * @description Name of the NLP model used for extraction
+             */
+            model_name?: string | null;
+            /**
+             * Additional Model Params
+             * @description Additional parameters from the extraction model (may contain nested structures)
+             */
+            additional_model_params?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Pipeline Run Id
+             * @description Identifier for the workflow run that produced this extraction
+             */
+            pipeline_run_id?: string | null;
+            /** Name */
+            name: string;
+        };
+        /**
+         * BioactivityDTO
+         * @description One NER-extracted bioactivity row. Mirrors web Bioactivity type.
+         */
+        BioactivityDTO: {
+            /** Assay Type */
+            assay_type: string;
+            /** Value */
+            value: string;
+            /** Unit */
+            unit?: string | null;
+            /** Raw Text */
+            raw_text?: string | null;
+        };
         /** Body_upload_blob_artifacts_upload_post */
         Body_upload_blob_artifacts_upload_post: {
             /**
@@ -1083,6 +2118,132 @@ export interface components {
              * @default workspace
              */
             visibility: string;
+        };
+        /**
+         * BrowseCategoriesResponse
+         * @description Top-level categories available for browsing.
+         */
+        BrowseCategoriesResponse: {
+            /** Categories */
+            categories: components["schemas"]["TagCategoryDTO"][];
+            /** Total Artifacts */
+            total_artifacts: number;
+        };
+        /**
+         * BrowseFoldersResponse
+         * @description Folders within a single category.
+         */
+        BrowseFoldersResponse: {
+            /** Entity Type */
+            entity_type: string;
+            /** Parent */
+            parent?: string | null;
+            /** Folders */
+            folders: components["schemas"]["TagFolderDTO"][];
+            /** Total Folders */
+            total_folders: number;
+        };
+        /**
+         * BulkReEmbedRequest
+         * @description Request body for selective re-embedding.
+         */
+        BulkReEmbedRequest: {
+            /** Targets */
+            targets?: ("text" | "smiles" | "summaries")[];
+        };
+        /**
+         * BulkWorkflowResponse
+         * @description Response for bulk workflow trigger operations.
+         */
+        BulkWorkflowResponse: {
+            /** Triggered */
+            triggered: number;
+            /** Workflow Ids */
+            workflow_ids: string[];
+            /** Targets */
+            targets?: ("text" | "smiles" | "summaries")[];
+        };
+        /**
+         * ChatFolderDTO
+         * @description A per-user chat folder within a workspace (flat, non-nested).
+         */
+        ChatFolderDTO: {
+            /**
+             * Folder Id
+             * Format: uuid
+             */
+            folder_id: string;
+            /**
+             * Workspace Id
+             * Format: uuid
+             */
+            workspace_id: string;
+            /**
+             * Owner Id
+             * Format: uuid
+             */
+            owner_id: string;
+            /** Name */
+            name: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Chat Count
+             * @default 0
+             */
+            chat_count: number;
+        };
+        /** ChatLatencyStatsResponse */
+        ChatLatencyStatsResponse: {
+            /** Steps */
+            steps: components["schemas"]["StepLatencyStats"][];
+            /** Overall Avg Ms */
+            overall_avg_ms: number;
+            /** Overall P95 Ms */
+            overall_p95_ms: number;
+        };
+        /**
+         * ChatMessageDTO
+         * @description A single message in a conversation.
+         */
+        ChatMessageDTO: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /**
+             * Message Id
+             * Format: uuid
+             */
+            message_id: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
+            /** Content */
+            content: string;
+            /** Structured Content */
+            structured_content?: components["schemas"]["ContentBlockDTO"][] | null;
+            /** Sources */
+            sources?: components["schemas"]["SourceCitationDTO"][];
+            agent_trace?: components["schemas"]["AgentTraceDTO"] | null;
+            token_usage?: components["schemas"]["TokenUsageDTO"] | null;
+            query_context?: components["schemas"]["QueryContextDTO"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /**
          * ChunkHit
@@ -1109,6 +2270,61 @@ export interface components {
             artifact_name?: string | null;
             /** Page Name */
             page_name?: string | null;
+            /** Rerank Score */
+            rerank_score?: number | null;
+            /** Original Rank */
+            original_rank?: number | null;
+        };
+        /** CitationFrequencyResponse */
+        CitationFrequencyResponse: {
+            /** Most Cited */
+            most_cited: components["schemas"]["CitedArtifactEntry"][];
+            /** Least Cited */
+            least_cited: components["schemas"]["CitedArtifactEntry"][];
+            /** Never Cited */
+            never_cited: components["schemas"]["UncitedArtifactEntry"][];
+            /** Never Cited Count */
+            never_cited_count: number;
+            /** Total Artifacts */
+            total_artifacts: number;
+        };
+        /**
+         * CitedArtifactEntry
+         * @description A document and how often it appears in chat citations.
+         */
+        CitedArtifactEntry: {
+            /** Artifact Id */
+            artifact_id: string;
+            /** Artifact Title */
+            artifact_title: string | null;
+            /** Citation Count */
+            citation_count: number;
+            /** Unique Conversation Count */
+            unique_conversation_count: number;
+        };
+        /**
+         * CitedDocumentDTO
+         * @description A document cited in a conversation (fallback chip).
+         */
+        CitedDocumentDTO: {
+            /**
+             * Artifact Id
+             * Format: uuid
+             */
+            artifact_id: string;
+            /** Title */
+            title?: string | null;
+        };
+        /** CollectionStats */
+        CollectionStats: {
+            /** Collection Name */
+            collection_name: string;
+            /** Points Count */
+            points_count: number;
+            /** Indexed Vectors Count */
+            indexed_vectors_count: number;
+            /** Status */
+            status: string;
         };
         /**
          * CompoundMention
@@ -1195,6 +2411,58 @@ export interface components {
             extracted_id?: string | null;
         };
         /**
+         * CompoundPageRefDTO
+         * @description A page where the compound was detected.
+         */
+        CompoundPageRefDTO: {
+            /**
+             * Page Id
+             * Format: uuid
+             */
+            page_id: string;
+            /** Page Index */
+            page_index: number;
+            /**
+             * Artifact Id
+             * Format: uuid
+             */
+            artifact_id: string;
+            /** Artifact Title */
+            artifact_title?: string | null;
+        };
+        /**
+         * CompoundProfileDTO
+         * @description Structure + activity profile for a compound, looked up by name.
+         */
+        CompoundProfileDTO: {
+            /** Name */
+            name: string;
+            /** Extracted Id */
+            extracted_id?: string | null;
+            /** Canonical Smiles */
+            canonical_smiles?: string | null;
+            /**
+             * Has Structure
+             * @default false
+             */
+            has_structure: boolean;
+            /**
+             * Synonyms
+             * @default []
+             */
+            synonyms: string[];
+            /**
+             * Bioactivities
+             * @default []
+             */
+            bioactivities: components["schemas"]["BioactivityDTO"][];
+            /**
+             * Reference Pages
+             * @default []
+             */
+            reference_pages: components["schemas"]["CompoundPageRefDTO"][];
+        };
+        /**
          * CompoundSearchRequest
          * @description Request to search for structurally similar compounds by SMILES.
          */
@@ -1269,6 +2537,232 @@ export interface components {
             /** Artifact Name */
             artifact_name?: string | null;
         };
+        /** ConfigSummary */
+        ConfigSummary: {
+            /** App Env */
+            app_env: string;
+            /** Llm Provider */
+            llm_provider: string;
+            /** Llm Model */
+            llm_model: string;
+            /** Chat Llm Provider */
+            chat_llm_provider: string;
+            /** Chat Llm Model */
+            chat_llm_model: string;
+            /** Embedding Model */
+            embedding_model: string;
+            /** Embedding Device */
+            embedding_device: string;
+            /** Smiles Model */
+            smiles_model: string;
+            /** Smiles Device */
+            smiles_device: string;
+            /** Reranker Enabled */
+            reranker_enabled: boolean;
+            /** Reranker Model */
+            reranker_model?: string | null;
+            /** Reranker Device */
+            reranker_device?: string | null;
+            /** Kafka Enabled */
+            kafka_enabled: boolean;
+            /** Temporal Address */
+            temporal_address: string;
+            /** Temporal Max Concurrent Activities */
+            temporal_max_concurrent_activities: number;
+            /** Temporal Max Concurrent Llm Activities */
+            temporal_max_concurrent_llm_activities: number;
+            /** Qdrant Url */
+            qdrant_url: string;
+            /** Blob Base Url */
+            blob_base_url: string;
+        };
+        /**
+         * ContentBlockDTO
+         * @description A typed content block in an assistant message.
+         */
+        ContentBlockDTO: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "text" | "table" | "molecule" | "citation_list" | "source_card";
+            /** Content */
+            content?: string | null;
+            /** Headers */
+            headers?: string[] | null;
+            /** Rows */
+            rows?: string[][] | null;
+            /** Smiles */
+            smiles?: string | null;
+            /** Label */
+            label?: string | null;
+            /** Sources */
+            sources?: components["schemas"]["SourceCitationDTO"][] | null;
+            /** Page Id */
+            page_id?: string | null;
+            /** Artifact Id */
+            artifact_id?: string | null;
+            /** Bioactivities */
+            bioactivities?: components["schemas"]["BioactivityDTO"][] | null;
+        };
+        /**
+         * ConversationDTO
+         * @description A chat conversation.
+         */
+        ConversationDTO: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /**
+             * Workspace Id
+             * Format: uuid
+             */
+            workspace_id: string;
+            /**
+             * Owner Id
+             * Format: uuid
+             */
+            owner_id: string;
+            /** Title */
+            title?: string | null;
+            /** Folder Id */
+            folder_id?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Message Count
+             * @default 0
+             */
+            message_count: number;
+            /** Model Used */
+            model_used?: string | null;
+            /**
+             * Is Archived
+             * @default false
+             */
+            is_archived: boolean;
+        };
+        /**
+         * ConversationDetailDTO
+         * @description Conversation with its messages.
+         */
+        ConversationDetailDTO: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /**
+             * Workspace Id
+             * Format: uuid
+             */
+            workspace_id: string;
+            /**
+             * Owner Id
+             * Format: uuid
+             */
+            owner_id: string;
+            /** Title */
+            title?: string | null;
+            /** Folder Id */
+            folder_id?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Message Count
+             * @default 0
+             */
+            message_count: number;
+            /** Model Used */
+            model_used?: string | null;
+            /**
+             * Is Archived
+             * @default false
+             */
+            is_archived: boolean;
+            /** Messages */
+            messages?: components["schemas"]["ChatMessageDTO"][];
+            /**
+             * Active Run
+             * @default false
+             */
+            active_run: boolean;
+        };
+        /**
+         * CorrectArtifactMetadataRequest
+         * @description Request DTO for correcting artifact metadata.
+         *
+         *     Omitted-vs-null matters: a field left out of the request is untouched,
+         *     while an explicit ``null`` clears it. Callers must check
+         *     ``model_fields_set`` rather than the field values themselves.
+         */
+        CorrectArtifactMetadataRequest: {
+            /** Title */
+            title?: string | null;
+            /** Presentation Date */
+            presentation_date?: string | null;
+            /** Tags */
+            tags?: components["schemas"]["CorrectedTagInput"][] | null;
+            /** Authors */
+            authors?: string[] | null;
+        };
+        /**
+         * CorrectPageCompoundMentionsRequest
+         * @description Request DTO for correcting a page's compound mentions.
+         *
+         *     Full-replace semantics: the submitted list becomes the page's entire
+         *     ``compound_mentions``. An empty list is allowed and clears all mentions.
+         */
+        CorrectPageCompoundMentionsRequest: {
+            /** Compound Mentions */
+            compound_mentions: components["schemas"]["CorrectedCompoundInput"][];
+        };
+        /**
+         * CorrectedCompoundInput
+         * @description A single compound mention as submitted by a human reviewer.
+         */
+        CorrectedCompoundInput: {
+            /** Smiles */
+            smiles: string;
+            /** Extracted Id */
+            extracted_id?: string | null;
+            /** Internal Id */
+            internal_id?: string | null;
+            /** Cdd Id */
+            cdd_id?: string | null;
+            /** Chembl Id */
+            chembl_id?: string | null;
+            /** Pdb Id */
+            pdb_id?: string | null;
+        };
+        /**
+         * CorrectedTagInput
+         * @description A single tag as submitted by a human reviewer.
+         */
+        CorrectedTagInput: {
+            /** Tag */
+            tag: string;
+            /** Entity Type */
+            entity_type?: string | null;
+        };
         /**
          * CreateArtifactRequest
          * @description Request DTO for creating a new artifact.
@@ -1299,6 +2793,22 @@ export interface components {
              */
             storage_location: string;
         };
+        /**
+         * CreateConversationRequest
+         * @description Request to create a new conversation.
+         */
+        CreateConversationRequest: {
+            /** Title */
+            title?: string | null;
+        };
+        /**
+         * CreateFolderRequest
+         * @description Request to create a chat folder.
+         */
+        CreateFolderRequest: {
+            /** Name */
+            name: string;
+        };
         /** CreatePageRequest */
         CreatePageRequest: {
             /** Name */
@@ -1313,6 +2823,149 @@ export interface components {
              * @default 0
              */
             index: number;
+            /** Page Id */
+            page_id?: string | null;
+        };
+        /**
+         * DashboardStatsResponse
+         * @description Aggregate statistics for the workspace dashboard.
+         */
+        DashboardStatsResponse: {
+            /**
+             * Total Artifacts
+             * @description Total number of artifacts
+             */
+            total_artifacts: number;
+            /**
+             * Total Pages
+             * @description Total pages across all artifacts
+             */
+            total_pages: number;
+            /**
+             * Total Compounds
+             * @description Total compound mentions across all pages
+             */
+            total_compounds: number;
+            /**
+             * With Summary
+             * @description Artifacts that have a generated summary
+             */
+            with_summary: number;
+        };
+        /** DetailedHealthResponse */
+        DetailedHealthResponse: {
+            /**
+             * Overall Status
+             * @enum {string}
+             */
+            overall_status: "healthy" | "degraded" | "unhealthy";
+            system: components["schemas"]["SystemInfo"];
+            gpu: components["schemas"]["GpuInfo"];
+            /** Services */
+            services: components["schemas"]["ServiceStatus"][];
+            /** Models */
+            models: components["schemas"]["ModelStatus"][];
+            config: components["schemas"]["ConfigSummary"];
+            /**
+             * Workers
+             * @default []
+             */
+            workers: components["schemas"]["WorkerHeartbeat"][];
+            /** Checked At */
+            checked_at: string;
+        };
+        /**
+         * EntityRefDTO
+         * @description A named entity discussed in a conversation (for recent-chat chips).
+         */
+        EntityRefDTO: {
+            /** Text */
+            text: string;
+            /** Type */
+            type: string;
+        };
+        /** FailedWorkflow */
+        FailedWorkflow: {
+            /** Workflow Id */
+            workflow_id: string;
+            /** Workflow Type */
+            workflow_type: string;
+            /** Started At */
+            started_at: string | null;
+            /** Closed At */
+            closed_at: string | null;
+            /** Failure Message */
+            failure_message: string | null;
+        };
+        /**
+         * FeedbackRequest
+         * @description Request to record feedback on a message.
+         */
+        FeedbackRequest: {
+            /**
+             * Feedback
+             * @enum {string}
+             */
+            feedback: "positive" | "negative";
+        };
+        /** GpuDevice */
+        GpuDevice: {
+            /** Index */
+            index: number;
+            /** Name */
+            name: string;
+            /** Memory Total Mb */
+            memory_total_mb: number;
+            /** Memory Used Mb */
+            memory_used_mb: number;
+            /** Memory Free Mb */
+            memory_free_mb: number;
+        };
+        /** GpuInfo */
+        GpuInfo: {
+            /** Cuda Available */
+            cuda_available: boolean;
+            /** Mps Available */
+            mps_available: boolean;
+            /** Cuda Version */
+            cuda_version?: string | null;
+            /**
+             * Device Count
+             * @default 0
+             */
+            device_count: number;
+            /**
+             * Devices
+             * @default []
+             */
+            devices: components["schemas"]["GpuDevice"][];
+        };
+        /**
+         * GroundingBucket
+         * @description Grounding score distribution bucket.
+         */
+        GroundingBucket: {
+            /** Mode */
+            mode: string;
+            /** Total Messages */
+            total_messages: number;
+            /** Grounded Count */
+            grounded_count: number;
+            /** Not Grounded Count */
+            not_grounded_count: number;
+            /** Grounded Rate */
+            grounded_rate: number;
+            /** Avg Confidence */
+            avg_confidence: number;
+        };
+        /** GroundingStatsResponse */
+        GroundingStatsResponse: {
+            /** Modes */
+            modes: components["schemas"]["GroundingBucket"][];
+            /** Overall Grounded Rate */
+            overall_grounded_rate: number;
+            /** Overall Avg Confidence */
+            overall_avg_confidence: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1342,6 +2995,22 @@ export interface components {
              * @default true
              */
             include_chunks: boolean;
+            /**
+             * Tags
+             * @description Filter by tags (case-insensitive).
+             */
+            tags?: string[] | null;
+            /**
+             * Entity Types Filter
+             * @description Filter by NER entity types (e.g. 'target', 'compound_name').
+             */
+            entity_types_filter?: string[] | null;
+            /**
+             * Tag Match Mode
+             * @description 'any' = match ANY tag, 'all' = must have ALL tags.
+             * @default any
+             */
+            tag_match_mode: string;
         };
         /**
          * HierarchicalSearchResponse
@@ -1360,6 +3029,111 @@ export interface components {
             total_chunk_hits: number;
             /** Model Used */
             model_used: string;
+            chunk_rerank_info?: components["schemas"]["RerankInfoDTO"] | null;
+        };
+        /**
+         * HumanCorrectionInfo
+         * @description Provenance for a single corrected field.
+         */
+        HumanCorrectionInfo: {
+            /** Corrected By Id */
+            corrected_by_id: string;
+            /** Corrected By Name */
+            corrected_by_name?: string | null;
+            /**
+             * Corrected At
+             * Format: date-time
+             */
+            corrected_at: string;
+        };
+        /**
+         * KindUsage
+         * @description Aggregated usage for one (member, kind) cell.
+         */
+        KindUsage: {
+            /**
+             * Prompt
+             * @default 0
+             */
+            prompt: number;
+            /**
+             * Completion
+             * @default 0
+             */
+            completion: number;
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            /**
+             * Event Count
+             * @default 0
+             */
+            event_count: number;
+        };
+        /**
+         * KnowledgeGapEntry
+         * @description An entity detected in chat queries that the corpus couldn't answer.
+         */
+        KnowledgeGapEntry: {
+            /** Entity Text */
+            entity_text: string;
+            /** Entity Type */
+            entity_type: string;
+            /** Query Count */
+            query_count: number;
+            /** Gap Count */
+            gap_count: number;
+            /** Gap Rate */
+            gap_rate: number;
+        };
+        /** KnowledgeGapsResponse */
+        KnowledgeGapsResponse: {
+            /** Gaps */
+            gaps: components["schemas"]["KnowledgeGapEntry"][];
+            /** Total Unique Entities */
+            total_unique_entities: number;
+            /** Total Gap Entities */
+            total_gap_entities: number;
+        };
+        /**
+         * MemberTokenUsage
+         * @description Per-member usage split by kind, for the admin stats view.
+         */
+        MemberTokenUsage: {
+            /** User Id */
+            user_id: string | null;
+            /**
+             * @default {
+             *       "prompt": 0,
+             *       "completion": 0,
+             *       "total": 0,
+             *       "event_count": 0
+             *     }
+             */
+            chat: components["schemas"]["KindUsage"];
+            /**
+             * @default {
+             *       "prompt": 0,
+             *       "completion": 0,
+             *       "total": 0,
+             *       "event_count": 0
+             *     }
+             */
+            ingestion: components["schemas"]["KindUsage"];
+            /**
+             * Total Tokens
+             * @default 0
+             */
+            total_tokens: number;
+        };
+        /** MemberUsageStatsResponse */
+        MemberUsageStatsResponse: {
+            /** Members */
+            members: components["schemas"]["MemberTokenUsage"][];
+            /** Period Days */
+            period_days: number;
         };
         /**
          * MimeType
@@ -1367,6 +3141,44 @@ export interface components {
          * @enum {string}
          */
         MimeType: "application/pdf" | "application/vnd.ms-powerpoint" | "application/vnd.openxmlformats-officedocument.presentationml.presentation" | "application/msword" | "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        /** ModelStatus */
+        ModelStatus: {
+            /** Name */
+            name: string;
+            /** Loaded */
+            loaded: boolean;
+            /** Device */
+            device: string;
+            /** Model Name */
+            model_name: string;
+            /** Inference Ok */
+            inference_ok?: boolean | null;
+            /** Error */
+            error?: string | null;
+        };
+        /**
+         * MonthUsage
+         * @description Current-calendar-month usage (UTC) + the caller's effective limit.
+         */
+        MonthUsage: {
+            /**
+             * Chat
+             * @default 0
+             */
+            chat: number;
+            /**
+             * Ingestion
+             * @default 0
+             */
+            ingestion: number;
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            /** Limit */
+            limit?: number | null;
+        };
         /** PageResponse */
         PageResponse: {
             /**
@@ -1396,6 +3208,306 @@ export interface components {
             workspace_id?: string | null;
             /** Owner Id */
             owner_id?: string | null;
+            /**
+             * Human Corrections
+             * @description Per-field human correction provenance (hiledit)
+             */
+            human_corrections?: {
+                [key: string]: components["schemas"]["HumanCorrectionInfo"];
+            };
+        };
+        /** PipelineStatsResponse */
+        PipelineStatsResponse: {
+            /** Total Artifacts */
+            total_artifacts: number;
+            /** Total Pages */
+            total_pages: number;
+            /** Pages With Text */
+            pages_with_text: number;
+            /** Pages With Summary */
+            pages_with_summary: number;
+            /** Pages With Compounds */
+            pages_with_compounds: number;
+            /** Pages With Tags */
+            pages_with_tags: number;
+        };
+        /**
+         * PresentationDate
+         * @description Represents a date extracted from a document (presentation, publication, etc.).
+         *
+         *     This value object captures the parsed date and metadata about the extraction,
+         *     including which extraction method produced it.
+         */
+        PresentationDate: {
+            /**
+             * Confidence
+             * @description Confidence score of the extraction (0.0 to 1.0)
+             */
+            confidence?: number | null;
+            /**
+             * Date Extracted
+             * @description Timestamp when the content was extracted
+             */
+            date_extracted?: string | null;
+            /**
+             * Model Name
+             * @description Name of the NLP model used for extraction
+             */
+            model_name?: string | null;
+            /**
+             * Additional Model Params
+             * @description Additional parameters from the extraction model (may contain nested structures)
+             */
+            additional_model_params?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Pipeline Run Id
+             * @description Identifier for the workflow run that produced this extraction
+             */
+            pipeline_run_id?: string | null;
+            /**
+             * Date
+             * Format: date-time
+             */
+            date: string;
+            /**
+             * Source
+             * @description Extraction method that produced this date (e.g. 'gliner2', 'llm').
+             */
+            source?: string | null;
+        };
+        /**
+         * QueryContextDTO
+         * @description Captured query context from the planning stage — persisted on assistant messages.
+         */
+        QueryContextDTO: {
+            /** Ner Entities */
+            ner_entities?: {
+                [key: string]: unknown;
+            }[];
+            /** Authors */
+            authors?: string[];
+            /**
+             * Query Type
+             * @default
+             */
+            query_type: string;
+            /**
+             * Reformulated Query
+             * @default
+             */
+            reformulated_query: string;
+            /**
+             * Grounded
+             * @default false
+             */
+            grounded: boolean;
+            /** Smiles Detected */
+            smiles_detected?: string[];
+            /** Smiles Resolved */
+            smiles_resolved?: {
+                [key: string]: unknown;
+            }[];
+        };
+        /**
+         * RecentConversationDTO
+         * @description A conversation enriched with a summary for the dashboard recent-chats panel.
+         */
+        RecentConversationDTO: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /**
+             * Workspace Id
+             * Format: uuid
+             */
+            workspace_id: string;
+            /**
+             * Owner Id
+             * Format: uuid
+             */
+            owner_id: string;
+            /** Title */
+            title?: string | null;
+            /** Folder Id */
+            folder_id?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Message Count
+             * @default 0
+             */
+            message_count: number;
+            /** Model Used */
+            model_used?: string | null;
+            /**
+             * Is Archived
+             * @default false
+             */
+            is_archived: boolean;
+            /** Last Answer Snippet */
+            last_answer_snippet?: string | null;
+            /** Entities */
+            entities?: components["schemas"]["EntityRefDTO"][];
+            /** Cited Documents */
+            cited_documents?: components["schemas"]["CitedDocumentDTO"][];
+            /**
+             * Source Count
+             * @default 0
+             */
+            source_count: number;
+            /** Grounded */
+            grounded?: boolean | null;
+            /** Grounded Confidence */
+            grounded_confidence?: number | null;
+        };
+        /** RecentDocumentEntry */
+        RecentDocumentEntry: {
+            /** Artifact Id */
+            artifact_id: string;
+            /** Artifact Title */
+            artifact_title?: string | null;
+            /** Created At */
+            created_at: string;
+        };
+        /** RecordDocumentOpenRequest */
+        RecordDocumentOpenRequest: {
+            /** Artifact Id */
+            artifact_id: string;
+            /** Artifact Title */
+            artifact_title?: string | null;
+        };
+        /** RecordSearchActivityRequest */
+        RecordSearchActivityRequest: {
+            /** Query Text */
+            query_text: string;
+            /**
+             * Search Mode
+             * @default hierarchical
+             */
+            search_mode: string;
+            /** Result Count */
+            result_count?: number | null;
+        };
+        /**
+         * RenameFolderRequest
+         * @description Request to rename a chat folder.
+         */
+        RenameFolderRequest: {
+            /** Name */
+            name: string;
+        };
+        /**
+         * RerankInfoDTO
+         * @description Diagnostics about the reranking step.
+         */
+        RerankInfoDTO: {
+            /** Reranker Model */
+            reranker_model: string;
+            /** Candidates Before */
+            candidates_before: number;
+            /** Results After */
+            results_after: number;
+            /**
+             * Top Promotion
+             * @description Largest rank jump (e.g. result moved from #15 to #1 = promotion of 14)
+             */
+            top_promotion?: number | null;
+        };
+        /**
+         * ResourceACLResponse
+         * @description Full ACL for a resource, with enriched user profiles.
+         */
+        ResourceACLResponse: {
+            /** Id */
+            id: string;
+            /** Resource Type */
+            resource_type: string;
+            /** Resource Id */
+            resource_id: string;
+            /** Workspace Id */
+            workspace_id: string;
+            /** Owner Id */
+            owner_id?: string | null;
+            /** Owner Name */
+            owner_name?: string | null;
+            /** Owner Email */
+            owner_email?: string | null;
+            /** Visibility */
+            visibility: string;
+            /** Shares */
+            shares?: components["schemas"]["ResourceShareResponse"][];
+        };
+        /**
+         * ResourceShareResponse
+         * @description A single share entry in a resource ACL.
+         */
+        ResourceShareResponse: {
+            /** Id */
+            id: string;
+            /** Grantee Type */
+            grantee_type: string;
+            /** Grantee Id */
+            grantee_id: string;
+            /** Grantee Name */
+            grantee_name?: string | null;
+            /** Grantee Email */
+            grantee_email?: string | null;
+            /** Permission */
+            permission: string;
+            /** Granted By */
+            granted_by?: string | null;
+            /** Granted By Name */
+            granted_by_name?: string | null;
+            /** Granted At */
+            granted_at?: string | null;
+        };
+        /** SearchHistoryEntry */
+        SearchHistoryEntry: {
+            /** Query Text */
+            query_text: string;
+            /** Search Mode */
+            search_mode: string;
+            /** Result Count */
+            result_count?: number | null;
+            /** Created At */
+            created_at: string;
+        };
+        /**
+         * SearchQualityStats
+         * @description Search quality metrics.
+         */
+        SearchQualityStats: {
+            /** Search Mode */
+            search_mode: string;
+            /** Total Searches */
+            total_searches: number;
+            /** Zero Result Count */
+            zero_result_count: number;
+            /** Zero Result Rate */
+            zero_result_rate: number;
+            /** Avg Result Count */
+            avg_result_count: number;
+        };
+        /** SearchQualityStatsResponse */
+        SearchQualityStatsResponse: {
+            /** Modes */
+            modes: components["schemas"]["SearchQualityStats"][];
+            /** Total Searches */
+            total_searches: number;
+            /** Overall Zero Result Rate */
+            overall_zero_result_rate: number;
         };
         /**
          * SearchRequest
@@ -1419,6 +3531,42 @@ export interface components {
              * @description Minimum similarity score (0.0 to 1.0)
              */
             score_threshold?: number | null;
+            /**
+             * Tags
+             * @description Filter by tags (case-insensitive). Matches pages containing these tags.
+             */
+            tags?: string[] | null;
+            /**
+             * Entity Types
+             * @description Filter by entity types (e.g. 'target', 'compound_name', 'gene_name').
+             */
+            entity_types?: string[] | null;
+            /**
+             * Tag Match Mode
+             * @description 'any' = match pages with ANY of the tags, 'all' = must have ALL tags.
+             * @default any
+             */
+            tag_match_mode: string;
+            /**
+             * Block Types
+             * @description Filter by block type (e.g. 'table', 'figure', 'heading', 'paragraph').
+             */
+            block_types?: string[] | null;
+            /**
+             * Section
+             * @description Filter to chunks under a heading whose text matches (case-insensitive).
+             */
+            section?: string | null;
+            /**
+             * Is Table
+             * @description If set, restrict to table (True) or non-table (False) chunks.
+             */
+            is_table?: boolean | null;
+            /**
+             * Is Figure
+             * @description If set, restrict to figure (True) or non-figure (False) chunks.
+             */
+            is_figure?: boolean | null;
         };
         /**
          * SearchResponse
@@ -1433,6 +3581,8 @@ export interface components {
             total_results: number;
             /** Model Used */
             model_used: string;
+            /** @description Reranking diagnostics (present when reranking was applied) */
+            rerank_info?: components["schemas"]["RerankInfoDTO"] | null;
         };
         /**
          * SearchResultDTO
@@ -1454,6 +3604,16 @@ export interface components {
             /** Similarity Score */
             similarity_score: number;
             /**
+             * Rerank Score
+             * @description Cross-encoder rerank score (if reranking was applied)
+             */
+            rerank_score?: number | null;
+            /**
+             * Original Rank
+             * @description Position before reranking (0-based). Shows how much the result moved.
+             */
+            original_rank?: number | null;
+            /**
              * Text Preview
              * @description Preview of the page text (if available from read model)
              */
@@ -1465,6 +3625,79 @@ export interface components {
             artifact_name?: string | null;
             /** @description Full artifact details including metadata, pages, and tags */
             artifact_details?: components["schemas"]["ArtifactDetailsDTO"] | null;
+        };
+        /**
+         * SendMessageRequest
+         * @description Request to send a message in a conversation.
+         */
+        SendMessageRequest: {
+            /** Message */
+            message: string;
+            /**
+             * Mode
+             * @description Pipeline mode. 'quick' = 4-step, 'thinking' = 5-stage, 'deep_thinking' = thinking + page images. None = server default.
+             */
+            mode?: ("quick" | "thinking" | "deep_thinking") | null;
+            /**
+             * Reasoning
+             * @description Per-lane reasoning override; absent lanes use the server default.
+             */
+            reasoning?: {
+                [key: string]: "off" | "low" | "medium" | "high";
+            } | null;
+        };
+        /** ServiceStatus */
+        ServiceStatus: {
+            /** Name */
+            name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "healthy" | "unhealthy" | "degraded" | "disabled";
+            /** Latency Ms */
+            latency_ms?: number | null;
+            /** Version */
+            version?: string | null;
+            /** Error */
+            error?: string | null;
+            /** Details */
+            details?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /**
+         * SetFolderRequest
+         * @description Request to move a conversation into a folder.
+         *
+         *     ``folder_id`` is required but nullable: explicit null unfiles the
+         *     conversation; omitting the field is a 422 (guards PATCH {} from
+         *     silently unfiling).
+         */
+        SetFolderRequest: {
+            /** Folder Id */
+            folder_id: string | null;
+        };
+        /**
+         * ShareActionResponse
+         * @description Response from share/unshare operations.
+         */
+        ShareActionResponse: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+            /** Resource Type */
+            resource_type: string;
+            /** Resource Id */
+            resource_id: string;
+            /** Grantee Type */
+            grantee_type: string;
+            /** Grantee Id */
+            grantee_id: string;
+            /** Permission */
+            permission: string;
         };
         /** ShareResourceRequest */
         ShareResourceRequest: {
@@ -1480,6 +3713,53 @@ export interface components {
              * @default view
              */
             permission: string;
+        };
+        /**
+         * SourceCitationDTO
+         * @description A grounding citation linking a claim to a source passage.
+         */
+        SourceCitationDTO: {
+            /**
+             * Artifact Id
+             * Format: uuid
+             */
+            artifact_id: string;
+            /** Artifact Title */
+            artifact_title?: string | null;
+            /** Authors */
+            authors?: string[];
+            /** Presentation Date */
+            presentation_date?: string | null;
+            /** Page Id */
+            page_id?: string | null;
+            /** Page Index */
+            page_index?: number | null;
+            /** Page Name */
+            page_name?: string | null;
+            /** Text Excerpt */
+            text_excerpt?: string | null;
+            /** Similarity Score */
+            similarity_score?: number | null;
+            /** Citation Index */
+            citation_index: number;
+        };
+        /**
+         * StepLatencyStats
+         * @description Latency stats for a single pipeline step.
+         */
+        StepLatencyStats: {
+            /** Step Name */
+            step_name: string;
+            /** Count */
+            count: number;
+            /** Avg Ms */
+            avg_ms: number;
+            /** P50 Ms */
+            p50_ms: number;
+            /** P95 Ms */
+            p95_ms: number;
+            /** Max Ms */
+            max_ms: number;
         };
         /**
          * SummaryCandidate
@@ -1534,6 +3814,27 @@ export interface components {
             hil_correction?: string | null;
         };
         /**
+         * SummaryDetailResponse
+         * @description Typed response for /summary endpoints (replaces bare dict).
+         */
+        SummaryDetailResponse: {
+            /** Entity Id */
+            entity_id: string;
+            /** Summary */
+            summary?: string | null;
+            /** Model Name */
+            model_name?: string | null;
+            /** Date Extracted */
+            date_extracted?: string | null;
+            /**
+             * Is Locked
+             * @default false
+             */
+            is_locked: boolean;
+            /** Hil Correction */
+            hil_correction?: string | null;
+        };
+        /**
          * SummaryHit
          * @description A matching summary from summary_embeddings.
          */
@@ -1561,6 +3862,10 @@ export interface components {
             artifact_title?: string | null;
             /** Page Index */
             page_index?: number | null;
+            /** Authors */
+            authors?: string[];
+            /** Presentation Date */
+            presentation_date?: string | null;
         };
         /**
          * SummarySearchRequest
@@ -1589,6 +3894,22 @@ export interface components {
              * @description Minimum cosine similarity score.
              */
             score_threshold?: number | null;
+            /**
+             * Tags
+             * @description Filter by tags (case-insensitive).
+             */
+            tags?: string[] | null;
+            /**
+             * Entity Types Filter
+             * @description Filter by NER entity types (e.g. 'target', 'compound_name').
+             */
+            entity_types_filter?: string[] | null;
+            /**
+             * Tag Match Mode
+             * @description 'any' = match ANY tag, 'all' = must have ALL tags.
+             * @default any
+             */
+            tag_match_mode: string;
         };
         /**
          * SummarySearchResponse
@@ -1637,12 +3958,81 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** SystemInfo */
+        SystemInfo: {
+            /** App Version */
+            app_version: string;
+            /** Python Version */
+            python_version: string;
+            /** Os Info */
+            os_info: string;
+            /** Hostname */
+            hostname: string;
+            /** Uptime Seconds */
+            uptime_seconds: number;
+            /** Timestamp */
+            timestamp: string;
+        };
+        /**
+         * TagCategoryDTO
+         * @description A tag entity type with aggregate counts across artifacts.
+         */
+        TagCategoryDTO: {
+            /**
+             * Entity Type
+             * @description e.g. target, compound_name, author, date
+             */
+            entity_type: string;
+            /**
+             * Display Name
+             * @description Human-readable label
+             */
+            display_name: string;
+            /**
+             * Artifact Count
+             * @description Artifacts with at least one tag of this type
+             */
+            artifact_count: number;
+            /**
+             * Distinct Count
+             * @description Unique tag values
+             */
+            distinct_count: number;
+        };
+        /**
+         * TagFolderDTO
+         * @description A single tag value within a category, acting as a virtual folder.
+         */
+        TagFolderDTO: {
+            /**
+             * Tag Value
+             * @description Normalized value (lowercase, stripped)
+             */
+            tag_value: string;
+            /**
+             * Display Name
+             * @description Original casing for display
+             */
+            display_name: string;
+            /** Artifact Count */
+            artifact_count: number;
+            /**
+             * Has Children
+             * @description True for date-year folders
+             * @default false
+             */
+            has_children: boolean;
+        };
         /**
          * TagMention
          * @description Represents tag extracted from a page using NLP.
          *
          *     This value object captures the extracted tag content and metadata
          *     about the extraction process, including confidence scores and model details.
+         *
+         *     On artifact-level aggregated tags, the provenance fields (tag_normalized,
+         *     sources, max_confidence, page_count) are populated to track which pages
+         *     contributed each tag.
          */
         TagMention: {
             /**
@@ -1676,6 +4066,60 @@ export interface components {
             tag: string;
             /** Entity Type */
             entity_type?: string | null;
+            /** Tag Normalized */
+            tag_normalized?: string | null;
+            /** Sources */
+            sources?: components["schemas"]["TagSource"][] | null;
+            /** Max Confidence */
+            max_confidence?: number | null;
+            /** Page Count */
+            page_count?: number | null;
+        };
+        /**
+         * TagPageSource
+         * @description Lightweight page-level provenance for a browsed tag.
+         */
+        TagPageSource: {
+            /**
+             * Page Id
+             * Format: uuid
+             */
+            page_id: string;
+            /** Page Index */
+            page_index: number;
+        };
+        /**
+         * TagSource
+         * @description Provenance: which page contributed a tag to the artifact-level aggregate.
+         */
+        TagSource: {
+            /**
+             * Page Id
+             * Format: uuid
+             */
+            page_id: string;
+            /** Page Index */
+            page_index: number;
+            /** Confidence */
+            confidence?: number | null;
+        };
+        /** TemporalWorkflowInfo */
+        TemporalWorkflowInfo: {
+            /** Workflow Id */
+            workflow_id: string;
+            /** Status */
+            status: string;
+            /** Run Id */
+            run_id?: string | null;
+            /** Started At */
+            started_at?: string | null;
+            /** Closed At */
+            closed_at?: string | null;
+            /**
+             * From Cache
+             * @default false
+             */
+            from_cache: boolean;
         };
         /**
          * TextMention
@@ -1716,6 +4160,18 @@ export interface components {
             text: string;
         };
         /**
+         * ThinkingBlockDTO
+         * @description A single labeled thinking block from an LLM call.
+         */
+        ThinkingBlockDTO: {
+            /** Label */
+            label: string;
+            /** Step */
+            step: string;
+            /** Content */
+            content: string;
+        };
+        /**
          * TitleMention
          * @description Represents title extracted from a page using NLP.
          *
@@ -1753,10 +4209,151 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** TokenLimitBody */
+        TokenLimitBody: {
+            /** Limit */
+            limit: number | null;
+        };
+        /**
+         * TokenLimitEntry
+         * @description One token-limit row: a per-user override, or the workspace default when user_id is None.
+         *
+         *     ``limit`` semantics: None = unlimited, 0 = fully blocked.
+         */
+        TokenLimitEntry: {
+            /** User Id */
+            user_id?: string | null;
+            /** Limit */
+            limit?: number | null;
+        };
+        /**
+         * TokenUsageBucket
+         * @description Token usage aggregated by time bucket.
+         */
+        TokenUsageBucket: {
+            /** Date */
+            date: string;
+            /** Mode */
+            mode: string;
+            /** Total Tokens */
+            total_tokens: number;
+            /** Prompt Tokens */
+            prompt_tokens: number;
+            /** Completion Tokens */
+            completion_tokens: number;
+            /** Message Count */
+            message_count: number;
+        };
+        /** TokenUsageDTO */
+        TokenUsageDTO: {
+            /**
+             * Prompt
+             * @default 0
+             */
+            prompt: number;
+            /**
+             * Completion
+             * @default 0
+             */
+            completion: number;
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+        };
+        /** TokenUsageStatsResponse */
+        TokenUsageStatsResponse: {
+            /** Buckets */
+            buckets: components["schemas"]["TokenUsageBucket"][];
+            /** Total Tokens */
+            total_tokens: number;
+            /** Total Messages */
+            total_messages: number;
+        };
+        /**
+         * UncitedArtifactEntry
+         * @description A document that has never been cited in chat answers.
+         */
+        UncitedArtifactEntry: {
+            /** Artifact Id */
+            artifact_id: string;
+            /** Artifact Title */
+            artifact_title: string | null;
+        };
+        /**
+         * UpdatePreferencesRequest
+         * @description Partial update — only set fields are applied.
+         */
+        UpdatePreferencesRequest: {
+            /** Theme */
+            theme?: string | null;
+            /** Sidebar Collapsed */
+            sidebar_collapsed?: boolean | null;
+            /** Dev Mode */
+            dev_mode?: boolean | null;
+            /** Default Scope */
+            default_scope?: string | null;
+            /** Font Family */
+            font_family?: string | null;
+        };
         /** UpdateVisibilityRequest */
         UpdateVisibilityRequest: {
             /** Visibility */
             visibility: string;
+        };
+        /**
+         * UserPreferencesDTO
+         * @description User UI preferences. Not a domain concern — simple operational metadata.
+         */
+        UserPreferencesDTO: {
+            /**
+             * Theme
+             * @default light
+             */
+            theme: string;
+            /**
+             * Sidebar Collapsed
+             * @default false
+             */
+            sidebar_collapsed: boolean;
+            /**
+             * Dev Mode
+             * @default false
+             */
+            dev_mode: boolean;
+            /**
+             * Default Scope
+             * @default workspace
+             */
+            default_scope: string;
+            /**
+             * Font Family
+             * @default plex
+             */
+            font_family: string;
+        };
+        /**
+         * UserTokenUsageResponse
+         * @description GET /chat/usage: requested-window totals + current-month block.
+         */
+        UserTokenUsageResponse: {
+            /**
+             * Prompt
+             * @default 0
+             */
+            prompt: number;
+            /**
+             * Completion
+             * @default 0
+             */
+            completion: number;
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            month: components["schemas"]["MonthUsage"];
         };
         /** ValidationError */
         ValidationError: {
@@ -1767,6 +4364,68 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** VectorStatsResponse */
+        VectorStatsResponse: {
+            /** Collections */
+            collections: components["schemas"]["CollectionStats"][];
+            /** Embedding Model */
+            embedding_model: {
+                [key: string]: unknown;
+            };
+            /** Reranker */
+            reranker: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /**
+         * VisibilityResponse
+         * @description Response from visibility update.
+         */
+        VisibilityResponse: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+            /** Resource Type */
+            resource_type: string;
+            /** Resource Id */
+            resource_id: string;
+            /** Visibility */
+            visibility: string;
+        };
+        /**
+         * WorkerHeartbeat
+         * @description Status snapshot from a single worker process.
+         */
+        WorkerHeartbeat: {
+            /** Worker Id */
+            worker_id: string;
+            /** Worker Type */
+            worker_type: string;
+            /** Worker Name */
+            worker_name: string;
+            /** Hostname */
+            hostname: string;
+            /** Pid */
+            pid: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "online" | "offline";
+            gpu: components["schemas"]["GpuInfo"];
+            /**
+             * Loaded Models
+             * @default []
+             */
+            loaded_models: components["schemas"]["ModelStatus"][];
+            system: components["schemas"]["SystemInfo"];
+            /** Started At */
+            started_at: string;
+            /** Last Heartbeat */
+            last_heartbeat: string;
+        };
         /** WorkflowStartedResponse */
         WorkflowStartedResponse: {
             /** Workflow Id */
@@ -1776,6 +4435,49 @@ export interface components {
              * @default started
              */
             status: string;
+        };
+        /** WorkflowStatsResponse */
+        WorkflowStatsResponse: {
+            /** Completed */
+            completed: components["schemas"]["WorkflowTypeStats"][];
+            /** Active */
+            active: components["schemas"]["ActiveWorkflow"][];
+            /** Recent Failures */
+            recent_failures: components["schemas"]["FailedWorkflow"][];
+        };
+        /**
+         * WorkflowStatusMapResponse
+         * @description Typed response for workflow status endpoints (replaces bare dict).
+         */
+        WorkflowStatusMapResponse: {
+            /** Entity Id */
+            entity_id: string;
+            /** Workflows */
+            workflows: {
+                [key: string]: components["schemas"]["TemporalWorkflowInfo"];
+            };
+        };
+        /** WorkflowTypeStats */
+        WorkflowTypeStats: {
+            /** Workflow Type */
+            workflow_type: string;
+            /** Count */
+            count: number;
+            /** Avg Duration Seconds */
+            avg_duration_seconds: number;
+            /** Min Duration Seconds */
+            min_duration_seconds: number;
+            /** Max Duration Seconds */
+            max_duration_seconds: number;
+            /** P95 Duration Seconds */
+            p95_duration_seconds: number;
+        };
+        /** WorkspaceTokenLimitsResponse */
+        WorkspaceTokenLimitsResponse: {
+            /** Default Limit */
+            default_limit: number | null;
+            /** Overrides */
+            overrides: components["schemas"]["TokenLimitEntry"][];
         };
     };
     responses: never;
@@ -1791,6 +4493,8 @@ export interface operations {
             query?: {
                 skip?: number;
                 limit?: number;
+                sort_by?: string;
+                sort_order?: number;
             };
             header?: never;
             path?: never;
@@ -2014,7 +4718,7 @@ export interface operations {
             };
         };
     };
-    update_title_mention_artifacts__artifact_id__title_mention_patch: {
+    correct_artifact_metadata_artifacts__artifact_id__metadata_patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -2025,7 +4729,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["TitleMention"] | null;
+                "application/json": components["schemas"]["CorrectArtifactMetadataRequest"];
             };
         };
         responses: {
@@ -2084,7 +4788,7 @@ export interface operations {
             };
         };
     };
-    update_tag_mentions_artifacts__artifact_id__tag_mentions_patch: {
+    trigger_artifact_summarization_artifacts__artifact_id__summarize_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2093,21 +4797,15 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                }[];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
-            200: {
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ArtifactResponse"];
+                    "application/json": components["schemas"]["WorkflowStartedResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2121,7 +4819,38 @@ export interface operations {
             };
         };
     };
-    trigger_artifact_summarization_artifacts__artifact_id__summarize_post: {
+    trigger_doc_metadata_extraction_artifacts__artifact_id__extract_metadata_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowStartedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trigger_artifact_reembed_artifacts__artifact_id__reembed_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2169,9 +4898,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SummaryDetailResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2202,9 +4929,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["WorkflowStatusMapResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2251,7 +4976,10 @@ export interface operations {
     };
     stream_page_image_artifacts__artifact_id__pages__page_index__image_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 'thumb' for lightweight JPEG thumbnail */
+                size?: string | null;
+            };
             header?: never;
             path: {
                 artifact_id: string;
@@ -2298,9 +5026,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ResourceACLResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2335,9 +5061,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ShareActionResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2372,9 +5096,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ShareActionResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2409,9 +5131,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["VisibilityResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2421,6 +5141,795 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mint_authz_token_auth_mint_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    suggest_tags_browse_tags_suggest_get: {
+        parameters: {
+            query: {
+                q: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_popular_tags_browse_tags_popular_get: {
+        parameters: {
+            query?: {
+                entity_type?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_categories_browse_categories_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowseCategoriesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_folders_browse_categories__entity_type__folders_get: {
+        parameters: {
+            query?: {
+                parent?: string | null;
+                skip?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                entity_type: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowseFoldersResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_folder_artifacts_browse_categories__entity_type__folders__tag_value__artifacts_get: {
+        parameters: {
+            query?: {
+                skip?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                entity_type: string;
+                tag_value: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactBrowseItemDTO"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_conversations_chat_get: {
+        parameters: {
+            query?: {
+                skip?: number;
+                limit?: number;
+                is_archived?: boolean;
+                folder_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDTO"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_conversation_chat_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateConversationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_user_token_usage_chat_usage_get: {
+        parameters: {
+            query?: {
+                days?: number | null;
+                kind?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserTokenUsageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_recent_conversations_chat_recent_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecentConversationDTO"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_conversation_chat__conversation_id__get: {
+        parameters: {
+            query?: {
+                skip?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_conversation_chat__conversation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_conversation_folder_chat__conversation_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetFolderRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_message_chat__conversation_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendMessageRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_message_stream_chat__conversation_id__messages_stream_get: {
+        parameters: {
+            query?: {
+                after?: number;
+            };
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stop_message_run_chat__conversation_id__run_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_feedback_chat__conversation_id__messages__message_id__feedback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_compound_profile_compounds__name__profile_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompoundProfileDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_dashboard_stats_dashboard_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardStatsResponse"];
+                };
+            };
+        };
+    };
+    list_folders_folders_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatFolderDTO"][];
+                };
+            };
+        };
+    };
+    create_folder_folders_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateFolderRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatFolderDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_folder_folders__folder_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                folder_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_folder_folders__folder_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                folder_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameFolderRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatFolderDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_detailed_health_system_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetailedHealthResponse"];
+                };
+            };
+        };
+    };
+    trigger_reembed_all_system_reembed_all_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["BulkReEmbedRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkWorkflowResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trigger_reprocess_compounds_all_system_reprocess_compounds_all_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkWorkflowResponse"];
                 };
             };
         };
@@ -2600,6 +6109,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SummaryCandidate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    correct_page_compound_mentions_pages__page_id__compound_mentions_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorrectPageCompoundMentionsRequest"];
             };
         };
         responses: {
@@ -2830,9 +6374,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SummaryDetailResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2863,9 +6405,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["WorkflowStatusMapResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3070,6 +6610,507 @@ export interface operations {
             };
         };
     };
+    get_workflow_stats_stats_workflows_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowStatsResponse"];
+                };
+            };
+        };
+    };
+    get_pipeline_stats_stats_pipeline_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PipelineStatsResponse"];
+                };
+            };
+        };
+    };
+    get_vector_stats_stats_vectors_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VectorStatsResponse"];
+                };
+            };
+        };
+    };
+    get_token_usage_stats_stats_token_usage_get: {
+        parameters: {
+            query?: {
+                period?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenUsageStatsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_member_usage_stats_stats_member_usage_get: {
+        parameters: {
+            query?: {
+                period?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberUsageStatsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_chat_latency_stats_stats_chat_latency_get: {
+        parameters: {
+            query?: {
+                period?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatLatencyStatsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_search_quality_stats_stats_search_quality_get: {
+        parameters: {
+            query?: {
+                period?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchQualityStatsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_grounding_stats_stats_grounding_get: {
+        parameters: {
+            query?: {
+                period?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroundingStatsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_knowledge_gaps_stats_knowledge_gaps_get: {
+        parameters: {
+            query?: {
+                period?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeGapsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_citation_frequency_stats_citation_frequency_get: {
+        parameters: {
+            query?: {
+                period?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CitationFrequencyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_preferences_user_preferences_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserPreferencesDTO"];
+                };
+            };
+        };
+    };
+    update_preferences_user_preferences_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePreferencesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserPreferencesDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_search_user_activity_search_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordSearchActivityRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_document_open_user_activity_document_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordDocumentOpenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_recent_searches_user_activity_searches_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchHistoryEntry"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_search_history_user_activity_searches_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_search_entry_user_activity_searches__query_text__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                query_text: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_recent_documents_user_activity_documents_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecentDocumentEntry"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     search_members_workspace_members_get: {
         parameters: {
             query?: {
@@ -3122,6 +7163,119 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
+                };
+            };
+        };
+    };
+    get_token_limits_workspace_token_limits_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceTokenLimitsResponse"];
+                };
+            };
+        };
+    };
+    set_default_token_limit_workspace_token_limits_default_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenLimitBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_user_token_limit_workspace_token_limits__user_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenLimitBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_user_token_limit_workspace_token_limits__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

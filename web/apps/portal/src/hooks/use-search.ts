@@ -27,7 +27,7 @@ export function useTextSearchQuery(params: SearchParams | null) {
           limit: 10,
           tags: params!.tags,
           entity_types: params!.entity_types,
-          tag_match_mode: params!.tag_match_mode,
+          tag_match_mode: params!.tag_match_mode ?? "any",
         },
       });
       if (error) throwApiError("Failed to search pages", error, response.status);
@@ -59,7 +59,7 @@ export function useSummarySearchQuery(params: SearchParams | null) {
           limit: 10,
           tags: params!.tags,
           entity_types_filter: params!.entity_types,
-          tag_match_mode: params!.tag_match_mode,
+          tag_match_mode: params!.tag_match_mode ?? "any",
         },
       });
       if (error) throwApiError("Failed to search summaries", error, response.status);
@@ -92,7 +92,7 @@ export function useHierarchicalSearchQuery(params: (SearchParams & { include_chu
           include_chunks: params!.include_chunks ?? true,
           tags: params!.tags,
           entity_types_filter: params!.entity_types,
-          tag_match_mode: params!.tag_match_mode,
+          tag_match_mode: params!.tag_match_mode ?? "any",
         },
       });
       if (error) throwApiError("Failed to perform hierarchical search", error, response.status);
@@ -127,6 +127,7 @@ export function useHierarchicalSearchMutation() {
           query_text: params.query_text,
           limit: params.limit ?? 6,
           include_chunks: params.include_chunks ?? true,
+          tag_match_mode: "any",
         },
       });
       if (error) throwApiError("Failed to perform hierarchical search", error, response.status);
