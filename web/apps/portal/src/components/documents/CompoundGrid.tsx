@@ -105,11 +105,15 @@ export function CompoundGrid({
           >
             {editable && (
               <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover/cm:opacity-100">
+                {/* All triggers are disabled while a PUT is in flight — concurrent
+                    full-list saves would each build `next` from the same stale
+                    snapshot and the last writer would resurrect the other's change. */}
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon-xs"
                   aria-label="Edit compound"
+                  disabled={correctMutation.isPending}
                   onClick={() => setEditor({ index: i })}
                 >
                   <Pencil className="size-3.5" />
@@ -119,6 +123,7 @@ export function CompoundGrid({
                   variant="ghost"
                   size="icon-xs"
                   aria-label="Delete compound"
+                  disabled={correctMutation.isPending}
                   onClick={() => handleDelete(i, cm)}
                 >
                   <Trash2 className="size-3.5" />
@@ -170,8 +175,9 @@ export function CompoundGrid({
         {editable && (
           <button
             type="button"
+            disabled={correctMutation.isPending}
             onClick={() => setEditor("add")}
-            className="flex min-h-[220px] flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border-default text-text-muted transition-colors hover:border-primary/40 hover:text-primary"
+            className="flex min-h-[220px] flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border-default text-text-muted transition-colors hover:border-primary/40 hover:text-primary disabled:pointer-events-none disabled:opacity-50"
           >
             <Plus className="size-5" />
             <span className="text-sm font-medium">Add compound</span>
