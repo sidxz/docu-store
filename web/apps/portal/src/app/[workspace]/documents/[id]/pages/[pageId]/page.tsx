@@ -3,6 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { AlertCircle, ArrowLeft, BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
+import { useAuthzHasRole } from "@sentinel-auth/react";
 
 import { useAuthBlobUrl } from "@/hooks/use-auth-blob-url";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -78,6 +79,7 @@ export default function PageViewerPage() {
   const { data: artifact } = useArtifact(id);
   const { data: workflowData } = usePageWorkflows(pageId);
   const rerunMutation = useRerunPageWorkflow(pageId);
+  const canEdit = useAuthzHasRole("editor");
   const { isPluginEnabled } = usePlugins();
   const { enrichmentBySmiles } = usePubChemEnrichments(pageId, {
     enabled: isPluginEnabled("pubchem_enrichment"),
@@ -232,11 +234,14 @@ export default function PageViewerPage() {
         </div>
       )}
 
-      {/* Compound mentions — card grid */}
-      {page.compound_mentions && page.compound_mentions.length > 0 && (
+      {/* Compound mentions — card grid (editable "Add compound" card needs the section even at 0) */}
+      {((page.compound_mentions?.length ?? 0) > 0 || canEdit) && (
         <CompoundGrid
-          compounds={page.compound_mentions as CompoundMention[]}
+          compounds={(page.compound_mentions as CompoundMention[]) ?? []}
           enrichmentBySmiles={enrichmentBySmiles}
+          editable={canEdit}
+          pageId={pageId}
+          humanCorrection={page.human_corrections?.compound_mentions}
         />
       )}
 
