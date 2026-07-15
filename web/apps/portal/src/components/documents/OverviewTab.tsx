@@ -3,6 +3,7 @@ import { Users, Calendar } from "lucide-react";
 import type { ArtifactResponse } from "@docu-store/types";
 import { Card } from "@/components/ui/Card";
 import { EntityTagPanel } from "@/components/EntityTagPanel";
+import { HumanCorrectedBadge } from "@/components/documents/HumanCorrectedBadge";
 
 interface OverviewTabProps {
   artifact: ArtifactResponse;
@@ -43,8 +44,11 @@ export function OverviewTab({
               <div className="flex items-start gap-3">
                 <Users className="mt-0.5 h-4 w-4 shrink-0 text-text-muted" />
                 <div>
-                  <span className="text-xs font-medium text-text-muted">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-text-muted">
                     Authors
+                    {artifact.human_corrections?.author_mentions && (
+                      <HumanCorrectedBadge info={artifact.human_corrections.author_mentions} />
+                    )}
                   </span>
                   <div className="mt-1 flex flex-wrap gap-2">
                     {artifact.author_mentions.map((am, i) => (
@@ -66,7 +70,7 @@ export function OverviewTab({
                   <span className="text-xs font-medium text-text-muted">
                     Date
                   </span>
-                  <p className="mt-1 text-sm font-medium text-text-primary">
+                  <p className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-text-primary">
                     {new Date(
                       artifact.presentation_date.date,
                     ).toLocaleDateString(undefined, {
@@ -74,6 +78,9 @@ export function OverviewTab({
                       month: "long",
                       day: "numeric",
                     })}
+                    {artifact.human_corrections?.presentation_date && (
+                      <HumanCorrectedBadge info={artifact.human_corrections.presentation_date} />
+                    )}
                   </p>
                 </div>
               </div>
@@ -84,6 +91,11 @@ export function OverviewTab({
 
       {artifact.tag_mentions && artifact.tag_mentions.length > 0 && (
         <EntityTagPanel
+          badge={
+            artifact.human_corrections?.tag_mentions && (
+              <HumanCorrectedBadge info={artifact.human_corrections.tag_mentions} />
+            )
+          }
           tagMentions={artifact.tag_mentions}
           workspace={workspace}
           artifactId={artifactId}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import type { components } from "@docu-store/api-client";
 import type { Bioactivity } from "@docu-store/types";
@@ -24,6 +24,8 @@ interface EntityTagPanelProps {
   workspace: string;
   artifactId: string;
   compoundMentions?: { extracted_id?: string | null; smiles: string; canonical_smiles?: string | null }[];
+  /** hiledit: shown next to the "Entities" heading, e.g. a HumanCorrectedBadge. */
+  badge?: ReactNode;
 }
 
 function groupTags(tagMentions: TagMentionItem[]) {
@@ -193,6 +195,7 @@ export function EntityTagPanel({
   workspace,
   artifactId,
   compoundMentions = [],
+  badge,
 }: EntityTagPanelProps) {
   const { compounds, grouped } = groupTags(tagMentions);
   const [expanded, setExpanded] = useState(false);
@@ -213,7 +216,10 @@ export function EntityTagPanel({
 
   return (
     <Card>
-      <h3 className="mb-4 text-sm font-medium text-text-secondary">Entities</h3>
+      <h3 className="mb-4 flex items-center gap-1.5 text-sm font-medium text-text-secondary">
+        Entities
+        {badge}
+      </h3>
       <div className="space-y-5">
         {[...grouped.entries()].map(([entityType, tags]) => (
           <EntityTypeSection

@@ -1,9 +1,10 @@
 "use client";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { FileText, ArrowLeft, Lock, Users, Loader2, AlertCircle, CheckCircle2, Trash2 } from "lucide-react";
+import { FileText, ArrowLeft, Lock, Users, Loader2, AlertCircle, CheckCircle2, Trash2, Pencil } from "lucide-react";
+import { useAuthzHasRole } from "@sentinel-auth/react";
 
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -13,6 +14,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { OverviewTab } from "@/components/documents/OverviewTab";
 import { PagesTab } from "@/components/documents/PagesTab";
+import { EditMetadataDialog } from "@/components/documents/EditMetadataDialog";
+import { HumanCorrectedBadge } from "@/components/documents/HumanCorrectedBadge";
 import { PdfEmbed } from "@/components/PdfEmbed";
 import { WorkflowList, parseWorkflows } from "@/components/WorkflowList";
 import {
@@ -63,6 +66,8 @@ export default function ArtifactDetailPage() {
   const deleteMutation = useDeleteArtifact();
   const confirm = useConfirm();
   const rerunMutation = useRerunArtifactWorkflow(id);
+  const canEdit = useAuthzHasRole("editor");
+  const [editOpen, setEditOpen] = useState(false);
 
   // Record document open for activity tracking (fire-and-forget)
   useEffect(() => {
@@ -141,20 +146,31 @@ export default function ArtifactDetailPage() {
         title={title}
         subtitle={`${artifact.artifact_type.replace(/_/g, " ")} · ${pages.length} pages`}
         badge={
-          acl?.visibility === "private" && acl.shares?.length > 0 ? (
-            <span className="inline-flex items-center gap-1 rounded-md bg-accent-light px-1.5 py-0.5 text-xs font-medium text-accent-text" title="Shared with specific people">
-              <Users className="size-3" />
-              Shared
-            </span>
-          ) : acl?.visibility === "private" ? (
-            <span className="inline-flex items-center gap-1 rounded-md bg-surface-sunken px-1.5 py-0.5 text-xs font-medium text-text-muted" title="Only you can access">
-              <Lock className="size-3" />
-              Private
-            </span>
-          ) : null
+          <>
+            {artifact.human_corrections?.title_mention && (
+              <HumanCorrectedBadge info={artifact.human_corrections.title_mention} />
+            )}
+            {acl?.visibility === "private" && acl.shares?.length > 0 ? (
+              <span className="inline-flex items-center gap-1 rounded-md bg-accent-light px-1.5 py-0.5 text-xs font-medium text-accent-text" title="Shared with specific people">
+                <Users className="size-3" />
+                Shared
+              </span>
+            ) : acl?.visibility === "private" ? (
+              <span className="inline-flex items-center gap-1 rounded-md bg-surface-sunken px-1.5 py-0.5 text-xs font-medium text-text-muted" title="Only you can access">
+                <Lock className="size-3" />
+                Private
+              </span>
+            ) : null}
+          </>
         }
         actions={
           <div className="flex items-center gap-2">
+            {canEdit && (
+              <Button variant="outline" onClick={() => setEditOpen(true)}>
+                <Pencil className="size-4" />
+                Edit
+              </Button>
+            )}
             <ShareDialog
               artifactId={id}
               isOwnerOrAdmin={isOwnerOrAdmin}
@@ -185,6 +201,10 @@ export default function ArtifactDetailPage() {
           </div>
         }
       />
+
+      {canEdit && (
+        <EditMetadataDialog artifact={artifact} open={editOpen} onOpenChange={setEditOpen} />
+      )}
 
       {/* Workflow status banner */}
       {workflows && (() => {
