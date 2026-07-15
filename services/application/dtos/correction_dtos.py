@@ -31,6 +31,8 @@ class CorrectArtifactMetadataRequest(BaseModel):
 class CorrectedCompoundInput(BaseModel):
     """A single compound mention as submitted by a human reviewer."""
 
+    model_config = {"extra": "forbid"}
+
     smiles: str
     extracted_id: str | None = None
     internal_id: str | None = None
@@ -45,6 +47,8 @@ class CorrectPageCompoundMentionsRequest(BaseModel):
     Full-replace semantics: the submitted list becomes the page's entire
     ``compound_mentions``. An empty list is allowed and clears all mentions.
     """
+
+    model_config = {"extra": "forbid"}
 
     compound_mentions: list[CorrectedCompoundInput]
 

@@ -210,13 +210,25 @@ class ExtractDocumentMetadataUseCase:
             author_mentions = self._build_authors(raw, now)
             presentation_date = self._build_date(raw, now)
 
-            if title_mention:
+            # A human-corrected field is off-limits to machine extraction. The
+            # aggregate's update_* methods already no-op in that case; mirror the
+            # guard here so we don't save + notify for a write that didn't land.
+            applied_title = (
+                bool(title_mention) and "title_mention" not in artifact.human_corrections
+            )
+            applied_authors = bool(author_mentions) and (
+                "author_mentions" not in artifact.human_corrections
+            )
+            applied_date = presentation_date is not None and (
+                "presentation_date" not in artifact.human_corrections
+            )
+            if applied_title:
                 artifact.update_title_mention(title_mention)
-            if author_mentions:
+            if applied_authors:
                 artifact.update_author_mentions(author_mentions)
-            if presentation_date is not None:
+            if applied_date:
                 artifact.update_presentation_date(presentation_date)
-            if title_mention or author_mentions or presentation_date is not None:
+            if applied_title or applied_authors or applied_date:
                 self.artifact_repository.save(artifact)
 
                 if self.external_event_publisher:

@@ -294,3 +294,48 @@ class TestCorrectArtifactMetadataUseCase:
         saved = fake_artifact_repo.get_by_id(artifact.id)
         assert saved.title_mention is None
         assert list(saved.human_corrections) == ["title_mention"]
+
+    @pytest.mark.asyncio
+    async def test_viewer_role_rejected(
+        self,
+        fake_artifact_repo: MockArtifactRepository,
+        make_saved_artifact,
+    ) -> None:
+        """A viewer (insufficient role) is rejected with forbidden."""
+        artifact = make_saved_artifact()
+        uc = CorrectArtifactMetadataUseCase(artifact_repository=fake_artifact_repo)
+
+        result = await uc.execute(
+            artifact_id=artifact.id,
+            request=CorrectArtifactMetadataRequest(title="X"),
+            auth=FakeAuth(role="viewer"),
+        )
+
+        assert isinstance(result, Failure)
+        assert result.failure().category == "forbidden"
+
+    @pytest.mark.asyncio
+    async def test_cross_workspace_rejected(
+        self,
+        fake_artifact_repo: MockArtifactRepository,
+    ) -> None:
+        """An artifact in another workspace reads as not_found (existence not leaked)."""
+        artifact = Artifact.create(
+            source_uri=None,
+            source_filename="deck.pdf",
+            artifact_type=ArtifactType.SCIENTIFIC_PRESENTATION,
+            mime_type=MimeType.PDF,
+            storage_location="blobs/deck.pdf",
+            workspace_id=uuid4(),
+        )
+        fake_artifact_repo.save(artifact)
+        uc = CorrectArtifactMetadataUseCase(artifact_repository=fake_artifact_repo)
+
+        result = await uc.execute(
+            artifact_id=artifact.id,
+            request=CorrectArtifactMetadataRequest(title="X"),
+            auth=FakeAuth(role="editor", workspace_id=uuid4()),
+        )
+
+        assert isinstance(result, Failure)
+        assert result.failure().category == "not_found"

@@ -111,15 +111,18 @@ class AddCompoundMentionsUseCase:
         require_page_workspace(auth, page)
 
         page.update_compound_mentions(request.compound_mentions)
-        self.page_repository.save(page)
-
         result = PageMapper.to_page_response(page)
 
-        if self.external_event_publisher:
-            await self.external_event_publisher.notify_page_updated(
-                result,
-                sub_type="CompoundMentionsUpdated",
-            )
+        # update_compound_mentions no-ops on a human-corrected page. Skip the
+        # save + notify too, so we don't emit a CompoundMentionsUpdated for a
+        # change that didn't happen — but still return the truthful current state.
+        if "compound_mentions" not in page.human_corrections:
+            self.page_repository.save(page)
+            if self.external_event_publisher:
+                await self.external_event_publisher.notify_page_updated(
+                    result,
+                    sub_type="CompoundMentionsUpdated",
+                )
 
         return Success(result)
 

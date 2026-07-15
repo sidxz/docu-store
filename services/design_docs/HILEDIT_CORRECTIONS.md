@@ -31,6 +31,7 @@ Out of scope for v1 (deliberate):
 - **Summaries** — separate, half-built HIL path (`is_locked`/`hil_correction`); unify later.
 - **Page-level tags / extracted text** — artifact tags are the user-facing search surface; text edits would cascade re-embedding for marginal value.
 - **Un-correcting** (returning a field to machine control) — follow-up; would be a `DELETE` on the correction.
+- **Page tag → artifact tag cascade** — page-level tag edits (`PATCH /pages/{id}/tag_mentions`) still cascade into artifact tag aggregation without the hiledit gate until the artifact's tags are themselves human-corrected (which then wins). Known asymmetry; follow-up.
 
 ## 3. Approaches considered
 

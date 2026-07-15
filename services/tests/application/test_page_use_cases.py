@@ -22,7 +22,11 @@ from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.text_mention import TextMention
 from tests.fakes.fake_auth import FakeAuth
-from tests.mocks import MockArtifactRepository, MockPageRepository
+from tests.mocks import (
+    MockArtifactRepository,
+    MockExternalEventPublisher,
+    MockPageRepository,
+)
 
 
 class TestCreatePageUseCase:
@@ -70,7 +74,9 @@ class TestCreatePageUseCase:
         assert result.unwrap().owner_id == owner
 
     @pytest.mark.asyncio
-    async def test_create_page_auth_overrides_explicit_workspace_args(self, sample_artifact) -> None:
+    async def test_create_page_auth_overrides_explicit_workspace_args(
+        self, sample_artifact
+    ) -> None:
         """Cross-tenant guard: when auth is present, the explicit workspace/owner args are
         ignored — identity always comes from auth, never spoofable input."""
         page_repo = MockPageRepository()
@@ -83,7 +89,10 @@ class TestCreatePageUseCase:
         request = CreatePageRequest(name="P", artifact_id=sample_artifact.id, index=0)
 
         result = await use_case.execute(
-            request, auth=auth, workspace_id=attacker_ws, owner_id=attacker_owner,
+            request,
+            auth=auth,
+            workspace_id=attacker_ws,
+            owner_id=attacker_owner,
         )
 
         assert isinstance(result, Success)
@@ -153,6 +162,39 @@ class TestAddCompoundMentionsUseCase:
         assert isinstance(result, Failure)
         error = result.failure()
         assert error.category == "not_found"
+
+    @pytest.mark.asyncio
+    async def test_add_skipped_on_human_corrected_page(self) -> None:
+        """A machine add on a human-corrected page is a truthful no-op: no notify, no overwrite."""
+        page = Page.create(name="Page 1", artifact_id=uuid4(), index=0)
+        page.correct_compound_mentions(
+            [
+                CompoundMention(
+                    smiles="CCO",
+                    canonical_smiles="CCO",
+                    is_smiles_valid=True,
+                    extracted_id="H1",
+                ),
+            ],
+            corrected_by_id="u1",
+            corrected_by_name="Human",
+        )
+        page_repo = MockPageRepository()
+        page_repo.save(page)
+        publisher = MockExternalEventPublisher()
+
+        use_case = AddCompoundMentionsUseCase(page_repo, external_event_publisher=publisher)
+        request = AddCompoundMentionsRequest(
+            page_id=page.id,
+            compound_mentions=[CompoundMention(smiles="C1=CC=CC=C1", extracted_id="Benzene")],
+        )
+
+        result = await use_case.execute(request)
+
+        assert isinstance(result, Success)  # still returns the truthful current state
+        saved = page_repo.get_by_id(page.id)
+        assert [m.extracted_id for m in saved.compound_mentions] == ["H1"]  # human mention survives
+        assert publisher.page_updated_called is False  # no misleading CompoundMentionsUpdated
 
 
 class TestUpdateTagMentionsUseCase:

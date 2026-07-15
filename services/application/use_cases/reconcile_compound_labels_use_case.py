@@ -78,6 +78,19 @@ class ReconcileCompoundLabelsUseCase:
                     ),
                 )
 
+            # A human has taken over this page's compounds — update_compound_mentions
+            # would silently no-op, so report the pending changes honestly as not applied
+            # rather than claiming success.
+            if "compound_mentions" in page.human_corrections:
+                return Success(
+                    ReconcileResultDTO(
+                        page_id=page_id,
+                        artifact_id=page.artifact_id,
+                        changes=changes,
+                        applied=False,
+                    ),
+                )
+
             page.update_compound_mentions(new_mentions)
             self.page_repository.save(page)
             logger.info(
@@ -99,7 +112,9 @@ class ReconcileCompoundLabelsUseCase:
             # Let Temporal retry — do NOT swallow into a Failure.
             raise
         except AggregateNotFoundError as e:
-            logger.warning("reconcile_compound_labels_not_found", page_id=str(page_id), error=str(e))
+            logger.warning(
+                "reconcile_compound_labels_not_found", page_id=str(page_id), error=str(e)
+            )
             return Failure(AppError("not_found", str(e)))
         except Exception as e:
             logger.exception(

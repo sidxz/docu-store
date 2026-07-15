@@ -60,6 +60,19 @@ class _GuardError(Exception):
 # ---------------------------------------------------------------------------
 
 
+def require_authenticated(auth: AuthContext | None) -> AuthContext:
+    """Return *auth* if present; raise otherwise.
+
+    A human action (e.g. a correction) always needs a real actor to attribute it
+    to — ``require_editor(None)`` is a no-op (it only rejects an insufficient
+    *role*), so the ``None`` case needs its own explicit check. Returning the
+    narrowed ``AuthContext`` lets callers drop the ``| None`` for mypy.
+    """
+    if auth is None:
+        raise _GuardError(AppError("unauthorized", "Authentication required"))
+    return auth
+
+
 def require_editor(auth: AuthContext | None) -> None:
     """Raise if *auth* is present but lacks the editor role."""
     if auth and not auth.has_role("editor"):

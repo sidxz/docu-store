@@ -1,9 +1,26 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from types import SimpleNamespace
+from uuid import uuid4
+
 import pytest
 
 from application.use_cases.extract_document_metadata_use_case import (
     ExtractDocumentMetadataUseCase,
+)
+from domain.aggregates.artifact import Artifact
+from domain.aggregates.page import Page
+from domain.value_objects.artifact_type import ArtifactType
+from domain.value_objects.author_mention import AuthorMention
+from domain.value_objects.mime_type import MimeType
+from domain.value_objects.presentation_date import PresentationDate
+from domain.value_objects.text_mention import TextMention
+from domain.value_objects.title_mention import TitleMention
+from tests.mocks import (
+    MockArtifactRepository,
+    MockExternalEventPublisher,
+    MockPageRepository,
 )
 
 
@@ -47,3 +64,80 @@ async def test_llm_extract_swallows_errors() -> None:
     uc.llm_client = _Boom()
 
     assert await uc._llm_extract("text") is None
+
+
+# ── Fully human-corrected artifact must not be overwritten by extraction ──
+
+
+class _NullCtx:
+    def __enter__(self) -> str:
+        return "/fake/render.pdf"
+
+    def __exit__(self, *_a: object) -> bool:
+        return False
+
+
+class _StubBlob:
+    def get_file(self, _key: str) -> _NullCtx:
+        return _NullCtx()
+
+
+class _StubTitleExtractor:
+    def extract_title(self, _path: str, _index: int) -> SimpleNamespace:
+        return SimpleNamespace(title="Extracted Title", confidence=0.9)
+
+
+class _StubExtractor:
+    async def extract(self, _text: str, _schema: list[str], *, threshold: float = 0.3) -> list:  # noqa: ARG002
+        return [
+            SimpleNamespace(name="author_name", value="Bob Jones", score=0.9),
+            SimpleNamespace(name="presentation_date", value="2024-01-15", score=0.9),
+        ]
+
+
+@pytest.mark.asyncio
+async def test_fully_corrected_artifact_not_overwritten() -> None:
+    """Extraction yields title/authors/date, but all three are human-corrected → no save, no notify."""
+    page = Page.create(name="Page 1", artifact_id=uuid4(), index=0)
+    page.update_text_mention(TextMention(text="Bob Jones presented on 2024-01-15.", confidence=0.9))
+    page_repo = MockPageRepository()
+    page_repo.save(page)
+
+    artifact = Artifact.create(
+        source_uri=None,
+        source_filename="deck.pdf",
+        artifact_type=ArtifactType.SCIENTIFIC_PRESENTATION,
+        mime_type=MimeType.PDF,
+        storage_location="blobs/deck.pdf",
+    )
+    artifact.add_pages([page.id])
+    artifact.correct_metadata(
+        corrected_by_id="u1",
+        corrected_by_name="Human",
+        title_mention=TitleMention(title="Human Title"),
+        author_mentions=[AuthorMention(name="Human Author")],
+        presentation_date=PresentationDate(date=datetime(2020, 1, 1, tzinfo=UTC)),
+    )
+    repo = MockArtifactRepository()
+    repo.save(artifact)
+    repo.save_called = False  # reset after seeding
+
+    publisher = MockExternalEventPublisher()
+    uc = object.__new__(ExtractDocumentMetadataUseCase)
+    uc.artifact_repository = repo
+    uc.page_repository = page_repo
+    uc.structured_extractor = _StubExtractor()
+    uc.title_extractor = _StubTitleExtractor()
+    uc.blob_store = _StubBlob()
+    uc.llm_client = _StubLLM()  # unused: extraction completes before LLM fallback
+    uc.prompt_repository = _StubPromptRepo()
+    uc.external_event_publisher = publisher
+    uc.token_usage_store = None
+
+    result = await uc.execute(artifact.id, page.id)
+
+    assert result.unwrap()["status"] == "success"
+    assert repo.save_called is False  # human corrections untouched
+    assert publisher.artifact_updated_called is False  # no misleading DocumentMetadataUpdated
+    # Sanity: the human values survived.
+    assert repo.get_by_id(artifact.id).title_mention.title == "Human Title"

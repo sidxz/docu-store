@@ -14,6 +14,7 @@ from application.mappers.page_mappers import PageMapper
 from application.use_cases._guards import (
     handle_domain_errors,
     require_artifact_workspace,
+    require_authenticated,
     require_editor,
     require_page_workspace,
 )
@@ -94,11 +95,7 @@ class CorrectArtifactMetadataUseCase:
         request: CorrectArtifactMetadataRequest,
         auth: AuthContext | None = None,
     ) -> Result[ArtifactResponse, AppError]:
-        # Unlike most use cases, a human correction always needs a real actor to
-        # attribute it to — require_editor(None) is a no-op (it only rejects an
-        # insufficient *role*), so the None case needs its own explicit check.
-        if auth is None:
-            return Failure(AppError("unauthorized", "Authentication required"))
+        auth = require_authenticated(auth)
         require_editor(auth)
 
         provided = request.model_fields_set
@@ -182,26 +179,43 @@ class CorrectPageCompoundMentionsUseCase:
         request: CorrectPageCompoundMentionsRequest,
         auth: AuthContext | None = None,
     ) -> Result[PageResponse, AppError]:
-        # Same rationale as CorrectArtifactMetadataUseCase: a human correction
-        # always needs a real actor to attribute it to — require_editor(None) is a
-        # no-op (it only rejects an insufficient *role*), so the None case needs
-        # its own explicit check.
-        if auth is None:
-            return Failure(AppError("unauthorized", "Authentication required"))
+        auth = require_authenticated(auth)
         require_editor(auth)
 
         page = self.page_repository.get_by_id(page_id)
         require_page_workspace(auth, page)
 
+        # Round-trip an unchanged mention verbatim so its machine provenance
+        # (confidence/model_name/pipeline_run_id/other_ids/date_extracted) survives
+        # a correction that only touches a *sibling* mention. Identity keyed on the
+        # human-editable fields the client can send.
+        by_key = {
+            (m.smiles, m.extracted_id, m.internal_id, m.cdd_id, m.chembl_id, m.pdb_id): m
+            for m in page.compound_mentions
+        }
         now = datetime.now(UTC)
         mentions: list[CompoundMention] = []
         for item in request.compound_mentions:
-            if not self.smiles_validator.validate(item.smiles):
+            existing = by_key.get(
+                (
+                    item.smiles,
+                    item.extracted_id,
+                    item.internal_id,
+                    item.cdd_id,
+                    item.chembl_id,
+                    item.pdb_id,
+                ),
+            )
+            if existing is not None:
+                mentions.append(existing)
+                continue
+            canonical = self.smiles_validator.canonicalize(item.smiles)
+            if canonical is None:
                 return Failure(AppError("validation", f"Invalid SMILES: {item.smiles!r}"))
             mentions.append(
                 CompoundMention(
                     smiles=item.smiles,
-                    canonical_smiles=self.smiles_validator.canonicalize(item.smiles),
+                    canonical_smiles=canonical,
                     is_smiles_valid=True,
                     extracted_id=item.extracted_id,
                     internal_id=item.internal_id,

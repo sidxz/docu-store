@@ -221,3 +221,108 @@ class TestCorrectPageCompoundMentionsUseCase:
 
         assert isinstance(result, Success)
         assert publisher.page_updated_called
+
+    @pytest.mark.asyncio
+    async def test_untouched_mention_keeps_provenance_edited_gets_fresh(
+        self,
+        fake_page_repo: MockPageRepository,
+        smiles_validator: FakeSmilesValidator,
+        auth_editor: FakeAuth,
+    ) -> None:
+        """A full-replace that edits only one mention round-trips the others verbatim.
+
+        The unchanged mention keeps its identity + machine provenance
+        (confidence/model_name); the relabeled one is rebuilt fresh (provenance dropped).
+        """
+        page = Page.create(name="Page 1", artifact_id=uuid4(), index=0)
+        m_keep = CompoundMention(
+            smiles="c1ccccc1",
+            canonical_smiles="c1ccccc1",
+            is_smiles_valid=True,
+            extracted_id="A1",
+            confidence=0.91,
+            model_name="cser",
+        )
+        m_edit = CompoundMention(
+            smiles="CCO",
+            canonical_smiles="CCO",
+            is_smiles_valid=True,
+            extracted_id="B2",
+            confidence=0.82,
+            model_name="cser",
+        )
+        page.update_compound_mentions([m_keep, m_edit])
+        fake_page_repo.save(page)
+
+        uc = CorrectPageCompoundMentionsUseCase(
+            page_repository=fake_page_repo,
+            smiles_validator=smiles_validator,
+        )
+        result = await uc.execute(
+            page_id=page.id,
+            request=CorrectPageCompoundMentionsRequest(
+                compound_mentions=[
+                    CorrectedCompoundInput(smiles="c1ccccc1", extracted_id="A1"),  # unchanged
+                    CorrectedCompoundInput(smiles="CCO", extracted_id="B2-fixed"),  # relabeled
+                ],
+            ),
+            auth=auth_editor,
+        )
+
+        assert isinstance(result, Success)
+        saved = fake_page_repo.get_by_id(page.id)
+        # Untouched mention: same object, machine provenance intact.
+        assert saved.compound_mentions[0] is m_keep
+        assert saved.compound_mentions[0].confidence == 0.91
+        assert saved.compound_mentions[0].model_name == "cser"
+        # Edited mention: rebuilt fresh, machine provenance dropped, SMILES recanonicalized.
+        assert saved.compound_mentions[1].extracted_id == "B2-fixed"
+        assert saved.compound_mentions[1].confidence is None
+        assert saved.compound_mentions[1].model_name is None
+        assert saved.compound_mentions[1].canonical_smiles == "CCO"
+
+    @pytest.mark.asyncio
+    async def test_viewer_role_rejected(
+        self,
+        fake_page_repo: MockPageRepository,
+        make_saved_page,
+        smiles_validator: FakeSmilesValidator,
+    ) -> None:
+        """A viewer (insufficient role) is rejected with forbidden."""
+        page = make_saved_page()
+        uc = CorrectPageCompoundMentionsUseCase(
+            page_repository=fake_page_repo,
+            smiles_validator=smiles_validator,
+        )
+
+        result = await uc.execute(
+            page_id=page.id,
+            request=CorrectPageCompoundMentionsRequest(compound_mentions=[]),
+            auth=FakeAuth(role="viewer"),
+        )
+
+        assert isinstance(result, Failure)
+        assert result.failure().category == "forbidden"
+
+    @pytest.mark.asyncio
+    async def test_cross_workspace_rejected(
+        self,
+        fake_page_repo: MockPageRepository,
+        smiles_validator: FakeSmilesValidator,
+    ) -> None:
+        """A page in another workspace reads as not_found (existence not leaked)."""
+        page = Page.create(name="Page 1", artifact_id=uuid4(), index=0, workspace_id=uuid4())
+        fake_page_repo.save(page)
+        uc = CorrectPageCompoundMentionsUseCase(
+            page_repository=fake_page_repo,
+            smiles_validator=smiles_validator,
+        )
+
+        result = await uc.execute(
+            page_id=page.id,
+            request=CorrectPageCompoundMentionsRequest(compound_mentions=[]),
+            auth=FakeAuth(role="editor", workspace_id=uuid4()),
+        )
+
+        assert isinstance(result, Failure)
+        assert result.failure().category == "not_found"

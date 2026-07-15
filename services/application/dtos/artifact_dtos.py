@@ -64,5 +64,5 @@ class ArtifactResponse(BaseModel):
     )
     human_corrections: dict[str, HumanCorrectionInfo] = Field(
         default_factory=dict,
-        description="Per-field human correction provenance (hiledit)",
+        description="Per-field human correction provenance",
     )
