@@ -68,7 +68,7 @@ export function OverviewTab({
                 <span className="text-xs font-medium text-text-muted">
                   Date
                 </span>
-                <p className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-text-primary">
+                <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-text-primary">
                   <EditableDate artifact={artifact} canEdit={canEdit} />
                   {artifact.human_corrections?.presentation_date && (
                     <HumanCorrectedBadge info={artifact.human_corrections.presentation_date} />
