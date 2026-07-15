@@ -2040,7 +2040,7 @@ export interface components {
             summary_candidate?: components["schemas"]["SummaryCandidate"] | null;
             /**
              * Human Corrections
-             * @description Per-field human correction provenance (hiledit)
+             * @description Per-field human correction provenance
              */
             human_corrections?: {
                 [key: string]: components["schemas"]["HumanCorrectionInfo"];
@@ -3210,7 +3210,7 @@ export interface components {
             owner_id?: string | null;
             /**
              * Human Corrections
-             * @description Per-field human correction provenance (hiledit)
+             * @description Per-field human correction provenance
              */
             human_corrections?: {
                 [key: string]: components["schemas"]["HumanCorrectionInfo"];
