@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 interface PageHeaderProps {
   icon?: LucideIcon;
-  title: string;
+  title: ReactNode;
   subtitle?: string;
   badge?: ReactNode;
   actions?: ReactNode;

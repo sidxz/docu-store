@@ -1,9 +1,9 @@
 "use client";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { toast } from "sonner";
-import { FileText, ArrowLeft, Lock, Users, Loader2, AlertCircle, CheckCircle2, Trash2, Pencil } from "lucide-react";
+import { FileText, ArrowLeft, Lock, Users, Loader2, AlertCircle, CheckCircle2, Trash2 } from "lucide-react";
 import { useAuthzHasRole } from "@sentinel-auth/react";
 
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -14,7 +14,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { OverviewTab } from "@/components/documents/OverviewTab";
 import { PagesTab } from "@/components/documents/PagesTab";
-import { EditMetadataDialog } from "@/components/documents/EditMetadataDialog";
+import { EditableTitle } from "@/components/documents/EditableMetadata";
 import { HumanCorrectedBadge } from "@/components/documents/HumanCorrectedBadge";
 import { PdfEmbed } from "@/components/PdfEmbed";
 import { WorkflowList, parseWorkflows } from "@/components/WorkflowList";
@@ -67,7 +67,6 @@ export default function ArtifactDetailPage() {
   const confirm = useConfirm();
   const rerunMutation = useRerunArtifactWorkflow(id);
   const canEdit = useAuthzHasRole("editor");
-  const [editOpen, setEditOpen] = useState(false);
 
   // Record document open for activity tracking (fire-and-forget)
   useEffect(() => {
@@ -143,7 +142,7 @@ export default function ArtifactDetailPage() {
 
       <PageHeader
         icon={FileText}
-        title={title}
+        title={<EditableTitle artifact={artifact} canEdit={canEdit} />}
         subtitle={`${artifact.artifact_type.replace(/_/g, " ")} · ${pages.length} pages`}
         badge={
           <>
@@ -165,12 +164,6 @@ export default function ArtifactDetailPage() {
         }
         actions={
           <div className="flex items-center gap-2">
-            {canEdit && (
-              <Button variant="outline" onClick={() => setEditOpen(true)}>
-                <Pencil className="size-4" />
-                Edit
-              </Button>
-            )}
             <ShareDialog
               artifactId={id}
               isOwnerOrAdmin={isOwnerOrAdmin}
@@ -201,10 +194,6 @@ export default function ArtifactDetailPage() {
           </div>
         }
       />
-
-      {canEdit && (
-        <EditMetadataDialog artifact={artifact} open={editOpen} onOpenChange={setEditOpen} />
-      )}
 
       {/* Workflow status banner */}
       {workflows && (() => {
@@ -261,6 +250,7 @@ export default function ArtifactDetailPage() {
             artifact={artifact}
             workspace={workspace}
             artifactId={id}
+            canEdit={canEdit}
           />
         </TabsContent>
 

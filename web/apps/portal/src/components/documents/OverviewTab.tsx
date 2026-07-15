@@ -4,17 +4,24 @@ import type { ArtifactResponse } from "@docu-store/types";
 import { Card } from "@/components/ui/Card";
 import { EntityTagPanel } from "@/components/EntityTagPanel";
 import { HumanCorrectedBadge } from "@/components/documents/HumanCorrectedBadge";
+import {
+  EditableAuthors,
+  EditableDate,
+  EditableTags,
+} from "@/components/documents/EditableMetadata";
 
 interface OverviewTabProps {
   artifact: ArtifactResponse;
   workspace: string;
   artifactId: string;
+  canEdit?: boolean;
 }
 
 export function OverviewTab({
   artifact,
   workspace,
   artifactId,
+  canEdit = false,
 }: OverviewTabProps) {
   return (
     <div className="space-y-6 pt-4">
@@ -35,76 +42,46 @@ export function OverviewTab({
         </Card>
       )}
 
-      {/* Authors & Date — shown when present OR human-corrected (incl. cleared) */}
-      {(artifact.author_mentions?.length > 0 ||
+      {/* Authors & Date — shown when present, human-corrected (incl. cleared), or editable */}
+      {(canEdit ||
+        artifact.author_mentions?.length > 0 ||
         artifact.presentation_date ||
         artifact.human_corrections?.author_mentions ||
         artifact.human_corrections?.presentation_date) && (
         <Card>
           <div className="space-y-3">
-            {(artifact.author_mentions?.length > 0 ||
-              artifact.human_corrections?.author_mentions) && (
-              <div className="flex items-start gap-3">
-                <Users className="mt-0.5 h-4 w-4 shrink-0 text-text-muted" />
-                <div>
-                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-text-muted">
-                    Authors
-                    {artifact.human_corrections?.author_mentions && (
-                      <HumanCorrectedBadge info={artifact.human_corrections.author_mentions} />
-                    )}
-                  </span>
-                  <div className="mt-1 flex flex-wrap gap-2">
-                    {artifact.author_mentions?.length > 0 ? (
-                      artifact.author_mentions.map((am, i) => (
-                        <span
-                          key={`${am.name}-${i}`}
-                          className="rounded-md border border-border-default bg-surface-elevated px-2 py-1 text-sm font-medium text-text-primary"
-                        >
-                          {am.name}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-sm text-text-muted">—</span>
-                    )}
-                  </div>
-                </div>
+            <div className="flex items-start gap-3">
+              <Users className="mt-0.5 h-4 w-4 shrink-0 text-text-muted" />
+              <div>
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-text-muted">
+                  Authors
+                  {artifact.human_corrections?.author_mentions && (
+                    <HumanCorrectedBadge info={artifact.human_corrections.author_mentions} />
+                  )}
+                </span>
+                <EditableAuthors artifact={artifact} canEdit={canEdit} />
               </div>
-            )}
-            {(artifact.presentation_date ||
-              artifact.human_corrections?.presentation_date) && (
-              <div className="flex items-center gap-3">
-                <Calendar className="h-4 w-4 shrink-0 text-text-muted" />
-                <div>
-                  <span className="text-xs font-medium text-text-muted">
-                    Date
-                  </span>
-                  <p className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-text-primary">
-                    {artifact.presentation_date ? (
-                      // Stored as a UTC-midnight datetime; render in UTC so it shows
-                      // the picked calendar day regardless of the viewer's timezone.
-                      new Date(
-                        artifact.presentation_date.date,
-                      ).toLocaleDateString(undefined, {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                        timeZone: "UTC",
-                      })
-                    ) : (
-                      <span className="text-text-muted">—</span>
-                    )}
-                    {artifact.human_corrections?.presentation_date && (
-                      <HumanCorrectedBadge info={artifact.human_corrections.presentation_date} />
-                    )}
-                  </p>
-                </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Calendar className="h-4 w-4 shrink-0 text-text-muted" />
+              <div>
+                <span className="text-xs font-medium text-text-muted">
+                  Date
+                </span>
+                <p className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-text-primary">
+                  <EditableDate artifact={artifact} canEdit={canEdit} />
+                  {artifact.human_corrections?.presentation_date && (
+                    <HumanCorrectedBadge info={artifact.human_corrections.presentation_date} />
+                  )}
+                </p>
               </div>
-            )}
+            </div>
           </div>
         </Card>
       )}
 
-      {(artifact.tag_mentions?.length > 0 ||
+      {(canEdit ||
+        artifact.tag_mentions?.length > 0 ||
         artifact.human_corrections?.tag_mentions) && (
         <EntityTagPanel
           badge={
@@ -112,6 +89,7 @@ export function OverviewTab({
               <HumanCorrectedBadge info={artifact.human_corrections.tag_mentions} />
             )
           }
+          editor={canEdit ? <EditableTags artifact={artifact} /> : undefined}
           tagMentions={artifact.tag_mentions ?? []}
           workspace={workspace}
           artifactId={artifactId}

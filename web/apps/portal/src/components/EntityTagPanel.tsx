@@ -26,6 +26,8 @@ interface EntityTagPanelProps {
   compoundMentions?: { extracted_id?: string | null; smiles: string; canonical_smiles?: string | null }[];
   /** hiledit: shown next to the "Entities" heading, e.g. a HumanCorrectedBadge. */
   badge?: ReactNode;
+  /** hiledit: inline tag editor (trigger + expanded strip), rendered in/under the heading row. */
+  editor?: ReactNode;
 }
 
 function groupTags(tagMentions: TagMentionItem[]) {
@@ -196,6 +198,7 @@ export function EntityTagPanel({
   artifactId,
   compoundMentions = [],
   badge,
+  editor,
 }: EntityTagPanelProps) {
   const { compounds, grouped } = groupTags(tagMentions);
   const [expanded, setExpanded] = useState(false);
@@ -216,10 +219,15 @@ export function EntityTagPanel({
 
   return (
     <Card>
-      <h3 className="mb-4 flex items-center gap-1.5 text-sm font-medium text-text-secondary">
-        Entities
-        {badge}
-      </h3>
+      <div className="mb-4">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="flex items-center gap-1.5 text-sm font-medium text-text-secondary">
+            Entities
+            {badge}
+          </h3>
+        </div>
+        {editor}
+      </div>
       <div className="space-y-5">
         {tagMentions.length === 0 && (
           <p className="text-sm text-text-muted">—</p>
