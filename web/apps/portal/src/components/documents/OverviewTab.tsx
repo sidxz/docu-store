@@ -35,12 +35,15 @@ export function OverviewTab({
         </Card>
       )}
 
-      {/* Authors & Date */}
+      {/* Authors & Date — shown when present OR human-corrected (incl. cleared) */}
       {(artifact.author_mentions?.length > 0 ||
-        artifact.presentation_date) && (
+        artifact.presentation_date ||
+        artifact.human_corrections?.author_mentions ||
+        artifact.human_corrections?.presentation_date) && (
         <Card>
           <div className="space-y-3">
-            {artifact.author_mentions?.length > 0 && (
+            {(artifact.author_mentions?.length > 0 ||
+              artifact.human_corrections?.author_mentions) && (
               <div className="flex items-start gap-3">
                 <Users className="mt-0.5 h-4 w-4 shrink-0 text-text-muted" />
                 <div>
@@ -51,19 +54,24 @@ export function OverviewTab({
                     )}
                   </span>
                   <div className="mt-1 flex flex-wrap gap-2">
-                    {artifact.author_mentions.map((am, i) => (
-                      <span
-                        key={`${am.name}-${i}`}
-                        className="rounded-md border border-border-default bg-surface-elevated px-2 py-1 text-sm font-medium text-text-primary"
-                      >
-                        {am.name}
-                      </span>
-                    ))}
+                    {artifact.author_mentions?.length > 0 ? (
+                      artifact.author_mentions.map((am, i) => (
+                        <span
+                          key={`${am.name}-${i}`}
+                          className="rounded-md border border-border-default bg-surface-elevated px-2 py-1 text-sm font-medium text-text-primary"
+                        >
+                          {am.name}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-sm text-text-muted">—</span>
+                    )}
                   </div>
                 </div>
               </div>
             )}
-            {artifact.presentation_date && (
+            {(artifact.presentation_date ||
+              artifact.human_corrections?.presentation_date) && (
               <div className="flex items-center gap-3">
                 <Calendar className="h-4 w-4 shrink-0 text-text-muted" />
                 <div>
@@ -71,13 +79,20 @@ export function OverviewTab({
                     Date
                   </span>
                   <p className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-text-primary">
-                    {new Date(
-                      artifact.presentation_date.date,
-                    ).toLocaleDateString(undefined, {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
+                    {artifact.presentation_date ? (
+                      // Stored as a UTC-midnight datetime; render in UTC so it shows
+                      // the picked calendar day regardless of the viewer's timezone.
+                      new Date(
+                        artifact.presentation_date.date,
+                      ).toLocaleDateString(undefined, {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                        timeZone: "UTC",
+                      })
+                    ) : (
+                      <span className="text-text-muted">—</span>
+                    )}
                     {artifact.human_corrections?.presentation_date && (
                       <HumanCorrectedBadge info={artifact.human_corrections.presentation_date} />
                     )}
@@ -89,14 +104,15 @@ export function OverviewTab({
         </Card>
       )}
 
-      {artifact.tag_mentions && artifact.tag_mentions.length > 0 && (
+      {(artifact.tag_mentions?.length > 0 ||
+        artifact.human_corrections?.tag_mentions) && (
         <EntityTagPanel
           badge={
             artifact.human_corrections?.tag_mentions && (
               <HumanCorrectedBadge info={artifact.human_corrections.tag_mentions} />
             )
           }
-          tagMentions={artifact.tag_mentions}
+          tagMentions={artifact.tag_mentions ?? []}
           workspace={workspace}
           artifactId={artifactId}
         />

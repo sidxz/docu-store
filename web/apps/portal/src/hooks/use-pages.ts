@@ -108,8 +108,17 @@ export function useCorrectPageCompounds(pageId: string) {
       if (error) throwApiError("Failed to save corrections", error, response.status);
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.pages.detail(pageId) });
+    // Return the invalidations so mutateAsync awaits the refetch before the caller
+    // closes the dialog / toasts. Also refresh the artifact detail — its embedded
+    // pages feed the document Pages tab's per-page compound counts.
+    onSuccess: (data) => {
+      const artifactId = data?.artifact_id;
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.pages.detail(pageId) }),
+        ...(artifactId
+          ? [queryClient.invalidateQueries({ queryKey: queryKeys.artifacts.detail(artifactId) })]
+          : []),
+      ]);
     },
   });
 }

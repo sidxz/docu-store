@@ -134,10 +134,10 @@ export function useCorrectArtifactMetadata(artifactId: string) {
       if (error) throwApiError("Failed to save corrections", error, response.status);
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.artifacts.detail(artifactId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.artifacts.all });
-    },
+    // Return the invalidation so mutateAsync awaits the refetch before the dialog
+    // closes. artifacts.all is a prefix of artifacts.detail(id), so it covers both.
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.artifacts.all }),
   });
 }
 

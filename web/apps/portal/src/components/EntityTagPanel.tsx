@@ -221,6 +221,9 @@ export function EntityTagPanel({
         {badge}
       </h3>
       <div className="space-y-5">
+        {tagMentions.length === 0 && (
+          <p className="text-sm text-text-muted">—</p>
+        )}
         {[...grouped.entries()].map(([entityType, tags]) => (
           <EntityTypeSection
             key={entityType}

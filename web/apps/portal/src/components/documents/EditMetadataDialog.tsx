@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Plus, X } from "lucide-react";
 
@@ -24,7 +24,8 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { authFetchJson } from "@/lib/auth-fetch";
+import { getErrorMessage } from "@/lib/api-error";
+import { useTagSuggestions } from "@/hooks/use-tag-suggestions";
 import {
   useCorrectArtifactMetadata,
   type CorrectArtifactMetadataBody,
@@ -41,11 +42,6 @@ interface TagChip {
   entity_type: string | null;
 }
 
-interface TagSuggestion {
-  tag: string;
-  entity_type: string;
-}
-
 /** `PresentationDate.date` comes back as an ISO datetime; <input type="date"> wants just the date part. */
 function toDateInputValue(iso: string | null | undefined): string {
   return iso ? iso.slice(0, 10) : "";
@@ -56,54 +52,36 @@ function toDateInputValue(iso: string | null | undefined): string {
 function TagChipsField({
   tags,
   onChange,
+  inputId,
 }: {
   tags: TagChip[];
   onChange: (tags: TagChip[]) => void;
+  inputId?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<TagSuggestion[]>([]);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const addTag = (raw: string) => {
-    const tag = raw.trim();
-    if (!tag || tags.some((t) => t.tag.toLowerCase() === tag.toLowerCase())) return;
-    // New chips start unclassified (precision over guessing) — re-extraction can tag them later.
-    onChange([...tags, { tag, entity_type: null }]);
-  };
+  const suggestions = useTagSuggestions(query);
 
   // The same tag text can legitimately appear twice with different entity_type
   // (e.g. "Rho" as both a target and a gene_name — the backend merges on the
   // (entity_type, tag) pair), so identity here must include entity_type too.
+  const addTag = (raw: string, entityType: string | null = null) => {
+    const tag = raw.trim();
+    if (
+      !tag ||
+      tags.some(
+        (t) => t.entity_type === entityType && t.tag.toLowerCase() === tag.toLowerCase(),
+      )
+    )
+      return;
+    // Typed additions carry the suggestion's entity_type; hand-typed chips stay
+    // unclassified (precision over guessing) — re-extraction can tag them later.
+    onChange([...tags, { tag, entity_type: entityType }]);
+  };
+
   const removeTag = (chip: TagChip) => {
     onChange(tags.filter((t) => t.tag !== chip.tag || t.entity_type !== chip.entity_type));
   };
-
-  // Debounced server-side tag suggestions — same endpoint/contract as TagFilter.
-  useEffect(() => {
-    const q = query.trim();
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    if (q.length < 1) {
-      setSuggestions([]);
-      return;
-    }
-
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const results = await authFetchJson<TagSuggestion[]>(
-          `/browse/tags/suggest?q=${encodeURIComponent(q)}&limit=10`,
-        );
-        setSuggestions(results);
-      } catch {
-        setSuggestions([]);
-      }
-    }, 200);
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [query]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && query && suggestions.length === 0) {
@@ -127,6 +105,11 @@ function TagChipsField({
           className="bg-accent-subtle text-accent-text"
         >
           {t.tag}
+          {t.entity_type && (
+            <span className="text-[10px] font-normal text-muted-foreground">
+              {t.entity_type}
+            </span>
+          )}
           <button
             type="button"
             onClick={() => removeTag(t)}
@@ -148,6 +131,7 @@ function TagChipsField({
         <PopoverContent className="w-64 p-0" align="start">
           <Command shouldFilter={false}>
             <CommandInput
+              id={inputId}
               placeholder="Type to search tags…"
               value={query}
               onValueChange={setQuery}
@@ -159,14 +143,17 @@ function TagChipsField({
               </CommandEmpty>
               {suggestions.map((s) => (
                 <CommandItem
-                  key={s.tag}
-                  value={s.tag}
+                  key={`${s.entity_type}:${s.tag}`}
+                  value={`${s.entity_type}:${s.tag}`}
                   onSelect={() => {
-                    addTag(s.tag);
+                    addTag(s.tag, s.entity_type);
                     setQuery("");
                   }}
                 >
-                  {s.tag}
+                  <span className="flex-1 truncate">{s.tag}</span>
+                  <span className="rounded bg-surface-sunken px-1.5 py-0.5 text-[10px] font-medium text-text-muted">
+                    {s.entity_type}
+                  </span>
                 </CommandItem>
               ))}
             </CommandList>
@@ -182,9 +169,11 @@ function TagChipsField({
 function AuthorChipsField({
   authors,
   onChange,
+  inputId,
 }: {
   authors: string[];
   onChange: (authors: string[]) => void;
+  inputId?: string;
 }) {
   const [query, setQuery] = useState("");
 
@@ -220,6 +209,7 @@ function AuthorChipsField({
         </Badge>
       ))}
       <input
+        id={inputId}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={handleKeyDown}
@@ -281,7 +271,7 @@ export function EditMetadataDialog({ artifact, open, onOpenChange }: EditMetadat
       onOpenChange(false);
     } catch (err) {
       toast.error("Failed to save corrections", {
-        description: err instanceof Error ? err.message : undefined,
+        description: getErrorMessage(err),
       });
     }
   };
@@ -329,13 +319,17 @@ export function EditMetadataDialog({ artifact, open, onOpenChange }: EditMetadat
           </div>
 
           <div className="space-y-1.5">
-            <Label>Tags</Label>
-            <TagChipsField tags={tags} onChange={setTags} />
+            <Label htmlFor="edit-metadata-tags">Tags</Label>
+            <TagChipsField tags={tags} onChange={setTags} inputId="edit-metadata-tags" />
           </div>
 
           <div className="space-y-1.5">
-            <Label>Authors</Label>
-            <AuthorChipsField authors={authors} onChange={setAuthors} />
+            <Label htmlFor="edit-metadata-authors">Authors</Label>
+            <AuthorChipsField
+              authors={authors}
+              onChange={setAuthors}
+              inputId="edit-metadata-authors"
+            />
           </div>
         </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { getErrorMessage } from "@/lib/api-error";
 import type { CorrectedCompoundInput } from "@/hooks/use-pages";
 
 interface EditCompoundDialogProps {
@@ -46,10 +47,12 @@ export function EditCompoundDialog({
     if (!open) return;
     setLabel(initialLabel);
     setSmiles(initialSmiles);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, compound]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- snapshot the compound at open-time only; a prop change while open must not stomp in-flight edits
+  }, [open]);
 
   const trimmedSmiles = smiles.trim();
+  // Defer the structure render so fast typing in the SMILES input stays responsive.
+  const deferredSmiles = useDeferredValue(trimmedSmiles);
 
   const handleSubmit = async () => {
     if (!trimmedSmiles || saving) return;
@@ -68,7 +71,7 @@ export function EditCompoundDialog({
     } catch (err) {
       // Keep the dialog open so the user can fix the SMILES and retry.
       toast.error("Failed to save compound", {
-        description: err instanceof Error ? err.message : undefined,
+        description: getErrorMessage(err),
       });
     } finally {
       setSaving(false);
@@ -105,7 +108,7 @@ export function EditCompoundDialog({
           </div>
 
           <div className="flex justify-center rounded-lg border border-border-subtle bg-surface-sunken py-3">
-            <MoleculeStructure smiles={trimmedSmiles} width={220} height={150} />
+            <MoleculeStructure smiles={deferredSmiles} width={220} height={150} />
           </div>
         </div>
 

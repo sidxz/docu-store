@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { ScoreBadge } from "@/components/ui/ScoreBadge";
 import { CopySmiles } from "@/components/ui/CopySmiles";
 import { PubChemBadge } from "@/plugins/pubchem";
+import { getErrorMessage } from "@/lib/api-error";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { useCorrectPageCompounds, type CorrectedCompoundInput } from "@/hooks/use-pages";
 import { HumanCorrectedBadge } from "@/components/documents/HumanCorrectedBadge";
@@ -81,7 +82,7 @@ export function CompoundGrid({
       toast.success("Compound removed");
     } catch (err) {
       toast.error("Failed to remove compound", {
-        description: err instanceof Error ? err.message : undefined,
+        description: getErrorMessage(err),
       });
     }
   };

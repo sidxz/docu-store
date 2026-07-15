@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { Filter, Plus, Tag, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -18,12 +18,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { authFetchJson } from "@/lib/auth-fetch";
-
-interface TagSuggestion {
-  tag: string;
-  entity_type: string;
-}
+import { useTagSuggestions } from "@/hooks/use-tag-suggestions";
 
 interface TagFilterProps {
   tags: string[];
@@ -54,8 +49,7 @@ export function TagFilter({
 }: TagFilterProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<TagSuggestion[]>([]);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suggestions = useTagSuggestions(query);
 
   const addTag = useCallback(
     (raw: string) => {
@@ -73,32 +67,6 @@ export function TagFilter({
     },
     [tags, onTagsChange],
   );
-
-  // Debounced server-side tag suggestions — same endpoint/contract as before.
-  useEffect(() => {
-    const q = query.trim();
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    if (q.length < 1) {
-      setSuggestions([]);
-      return;
-    }
-
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const results = await authFetchJson<TagSuggestion[]>(
-          `/browse/tags/suggest?q=${encodeURIComponent(q)}&limit=10`,
-        );
-        setSuggestions(results);
-      } catch {
-        setSuggestions([]);
-      }
-    }, 200);
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [query]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && query && suggestions.length === 0) {
