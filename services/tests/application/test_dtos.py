@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import uuid4
 
 import pytest
@@ -62,6 +63,44 @@ class TestArtifactResponse:
         assert response.tag_mentions == []
         assert response.title_mention is None
         assert response.summary_candidate is None
+        assert response.human_corrections == {}
+
+    def test_artifact_response_human_corrections_default_empty_from_mongo_doc(self) -> None:
+        """A Mongo doc without human_corrections yields {} (mirrors MongoReadRepository)."""
+        doc = {
+            "artifact_id": uuid4(),
+            "source_filename": "paper.pdf",
+            "artifact_type": ArtifactType.RESEARCH_ARTICLE,
+            "mime_type": MimeType.PDF,
+            "storage_location": "/storage/paper.pdf",
+            "pages": [],
+        }
+        # Same construction MongoReadRepository.get_artifact_by_id uses: ArtifactResponse(**doc)
+        response = ArtifactResponse(**doc)
+        assert response.human_corrections == {}
+
+    def test_artifact_response_human_corrections_populated_from_mongo_doc(self) -> None:
+        """A Mongo doc with human_corrections populates HumanCorrectionInfo entries."""
+        doc = {
+            "artifact_id": uuid4(),
+            "source_filename": "paper.pdf",
+            "artifact_type": ArtifactType.RESEARCH_ARTICLE,
+            "mime_type": MimeType.PDF,
+            "storage_location": "/storage/paper.pdf",
+            "pages": [],
+            "human_corrections": {
+                "title_mention": {
+                    "corrected_by_id": "user-1",
+                    "corrected_by_name": "Jane Reviewer",
+                    "corrected_at": "2026-07-14T12:00:00+00:00",
+                },
+            },
+        }
+        response = ArtifactResponse(**doc)
+        info = response.human_corrections["title_mention"]
+        assert info.corrected_by_id == "user-1"
+        assert info.corrected_by_name == "Jane Reviewer"
+        assert info.corrected_at == datetime.fromisoformat("2026-07-14T12:00:00+00:00")
 
 
 class TestCreatePageRequest:
@@ -119,3 +158,39 @@ class TestPageResponse:
         assert response.tag_mentions == []
         assert response.text_mention is None
         assert response.summary_candidate is None
+        assert response.human_corrections == {}
+
+    def test_page_response_human_corrections_default_empty_from_mongo_doc(self) -> None:
+        """A Mongo doc without human_corrections yields {} (mirrors MongoReadRepository)."""
+        doc = {
+            "page_id": uuid4(),
+            "artifact_id": uuid4(),
+            "name": "Introduction",
+            "index": 0,
+            "compound_mentions": [],
+        }
+        # Same construction MongoReadRepository.get_page_by_id uses: PageResponse(**doc)
+        response = PageResponse(**doc)
+        assert response.human_corrections == {}
+
+    def test_page_response_human_corrections_populated_from_mongo_doc(self) -> None:
+        """A Mongo doc with human_corrections populates HumanCorrectionInfo entries."""
+        doc = {
+            "page_id": uuid4(),
+            "artifact_id": uuid4(),
+            "name": "Introduction",
+            "index": 0,
+            "compound_mentions": [],
+            "human_corrections": {
+                "compound_mentions": {
+                    "corrected_by_id": "user-1",
+                    "corrected_by_name": None,
+                    "corrected_at": "2026-07-14T12:00:00+00:00",
+                },
+            },
+        }
+        response = PageResponse(**doc)
+        info = response.human_corrections["compound_mentions"]
+        assert info.corrected_by_id == "user-1"
+        assert info.corrected_by_name is None
+        assert info.corrected_at == datetime.fromisoformat("2026-07-14T12:00:00+00:00")

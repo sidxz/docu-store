@@ -33,6 +33,7 @@ class EventProjector:
             Page.TagMentionsUpdated: page_projector.tag_mentions_updated,
             Page.TextMentionUpdated: page_projector.text_mention_updated,
             Page.SummaryCandidateUpdated: page_projector.summary_candidate_updated,
+            Page.HumanCorrectionRecorded: page_projector.human_correction_recorded,
             Page.Deleted: page_projector.page_deleted,
             # Artifact events
             Artifact.Created: artifact_projector.artifact_created,
@@ -43,6 +44,7 @@ class EventProjector:
             Artifact.AuthorMentionsUpdated: artifact_projector.author_mentions_updated,
             Artifact.PresentationDateUpdated: artifact_projector.presentation_date_updated,
             Artifact.SummaryCandidateUpdated: artifact_projector.summary_candidate_updated,
+            Artifact.HumanCorrectionRecorded: artifact_projector.human_correction_recorded,
             Artifact.Deleted: artifact_projector.artifact_deleted,
         }
 

@@ -2,6 +2,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from application.dtos.correction_dtos import HumanCorrectionInfo
 from application.dtos.page_dtos import PageResponse
 from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.author_mention import AuthorMention
@@ -60,4 +61,8 @@ class ArtifactResponse(BaseModel):
     summary_candidate: SummaryCandidate | None = Field(
         None,
         description="Summary candidate extracted from the artifact",
+    )
+    human_corrections: dict[str, HumanCorrectionInfo] = Field(
+        default_factory=dict,
+        description="Per-field human correction provenance (hiledit)",
     )

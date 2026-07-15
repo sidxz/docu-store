@@ -1,3 +1,4 @@
+from application.dtos.correction_dtos import HumanCorrectionInfo
 from application.dtos.page_dtos import PageResponse
 from domain.aggregates.page import Page
 
@@ -27,4 +28,7 @@ class PageMapper:
             summary_candidate=page.summary_candidate,
             workspace_id=page.workspace_id,
             owner_id=page.owner_id,
+            human_corrections={
+                k: HumanCorrectionInfo(**v) for k, v in page.human_corrections.items()
+            },
         )

@@ -1,4 +1,5 @@
 from application.dtos.artifact_dtos import ArtifactResponse
+from application.dtos.correction_dtos import HumanCorrectionInfo
 from domain.aggregates.artifact import Artifact
 
 
@@ -29,4 +30,7 @@ class ArtifactMapper:
             summary_candidate=artifact.summary_candidate,
             workspace_id=artifact.workspace_id,
             owner_id=artifact.owner_id,
+            human_corrections={
+                k: HumanCorrectionInfo(**v) for k, v in artifact.human_corrections.items()
+            },
         )

@@ -1,7 +1,8 @@
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from application.dtos.correction_dtos import HumanCorrectionInfo
 from domain.value_objects.compound_mention import CompoundMention
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention
@@ -35,3 +36,7 @@ class PageResponse(BaseModel):
     summary_candidate: SummaryCandidate | None = None
     workspace_id: UUID | None = None
     owner_id: UUID | None = None
+    human_corrections: dict[str, HumanCorrectionInfo] = Field(
+        default_factory=dict,
+        description="Per-field human correction provenance (hiledit)",
+    )

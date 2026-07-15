@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -10,6 +11,7 @@ from domain.aggregates.page import Page
 from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.compound_mention import CompoundMention
 from domain.value_objects.mime_type import MimeType
+from domain.value_objects.presentation_date import PresentationDate
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.text_mention import TextMention
@@ -18,6 +20,8 @@ from infrastructure.event_projectors.artifact_projector import ArtifactProjector
 from infrastructure.event_projectors.event_projector import EventProjector
 from infrastructure.event_projectors.page_projector import PageProjector
 from infrastructure.serialization.pydantic_transcoder import PydanticTranscoding
+
+_CORRECTED_BY_ID = "11111111-1111-1111-1111-111111111111"
 
 
 class FakeMaterializer:
@@ -228,6 +232,87 @@ class TestEventProjector:
         assert materializer.upsert_artifact_calls[2][1]["tag_mentions"][0]["tag"] == "chemistry"
         assert materializer.delete_artifact_calls[0][0] == str(deleted_event.originator_id)
 
+    def test_artifact_human_correction_recorded_dotted_path(self) -> None:
+        """A HumanCorrectionRecorded event projects to a dotted human_corrections.<field> key."""
+        materializer = FakeMaterializer()
+        projector = ArtifactProjector(materializer)
+
+        artifact = Artifact.create(
+            source_uri="https://example.com/paper.pdf",
+            source_filename="paper.pdf",
+            artifact_type=ArtifactType.RESEARCH_ARTICLE,
+            mime_type=MimeType.PDF,
+            storage_location="/storage/paper.pdf",
+        )
+        list(artifact.collect_events())
+
+        artifact.correct_metadata(
+            corrected_by_id=_CORRECTED_BY_ID,
+            corrected_by_name="Jane Reviewer",
+            title_mention=TitleMention(title="Fixed Title"),
+        )
+        # correct_metadata triggers TitleMentionUpdated then HumanCorrectionRecorded
+        correction_event = list(artifact.collect_events())[-1]
+        assert isinstance(correction_event, Artifact.HumanCorrectionRecorded)
+
+        projector.human_correction_recorded(correction_event, _tracking())
+
+        assert len(materializer.upsert_artifact_calls) == 1
+        artifact_id, fields, _ = materializer.upsert_artifact_calls[0]
+        assert artifact_id == str(artifact.id)
+        assert fields == {
+            "human_corrections.title_mention": {
+                "corrected_by_id": _CORRECTED_BY_ID,
+                "corrected_by_name": "Jane Reviewer",
+                "corrected_at": correction_event.corrected_at.isoformat(),
+            },
+        }
+        # ISO datetime string, not a raw datetime object (Mongo-friendly)
+        assert isinstance(fields["human_corrections.title_mention"]["corrected_at"], str)
+
+    def test_artifact_human_correction_recorded_accumulates_across_fields(self) -> None:
+        """A second correction for a different field doesn't wipe the first (dotted $set)."""
+        materializer = FakeMaterializer()
+        projector = ArtifactProjector(materializer)
+
+        artifact = Artifact.create(
+            source_uri="https://example.com/paper.pdf",
+            source_filename="paper.pdf",
+            artifact_type=ArtifactType.RESEARCH_ARTICLE,
+            mime_type=MimeType.PDF,
+            storage_location="/storage/paper.pdf",
+        )
+        list(artifact.collect_events())
+
+        artifact.correct_metadata(
+            corrected_by_id=_CORRECTED_BY_ID,
+            corrected_by_name="Jane Reviewer",
+            title_mention=TitleMention(title="Fixed Title"),
+        )
+        first_correction = list(artifact.collect_events())[-1]
+        projector.human_correction_recorded(first_correction, _tracking())
+
+        artifact.correct_metadata(
+            corrected_by_id=_CORRECTED_BY_ID,
+            corrected_by_name="Bob Editor",
+            presentation_date=PresentationDate(
+                date=datetime(2020, 1, 1, tzinfo=UTC),
+                source="human",
+            ),
+        )
+        second_correction = list(artifact.collect_events())[-1]
+        projector.human_correction_recorded(second_correction, _tracking())
+
+        # Two separate upsert calls, each with a DIFFERENT dotted key. The real
+        # materializer forwards `fields` straight into a Mongo `$set`, where dotted
+        # keys write only that nested path — so these two calls accumulate instead
+        # of one wholesale-overwriting the human_corrections subdocument.
+        assert len(materializer.upsert_artifact_calls) == 2
+        first_fields = materializer.upsert_artifact_calls[0][1]
+        second_fields = materializer.upsert_artifact_calls[1][1]
+        assert set(first_fields) == {"human_corrections.title_mention"}
+        assert set(second_fields) == {"human_corrections.presentation_date"}
+
     def test_page_projector_events(self) -> None:
         materializer = FakeMaterializer()
         projector = PageProjector(materializer)
@@ -267,6 +352,38 @@ class TestEventProjector:
         assert materializer.upsert_page_calls[4][1]["summary_candidate"]["summary"] == "Summary"
         assert materializer.delete_page_calls[0][0] == str(deleted_event.originator_id)
 
+    def test_page_human_correction_recorded_dotted_path(self) -> None:
+        """Page HumanCorrectionRecorded projects to a dotted human_corrections.<field> key."""
+        materializer = FakeMaterializer()
+        projector = PageProjector(materializer)
+
+        page = Page.create(name="Intro", artifact_id=uuid4(), index=0)
+        list(page.collect_events())
+
+        compound = CompoundMention(smiles="C", extracted_id="Test")
+        page.correct_compound_mentions(
+            [compound],
+            corrected_by_id=_CORRECTED_BY_ID,
+            corrected_by_name="Jane Reviewer",
+        )
+        # correct_compound_mentions triggers CompoundMentionsUpdated then HumanCorrectionRecorded
+        correction_event = list(page.collect_events())[-1]
+        assert isinstance(correction_event, Page.HumanCorrectionRecorded)
+
+        projector.human_correction_recorded(correction_event, _tracking())
+
+        assert len(materializer.upsert_page_calls) == 1
+        page_id, fields, _ = materializer.upsert_page_calls[0]
+        assert page_id == str(page.id)
+        assert fields == {
+            "human_corrections.compound_mentions": {
+                "corrected_by_id": _CORRECTED_BY_ID,
+                "corrected_by_name": "Jane Reviewer",
+                "corrected_at": correction_event.corrected_at.isoformat(),
+            },
+        }
+        assert isinstance(fields["human_corrections.compound_mentions"]["corrected_at"], str)
+
     def test_artifact_deleted_cleans_tags_and_deletes(self) -> None:
         materializer = FakeMaterializer()
         projector = ArtifactProjector(materializer)
@@ -305,6 +422,39 @@ class TestEventProjector:
         projector.process_event(UnknownEvent(), _tracking())
 
         assert len(materializer.upsert_page_calls) == 1
+
+    def test_event_projector_routes_human_correction_recorded(self) -> None:
+        """Both Artifact and Page HumanCorrectionRecorded events are wired into the routing map."""
+        materializer = FakeMaterializer()
+        projector = EventProjector(materializer)
+
+        artifact = Artifact.create(
+            source_uri=None,
+            source_filename="paper.pdf",
+            artifact_type=ArtifactType.RESEARCH_ARTICLE,
+            mime_type=MimeType.PDF,
+            storage_location="/storage/paper.pdf",
+        )
+        list(artifact.collect_events())
+        artifact.correct_metadata(
+            corrected_by_id=_CORRECTED_BY_ID,
+            corrected_by_name="Jane Reviewer",
+            title_mention=TitleMention(title="Fixed Title"),
+        )
+        artifact_correction = list(artifact.collect_events())[-1]
+        projector.process_event(artifact_correction, _tracking())
+        assert "human_corrections.title_mention" in materializer.upsert_artifact_calls[0][1]
+
+        page = Page.create(name="Intro", artifact_id=uuid4(), index=0)
+        list(page.collect_events())
+        page.correct_compound_mentions(
+            [CompoundMention(smiles="C", extracted_id="Test")],
+            corrected_by_id=_CORRECTED_BY_ID,
+            corrected_by_name="Jane Reviewer",
+        )
+        page_correction = list(page.collect_events())[-1]
+        projector.process_event(page_correction, _tracking())
+        assert "human_corrections.compound_mentions" in materializer.upsert_page_calls[0][1]
 
 
 class TestEventSourcedRepository:

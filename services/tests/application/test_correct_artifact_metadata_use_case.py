@@ -98,7 +98,9 @@ class TestCorrectArtifactMetadataUseCase:
             auth_editor.user_id
         )
         assert saved.human_corrections["title_mention"]["corrected_by_name"] == auth_editor.name
-        # NOTE: ArtifactResponse doesn't expose human_corrections yet (lands in Task 6).
+        assert result.unwrap().human_corrections["title_mention"].corrected_by_id == str(
+            auth_editor.user_id
+        )
 
     @pytest.mark.asyncio
     async def test_omitted_fields_untouched_null_clears(

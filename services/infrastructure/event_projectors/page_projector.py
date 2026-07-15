@@ -91,6 +91,28 @@ class PageProjector:
             tracking=tracking,  # type: ignore[arg-type]
         )
 
+    def human_correction_recorded(self, event: object, tracking: object) -> None:
+        """Project HumanCorrectionRecorded event to read model (hiledit).
+
+        Uses dotted-path keys (``human_corrections.<field>``) so a Mongo ``$set``
+        writes only the corrected field's provenance, leaving corrections already
+        recorded for other fields untouched instead of overwriting the whole
+        subdocument.
+        """
+        fields = {
+            f"human_corrections.{name}": {
+                "corrected_by_id": event.corrected_by_id,  # type: ignore[attr-defined]
+                "corrected_by_name": event.corrected_by_name,  # type: ignore[attr-defined]
+                "corrected_at": event.corrected_at.isoformat(),  # type: ignore[attr-defined]
+            }
+            for name in event.corrected_fields  # type: ignore[attr-defined]
+        }
+        self._materializer.upsert_page(
+            page_id=str(event.originator_id),  # type: ignore[attr-defined]
+            fields=fields,
+            tracking=tracking,  # type: ignore[arg-type]
+        )
+
     def page_deleted(self, event: object, tracking: object) -> None:
         """Project PageDeleted event to read model."""
         self._materializer.delete_page(

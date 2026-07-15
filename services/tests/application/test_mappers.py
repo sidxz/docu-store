@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from application.mappers.artifact_mappers import ArtifactMapper
 from application.mappers.page_mappers import PageMapper
+from domain.value_objects.title_mention import TitleMention
 
 
 class TestArtifactMapper:
@@ -60,6 +61,26 @@ class TestArtifactMapper:
         response = ArtifactMapper.to_artifact_response(sample_artifact)
         assert response.summary_candidate == sample_summary_candidate
 
+    def test_map_artifact_without_corrections_is_empty(self, sample_artifact) -> None:
+        """An artifact with no human corrections maps to an empty dict (hiledit)."""
+        response = ArtifactMapper.to_artifact_response(sample_artifact)
+        assert response.human_corrections == {}
+
+    def test_map_artifact_with_human_corrections(self, sample_artifact) -> None:
+        """A human-corrected field's provenance is mapped to HumanCorrectionInfo (hiledit)."""
+        sample_artifact.correct_metadata(
+            corrected_by_id="user-1",
+            corrected_by_name="Jane Reviewer",
+            title_mention=TitleMention(title="Fixed Title"),
+        )
+
+        response = ArtifactMapper.to_artifact_response(sample_artifact)
+
+        info = response.human_corrections["title_mention"]
+        assert info.corrected_by_id == "user-1"
+        assert info.corrected_by_name == "Jane Reviewer"
+        assert info.corrected_at is not None
+
 
 class TestPageMapper:
     """Test PageMapper."""
@@ -115,3 +136,27 @@ class TestPageMapper:
 
         response = PageMapper.to_page_response(sample_page)
         assert response.summary_candidate == sample_summary_candidate
+
+    def test_map_page_without_corrections_is_empty(self, sample_page) -> None:
+        """A page with no human corrections maps to an empty dict (hiledit)."""
+        response = PageMapper.to_page_response(sample_page)
+        assert response.human_corrections == {}
+
+    def test_map_page_with_human_corrections(
+        self,
+        sample_page,
+        sample_compound_mention,
+    ) -> None:
+        """A human-corrected field's provenance is mapped to HumanCorrectionInfo (hiledit)."""
+        sample_page.correct_compound_mentions(
+            [sample_compound_mention],
+            corrected_by_id="user-1",
+            corrected_by_name="Jane Reviewer",
+        )
+
+        response = PageMapper.to_page_response(sample_page)
+
+        info = response.human_corrections["compound_mentions"]
+        assert info.corrected_by_id == "user-1"
+        assert info.corrected_by_name == "Jane Reviewer"
+        assert info.corrected_at is not None
