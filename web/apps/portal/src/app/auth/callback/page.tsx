@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { AuthzCallback } from "@sentinel-auth/react";
 import { ShapeGrid } from "@/components/backgrounds/ShapeGrid";
+import { WorkspaceSelector } from "./workspace-selector";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -46,49 +47,9 @@ export default function AuthCallbackPage() {
           </div>
         </AuthShell>
       )}
-      workspaceSelector={({ workspaces, onSelect, isLoading }) => (
+      workspaceSelector={(props) => (
         <AuthShell>
-          <div className="w-full max-w-sm">
-            <h2
-              className="mb-6 text-center text-lg font-semibold"
-              style={{
-                color: "#0f172a",
-                animation: "auth-enter 0.6s ease-out 0.1s both",
-              }}
-            >
-              Select Workspace
-            </h2>
-            <div className="space-y-2">
-              {workspaces.map((ws, i) => (
-                <button
-                  key={ws.id}
-                  onClick={() => onSelect(ws.id)}
-                  disabled={isLoading}
-                  className="w-full rounded-xl border border-[#e2e8f0] bg-white p-4 text-left transition-colors hover:border-[#3b82f6] hover:bg-[#f8fafc] disabled:opacity-50"
-                  style={{
-                    animation: `auth-enter 0.5s ease-out ${0.15 + i * 0.05}s both`,
-                  }}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium" style={{ color: "#0f172a" }}>
-                        {ws.name}
-                      </div>
-                      <div className="text-xs" style={{ color: "#64748b" }}>
-                        {ws.slug}
-                      </div>
-                    </div>
-                    <span
-                      className="rounded-full px-2 py-0.5 text-xs font-medium"
-                      style={{ background: "#eff6ff", color: "#2563eb" }}
-                    >
-                      {ws.role}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
+          <WorkspaceSelector {...props} />
         </AuthShell>
       )}
     />
