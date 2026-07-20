@@ -2,11 +2,12 @@
 
 import { Fragment } from "react";
 import Link from "next/link";
-import { Coins, Globe, Lock, LogOut, Moon, Sun } from "lucide-react";
+import { Building2, ChevronDown, Coins, Globe, Lock, LogOut, Moon, Sun } from "lucide-react";
 import { useAuthz } from "@sentinel-auth/react";
 import type { MonthTokenUsage } from "@docu-store/types";
 
 import { useSession } from "@/lib/auth";
+import { forgetWorkspace } from "@/lib/workspace-memory";
 import { useBreadcrumbs } from "@/hooks/use-breadcrumbs";
 import { useUserTokenUsage } from "@/hooks/use-usage";
 import { useThemeStore } from "@/lib/stores/theme-store";
@@ -16,6 +17,14 @@ import { getInitials, formatTokens } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { FontSizeControl } from "./FontSizeControl";
 import {
   Breadcrumb,
@@ -144,36 +153,49 @@ export function Topbar() {
         {/* Separator */}
         <Separator orientation="vertical" className="mx-1.5 data-[orientation=vertical]:h-5" />
 
-        {/* User + logout */}
-        <div className="flex items-center gap-2.5">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-hover text-xs font-semibold text-white shadow-sm">
-              {initials}
-            </div>
-            <div className="hidden sm:flex flex-col">
-              <span className="text-sm font-medium leading-tight text-text-primary">
-                {user.name || "User"}
-              </span>
-              <span className="text-xs leading-tight text-text-muted">
+        {/* User menu */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-auto gap-2.5 rounded-full px-2 py-1">
+              <span className="sr-only">Account menu</span>
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-hover text-xs font-semibold text-white shadow-sm">
+                {initials}
+              </div>
+              <div className="hidden sm:flex flex-col text-left">
+                <span className="text-sm font-medium leading-tight text-text-primary">
+                  {user.name || "User"}
+                </span>
+                <span className="text-xs leading-tight text-text-muted">
+                  {user.email || workspace.slug}
+                </span>
+              </div>
+              <ChevronDown className="size-3.5 text-text-muted" aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>
+              <p className="truncate text-sm font-medium">{user.name || "User"}</p>
+              <p className="truncate text-xs font-normal text-text-muted">
                 {user.email || workspace.slug}
-              </span>
-            </div>
-          </div>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="rounded-full"
-                onClick={handleLogout}
-                aria-label="Sign out"
-              >
-                <LogOut className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">Sign out</TooltipContent>
-          </Tooltip>
-        </div>
+              </p>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={() => {
+                // Forget the remembered workspace so the next sign-in shows the picker.
+                forgetWorkspace();
+                handleLogout();
+              }}
+            >
+              <Building2 />
+              Switch workspace
+            </DropdownMenuItem>
+            <DropdownMenuItem variant="destructive" onSelect={handleLogout}>
+              <LogOut />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );
