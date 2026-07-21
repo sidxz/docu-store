@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { AuthzCallback } from "@sentinel-auth/react";
 import { ShapeGrid } from "@/components/backgrounds/ShapeGrid";
+import { forgetWorkspace } from "@/lib/workspace-memory";
 import { WorkspaceSelector } from "./workspace-selector";
 
 export default function AuthCallbackPage() {
@@ -18,6 +19,11 @@ export default function AuthCallbackPage() {
         const home = `/${user.workspaceSlug}`;
         const dest = returnTo === home || returnTo?.startsWith(`${home}/`) ? returnTo : home;
         router.replace(dest);
+      }}
+      onError={() => {
+        // A failed auto-entry must not loop — forget the remembered workspace
+        // so the next sign-in shows the picker again (errorComponent still renders).
+        forgetWorkspace();
       }}
       onSilentReauthFailed={() => router.replace("/login")}
       loadingComponent={
