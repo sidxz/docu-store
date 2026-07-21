@@ -11,9 +11,14 @@ export default function AuthCallbackPage() {
 
   return (
     <AuthzCallback
-      onSuccess={(user, returnTo) =>
-        router.replace(returnTo ?? `/${user.workspaceSlug}`)
-      }
+      onSuccess={(user, returnTo) => {
+        // A stale returnTo (e.g. captured in another tab before a workspace
+        // switch) must not land this workspace's token on another workspace's
+        // URLs — honor it only inside the entered workspace.
+        const home = `/${user.workspaceSlug}`;
+        const dest = returnTo === home || returnTo?.startsWith(`${home}/`) ? returnTo : home;
+        router.replace(dest);
+      }}
       onSilentReauthFailed={() => router.replace("/login")}
       loadingComponent={
         <AuthShell>
