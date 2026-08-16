@@ -17,3 +17,8 @@ strictPeerDependencies: false
 allowBuilds:
   core-js: false
   sharp: false
+
+# Our own packages: no supply-chain quarantine (pnpm 11 defaults to 24h minimumReleaseAge,
+# which blocks Docker builds right after we publish a Duar SDK release).
+minimumReleaseAgeExclude:
+  - "@duar-auth/*"
