@@ -56,8 +56,11 @@ class _FakeRepo:
         self.set_result = True  # False simulates a write that matched 0 docs
         self.create_folder_error: Exception | None = None
 
-    async def get_conversation(self, conversation_id, workspace_id=None):
-        return self.conversations.get(conversation_id)
+    async def get_conversation(self, conversation_id, workspace_id=None, owner_id=None):
+        conv = self.conversations.get(conversation_id)
+        if conv is not None and owner_id is not None and conv.owner_id != owner_id:
+            return None
+        return conv
 
     async def create_folder(self, folder):
         if self.create_folder_error is not None:

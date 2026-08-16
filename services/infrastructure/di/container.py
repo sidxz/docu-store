@@ -151,7 +151,7 @@ from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.text_mention import TextMention
 from domain.value_objects.title_mention import TitleMention
-from infrastructure.auth import sentinel
+from infrastructure.auth import duar
 from infrastructure.blob_stores.fsspec_blob_store import FsspecBlobStore
 from infrastructure.chat.run_registry import ChatRunRegistry
 from infrastructure.chemistry.rdkit_smiles_validator import RdkitSmilesValidator
@@ -179,7 +179,7 @@ from infrastructure.llm.factory import (
 )
 from infrastructure.ner.gliner2_extractor import GLiNER2Extractor
 from infrastructure.ner.structflo_ner_extractor import StructfloNERExtractor
-from infrastructure.permissions.sentinel_permission_registrar import SentinelPermissionRegistrar
+from infrastructure.permissions.duar_permission_registrar import DuarPermissionRegistrar
 from infrastructure.read_repositories.mongo_read_model_materializer import (
     MongoReadModelMaterializer,
 )
@@ -348,8 +348,8 @@ def create_container() -> Container:
         cache=c[WorkflowStatusCache],
     )
 
-    # Permission Registrar (Sentinel entity-level permissions)
-    container[PermissionRegistrar] = lambda _: SentinelPermissionRegistrar(sentinel.permissions)
+    # Permission Registrar (Duar entity-level permissions)
+    container[PermissionRegistrar] = lambda _: DuarPermissionRegistrar(duar.permissions)
     container[TriggerResourceRegistrationUseCase] = lambda c: TriggerResourceRegistrationUseCase(
         permission_registrar=c[PermissionRegistrar],
     )

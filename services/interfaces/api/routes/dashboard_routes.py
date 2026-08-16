@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 from lagom import Container
-from sentinel_auth import RequestAuth
+from duar_auth import RequestAuth
 
 from application.dtos.dashboard_dtos import DashboardStatsResponse
 from application.ports.repositories.dashboard_read_models import DashboardReadModel

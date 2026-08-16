@@ -208,7 +208,7 @@ async def run(worker_name: str = "pipeline_worker") -> None:
                                     tracking_id=tracking.notification_id,
                                 )
 
-                                # Note: Sentinel resource registration is handled by
+                                # Note: Duar resource registration is handled by
                                 # ArtifactUploadSaga (with user-specified visibility),
                                 # not here in the pipeline worker.
 

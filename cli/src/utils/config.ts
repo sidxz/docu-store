@@ -3,14 +3,14 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 export interface AppConfig {
-  sentinel_url: string;
+  duar_url: string;
   api_url: string;
   google_client_id: string;
   google_client_secret: string;
 }
 
 const DEFAULTS: AppConfig = {
-  sentinel_url: "http://localhost:9003",
+  duar_url: "http://localhost:9003",
   api_url: "http://localhost:8000",
   google_client_id: "",
   google_client_secret: "",
@@ -37,8 +37,12 @@ export function loadConfig(): AppConfig {
   }
 
   return {
-    sentinel_url:
-      process.env.DOCU_SENTINEL_URL || file.sentinel_url || DEFAULTS.sentinel_url,
+    duar_url:
+      process.env.DOCU_DUAR_URL ||
+      file.duar_url ||
+      // ponytail: legacy key from configs written before the Sentinel → Duar rename
+      (file as { sentinel_url?: string }).sentinel_url ||
+      DEFAULTS.duar_url,
     api_url:
       process.env.DOCU_API_URL || file.api_url || DEFAULTS.api_url,
     google_client_id:
@@ -69,7 +73,7 @@ export function saveConfig(partial: Partial<AppConfig>): void {
 export function showConfig(): Record<string, string> {
   const config = loadConfig();
   return {
-    sentinel_url: config.sentinel_url,
+    duar_url: config.duar_url,
     api_url: config.api_url,
     google_client_id: config.google_client_id || "(not set)",
     google_client_secret: config.google_client_secret ? "(set)" : "(not set)",

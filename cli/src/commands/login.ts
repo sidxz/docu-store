@@ -3,29 +3,29 @@ import { stdin, stdout } from "node:process";
 import { loadConfig } from "../utils/config.js";
 import { saveCredentials, type Credentials } from "../auth/credentials.js";
 import { startOAuthFlow } from "../auth/oauth-server.js";
-import { mint, resolve, type SentinelWorkspace } from "../auth/sentinel.js";
+import { mint, resolve, type DuarWorkspace } from "../auth/duar.js";
 import * as log from "../utils/logger.js";
 
 interface LoginOptions {
   provider: string;
   workspace?: string;
   token?: string;
-  sentinelUrl?: string;
+  duarUrl?: string;
 }
 
 export async function loginCommand(opts: LoginOptions): Promise<void> {
   const config = loadConfig();
-  const sentinelUrl = opts.sentinelUrl || config.sentinel_url;
+  const duarUrl = opts.duarUrl || config.duar_url;
 
   // Token paste fallback (headless/SSH environments)
   if (opts.token) {
-    await tokenLogin(opts.token, opts.workspace, sentinelUrl, opts.provider);
+    await tokenLogin(opts.token, opts.workspace, duarUrl, opts.provider);
     return;
   }
 
   // Browser OAuth flow
   const oauthResult = await startOAuthFlow(
-    sentinelUrl,
+    duarUrl,
     opts.provider,
     config.google_client_id,
     config.google_client_secret,
@@ -34,8 +34,8 @@ export async function loginCommand(opts: LoginOptions): Promise<void> {
   log.success("IdP token received");
 
   // Step 1: Resolve without workspace to get user + workspace list
-  log.info("Authenticating with Sentinel...");
-  const initial = await resolve(sentinelUrl, idpToken, opts.provider);
+  log.info("Authenticating with Duar...");
+  const initial = await resolve(duarUrl, idpToken, opts.provider);
 
   if (!initial.workspaces || initial.workspaces.length === 0) {
     log.error("No workspaces available for this account.");
@@ -43,7 +43,7 @@ export async function loginCommand(opts: LoginOptions): Promise<void> {
   }
 
   // Step 2: Select workspace
-  let selectedWorkspace: SentinelWorkspace;
+  let selectedWorkspace: DuarWorkspace;
 
   if (opts.workspace) {
     // Match by slug or ID
@@ -103,7 +103,7 @@ export async function loginCommand(opts: LoginOptions): Promise<void> {
 async function tokenLogin(
   token: string,
   workspace: string | undefined,
-  sentinelUrl: string,
+  duarUrl: string,
   provider: string,
 ): Promise<void> {
   if (!workspace) {
@@ -131,8 +131,8 @@ async function tokenLogin(
 }
 
 async function promptWorkspaceSelection(
-  workspaces: SentinelWorkspace[],
-): Promise<SentinelWorkspace> {
+  workspaces: DuarWorkspace[],
+): Promise<DuarWorkspace> {
   console.log("\nAvailable workspaces:");
   for (let i = 0; i < workspaces.length; i++) {
     console.log(`  ${i + 1}. ${workspaces[i].slug} (${workspaces[i].role})`);

@@ -8,7 +8,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 from lagom import Container
 from returns.result import Success
-from sentinel_auth import RequestAuth
+from duar_auth import RequestAuth
 
 from application.dtos.embedding_dtos import SearchRequest, SearchResponse
 from application.dtos.search_dtos import (

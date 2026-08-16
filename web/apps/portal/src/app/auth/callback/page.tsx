@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { AuthzCallback } from "@sentinel-auth/react";
+import { AuthzCallback } from "@duar-auth/react";
 import { ShapeGrid } from "@/components/backgrounds/ShapeGrid";
 import { forgetWorkspace } from "@/lib/workspace-memory";
 import { WorkspaceSelector } from "./workspace-selector";

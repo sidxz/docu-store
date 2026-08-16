@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 from lagom import Container
-from sentinel_auth import RequestAuth
+from duar_auth import RequestAuth
 
 from application.dtos.user_dtos import (
     RecentDocumentEntry,

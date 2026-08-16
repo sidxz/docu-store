@@ -4,10 +4,10 @@ from functools import lru_cache
 
 from lagom import Container
 
-from infrastructure.auth import sentinel
+from infrastructure.auth import duar
 from infrastructure.di.container import create_container
 
-get_auth = sentinel.get_auth
+get_auth = duar.get_auth
 
 
 @lru_cache

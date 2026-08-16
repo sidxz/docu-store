@@ -61,7 +61,7 @@ program
   .option("-p, --provider <provider>", "Identity provider (github, google)", "github")
   .option("-w, --workspace <workspace>", "Workspace slug or ID")
   .option("-t, --token <token>", "Paste an authz token directly (headless fallback)")
-  .option("--sentinel-url <url>", "Override Sentinel URL")
+  .option("--duar-url <url>", "Override Duar URL")
   .action(loginCommand);
 
 // ── Logout ─────────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ const configCmd = program
 
 configCmd
   .command("set <key> <value>")
-  .description("Set a config value (sentinel-url, api-url)")
+  .description("Set a config value (duar-url, api-url)")
   .action(configSetCommand);
 
 configCmd

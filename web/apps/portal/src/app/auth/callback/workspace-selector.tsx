@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { AuthzWorkspaceSelectorProps } from "@sentinel-auth/react";
+import type { AuthzWorkspaceSelectorProps } from "@duar-auth/react";
 
 import { rememberWorkspace, rememberedWorkspace } from "@/lib/workspace-memory";
 

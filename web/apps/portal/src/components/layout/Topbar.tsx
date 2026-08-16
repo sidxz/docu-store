@@ -3,7 +3,7 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import { Building2, ChevronDown, Coins, Globe, Lock, LogOut, Moon, Sun } from "lucide-react";
-import { useAuthz } from "@sentinel-auth/react";
+import { useAuthz } from "@duar-auth/react";
 import type { MonthTokenUsage } from "@docu-store/types";
 
 import { useSession } from "@/lib/auth";

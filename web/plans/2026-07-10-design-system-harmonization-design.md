@@ -30,7 +30,7 @@ Non-goal: a shared component library. Flagged as the natural next step, explicit
 | **daikon-gen3** | Geist + Geist Mono | **@base-ui/react** + shadcn v4 | `.dark` class | OKLCH default **gray** (no brand) |
 
 Notes established during exploration:
-- `@sentinel-auth/*` (used by all four) resolves from **public npm** — the Docker build is a plain `pnpm install --frozen-lockfile` with no `.npmrc`, no token. This is the template for `@structflo/daikon-design-tokens`.
+- `@duar-auth/*` (used by all four) resolves from **public npm** — the Docker build is a plain `pnpm install --frozen-lockfile` with no `.npmrc`, no token. This is the template for `@structflo/daikon-design-tokens`.
 - daikon-gen3's `ui/` folder holds only `button.tsx` (sole base-ui importer) and `sonner.tsx`. The "radix migration" is ~1 component, not a rewrite.
 - All three cellar-style apps import Tailwind identically (`@import "tailwindcss"`), so a package `@import` slots in cleanly.
 - Design tokens are not secret — they ship in every app's CSS and are readable in any browser's devtools. Hence public npm, not a private registry.

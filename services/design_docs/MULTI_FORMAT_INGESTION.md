@@ -75,7 +75,7 @@ POST /artifacts/upload
   └─ ArtifactUploadSaga (thinned):
        1. UploadBlobUseCase        — store blob; validate MIME ∈ supported set (not PDF-only)
        2. CreateArtifactUseCase    — emits Artifact.Created (storage_location + mime_type)
-       3. register_resource        — Sentinel permissions
+       3. register_resource        — Duar permissions
        └─ return ArtifactResponse immediately (pages=[], not yet parsed)   ← no parsing here
 
 Artifact.Created  (pipeline_worker subscription)

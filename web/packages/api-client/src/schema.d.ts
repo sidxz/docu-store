@@ -359,7 +359,7 @@ export interface paths {
          * @description Share an artifact with a user or group.
          *
          *     Only the artifact owner or workspace admin can share.
-         *     Sentinel enforces this server-side; the route also fast-fails.
+         *     Duar enforces this server-side; the route also fast-fails.
          */
         post: operations["share_artifact_artifacts__artifact_id__shares_post"];
         /**
@@ -403,7 +403,7 @@ export interface paths {
         put?: never;
         /**
          * Mint Authz Token
-         * @description Forward an authz-token mint request to Sentinel with the service key.
+         * @description Forward an authz-token mint request to Duar with the service key.
          */
         post: operations["mint_authz_token_auth_mint_post"];
         delete?: never;
@@ -1696,7 +1696,7 @@ export interface paths {
          * Search Members
          * @description Search workspace members by name or email.
          *
-         *     Proxies to Sentinel's workspace member list endpoint.
+         *     Proxies to Duar's workspace member list endpoint.
          */
         get: operations["search_members_workspace_members_get"];
         put?: never;

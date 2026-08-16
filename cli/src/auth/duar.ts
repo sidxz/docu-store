@@ -1,12 +1,12 @@
 const CLI_ORIGIN = "docu-cli://localhost";
 
-export interface SentinelUser {
+export interface DuarUser {
   id: string;
   email: string;
   name: string;
 }
 
-export interface SentinelWorkspace {
+export interface DuarWorkspace {
   id: string;
   slug: string;
   name: string;
@@ -14,31 +14,31 @@ export interface SentinelWorkspace {
 }
 
 export interface ResolveResult {
-  user: SentinelUser;
-  workspaces?: SentinelWorkspace[];
-  workspace?: SentinelWorkspace;
+  user: DuarUser;
+  workspaces?: DuarWorkspace[];
+  workspace?: DuarWorkspace;
   authz_token?: string;
   expires_in?: number;
 }
 
-export class SentinelError extends Error {
+export class DuarError extends Error {
   constructor(
     message: string,
     public statusCode: number,
   ) {
     super(message);
-    this.name = "SentinelError";
+    this.name = "DuarError";
   }
 }
 
 /**
- * Call Sentinel's /authz/resolve endpoint using Origin-based auth (no service key).
+ * Call Duar's /authz/resolve endpoint using Origin-based auth (no service key).
  *
  * - Without workspace_id: returns user + available workspaces
  * - With workspace_id: returns user + workspace + authz_token
  */
 export async function resolve(
-  sentinelUrl: string,
+  duarUrl: string,
   idpToken: string,
   provider: string,
   workspaceId?: string,
@@ -51,7 +51,7 @@ export async function resolve(
     body.workspace_id = workspaceId;
   }
 
-  const resp = await fetch(`${sentinelUrl.replace(/\/$/, "")}/authz/resolve`, {
+  const resp = await fetch(`${duarUrl.replace(/\/$/, "")}/authz/resolve`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -68,7 +68,7 @@ export async function resolve(
     } catch {
       detail = resp.statusText;
     }
-    throw new SentinelError(detail, resp.status);
+    throw new DuarError(detail, resp.status);
   }
 
   return (await resp.json()) as ResolveResult;
@@ -77,9 +77,9 @@ export async function resolve(
 /**
  * Mint an authz token via the docu-store backend's /auth/mint endpoint.
  *
- * Since Sentinel 0.11.0, minting requires a service key, which a CLI must not
- * hold. The backend holds it and forwards to Sentinel's /authz/resolve. Discovery
- * (workspace listing, no workspace_id) still uses `resolve()` against Sentinel
+ * Since Duar 0.11.0, minting requires a service key, which a CLI must not
+ * hold. The backend holds it and forwards to Duar's /authz/resolve. Discovery
+ * (workspace listing, no workspace_id) still uses `resolve()` against Duar
  * directly via Origin auth; only the credential-issuance step is routed here.
  */
 export async function mint(
@@ -112,7 +112,7 @@ export async function mint(
     } catch {
       detail = resp.statusText;
     }
-    throw new SentinelError(detail, resp.status);
+    throw new DuarError(detail, resp.status);
   }
 
   return (await resp.json()) as ResolveResult;

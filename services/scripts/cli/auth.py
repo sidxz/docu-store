@@ -22,7 +22,7 @@ class AuthError(Exception):
 
 
 class CliAuth:
-    """Manages Sentinel authz token lifecycle for CLI tools.
+    """Manages Duar authz token lifecycle for CLI tools.
 
     Auth flow:
     1. Login captures an IdP token (e.g., GitHub access token) and workspace info.
@@ -30,8 +30,8 @@ class CliAuth:
     3. On expiry, calls /authz/resolve again with the same IdP token (GitHub tokens don't expire).
     """
 
-    def __init__(self, sentinel_url: str, service_key: str) -> None:
-        self.sentinel_url = sentinel_url.rstrip("/")
+    def __init__(self, duar_url: str, service_key: str) -> None:
+        self.duar_url = duar_url.rstrip("/")
         self.service_key = service_key
         self._creds: dict | None = None
         self._load()
@@ -82,7 +82,7 @@ class CliAuth:
     def resolve_authz(self, idp_token: str, provider: str, workspace_id: str) -> dict:
         """Call /authz/resolve and return the response."""
         resp = httpx.post(
-            f"{self.sentinel_url}/authz/resolve",
+            f"{self.duar_url}/authz/resolve",
             json={
                 "idp_token": idp_token,
                 "provider": provider,

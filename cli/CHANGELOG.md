@@ -21,7 +21,7 @@
 
 ### Added
 - Initial release
-- `docu login/logout/whoami` — OAuth authentication (GitHub, Google) via Sentinel
+- `docu login/logout/whoami` — OAuth authentication (GitHub, Google) via Duar
 - `docu config` — CLI configuration management
 - `docu upload` — file and directory upload with resume, dry-run, glob support
 - `docu list` — list workspace documents

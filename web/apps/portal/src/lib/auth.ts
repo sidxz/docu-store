@@ -1,10 +1,10 @@
 /**
- * Auth — backed by Sentinel AuthZ SDK.
+ * Auth — backed by Duar AuthZ SDK.
  *
  * Provides a `useSession()` hook with the same interface components already consume.
  */
 
-import { useAuthz } from "@sentinel-auth/react";
+import { useAuthz } from "@duar-auth/react";
 import type { User, Workspace } from "@docu-store/types";
 
 interface Session {

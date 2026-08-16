@@ -1,10 +1,10 @@
 "use client";
 
-import { AuthzProvider } from "@sentinel-auth/react";
+import { AuthzProvider } from "@duar-auth/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { SentinelAuthz } from "@sentinel-auth/js";
+import type { DuarAuthz } from "@duar-auth/js";
 
 import { getAuthzClient } from "@/lib/authz-client";
 import { shouldAutoReauth } from "@/lib/auth-routes";
@@ -35,7 +35,7 @@ import { ConfirmProvider } from "./ConfirmProvider";
  *
  * Order matters:
  *  1. AppConfigProvider   — Runtime config context (outermost)
- *  2. AuthzProvider       — Sentinel auth context
+ *  2. AuthzProvider       — Duar auth context
  *  3. QueryClientProvider — TanStack Query
  *  4. TooltipProvider     — Radix tooltip context (shadcn/ui)
  *  5. ThemeProvider       — Applies the data-theme attribute; Providers
@@ -44,7 +44,7 @@ import { ConfirmProvider } from "./ConfirmProvider";
 export function Providers({ children }: { children: ReactNode }) {
   const queryClient = getQueryClient();
   const pathname = usePathname();
-  const clientRef = useRef<SentinelAuthz | null>(null);
+  const clientRef = useRef<DuarAuthz | null>(null);
   const configRef = useRef<AppConfig | null>(null);
   const middlewareApplied = useRef(false);
   const [mounted, setMounted] = useState(false);

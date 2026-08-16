@@ -495,31 +495,31 @@ class Settings(BaseSettings):
         description="Max compound results per detected SMILES in chat.",
     )
 
-    # Sentinel (AuthZ mode)
-    sentinel_url: str = Field(default="http://localhost:9003", validation_alias="SENTINEL_URL")
-    sentinel_service_key: str = Field(default="", validation_alias="SENTINEL_SERVICE_KEY")
-    sentinel_service_name: str = Field(
+    # Duar (AuthZ mode)
+    duar_url: str = Field(default="http://localhost:9003", validation_alias="DUAR_URL")
+    duar_service_key: str = Field(default="", validation_alias="DUAR_SERVICE_KEY")
+    duar_service_name: str = Field(
         default="docu-store",
-        validation_alias="SENTINEL_SERVICE_NAME",
+        validation_alias="DUAR_SERVICE_NAME",
     )
-    sentinel_idp_jwks_url: str = Field(
+    duar_idp_jwks_url: str = Field(
         default="https://www.googleapis.com/oauth2/v3/certs",
-        validation_alias="SENTINEL_IDP_JWKS_URL",
+        validation_alias="DUAR_IDP_JWKS_URL",
     )
-    # Required since Sentinel 0.11.0 (authz mode): the IdP token's `aud` must
+    # Required since Duar 0.11.0 (authz mode): the IdP token's `aud` must
     # equal your OAuth client_id, else a token minted for any other client of
-    # the same IdP would authenticate. Without it, Sentinel(...) raises ValueError.
-    sentinel_idp_audience: str = Field(
+    # the same IdP would authenticate. Without it, Duar(...) raises ValueError.
+    duar_idp_audience: str = Field(
         default="",
-        validation_alias="SENTINEL_IDP_AUDIENCE",
+        validation_alias="DUAR_IDP_AUDIENCE",
     )
-    sentinel_idp_issuer: str = Field(
+    duar_idp_issuer: str = Field(
         default="https://accounts.google.com",
-        validation_alias="SENTINEL_IDP_ISSUER",
+        validation_alias="DUAR_IDP_ISSUER",
     )
-    sentinel_cache_ttl: float = Field(
+    duar_cache_ttl: float = Field(
         default=120,
-        validation_alias="SENTINEL_CACHE_TTL",
+        validation_alias="DUAR_CACHE_TTL",
         description="Seconds to cache permission check results (accessible/can). 0 disables.",
     )
 

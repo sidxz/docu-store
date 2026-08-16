@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuthz } from "@sentinel-auth/react";
+import { useAuthz } from "@duar-auth/react";
 import { useAppConfig } from "@/lib/app-config";
 import { ShapeGrid } from "@/components/backgrounds/ShapeGrid";
 import { LogoMark } from "@/components/ui/LogoMark";

@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from lagom import Container
-from sentinel_auth import RequestAuth
+from duar_auth import RequestAuth
 
 from application.dtos.correction_dtos import CorrectPageCompoundMentionsRequest
 from application.dtos.page_dtos import AddCompoundMentionsRequest, CreatePageRequest, PageResponse

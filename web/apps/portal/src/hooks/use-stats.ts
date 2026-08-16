@@ -258,7 +258,7 @@ interface MemberUsageStatsResponse {
   period_days: number;
 }
 
-// The route returns `list[dict]` (proxied from Sentinel), so the generated OpenAPI
+// The route returns `list[dict]` (proxied from Duar), so the generated OpenAPI
 // schema has no field names for it — keep these optional and fall back gracefully.
 interface WorkspaceMember {
   user_id?: string;

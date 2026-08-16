@@ -3,7 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { AlertCircle, ArrowLeft, BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
-import { useAuthzHasRole } from "@sentinel-auth/react";
+import { useAuthzHasRole } from "@duar-auth/react";
 
 import { useAuthBlobUrl } from "@/hooks/use-auth-blob-url";
 import { PageHeader } from "@/components/ui/PageHeader";

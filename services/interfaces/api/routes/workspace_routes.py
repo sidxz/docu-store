@@ -1,4 +1,4 @@
-"""Workspace routes — Sentinel member/group proxies + admin token-limit config."""
+"""Workspace routes — Duar member/group proxies + admin token-limit config."""
 
 from typing import Annotated
 from uuid import UUID
@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from lagom import Container
 from pydantic import BaseModel, Field
-from sentinel_auth import RequestAuth
+from duar_auth import RequestAuth
 
 from application.dtos.usage_dtos import TokenLimitEntry
 from application.ports.token_limit_store import TokenLimitStore
@@ -23,7 +23,7 @@ async def search_members(
 ) -> list[dict]:
     """Search workspace members by name or email.
 
-    Proxies to Sentinel's workspace member list endpoint.
+    Proxies to Duar's workspace member list endpoint.
     """
     return await auth.search_members(query=q, limit=limit)
 

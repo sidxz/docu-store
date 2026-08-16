@@ -8,7 +8,7 @@ import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from infrastructure.auth import register_service_actions, sentinel
+from infrastructure.auth import duar, register_service_actions
 from infrastructure.config import settings
 from infrastructure.logging import setup_logging
 from interfaces.api.routes.artifact_routes import router as artifact_router
@@ -34,12 +34,12 @@ logger = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Handle application startup and shutdown."""
-    async with sentinel.lifespan(app):
+    async with duar.lifespan(app):
         logger.info("app_starting", env=settings.app_env)
 
         # Register RBAC action definitions best-effort — never block boot if
-        # Sentinel is slow/down (the SDK ctor-actions path would be fatal).
-        await register_service_actions(sentinel)
+        # Duar is slow/down (the SDK ctor-actions path would be fatal).
+        await register_service_actions(duar)
 
         # Initialize Qdrant collections on startup
         try:
@@ -233,13 +233,13 @@ def create_app() -> FastAPI:
 
     app.add_middleware(TimingMiddleware)
 
-    # Sentinel auth middleware — protects all routes except excluded paths
+    # Duar auth middleware — protects all routes except excluded paths
     # NOTE: Starlette middleware is LIFO — last added runs first.
-    # Sentinel must be added BEFORE CORS so that CORS runs first and adds
+    # Duar must be added BEFORE CORS so that CORS runs first and adds
     # Access-Control-Allow-* headers to ALL responses, including 401s.
     # /auth/mint is the pre-auth credential-issuance step (CLI token minting) —
     # it must NOT require an authz token, so it is excluded from the middleware.
-    sentinel.protect(
+    duar.protect(
         app,
         exclude_paths=["/health", "/docs", "/openapi.json", "/search/health", "/auth/mint"],
     )

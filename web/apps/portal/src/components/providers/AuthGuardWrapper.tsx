@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuthz } from "@sentinel-auth/react";
+import { useAuthz } from "@duar-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 

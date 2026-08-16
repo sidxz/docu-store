@@ -7,7 +7,7 @@
 
 What already exists:
 - Per-field human edit endpoints: `PATCH /artifacts/{id}/title_mention`, `/tag_mentions`, `/summary_candidate`; `PATCH /pages/{id}/tag_mentions`, `/text_mention`, `/summary_candidate`; `POST /pages/{id}/compound_mentions` (append-only). All gated on workspace + entity `edit` permission. **None record the actor.**
-- Identity is in hand: `RequestAuth` (sentinel-auth-sdk 0.15.0) exposes `user_id`, `email`, `name` from the JWT; use cases receive it but drop it before the aggregate.
+- Identity is in hand: `RequestAuth` (duar-auth 0.15.0) exposes `user_id`, `email`, `name` from the JWT; use cases receive it but drop it before the aggregate.
 - RBAC action-gate pattern: `require_action(auth, "artifacts:create")` (`interfaces/api/routes/helpers.py:90`) + `SERVICE_ACTIONS` registration (`infrastructure/auth.py:12`). Admin/owner bypass built in.
 - Summary HIL half-exists: `SummaryCandidate.is_locked` + `hil_correction`; re-summarization skips locked summaries. No equivalent for title/date/tags/authors/compounds.
 
@@ -58,7 +58,7 @@ Human correction triggers the *existing* `TagMentionsUpdated`/`TitleMentionUpdat
   - `PATCH /artifacts/{artifact_id}/metadata` — body with optional `title`, `presentation_date`, `tags`, `authors` (pydantic `model_fields_set` distinguishes omitted vs null).
   - `PUT /pages/{page_id}/compound_mentions` — full corrected list.
   - Both: `require_action(auth, "artifacts:hiledit")` + workspace + entity `edit` gates.
-- New RBAC action `artifacts:hiledit` added to `SERVICE_ACTIONS`. **Prod note:** Sentinel grants no actions by default — roles must be seeded (same operational step as `artifacts:create`).
+- New RBAC action `artifacts:hiledit` added to `SERVICE_ACTIONS`. **Prod note:** Duar grants no actions by default — roles must be seeded (same operational step as `artifacts:create`).
 - The old per-field artifact PATCH routes `title_mention`/`tag_mentions` (and their use cases) are removed if nothing consumes them (FE doesn't): they would silently no-op after a correction and record no provenance — a trap. `summary_candidate` PATCH stays (separate summary-HIL path).
 
 ### Read models / DTOs
@@ -86,10 +86,10 @@ Today: **no** — actor is dropped at the use-case boundary. After this change: 
 ## 6. Rollout
 - No data migration: new event types only, additive read-model field, additive DTO fields.
 - Existing docs: corrections apply from the moment a human makes one; prior machine values stay machine-owned.
-- Deploy order: services before web (as usual). Seed `artifacts:hiledit` on appropriate Sentinel roles for prod (`docu-store`) and dev (`docu-store-dev`).
+- Deploy order: services before web (as usual). Seed `artifacts:hiledit` on appropriate Duar roles for prod (`docu-store`) and dev (`docu-store-dev`).
 
 ## 7. Follow-ups (not in v1)
 - Un-correct (`DELETE` a correction → field returns to machine control, next pipeline run repopulates).
 - Unify summary HIL (`is_locked`/`hil_correction`) with `human_corrections`.
-- FE object-action permission hook (needs sentinel JS/React SDK support).
+- FE object-action permission hook (needs duar JS/React SDK support).
 - Correction history view (the event stream already holds it; needs a query endpoint).

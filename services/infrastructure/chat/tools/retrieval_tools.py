@@ -323,7 +323,11 @@ class GetPageContentTool:
         except (ValueError, AttributeError):
             return [], f"Invalid page_id: {page_id_str}", []
 
-        page = await self._pages.get_page_by_id(page_id)
+        # Scope the fetch to the caller's workspace: page_id is model-controlled
+        # (and user-steerable), so an unscoped lookup would return any tenant's
+        # page. The allowed_artifact_ids check below is entity-ACL on top and is
+        # skipped for full-access members (None) — it is NOT a tenant boundary.
+        page = await self._pages.get_page_by_id(page_id, workspace_id=workspace_id)
         if not page:
             return [], f"Page {page_id_str} not found.", []
 

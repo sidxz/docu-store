@@ -6,7 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
-from sentinel_auth import RequestAuth
+from duar_auth import RequestAuth
 
 from application.dtos.artifact_dtos import ArtifactResponse, CreateArtifactRequest
 from application.dtos.blob_dtos import UploadBlobRequest
@@ -453,7 +453,7 @@ async def share_artifact(
     """Share an artifact with a user or group.
 
     Only the artifact owner or workspace admin can share.
-    Sentinel enforces this server-side; the route also fast-fails.
+    Duar enforces this server-side; the route also fast-fails.
     """
     artifact = await require_workspace_artifact(artifact_id, auth, container)
     if artifact.owner_id != auth.user_id and not auth.is_admin:

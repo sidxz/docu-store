@@ -1,13 +1,13 @@
 from uuid import UUID
 
 import structlog
-from sentinel_auth import PermissionClient
+from duar_auth import PermissionClient
 
 logger = structlog.get_logger()
 
 
-class SentinelPermissionRegistrar:
-    """Adapter that registers resources with Sentinel's permission system.
+class DuarPermissionRegistrar:
+    """Adapter that registers resources with Duar's permission system.
 
     Uses the SDK's PermissionClient which authenticates via service key
     (no user JWT needed for registration).

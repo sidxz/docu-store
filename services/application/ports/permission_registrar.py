@@ -6,7 +6,7 @@ class PermissionRegistrar(Protocol):
     """Port for registering resources with the permission system.
 
     Used by the pipeline worker (no user context) to register artifacts
-    as Sentinel resources on creation. Uses service-key auth internally.
+    as Duar resources on creation. Uses service-key auth internally.
     """
 
     async def register_resource(

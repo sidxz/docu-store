@@ -1,5 +1,5 @@
-"""register_service_actions is best-effort: a slow/locked Sentinel must never
-block application boot. Moving actions out of the Sentinel(...) ctor (where the
+"""register_service_actions is best-effort: a slow/locked Duar must never
+block application boot. Moving actions out of the Duar(...) ctor (where the
 SDK lifespan registers them fatally) is the whole point — guard it here.
 """
 
@@ -21,28 +21,28 @@ class _Roles:
         return list(actions)
 
 
-class _Sentinel:
+class _Duar:
     def __init__(self, exc: Exception | None = None) -> None:
         self.roles = _Roles(exc)
 
 
 @pytest.mark.asyncio
 async def test_successful_registration_returns_true():
-    sentinel = _Sentinel()
-    assert await auth.register_service_actions(sentinel) is True
-    assert sentinel.roles.calls == 1
+    duar = _Duar()
+    assert await auth.register_service_actions(duar) is True
+    assert duar.roles.calls == 1
 
 
 @pytest.mark.asyncio
 async def test_readtimeout_is_swallowed_so_boot_continues():
-    # The exact failure mode: Sentinel accepts the connection but the
+    # The exact failure mode: Duar accepts the connection but the
     # registration POST never returns within the SDK timeout.
-    sentinel = _Sentinel(exc=httpx.ReadTimeout("sentinel hung"))
-    assert await auth.register_service_actions(sentinel) is False
-    assert sentinel.roles.calls == 1
+    duar = _Duar(exc=httpx.ReadTimeout("duar hung"))
+    assert await auth.register_service_actions(duar) is False
+    assert duar.roles.calls == 1
 
 
 @pytest.mark.asyncio
 async def test_arbitrary_error_is_swallowed():
-    sentinel = _Sentinel(exc=RuntimeError("unexpected"))
-    assert await auth.register_service_actions(sentinel) is False
+    duar = _Duar(exc=RuntimeError("unexpected"))
+    assert await auth.register_service_actions(duar) is False

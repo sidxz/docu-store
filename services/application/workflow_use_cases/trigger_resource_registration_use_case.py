@@ -1,7 +1,7 @@
 """Trigger resource registration with the permission system.
 
 Called by the pipeline worker when an Artifact.Created event is received.
-Registers the artifact as a resource in Sentinel so entity-level permissions
+Registers the artifact as a resource in Duar so entity-level permissions
 (sharing, visibility) can be applied.
 """
 

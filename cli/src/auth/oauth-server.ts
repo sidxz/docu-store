@@ -68,11 +68,11 @@ function generatePKCE(): { codeVerifier: string; codeChallenge: string } {
  * Start a local HTTP server, open the browser to the IdP login,
  * and wait for the callback with the IdP token.
  *
- * - GitHub: routes through Sentinel's proxy, token in hash fragment
+ * - GitHub: routes through Duar's proxy, token in hash fragment
  * - Google: authorization code + PKCE flow, code in query params
  */
 export async function startOAuthFlow(
-  sentinelUrl: string,
+  duarUrl: string,
   provider: string,
   googleClientId?: string,
   googleClientSecret?: string,
@@ -190,7 +190,7 @@ export async function startOAuthFlow(
       let loginUrl: string;
       try {
         loginUrl = buildLoginUrl(provider, {
-          sentinelUrl,
+          duarUrl,
           callbackUrl,
           nonce,
           googleClientId,
@@ -216,7 +216,7 @@ export async function startOAuthFlow(
 function buildLoginUrl(
   provider: string,
   opts: {
-    sentinelUrl: string;
+    duarUrl: string;
     callbackUrl: string;
     nonce: string;
     googleClientId?: string;
@@ -225,7 +225,7 @@ function buildLoginUrl(
 ): string {
   if (provider === "github") {
     return (
-      `${opts.sentinelUrl.replace(/\/$/, "")}/authz/idp/github/login` +
+      `${opts.duarUrl.replace(/\/$/, "")}/authz/idp/github/login` +
       `?redirect_uri=${encodeURIComponent(opts.callbackUrl)}&nonce=${opts.nonce}`
     );
   }

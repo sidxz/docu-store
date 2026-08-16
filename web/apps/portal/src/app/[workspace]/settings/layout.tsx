@@ -3,7 +3,7 @@
 import { Settings } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { useAuthzHasRole } from "@sentinel-auth/react";
+import { useAuthzHasRole } from "@duar-auth/react";
 
 import { PageHeader } from "@/components/ui/PageHeader";
 

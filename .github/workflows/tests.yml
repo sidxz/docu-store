@@ -57,8 +57,8 @@ jobs:
 
       - name: Run tests
         env:
-          SENTINEL_SERVICE_KEY: test-dummy-key
-          SENTINEL_URL: http://localhost:9003
+          DUAR_SERVICE_KEY: test-dummy-key
+          DUAR_URL: http://localhost:9003
         run: cd services && make test
 
       - name: Upload coverage

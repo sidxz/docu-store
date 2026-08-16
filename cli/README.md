@@ -12,7 +12,7 @@ npm install -g @docu-store/cli
 cd cli && npm install && npm run build && npm link
 
 # Configure
-docu config set sentinel-url https://sentinel.example.com
+docu config set duar-url https://duar.example.com
 docu config set api-url https://api.example.com
 
 # Login
@@ -62,7 +62,7 @@ docu login --token <paste> --workspace my-lab  # Headless fallback (no auto-refr
 | `-p, --provider` | Identity provider (`github`, `google`) | `github` |
 | `-w, --workspace` | Workspace slug or ID (skips selection prompt) | — |
 | `-t, --token` | Paste an authz token directly (for headless/SSH) | — |
-| `--sentinel-url` | Override Sentinel URL for this command | — |
+| `--duar-url` | Override Duar URL for this command | — |
 
 **Google login** requires OAuth credentials from your Google Cloud Console:
 
@@ -298,7 +298,7 @@ Manage CLI configuration. Settings are stored in `~/.config/docu-store/config.js
 
 ```bash
 docu config show
-docu config set sentinel-url https://sentinel.example.com
+docu config set duar-url https://duar.example.com
 docu config set api-url https://api.example.com
 docu config set google-client-id YOUR_CLIENT_ID
 docu config set google-client-secret YOUR_CLIENT_SECRET
@@ -308,7 +308,7 @@ docu config set google-client-secret YOUR_CLIENT_SECRET
 
 | Setting | Env Variable | Default |
 |---------|-------------|---------|
-| `sentinel-url` | `DOCU_SENTINEL_URL` | `http://localhost:9003` |
+| `duar-url` | `DOCU_DUAR_URL` | `http://localhost:9003` |
 | `api-url` | `DOCU_API_URL` | `http://localhost:8000` |
 | `google-client-id` | `DOCU_GOOGLE_CLIENT_ID` | — |
 | `google-client-secret` | `DOCU_GOOGLE_CLIENT_SECRET` | — |
@@ -328,7 +328,7 @@ The CLI authenticates the same way as the web frontend — no service keys are d
 
 1. `docu login` opens your browser to the identity provider (GitHub or Google)
 2. After login, the token is captured via a local callback server (port 18549)
-3. The CLI exchanges this for an authorization token via Sentinel
+3. The CLI exchanges this for an authorization token via Duar
 4. Credentials are stored in `~/.config/docu-store/credentials.json` (mode `0600`)
 5. Tokens auto-refresh transparently on each API call
 
@@ -338,11 +338,11 @@ The CLI authenticates the same way as the web frontend — no service keys are d
 
 ## Admin Setup (one-time)
 
-An admin must add the CLI origin to the existing docu-store service app in Sentinel:
+An admin must add the CLI origin to the existing docu-store service app in Duar:
 
 ```bash
 curl -X PATCH \
-  https://sentinel.example.com/admin/service-apps/<APP_ID> \
+  https://duar.example.com/admin/service-apps/<APP_ID> \
   -H "Authorization: Bearer <admin-token>" \
   -H "Content-Type: application/json" \
   -d '{"allowed_origins": ["http://localhost:15000", "docu-cli://localhost"]}'

@@ -558,7 +558,7 @@ def strip_authz_middleware(app) -> None:
     Without this, the real middleware 401s every request before
     ``Depends(get_auth)`` runs, so dependency overrides never apply.
     """
-    from sentinel_auth.authz_middleware import AuthzMiddleware
+    from duar_auth.authz_middleware import AuthzMiddleware
 
     app.user_middleware = [m for m in app.user_middleware if m.cls is not AuthzMiddleware]
     app.middleware_stack = app.build_middleware_stack()
@@ -697,7 +697,7 @@ Expected: FAIL — 404s (routes don't exist yet)
 Replace `services/interfaces/api/routes/workspace_routes.py` in full:
 
 ```python
-"""Workspace routes — Sentinel member/group proxies + admin token-limit config."""
+"""Workspace routes — Duar member/group proxies + admin token-limit config."""
 
 from typing import Annotated
 from uuid import UUID
@@ -705,7 +705,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from lagom import Container
 from pydantic import BaseModel, Field
-from sentinel_auth import RequestAuth
+from duar_auth import RequestAuth
 
 from application.dtos.usage_dtos import TokenLimitEntry
 from application.ports.token_limit_store import TokenLimitStore
@@ -722,7 +722,7 @@ async def search_members(
 ) -> list[dict]:
     """Search workspace members by name or email.
 
-    Proxies to Sentinel's workspace member list endpoint.
+    Proxies to Duar's workspace member list endpoint.
     """
     return await auth.search_members(query=q, limit=limit)
 
@@ -1319,7 +1319,7 @@ Create `web/apps/portal/src/app/[workspace]/settings/layout.tsx`:
 import { Settings } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { useAuthzHasRole } from "@sentinel-auth/react";
+import { useAuthzHasRole } from "@duar-auth/react";
 
 import { PageHeader } from "@/components/ui/PageHeader";
 
@@ -1779,7 +1779,7 @@ const ADMIN_TABS: SettingsTab[] = [
 In `web/apps/portal/src/components/layout/Sidebar.tsx`:
 - Delete the two `mainNav` entries for Stats and Status (lines 42-43).
 - Delete `requireAdmin?: boolean;` from the `NavItem` interface, and simplify line 92 `mainNav.filter((item) => !item.requireAdmin || isAdmin).map(...)` → `mainNav.map(...)`.
-- Delete `const isAdmin = useAuthzHasRole("admin");` (line 50) and the `import { useAuthzHasRole } from "@sentinel-auth/react";` (line 19).
+- Delete `const isAdmin = useAuthzHasRole("admin");` (line 50) and the `import { useAuthzHasRole } from "@duar-auth/react";` (line 19).
 - Remove `Activity` and `BarChart3` from the lucide import (lines 10-11).
 
 Then check for other hardcoded links to the old routes:
@@ -1917,7 +1917,7 @@ Create `web/apps/portal/src/app/[workspace]/settings/tokens/page.tsx`:
 
 import { useState } from "react";
 import { ShieldAlert } from "lucide-react";
-import { useAuthzHasRole } from "@sentinel-auth/react";
+import { useAuthzHasRole } from "@duar-auth/react";
 
 import { Card, CardHeader } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -2358,7 +2358,7 @@ Expected: green
 Start the stack (per repo runbook): `cd services && make docker-up`, then `PORT=8010 make run-all`; `cd web && pnpm --filter portal dev` (:15000). Then verify:
 
 1. Sidebar no longer shows Stats/Status; `/{ws}/stats` and `/{ws}/status` redirect into settings.
-2. `/{ws}/settings` redirects to General; rail shows General/Chat/Usage/Workspace (+ admin section for admins); as a non-admin (Sentinel viewer/editor account) the admin section is absent and direct URLs to tokens/stats/status show Access Denied.
+2. `/{ws}/settings` redirects to General; rail shows General/Chat/Usage/Workspace (+ admin section for admins); as a non-admin (Duar viewer/editor account) the admin section is absent and direct URLs to tokens/stats/status show Access Denied.
 3. Token Settings: set workspace default to a small number (e.g. `1000`); table shows members with month usage; set + clear a per-user override.
 4. As a non-admin over the limit: chat send shows `**Error:** Monthly token limit reached: …` in-thread; document upload row shows the same detail message.
 5. Topbar badge shows `used / limit` and turns amber/red at 80%/100%; Usage tab bar matches.

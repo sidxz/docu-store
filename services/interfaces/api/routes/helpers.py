@@ -4,7 +4,7 @@ import structlog
 from fastapi import HTTPException, status
 from lagom import Container
 from returns.result import Failure
-from sentinel_auth import RequestAuth
+from duar_auth import RequestAuth
 
 from application.dtos.artifact_dtos import ArtifactResponse
 from application.dtos.errors import AppError
@@ -57,8 +57,8 @@ def _map_app_error_to_http_exception(error: AppError) -> HTTPException:  # noqa:
 async def get_allowed_artifact_ids(auth: RequestAuth) -> list[UUID] | None:
     """Get artifact IDs the user can access, or None for full access.
 
-    Calls Sentinel's accessible() endpoint. Returns None (no filtering)
-    when the user has full access or when Sentinel is unavailable (graceful
+    Calls Duar's accessible() endpoint. Returns None (no filtering)
+    when the user has full access or when Duar is unavailable (graceful
     degradation to workspace-only filtering).
     """
     try:
@@ -91,7 +91,7 @@ async def require_action(auth: RequestAuth, action: str) -> None:
     """Check workspace RBAC action, raise 403 if the user's roles don't grant it.
 
     Workspace admins/owners bypass, mirroring entity-level resolution (see
-    Sentinel check_permission); without this, a fresh workspace has no role
+    Duar check_permission); without this, a fresh workspace has no role
     granting any action and every member would be locked out.
     """
     if auth.is_admin:

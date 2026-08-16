@@ -20,12 +20,12 @@ from scripts.cli.auth import CREDENTIALS_FILE, AuthError, CliAuth
 
 
 def _get_auth(args: argparse.Namespace) -> CliAuth:
-    sentinel_url = args.sentinel_url or os.environ.get("SENTINEL_URL", "http://localhost:8100")
-    service_key = args.service_key or os.environ.get("SENTINEL_SERVICE_KEY", "")
+    duar_url = args.duar_url or os.environ.get("DUAR_URL", "http://localhost:8100")
+    service_key = args.service_key or os.environ.get("DUAR_SERVICE_KEY", "")
     if not service_key:
-        print("Error: provide --service-key or set SENTINEL_SERVICE_KEY", file=sys.stderr)
+        print("Error: provide --service-key or set DUAR_SERVICE_KEY", file=sys.stderr)
         sys.exit(1)
-    return CliAuth(sentinel_url=sentinel_url, service_key=service_key)
+    return CliAuth(duar_url=duar_url, service_key=service_key)
 
 
 def cmd_login(args: argparse.Namespace) -> None:
@@ -98,13 +98,13 @@ def main() -> None:
         prog="docu-store",
         description="docu-store CLI — manage documents from the command line",
     )
-    parser.add_argument("--sentinel-url", help="Sentinel URL (or SENTINEL_URL env)")
-    parser.add_argument("--service-key", help="Sentinel service key (or SENTINEL_SERVICE_KEY env)")
+    parser.add_argument("--duar-url", help="Duar URL (or DUAR_URL env)")
+    parser.add_argument("--service-key", help="Duar service key (or DUAR_SERVICE_KEY env)")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # login
-    login_parser = subparsers.add_parser("login", help="Authenticate with Sentinel")
+    login_parser = subparsers.add_parser("login", help="Authenticate with Duar")
     login_parser.add_argument("--provider", default="github", help="IdP provider (default: github)")
     login_parser.add_argument("--workspace", required=True, help="Workspace ID to authorize for")
     login_parser.add_argument("--token", help="Paste an existing authz token (skips browser flow)")

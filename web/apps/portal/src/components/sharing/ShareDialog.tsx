@@ -14,7 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { ResourceShare } from "@docu-store/types";
-import type { WorkspaceMember, GroupInfo } from "@sentinel-auth/js";
+import type { WorkspaceMember, GroupInfo } from "@duar-auth/js";
 import {
   useArtifactPermissions,
   useShareArtifact,
@@ -124,7 +124,7 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
           params: { query: { q, limit: 10 } },
         });
         if (error) throw new Error("Search failed");
-        // Schema type doesn't overlap with Sentinel SDK types — double cast needed
+        // Schema type doesn't overlap with Duar SDK types — double cast needed
         setMemberSuggestions((data as unknown as WorkspaceMember[]) ?? []);
       } catch {
         setMemberSuggestions([]);
@@ -141,7 +141,7 @@ export function ShareDialog({ artifactId, isOwnerOrAdmin }: ShareDialogProps) {
     try {
       const { data, error } = await apiClient.GET("/workspace/groups");
       if (error) throw new Error("Failed to load groups");
-      // Schema type doesn't overlap with Sentinel SDK types — double cast needed
+      // Schema type doesn't overlap with Duar SDK types — double cast needed
       setGroupOptions((data as unknown as GroupInfo[]) ?? []);
       setGroupsLoaded(true);
     } catch {

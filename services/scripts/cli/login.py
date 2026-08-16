@@ -2,8 +2,8 @@
 
 Flow:
 1. Start local HTTP server on a random port
-2. Open browser to Sentinel's IdP OAuth proxy (e.g., GitHub)
-3. User authenticates, Sentinel redirects back with IdP token in URL hash
+2. Open browser to Duar's IdP OAuth proxy (e.g., GitHub)
+3. User authenticates, Duar redirects back with IdP token in URL hash
 4. Local callback page extracts token via JS and POSTs to local server
 5. CLI calls /authz/resolve to get authz token
 6. Credentials stored locally
@@ -100,9 +100,9 @@ def browser_login(
     thread.start()
     server_ready.wait()
 
-    # Open browser to Sentinel's OAuth proxy
+    # Open browser to Duar's OAuth proxy
     login_url = (
-        f"{auth.sentinel_url}/authz/idp/{provider}/login?redirect_uri={callback_url}&nonce={nonce}"
+        f"{auth.duar_url}/authz/idp/{provider}/login?redirect_uri={callback_url}&nonce={nonce}"
     )
     print(f"Opening browser for {provider} login...")
     print(f"If the browser doesn't open, visit: {login_url}")
@@ -117,7 +117,7 @@ def browser_login(
         sys.exit(1)
 
     # Exchange IdP token for authz token
-    print("Authenticating with Sentinel...")
+    print("Authenticating with Duar...")
     try:
         data = auth.resolve_authz(captured["idp_token"], provider, workspace_id)
     except Exception as e:

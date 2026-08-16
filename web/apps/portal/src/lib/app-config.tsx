@@ -5,7 +5,7 @@ import { createContext, useContext, type ReactNode } from "react";
 export interface AppConfig {
   apiUrl: string;
   appUrl: string;
-  sentinelUrl: string;
+  duarUrl: string;
   googleClientId: string;
   githubClientId: string;
   entraIdClientId: string;
@@ -16,7 +16,7 @@ export interface AppConfig {
 const defaultConfig: AppConfig = {
   apiUrl: "http://localhost:8000",
   appUrl: "http://localhost:15000",
-  sentinelUrl: "http://localhost:9003",
+  duarUrl: "http://localhost:9003",
   googleClientId: "",
   githubClientId: "",
   entraIdClientId: "",
@@ -61,8 +61,8 @@ export async function fetchAppConfig(): Promise<AppConfig> {
   return {
     apiUrl: process.env.NEXT_PUBLIC_API_URL ?? defaultConfig.apiUrl,
     appUrl: process.env.NEXT_PUBLIC_APP_URL ?? defaultConfig.appUrl,
-    sentinelUrl:
-      process.env.NEXT_PUBLIC_SENTINEL_URL ?? defaultConfig.sentinelUrl,
+    duarUrl:
+      process.env.NEXT_PUBLIC_DUAR_URL ?? defaultConfig.duarUrl,
     googleClientId:
       process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? defaultConfig.googleClientId,
     githubClientId:

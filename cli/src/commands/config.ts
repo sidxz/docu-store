@@ -1,7 +1,7 @@
 import { saveConfig, showConfig, type AppConfig } from "../utils/config.js";
 import * as log from "../utils/logger.js";
 
-const VALID_KEYS: (keyof AppConfig)[] = ["sentinel_url", "api_url", "google_client_id", "google_client_secret"];
+const VALID_KEYS: (keyof AppConfig)[] = ["duar_url", "api_url", "google_client_id", "google_client_secret"];
 
 export function configSetCommand(key: string, value: string): void {
   // Accept both dash and underscore forms

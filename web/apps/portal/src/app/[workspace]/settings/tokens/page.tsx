@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AlertTriangle, ShieldAlert } from "lucide-react";
-import { useAuthzHasRole } from "@sentinel-auth/react";
+import { useAuthzHasRole } from "@duar-auth/react";
 
 import { Card, CardHeader } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";

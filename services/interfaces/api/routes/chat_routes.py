@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from lagom import Container
 from pydantic import BaseModel, Field
 from returns.result import Failure, Success
-from sentinel_auth import RequestAuth
+from duar_auth import RequestAuth
 
 from application.dtos.chat_dtos import (
     ChatFeedbackDTO,
@@ -175,6 +175,7 @@ async def get_conversation(
     result = await use_case.execute(
         conversation_id=conversation_id,
         workspace_id=auth.workspace_id,
+        owner_id=auth.user_id,
         skip=skip,
         limit=limit,
     )
@@ -201,6 +202,7 @@ async def delete_conversation(
     result = await use_case.execute(
         conversation_id=conversation_id,
         workspace_id=auth.workspace_id,
+        owner_id=auth.user_id,
     )
     if isinstance(result, Success):
         # Only after a confirmed delete — a cross-workspace 404 must never

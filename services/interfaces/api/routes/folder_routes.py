@@ -13,7 +13,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from lagom import Container
 from pydantic import BaseModel, StringConstraints
-from sentinel_auth import RequestAuth
+from duar_auth import RequestAuth
 
 from application.dtos.chat_dtos import ChatFolderDTO
 from application.use_cases.chat_folder_use_cases import (

@@ -439,7 +439,7 @@ git commit -m "feat(domain): page compound-mention human corrections with proven
 - Produces:
   - `application/dtos/correction_dtos.py`: `CorrectedTagInput(BaseModel)` {`tag: str`, `entity_type: str | None = None`}; `CorrectArtifactMetadataRequest(BaseModel)` {`title: str | None = None`, `presentation_date: datetime.date | None = None`, `tags: list[CorrectedTagInput] | None = None`, `authors: list[str] | None = None`} — **omitted-vs-null via `model_fields_set`**; `HumanCorrectionInfo(BaseModel)` {`corrected_by_id: str`, `corrected_by_name: str | None = None`, `corrected_at: datetime.datetime`}.
   - `CorrectArtifactMetadataUseCase(artifact_repository, external_event_publisher=None).execute(artifact_id: UUID, request: CorrectArtifactMetadataRequest, auth: AuthContext | None) -> Result[ArtifactResponse, AppError]`.
-- `AuthContext` protocol gains `name: str` and `email: str` properties (concrete sentinel `RequestAuth` already provides both).
+- `AuthContext` protocol gains `name: str` and `email: str` properties (concrete duar `RequestAuth` already provides both).
 
 - [ ] **Step 1: Write the failing tests**
 

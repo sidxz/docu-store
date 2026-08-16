@@ -28,7 +28,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { useAuthzHasRole } from "@sentinel-auth/react";
+import { useAuthzHasRole } from "@duar-auth/react";
 
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { StatCard } from "@/components/ui/StatCard";

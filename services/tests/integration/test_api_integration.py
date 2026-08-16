@@ -8,7 +8,7 @@ from uuid import UUID
 import pytest
 from fastapi.testclient import TestClient
 from returns.result import Success
-from sentinel_auth.authz_middleware import AuthzMiddleware
+from duar_auth.authz_middleware import AuthzMiddleware
 
 from application.dtos.artifact_dtos import ArtifactResponse
 from application.dtos.page_dtos import PageResponse

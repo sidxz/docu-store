@@ -5,7 +5,7 @@ import {
   type Credentials,
 } from "../auth/credentials.js";
 import { refreshGoogleToken } from "../auth/google.js";
-import { mint, SentinelError } from "../auth/sentinel.js";
+import { mint, DuarError } from "../auth/duar.js";
 import { loadConfig } from "../utils/config.js";
 import * as log from "../utils/logger.js";
 
@@ -87,7 +87,7 @@ export async function getAuthCredentials(): Promise<Credentials> {
     saveCredentials(creds);
     return creds;
   } catch (err) {
-    if (err instanceof SentinelError) {
+    if (err instanceof DuarError) {
       log.error(`Token refresh failed: ${err.message}. Run: docu login`);
     } else {
       log.error(`Token refresh failed. Run: docu login`);
@@ -96,7 +96,7 @@ export async function getAuthCredentials(): Promise<Credentials> {
   }
 }
 
-/** Build the dual-token auth headers matching @sentinel-auth/js getHeaders(). */
+/** Build the dual-token auth headers matching @duar-auth/js getHeaders(). */
 export function authHeaders(creds: Credentials): Record<string, string> {
   return {
     Authorization: `Bearer ${creds.idp_token}`,

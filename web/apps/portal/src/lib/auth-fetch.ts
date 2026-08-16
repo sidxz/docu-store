@@ -3,7 +3,7 @@ import { API_URL } from "./constants";
 import { ApiError } from "./api-error";
 
 /**
- * Fetch wrapper that injects Sentinel auth headers and retries on 401.
+ * Fetch wrapper that injects Duar auth headers and retries on 401.
  * Use this for API calls that can't go through the openapi-fetch `apiClient`
  * (e.g. endpoints not in the OpenAPI spec, or browse/dashboard/plugin endpoints).
  */

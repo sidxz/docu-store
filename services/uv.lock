@@ -967,6 +967,7 @@ dependencies = [
     { name = "confluent-kafka" },
     { name = "dateparser" },
     { name = "docling" },
+    { name = "duar-auth" },
     { name = "einops" },
     { name = "eventsourcing" },
     { name = "eventsourcing-kurrentdb" },
@@ -998,7 +999,6 @@ dependencies = [
     { name = "rdkit" },
     { name = "returns" },
     { name = "sentence-transformers" },
-    { name = "sentinel-auth-sdk" },
     { name = "structflo-cser" },
     { name = "structflo-ner" },
     { name = "structlog" },
@@ -1023,6 +1023,7 @@ requires-dist = [
     { name = "confluent-kafka", specifier = ">=2.13.0" },
     { name = "dateparser", specifier = ">=1.2.0" },
     { name = "docling", specifier = ">=2.107.0" },
+    { name = "duar-auth", specifier = ">=1.0.0" },
     { name = "einops" },
     { name = "eventsourcing", specifier = ">=9.5.2" },
     { name = "eventsourcing-kurrentdb", specifier = ">=1.2.2" },
@@ -1054,7 +1055,6 @@ requires-dist = [
     { name = "rdkit", specifier = ">=2025.9.5" },
     { name = "returns", specifier = ">=0.26.0" },
     { name = "sentence-transformers", specifier = ">=3.3.0" },
-    { name = "sentinel-auth-sdk", specifier = ">=0.15.0" },
     { name = "structflo-cser", specifier = ">=0.4.1" },
     { name = "structflo-ner", specifier = ">=0.4.0" },
     { name = "structlog", specifier = ">=25.5.0" },
@@ -1071,6 +1071,23 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.24.0" },
     { name = "pytest-cov", specifier = ">=4.1.0" },
     { name = "ruff", specifier = ">=0.14.14" },
+]
+
+[[package]]
+name = "duar-auth"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "pyjwt", extra = ["crypto"] },
+    { name = "starlette" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/04/ca/9bfb152d869025502640c4bb3f166fcf1748364df9ad8855b6032c803ba7/duar_auth-1.0.0.tar.gz", hash = "sha256:76d1b94046914904cf16ff6b278dc7497b03401c61de4a145075ccc5b4af0a02", size = 35968, upload-time = "2026-08-15T22:18:29.788Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5e/d5/6804bfbc306bcebc439125b27b91c83e6f42b3a1e171932b465e256a3396/duar_auth-1.0.0-py3-none-any.whl", hash = "sha256:118be7466b2f36bec254ae970d564a1491cf35fc1865982cc8b6515d1a35ef6a", size = 27174, upload-time = "2026-08-15T22:18:28.506Z" },
 ]
 
 [[package]]
@@ -5346,23 +5363,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/66/7c/08ff0012507297a4dd74a5420fdc0eb9e3e80f4e88cab1538d7f28db303d/sentencepiece-0.2.1-cp314-cp314t-win32.whl", hash = "sha256:d3233770f78e637dc8b1fda2cd7c3b99ec77e7505041934188a4e7fe751de3b0", size = 1099765, upload-time = "2025-08-12T07:00:46.058Z" },
     { url = "https://files.pythonhosted.org/packages/91/d5/2a69e1ce15881beb9ddfc7e3f998322f5cedcd5e4d244cb74dade9441663/sentencepiece-0.2.1-cp314-cp314t-win_amd64.whl", hash = "sha256:5e4366c97b68218fd30ea72d70c525e6e78a6c0a88650f57ac4c43c63b234a9d", size = 1157807, upload-time = "2025-08-12T07:00:47.673Z" },
     { url = "https://files.pythonhosted.org/packages/f3/16/54f611fcfc2d1c46cbe3ec4169780b2cfa7cf63708ef2b71611136db7513/sentencepiece-0.2.1-cp314-cp314t-win_arm64.whl", hash = "sha256:105e36e75cbac1292642045458e8da677b2342dcd33df503e640f0b457cb6751", size = 1136264, upload-time = "2025-08-12T07:00:49.485Z" },
-]
-
-[[package]]
-name = "sentinel-auth-sdk"
-version = "0.15.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "cryptography" },
-    { name = "fastapi" },
-    { name = "httpx" },
-    { name = "pydantic" },
-    { name = "pyjwt", extra = ["crypto"] },
-    { name = "starlette" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/62/0e/f62cfbd0570a2dfc5773db149a9e47b6582453f299490ddfe4f16445eca9/sentinel_auth_sdk-0.15.0.tar.gz", hash = "sha256:3fbe1412e2fed91f34f31b1d232e6683913e8066e26ac5db2e584144964c2351", size = 32487, upload-time = "2026-07-10T17:17:07.585Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a6/af/8350f6b1bb0c9cf14e9094efa12d8f026c5f4deead1745e9159198a0c64a/sentinel_auth_sdk-0.15.0-py3-none-any.whl", hash = "sha256:9358328fd10f15dcf4fc224a103eab5d344813dc84e9a563d016f3742d83e59e", size = 25057, upload-time = "2026-07-10T17:17:06.32Z" },
 ]
 
 [[package]]

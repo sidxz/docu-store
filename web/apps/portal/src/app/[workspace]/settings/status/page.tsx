@@ -19,7 +19,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useAuthzHasRole } from "@sentinel-auth/react";
+import { useAuthzHasRole } from "@duar-auth/react";
 
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { StatCard } from "@/components/ui/StatCard";

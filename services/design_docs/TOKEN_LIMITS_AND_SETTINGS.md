@@ -136,7 +136,7 @@ Response keeps today's shape and adds a `month` object (consumers: badge + Usage
 
 - **Workspace default card**: shows current default (or "Unlimited"), edit + save.
 - **Members table** joining three sources by `user_id` (FE-side join, precedent: existing stats member card):
-  1. `GET /workspace/members` — identities (Sentinel; 50-member cap, same as the stats card today),
+  1. `GET /workspace/members` — identities (Duar; 50-member cap, same as the stats card today),
   2. `GET /stats/member-usage?period=month` — current-month usage,
   3. `GET /workspace/token-limits` — limits.
 - Columns: member (name/email), month usage, effective limit with a `default`/`override` badge, actions (set override / clear override → falls back to default).

@@ -15,7 +15,7 @@ class UpdateVisibilityRequest(BaseModel):
     visibility: str = Field(pattern=r"^(private|workspace)$")
 
 
-# ── Response models (match sentinel-auth SDK return shapes) ──
+# ── Response models (match duar-auth SDK return shapes) ──
 
 
 class ResourceShareResponse(BaseModel):

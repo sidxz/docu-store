@@ -1639,7 +1639,7 @@ git commit -m "feat(usage): admin per-member token usage endpoint (chat vs inges
 - Modify: `web/apps/portal/src/app/[workspace]/stats/page.tsx` (new card after the "Token Usage (daily)" card, ~line 725)
 
 **Interfaces:**
-- Consumes: `GET /stats/member-usage?period=` (Task 6); `GET /workspace/members?limit=50` (existing Sentinel proxy, `services/interfaces/api/routes/workspace_routes.py:13-23`, returns `list[dict]` of member records).
+- Consumes: `GET /stats/member-usage?period=` (Task 6); `GET /workspace/members?limit=50` (existing Duar proxy, `services/interfaces/api/routes/workspace_routes.py:13-23`, returns `list[dict]` of member records).
 - Produces: `useMemberUsageStats(period)`, `useWorkspaceMembers()` hooks; a "Token Usage by Member" card visible to admins.
 
 - [ ] **Step 1: Query keys** — in `web/apps/portal/src/lib/query-keys.ts` add inside `stats`:
@@ -1695,7 +1695,7 @@ export function useWorkspaceMembers() {
 }
 ```
 
-(Verify the Sentinel member record's id field at implementation time — the card below falls back across `user_id` → `id`, and to the raw ledger id when no member matches, so an unexpected shape degrades gracefully, never breaks.)
+(Verify the Duar member record's id field at implementation time — the card below falls back across `user_id` → `id`, and to the raw ledger id when no member matches, so an unexpected shape degrades gracefully, never breaks.)
 
 - [ ] **Step 3: Card** — in `web/apps/portal/src/app/[workspace]/stats/page.tsx`, import the two hooks, call them alongside the other stats hooks (`const memberUsage = useMemberUsageStats(period);` `const members = useWorkspaceMembers();` — reuse the page's existing `period` state), and render after the "Token Usage (daily)" card:
 

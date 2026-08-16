@@ -36,7 +36,11 @@ class FakeSendUseCase:
 
 
 class FakeDeleteConversation:
+    def __init__(self) -> None:
+        self.owner_ids: list[UUID | None] = []
+
     async def execute(self, **kwargs):
+        self.owner_ids.append(kwargs.get("owner_id"))
         return Success(None)
 
 
@@ -47,6 +51,7 @@ class FakeGetConversation:
         from application.dtos.chat_dtos import ConversationDetailDTO
 
         now = datetime.now(UTC)
+        self.owner_ids: list[UUID | None] = []
         self._make = lambda cid: ConversationDetailDTO(
             conversation_id=cid,
             workspace_id=WS,
@@ -58,7 +63,8 @@ class FakeGetConversation:
             messages=[],
         )
 
-    async def execute(self, conversation_id, workspace_id, skip=0, limit=100):
+    async def execute(self, conversation_id, workspace_id, owner_id=None, skip=0, limit=100):
+        self.owner_ids.append(owner_id)
         return self._make(conversation_id)
 
 
@@ -70,14 +76,19 @@ class FakeContainer:
         return self._mapping[key]
 
 
-def _client(registry: ChatRunRegistry) -> TestClient:
+def _client(
+    registry: ChatRunRegistry,
+    *,
+    get_uc: FakeGetConversation | None = None,
+    delete_uc: FakeDeleteConversation | None = None,
+) -> TestClient:
     strip_authz_middleware(app)
     app.dependency_overrides[get_container] = lambda: FakeContainer(
         {
             CheckTokenQuotaUseCase: FakeQuota(),
             SendMessageUseCase: FakeSendUseCase(),
-            GetConversationUseCase: FakeGetConversation(),
-            DeleteConversationUseCase: FakeDeleteConversation(),
+            GetConversationUseCase: get_uc or FakeGetConversation(),
+            DeleteConversationUseCase: delete_uc or FakeDeleteConversation(),
             ChatRunRegistry: registry,
         },
     )
@@ -227,6 +238,20 @@ def test_conversation_detail_active_run_false_when_done() -> None:
     try:
         resp = _client(registry).get(f"/chat/{cid}")
         assert resp.json()["active_run"] is False
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_get_and_delete_are_owner_scoped() -> None:
+    """Conversations are private: GET/DELETE must scope by the caller, not just the workspace."""
+    registry = ChatRunRegistry()
+    get_uc, delete_uc = FakeGetConversation(), FakeDeleteConversation()
+    client = _client(registry, get_uc=get_uc, delete_uc=delete_uc)
+    try:
+        assert client.get(f"/chat/{uuid4()}").status_code == 200
+        assert client.delete(f"/chat/{uuid4()}").status_code == 204
+        assert get_uc.owner_ids == [OWNER]
+        assert delete_uc.owner_ids == [OWNER]
     finally:
         app.dependency_overrides.clear()
 

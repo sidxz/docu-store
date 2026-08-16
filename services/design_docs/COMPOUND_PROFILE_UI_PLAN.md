@@ -417,7 +417,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from lagom import Container
-from sentinel_auth import RequestAuth
+from duar_auth import RequestAuth
 
 from application.dtos.compound_dtos import CompoundProfileDTO
 from application.use_cases.compound_profile_use_case import GetCompoundProfileUseCase

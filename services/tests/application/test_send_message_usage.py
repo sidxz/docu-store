@@ -34,7 +34,7 @@ class FakeChatRepo:
         self._conversation = conversation
         self.messages: list[ChatMessageDTO] = []
 
-    async def get_conversation(self, conversation_id, workspace_id=None):
+    async def get_conversation(self, conversation_id, workspace_id=None, owner_id=None):
         return self._conversation
 
     async def append_message(self, message):

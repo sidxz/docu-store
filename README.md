@@ -162,7 +162,7 @@ Browser ──> Frontend (web)        ──> /api/config reads APP_* env vars a
                 │
                 │  APP_API_URL points here
                 v
-            Backend (api)         ──> SENTINEL_URL validates tokens with Sentinel
+            Backend (api)         ──> DUAR_URL validates tokens with Duar
                 │
                 │  Internal service DNS (set in compose environment block)
                 v
@@ -184,27 +184,27 @@ These are hardcoded in the compose `environment:` block — you don't need to se
 | `KAFKA_BOOTSTRAP_SERVERS` | `kafka:9092` | Using external Kafka/Confluent |
 | `EMBEDDING_DEVICE` | `cpu` | Set `cuda` for GPU nodes |
 
-#### Authentication (Sentinel)
+#### Authentication (Duar)
 
-DocuStore uses [Sentinel](https://github.com/sidxz/identity-service) for authorization. The backend validates tokens, the frontend redirects users to the IdP via Sentinel.
+DocuStore uses [Duar](https://github.com/sidxz/duar) for authorization. The backend validates tokens, the frontend redirects users to the IdP via Duar.
 
 ```env
-# Backend — validates authorization tokens with Sentinel
-SENTINEL_URL=https://sentinel.example.com
-SENTINEL_SERVICE_KEY=sk_...          # Generate in Sentinel admin panel (/admin/service-apps)
-SENTINEL_SERVICE_NAME=docu-store
-SENTINEL_IDP_JWKS_URL=https://www.googleapis.com/oauth2/v3/certs
+# Backend — validates authorization tokens with Duar
+DUAR_URL=https://duar.example.com
+DUAR_SERVICE_KEY=sk_...          # Generate in Duar admin panel (/admin/service-apps)
+DUAR_SERVICE_NAME=docu-store
+DUAR_IDP_JWKS_URL=https://www.googleapis.com/oauth2/v3/certs
 
 # Frontend — tells the browser where to redirect for login
-APP_SENTINEL_URL=https://sentinel.example.com
+APP_DUAR_URL=https://duar.example.com
 APP_GOOGLE_CLIENT_ID=185792...       # OAuth client ID from Google Console
 APP_GITHUB_CLIENT_ID=Iv1_...         # OAuth app from GitHub Settings
 # APP_ENTRA_ID_CLIENT_ID=            # Azure AD (optional)
 ```
 
-The backend `SENTINEL_URL` and frontend `APP_SENTINEL_URL` usually point to the same Sentinel instance. The difference: backend reads it as a server-side env var, frontend reads it at runtime via `/api/config`.
+The backend `DUAR_URL` and frontend `APP_DUAR_URL` usually point to the same Duar instance. The difference: backend reads it as a server-side env var, frontend reads it at runtime via `/api/config`.
 
-> **Note**: Uploading documents requires the `artifacts:create` action, and Sentinel grants no actions by default — grant it to a role in the Sentinel admin panel after deploying. Workspace admins/owners bypass this check.
+> **Note**: Uploading documents requires the `artifacts:create` action, and Duar grants no actions by default — grant it to a role in the Duar admin panel after deploying. Workspace admins/owners bypass this check.
 
 #### Frontend ↔ Backend connection
 
@@ -214,12 +214,12 @@ The frontend needs to know where the API lives. Set `APP_API_URL` to the backend
 # Frontend runtime config (read by /api/config, not baked at build time)
 APP_API_URL=https://api.example.com        # Backend API URL (public, reachable from browser)
 APP_URL=https://app.example.com            # Frontend's own URL (for OAuth redirects)
-APP_SENTINEL_URL=https://sentinel.example.com
+APP_DUAR_URL=https://duar.example.com
 APP_GOOGLE_CLIENT_ID=...
 APP_GITHUB_CLIENT_ID=...
 ```
 
-In Docker Compose, both the `api` and `web` services read from the same `.env.prod` file. The backend ignores `APP_*` vars, the frontend ignores `SENTINEL_SERVICE_KEY`, etc.
+In Docker Compose, both the `api` and `web` services read from the same `.env.prod` file. The backend ignores `APP_*` vars, the frontend ignores `DUAR_SERVICE_KEY`, etc.
 
 #### LLM Provider
 

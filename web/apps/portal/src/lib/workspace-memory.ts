@@ -1,5 +1,5 @@
 // Remembered workspace so interactive logins skip the picker.
-// Survives logout on purpose (the SDK's sentinel_workspace_id does not) —
+// Survives logout on purpose (the SDK's duar_workspace_id does not) —
 // "Switch workspace" in the topbar user menu clears it to bring the picker back.
 const KEY = "ds-last-workspace-id";
 

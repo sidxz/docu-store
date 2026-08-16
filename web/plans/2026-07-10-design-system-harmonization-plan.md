@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- **Registry:** `@structflo/daikon-design-tokens`, **public npm**, published `--access public` (mirrors `@sentinel-auth/*` — zero Docker/CI/dev auth changes). Requires the `@structflo` npm org to exist with publish rights.
+- **Registry:** `@structflo/daikon-design-tokens`, **public npm**, published `--access public` (mirrors `@duar-auth/*` — zero Docker/CI/dev auth changes). Requires the `@structflo` npm org to exist with publish rights.
 - **Dark selector:** `[data-theme="dark"]` for ALL apps. next-themes apps use `attribute="data-theme"`.
 - **Font attribute:** `data-font` on `<html>`, values `plex` | `inter`, **default `plex`**. Persisted to `localStorage['ds-font']`.
 - **Mono font:** always IBM Plex Mono. The preference switches the **sans/body** family only.

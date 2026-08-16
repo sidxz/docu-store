@@ -144,7 +144,7 @@ class InfrastructureHealthChecker:
             _timed_check("Qdrant", self._check_qdrant()),
             _timed_check("Temporal", self._check_temporal()),
             _timed_check("LLM Service", self._check_llm()),
-            _timed_check("Sentinel", self._check_sentinel()),
+            _timed_check("Duar", self._check_duar()),
             _timed_check("Langfuse", self._check_langfuse()),
             _timed_check("Blob Storage", self._check_blob_storage()),
         ]
@@ -295,15 +295,15 @@ class InfrastructureHealthChecker:
             error="LLM API key not configured" if not has_key else None,
         )
 
-    async def _check_sentinel(self) -> ServiceStatus:
+    async def _check_duar(self) -> ServiceStatus:
         import httpx
 
-        url = f"{self._settings.sentinel_url}/health"
+        url = f"{self._settings.duar_url}/health"
         async with httpx.AsyncClient(timeout=_CHECK_TIMEOUT) as client:
             resp = await client.get(url)
             resp.raise_for_status()
 
-        return ServiceStatus(name="Sentinel", status="healthy")
+        return ServiceStatus(name="Duar", status="healthy")
 
     async def _check_langfuse(self) -> ServiceStatus:
         if self._settings.prompt_repository_type != "langfuse":

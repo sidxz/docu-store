@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import os
 
-# Sentinel 0.11.0 validates authz config when the client is constructed, which
+# Duar 0.11.0 validates authz config when the client is constructed, which
 # happens at import time in infrastructure/auth.py (pulled in by the API app during
 # test collection). Seed dummy values so the import does not raise; real values are
 # supplied by the environment in actual deployments.
-os.environ.setdefault("SENTINEL_SERVICE_KEY", "test-dummy-key")
-os.environ.setdefault("SENTINEL_IDP_AUDIENCE", "test-client-id")
+os.environ.setdefault("DUAR_SERVICE_KEY", "test-dummy-key")
+os.environ.setdefault("DUAR_IDP_AUDIENCE", "test-client-id")
 
 from uuid import UUID, uuid4
 
@@ -112,7 +112,7 @@ def strip_authz_middleware(app) -> None:
     Without this, the real middleware 401s every request before
     ``Depends(get_auth)`` runs, so dependency overrides never apply.
     """
-    from sentinel_auth.authz_middleware import AuthzMiddleware
+    from duar_auth.authz_middleware import AuthzMiddleware
 
     app.user_middleware = [m for m in app.user_middleware if m.cls is not AuthzMiddleware]
     app.middleware_stack = app.build_middleware_stack()
