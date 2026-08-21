@@ -259,6 +259,7 @@ class GetConversationUseCase:
         self,
         conversation_id: UUID,
         workspace_id: UUID | None = None,
+        owner_id: UUID | None = None,
         skip: int = 0,
         limit: int = 100,
     ) -> Result[ConversationDetailDTO, AppError]:
@@ -266,6 +267,7 @@ class GetConversationUseCase:
             conversation = await self._repo.get_conversation(
                 conversation_id,
                 workspace_id=workspace_id,
+                owner_id=owner_id,
             )
             if conversation is None:
                 return Failure(AppError("not_found", "Conversation not found"))
@@ -296,11 +298,13 @@ class DeleteConversationUseCase:
         self,
         conversation_id: UUID,
         workspace_id: UUID | None = None,
+        owner_id: UUID | None = None,
     ) -> Result[bool, AppError]:
         try:
             deleted = await self._repo.delete_conversation(
                 conversation_id,
                 workspace_id=workspace_id,
+                owner_id=owner_id,
             )
             if not deleted:
                 return Failure(AppError("not_found", "Conversation not found"))
@@ -344,10 +348,11 @@ class SendMessageUseCase:
 
         _reasoning_token = reasoning_context.set_reasoning_override(reasoning)
         try:
-            # Verify conversation exists
+            # Verify conversation exists and belongs to the sender
             conversation = await self._repo.get_conversation(
                 conversation_id,
                 workspace_id=workspace_id,
+                owner_id=owner_id,
             )
             if conversation is None:
                 yield AgentEvent(type="error", error_message="Conversation not found")
@@ -594,7 +599,7 @@ class SendMessageUseCase:
 class RecordFeedbackUseCase:
     """Record thumbs-up/thumbs-down feedback on a chat message.
 
-    Validates that the conversation exists and belongs to the caller's workspace.
+    Validates that the conversation exists and belongs to the caller.
     """
 
     def __init__(self, chat_repository: ChatRepository) -> None:
@@ -605,10 +610,11 @@ class RecordFeedbackUseCase:
         feedback: ChatFeedbackDTO,
     ) -> Result[None, AppError]:
         try:
-            # Verify conversation exists and belongs to the workspace
+            # Verify conversation exists and belongs to the caller
             conversation = await self._repo.get_conversation(
                 feedback.conversation_id,
                 workspace_id=feedback.workspace_id,
+                owner_id=feedback.user_id,
             )
             if conversation is None:
                 return Failure(AppError("not_found", "Conversation not found"))
