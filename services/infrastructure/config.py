@@ -555,43 +555,6 @@ class Settings(BaseSettings):
         validation_alias="EMBEDDING_ENABLE_CONTEXT_ENRICHMENT",
         description="Prepend document title/tags/summary context to chunks before dense embedding.",
     )
-    chat_clear_ner_filters: bool = Field(
-        default=False,
-        validation_alias="CHAT_CLEAR_NER_FILTERS",
-        description=(
-            "Drop extracted entity filters before retrieval, so search is unconstrained. "
-            "Ablation of the domain-constraint mechanism."
-        ),
-    )
-    chat_enable_bioactivity_tool: bool = Field(
-        default=True,
-        validation_alias="CHAT_ENABLE_BIOACTIVITY_TOOL",
-        description=(
-            "Expose the structured bioactivity lookup (and its deterministic pre-fetch). "
-            "When False, quantitative questions must be answered by vector search alone."
-        ),
-    )
-    chat_enable_structure_tool: bool = Field(
-        default=True,
-        validation_alias="CHAT_ENABLE_STRUCTURE_TOOL",
-        description=(
-            "Expose chemical-structure lookup over the compound embeddings. "
-            "When False, structure-based questions lose their retrieval path."
-        ),
-    )
-    chat_enable_grounding_verification: bool = Field(
-        default=True,
-        validation_alias="CHAT_ENABLE_GROUNDING_VERIFICATION",
-        description="Run inline citation/grounding verification and its retry loop.",
-    )
-    chat_enable_retrieval: bool = Field(
-        default=True,
-        validation_alias="CHAT_ENABLE_RETRIEVAL",
-        description=(
-            "Retrieve context at all. When False the model answers from parametric "
-            "memory — the zero-retrieval floor for the ablation study."
-        ),
-    )
 
     # Evaluation (LLM-as-judge)
     eval_judge_provider: Literal["openai", "gemini"] = Field(

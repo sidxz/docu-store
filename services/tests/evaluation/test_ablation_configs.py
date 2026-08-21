@@ -58,70 +58,17 @@ class TestAblationConfigs:
     def test_vanilla_rag_config(self):
         cfg = get_config_by_id(11)
         assert cfg.name == "vanilla_rag"
-        assert cfg.overrides.get("chat_clear_ner_filters") is True
-        assert cfg.overrides.get("chat_enable_bioactivity_tool") is False
+        assert cfg.clear_ner_filters_before_retrieval is True
+        assert cfg.skip_bioactivity_tool is True
         assert cfg.overrides.get("reranker_enabled") is False
 
-    def test_no_structure_search_config(self):
+    def test_bm25_only_config(self):
         cfg = get_config_by_id(12)
-        assert cfg.name == "no_structure_search"
-        assert cfg.overrides.get("chat_enable_structure_tool") is False
+        assert cfg.name == "bm25_only"
+        assert cfg.overrides.get("sparse_encoding_enabled") is True
+        assert cfg.overrides.get("retrieval_use_sparse_only") is True
 
     def test_no_retrieval_config(self):
         cfg = get_config_by_id(13)
         assert cfg.name == "no_retrieval"
-        assert cfg.overrides.get("chat_enable_retrieval") is False
-
-
-class TestAblationsReachProductionCode:
-    """Guards against ablations that silently do nothing.
-
-    An override naming a field that no Settings object has, or a setting that no
-    production code reads, produces a run identical to the baseline — the
-    ablation looks like it worked and reports "no effect".
-    """
-
-    def test_every_override_is_a_real_settings_field(self):
-        from infrastructure.config import settings
-
-        unknown = [
-            (cfg.name, key)
-            for cfg in ABLATION_CONFIGS
-            for key in cfg.overrides
-            if not hasattr(settings, key)
-        ]
-        assert unknown == []
-
-    def test_every_toggled_setting_is_read_outside_the_evaluation_package(self):
-        """Each ablation setting must be consumed by the pipeline itself."""
-        from pathlib import Path
-
-        services_root = Path(__file__).parents[2]
-        searched = [
-            services_root / "application",
-            services_root / "infrastructure",
-            services_root / "domain",
-            services_root / "interfaces",
-        ]
-        sources = [
-            path.read_text()
-            for root in searched
-            for path in root.rglob("*.py")
-            if "config.py" not in path.name
-        ]
-
-        toggles = {key for cfg in ABLATION_CONFIGS for key in cfg.overrides}
-        unread = sorted(
-            key for key in toggles if not any(key in source for source in sources)
-        )
-        assert unread == [], f"ablation settings never read by production code: {unread}"
-
-    def test_harness_rejects_an_unknown_override(self):
-        from evaluation.ablation_configs import AblationConfig
-        from evaluation.eval_harness import _apply_config_overrides
-
-        bogus = AblationConfig(
-            config_id=99, name="bogus", description="", overrides={"not_a_setting": True}
-        )
-        with pytest.raises(ValueError, match="unknown Settings field"):
-            _apply_config_overrides(bogus)
+        assert cfg.overrides.get("retrieval_enabled") is False

@@ -29,13 +29,7 @@ class ChatRepository(Protocol):
         self,
         conversation_id: UUID,
         workspace_id: UUID | None = None,
-        owner_id: UUID | None = None,
-    ) -> ConversationDTO | None:
-        """Fetch a conversation. When owner_id is given, only that owner's
-        conversation matches — callers acting for a request user MUST pass it;
-        conversations are private to their owner.
-        """
-        ...
+    ) -> ConversationDTO | None: ...
 
     async def list_conversations(
         self,
@@ -58,7 +52,6 @@ class ChatRepository(Protocol):
         self,
         conversation_id: UUID,
         workspace_id: UUID | None = None,
-        owner_id: UUID | None = None,
     ) -> bool: ...
 
     async def update_conversation(

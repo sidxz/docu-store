@@ -696,16 +696,12 @@ class ToolRegistry:
             "search_summaries": SearchSummariesTool(summary_search),
             "get_page_content": GetPageContentTool(page_read_model),
         }
-        # Ablation toggles: withholding a tool also disables its deterministic
-        # pre-fetch, which is gated on the tool being registered.
-        from infrastructure.config import settings
-
-        if compound_activity_query is not None and settings.chat_enable_bioactivity_tool:
+        if compound_activity_query is not None:
             self._tools["search_structured_bioactivity"] = SearchStructuredBioactivityTool(
                 activity_query=compound_activity_query,
                 artifact_read_model=artifact_read_model,
             )
-        if compound_vector_store is not None and settings.chat_enable_structure_tool:
+        if compound_vector_store is not None:
             self._tools["search_compound_structure"] = SearchCompoundStructureTool(
                 compound_vector_store=compound_vector_store,
             )

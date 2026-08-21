@@ -145,10 +145,8 @@ class SetConversationFolderUseCase:
         folder_id: UUID | None,
     ) -> Result[ConversationDTO, AppError]:
         try:
-            conv = await self._repo.get_conversation(
-                conversation_id, workspace_id=workspace_id, owner_id=owner_id
-            )
-            if conv is None:
+            conv = await self._repo.get_conversation(conversation_id, workspace_id=workspace_id)
+            if conv is None or conv.owner_id != owner_id:
                 return Failure(AppError("not_found", "Conversation not found"))
 
             old = conv.folder_id
