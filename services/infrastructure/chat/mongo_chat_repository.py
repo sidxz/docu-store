@@ -69,10 +69,13 @@ class MongoChatRepository:
         self,
         conversation_id: UUID,
         workspace_id: UUID | None = None,
+        owner_id: UUID | None = None,
     ) -> ConversationDTO | None:
         query: dict = {"conversation_id": str(conversation_id)}
         if workspace_id:
             query["workspace_id"] = str(workspace_id)
+        if owner_id:
+            query["owner_id"] = str(owner_id)
         doc = await self._conversations.find_one(query)
         if doc is None:
             return None
@@ -116,10 +119,13 @@ class MongoChatRepository:
         self,
         conversation_id: UUID,
         workspace_id: UUID | None = None,
+        owner_id: UUID | None = None,
     ) -> bool:
         query: dict = {"conversation_id": str(conversation_id)}
         if workspace_id:
             query["workspace_id"] = str(workspace_id)
+        if owner_id:
+            query["owner_id"] = str(owner_id)
         result = await self._conversations.delete_one(query)
         if result.deleted_count > 0:
             # Also delete all messages and summaries

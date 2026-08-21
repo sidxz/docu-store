@@ -173,6 +173,17 @@ class QueryPlanningNode:
         elif settings.chat_debug:
             log.info("chat.debug.planning.ner_merge_disabled", reason="entity_accumulation_off")
 
+        # Ablation: drop entity constraints entirely, leaving pure vector search.
+        # Cleared here — after accumulation — so no downstream consumer (seed search,
+        # factual force-injection, tool calls) sees a filter.
+        if settings.chat_clear_ner_filters:
+            log.info(
+                "chat.planning.ner_filters_cleared",
+                dropped=[f.entity_text for f in plan.ner_entity_filters],
+                reason="ablation:chat_clear_ner_filters",
+            )
+            plan = plan.model_copy(update={"ner_entity_filters": []})
+
         if _debug:
             log.info(
                 "chat.debug.planning.done",
