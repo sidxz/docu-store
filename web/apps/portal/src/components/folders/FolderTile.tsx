@@ -48,7 +48,7 @@ export function FolderTile({
     if (
       await confirm({
         title: `Delete "${folder.name}"?`,
-        description: "The folder is removed, but its chats stay — they're just unfiled.",
+        description: "The folder is removed, but its research sessions stay — they're just unfiled.",
         confirmLabel: "Delete",
         destructive: true,
       })
@@ -84,7 +84,7 @@ export function FolderTile({
             {folder.name}
           </span>
           <span className="truncate text-[11px] text-text-muted">
-            {folder.chat_count} {folder.chat_count === 1 ? "chat" : "chats"} · Updated{" "}
+            {folder.chat_count} {folder.chat_count === 1 ? "session" : "sessions"} · Updated{" "}
             {formatRelativeTime(folder.updated_at)}
           </span>
         </span>

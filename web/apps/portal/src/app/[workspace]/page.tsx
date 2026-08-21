@@ -181,7 +181,7 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-text-primary">
-                    Chat
+                    Deep Research
                   </p>
                   <p className="text-xs text-text-muted">
                     Ask questions about your documents

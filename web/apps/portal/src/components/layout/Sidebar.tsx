@@ -31,7 +31,7 @@ interface NavItem {
 
 const mainNav: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard, href: "", color: "text-blue-500" },
-  { label: "Chat", icon: MessageSquare, href: "/chat", color: "text-indigo-500" },
+  { label: "Deep Research", icon: MessageSquare, href: "/chat", color: "text-indigo-500" },
   { label: "Search", icon: Search, href: "/search", color: "text-violet-500" },
   { label: "Documents", icon: FileText, href: "/documents", color: "text-amber-500" },
   { label: "Compounds", icon: Atom, href: "/compounds", color: "text-emerald-500" },

@@ -19,7 +19,7 @@ export function ChatRow({ chat, workspace }: { chat: Conversation; workspace: st
       >
         <div className="flex items-baseline justify-between gap-3">
           <p className="truncate text-sm font-medium text-text-primary">
-            {chat.title || "New Chat"}
+            {chat.title || "New Research"}
           </p>
           <span className="shrink-0 text-xs text-text-muted">
             {formatRelativeTime(chat.updated_at)}

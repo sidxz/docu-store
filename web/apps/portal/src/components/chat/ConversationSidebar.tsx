@@ -38,7 +38,7 @@ export function ConversationSidebar({
     e.stopPropagation();
     if (
       !(await confirm({
-        title: "Delete chat?",
+        title: "Delete research session?",
         description: "This conversation and its messages will be permanently deleted.",
         confirmLabel: "Delete",
         destructive: true,
@@ -74,7 +74,7 @@ export function ConversationSidebar({
           ) : (
             <Plus className="size-4" />
           )}
-          New Chat
+          New Research
         </Button>
       </div>
 

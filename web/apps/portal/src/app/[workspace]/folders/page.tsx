@@ -35,7 +35,7 @@ export default function FoldersPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-text-primary">Folders</h1>
         <p className="mt-1 text-sm text-text-muted">
-          Organize your chats. Drag one onto a folder, or open a folder to see what is inside.
+          Organize your research sessions. Drag one onto a folder, or open a folder to see what is inside.
         </p>
       </div>
 
@@ -53,7 +53,7 @@ export default function FoldersPage() {
             </p>
             <p className="mt-1 max-w-sm text-xs text-text-muted">
               {folders.length
-                ? "Click a folder above to see its chats."
+                ? "Click a folder above to see its research sessions."
                 : "Create a folder, then drag chats into it from the dashboard or the ⋯ menu on a chat."}
             </p>
           </div>
@@ -75,7 +75,7 @@ export default function FoldersPage() {
             {selectedFolder?.name} is empty
           </p>
           <p className="mt-1 max-w-sm text-xs text-text-muted">
-            Drag a chat onto this folder, or use the ⋯ menu on a chat to move it here.
+            Drag a research session onto this folder, or use the ⋯ menu on one to move it here.
           </p>
         </div>
       ) : (

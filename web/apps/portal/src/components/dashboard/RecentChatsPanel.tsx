@@ -50,7 +50,7 @@ export function RecentChatsPanel({ workspace }: { workspace: string }) {
         <FolderStrip selectedFolderId={selectedFolderId} onSelect={setSelectedFolderId} />
         {folders?.length === 0 && (
           <p className="text-xs text-text-muted">
-            No folders yet — create one and drag chats into it to organize them.
+            No folders yet — create one and drag research sessions into it to organize them.
           </p>
         )}
       </section>
@@ -68,11 +68,11 @@ export function RecentChatsPanel({ workspace }: { workspace: string }) {
               <span className="truncate">{selectedFolder?.name ?? "Folder"}</span>
             </button>
           ) : (
-            <h2 className="text-sm font-semibold text-text-primary">My Recent Chats</h2>
+            <h2 className="text-sm font-semibold text-text-primary">Recent Research</h2>
           )}
           <Button size="sm" onClick={handleNew} disabled={createConversation.isPending}>
             <Plus className="size-4" />
-            New Chat
+            New Research
           </Button>
         </div>
 
@@ -82,7 +82,7 @@ export function RecentChatsPanel({ workspace }: { workspace: string }) {
           ) : !folderChats?.length ? (
             <Empty
               title="This folder is empty"
-              hint="Drag a chat here, or use a chat's ⋯ menu to move it into this folder."
+              hint="Drag a research session here, or use its ⋯ menu to move it into this folder."
             />
           ) : (
             <div className="space-y-2">
@@ -109,13 +109,13 @@ export function RecentChatsPanel({ workspace }: { workspace: string }) {
             <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-accent-light">
               <MessageSquare className="h-6 w-6 text-accent-text" />
             </div>
-            <p className="text-sm font-medium text-text-primary">No chats yet</p>
+            <p className="text-sm font-medium text-text-primary">No research sessions yet</p>
             <p className="mt-1 text-xs text-text-muted">
-              Start your first chat to explore your documents.
+              Start your first research session to explore your documents.
             </p>
             <Button size="sm" className="mt-4" onClick={handleNew} disabled={createConversation.isPending}>
               <Plus className="size-4" />
-              New Chat
+              New Research
             </Button>
           </div>
         ) : (

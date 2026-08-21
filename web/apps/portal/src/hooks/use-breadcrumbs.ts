@@ -17,7 +17,7 @@ const LABEL_MAP: Record<string, string> = {
   documents: "Documents",
   search: "Search",
   compounds: "Compounds",
-  chat: "Chat",
+  chat: "Deep Research",
   settings: "Settings",
   upload: "Upload",
 };
@@ -144,7 +144,7 @@ export function useBreadcrumbs(): Breadcrumb[] {
 
     if (prevSegment === "chat" && segment === conversationId) {
       if (!conversation) return "\u2026";
-      return conversation.title || "New Chat";
+      return conversation.title || "New Research";
     }
 
     // Fallback for unrecognised UUIDs
