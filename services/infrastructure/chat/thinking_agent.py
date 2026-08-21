@@ -23,6 +23,7 @@ from uuid import uuid4
 import structlog
 
 from application.dtos.chat_dtos import AgentEvent
+from infrastructure.chat.models import GroundingResult
 from infrastructure.chat.utils import extract_cited_indices
 from infrastructure.config import settings
 from infrastructure.llm.token_counter import get_active_counter
@@ -342,12 +343,23 @@ class ThinkingAgent:
                     description="Verifying citations...",
                 )
 
-                grounding, verification_llm_output = await self._verification.run(
-                    draft_answer,
-                    sources_text,
-                    plan,
-                    context_meta,
-                )
+                if settings.chat_enable_grounding_verification:
+                    grounding, verification_llm_output = await self._verification.run(
+                        draft_answer,
+                        sources_text,
+                        plan,
+                        context_meta,
+                    )
+                else:
+                    # Ablation: accept the draft unverified, so no retry can fire.
+                    grounding, verification_llm_output = (
+                        GroundingResult(
+                            is_grounded=True,
+                            confidence=1.0,
+                            verification_summary="verification disabled (ablation)",
+                        ),
+                        None,
+                    )
 
                 verification_ms = int((time.monotonic() - t5) * 1000)
                 yield AgentEvent(

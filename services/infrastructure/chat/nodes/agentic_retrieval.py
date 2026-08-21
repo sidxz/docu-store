@@ -76,6 +76,13 @@ class AgenticRetrievalNode:
             ("results", list[RetrievalResult]) — final accumulated results (last yield)
 
         """
+        # Ablation: answer from parametric memory alone — the zero-retrieval floor
+        # that shows how much of the score comes from the corpus rather than the LLM.
+        if not settings.chat_enable_retrieval:
+            log.info("chat.agentic_retrieval.disabled", reason="ablation:chat_enable_retrieval")
+            yield "results", []
+            return
+
         _debug = settings.chat_debug
         max_iterations = settings.chat_agent_max_iterations
         iteration_timeout = settings.chat_agent_iteration_timeout_s
