@@ -29,11 +29,13 @@ from application.ports.structured_extractor import StructuredExtractorPort
 from application.ports.summary_vector_store import SummaryVectorStore
 from application.ports.text_chunker import TextChunker
 from application.ports.title_extractor import TitleExtractorPort
+from application.ports.user_llm_config import NullUserLLMConfigStore, UserLLMConfigStore
 from application.ports.vector_store import VectorStore
 from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.ports.workflow_status_cache import WorkflowStatusCache
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
 from application.services.compound_activity_query import CompoundActivityQuery
+from application.services.llm_scope import UserLLMScope
 from application.use_cases.aggregate_artifact_tags_use_case import AggregateArtifactTagsUseCase
 from application.use_cases.artifact_use_cases import (
     AddPagesUseCase,
@@ -662,6 +664,13 @@ def create_container() -> Container:
     # LLM Infrastructure (shared — provider selected via LLM_PROVIDER config)
     container[LLMClientPort] = lambda _: create_llm_client(settings)
     container[PromptRepositoryPort] = lambda _: create_prompt_repository(settings)
+
+    # Per-user LLM config (BYO key). Phase 3 replaces the Null store with Mongo;
+    # USER_LLM_KEYS_ENABLED=false keeps every call on the env defaults.
+    container[UserLLMConfigStore] = lambda _: NullUserLLMConfigStore()
+    container[UserLLMScope] = lambda c: UserLLMScope(
+        c[UserLLMConfigStore], enabled=settings.user_llm_keys_enabled,
+    )
 
     # Summarization Use Cases
     container[SummarizePageUseCase] = lambda c: SummarizePageUseCase(
