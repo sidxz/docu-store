@@ -79,6 +79,7 @@ export const queryKeys = {
   user: {
     all: ["user"] as const,
     preferences: () => [...queryKeys.user.all, "preferences"] as const,
+    llmProvider: () => [...queryKeys.user.all, "llm-provider"] as const,
     activity: {
       searches: () => [...queryKeys.user.all, "activity", "searches"] as const,
       documents: () => [...queryKeys.user.all, "activity", "documents"] as const,

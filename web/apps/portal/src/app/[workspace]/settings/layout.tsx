@@ -6,6 +6,7 @@ import { useParams, usePathname } from "next/navigation";
 import { useAuthzHasRole } from "@duar-auth/react";
 
 import { PageHeader } from "@/components/ui/PageHeader";
+import { useLlmProvider } from "@/hooks/use-llm-provider";
 
 interface SettingsTab {
   label: string;
@@ -29,6 +30,10 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   const pathname = usePathname();
   const { workspace } = useParams<{ workspace: string }>();
   const isAdmin = useAuthzHasRole("admin");
+  const provider = useLlmProvider();
+  const tabs = provider.data?.enabled
+    ? [...TABS, { label: "AI Provider", segment: "llm" }]
+    : TABS;
 
   const base = `/${workspace}/settings`;
 
@@ -59,7 +64,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
       />
       <div className="flex gap-8">
         <nav className="flex w-44 shrink-0 flex-col gap-0.5">
-          {TABS.map(renderTab)}
+          {tabs.map(renderTab)}
           {isAdmin && ADMIN_TABS.length > 0 && (
             <>
               <div className="my-2 border-t border-border-default" />
