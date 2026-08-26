@@ -120,7 +120,9 @@ def test_put_without_key_and_without_row_is_404() -> None:
 
 def test_put_rejects_unknown_provider_and_short_key() -> None:
     assert _client(FakeStore()).put("/user/llm-provider", json={"provider": "azure", "api_key": KEY}).status_code == 422
-    assert _client(FakeStore()).put("/user/llm-provider", json={"provider": "openai", "api_key": "short"}).status_code == 422
+    resp = _client(FakeStore()).put("/user/llm-provider", json={"provider": "openai", "api_key": "abc1234"})
+    assert resp.status_code == 422
+    assert "abc1234" not in resp.text
 
 
 def test_writes_are_404_when_flag_off() -> None:

@@ -219,7 +219,13 @@ async def set_llm_provider(
     preset = PRESETS[body.provider]
     model = body.model or preset.model
     chat_model = body.chat_model or preset.chat_model
-    if body.api_key is None:
+    api_key = body.api_key.strip() if body.api_key is not None else None
+    if api_key is not None and not 8 <= len(api_key) <= 512:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="api_key must be between 8 and 512 characters.",
+        )
+    if api_key is None:
         if not await store.update_models(
             auth.workspace_id,
             auth.user_id,
@@ -235,7 +241,7 @@ async def set_llm_provider(
         auth.workspace_id,
         auth.user_id,
         provider=body.provider,
-        api_key=body.api_key,
+        api_key=api_key,
         model=model,
         chat_model=chat_model,
     )

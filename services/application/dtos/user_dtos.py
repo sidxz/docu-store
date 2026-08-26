@@ -49,7 +49,6 @@ class RecordDocumentOpenRequest(BaseModel):
 
 # ── BYO LLM provider ──────────────────────────────────────────────────────────
 
-_Key = Annotated[str, StringConstraints(strip_whitespace=True, min_length=8, max_length=512)]
 _Model = Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)]
 
 
@@ -59,7 +58,7 @@ class LLMProviderRequest(BaseModel):
     """
 
     provider: Literal["openrouter", "openai", "gemini"]
-    api_key: _Key | None = None
+    api_key: str | None = None
     model: _Model | None = None
     chat_model: _Model | None = None
 
