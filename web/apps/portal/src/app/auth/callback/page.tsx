@@ -1,9 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { AuthzCallback } from "@duar-auth/react";
-import { ShapeGrid } from "@/components/backgrounds/ShapeGrid";
+import { AuthShell } from "@/components/auth/AuthShell";
 import { forgetWorkspace } from "@/lib/workspace-memory";
 import { useAppConfig } from "@/lib/app-config";
 import { onboardUrl } from "@/lib/onboard";
@@ -85,16 +84,5 @@ export default function AuthCallbackPage() {
         </AuthShell>
       )}
     />
-  );
-}
-
-function AuthShell({ children }: { children: ReactNode }) {
-  return (
-    <div className="fixed inset-0 overflow-hidden" style={{ background: "#f6f8fb" }}>
-      <ShapeGrid />
-      <div className="relative z-10 flex min-h-screen items-center justify-center px-4">
-        {children}
-      </div>
-    </div>
   );
 }

@@ -191,10 +191,12 @@ function SetupView({
   const [model, setModel] = useState("");
   const [chatModel, setChatModel] = useState("");
   const [connecting, setConnecting] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
   const preset = status.presets[provider];
 
   const pick = (id: LlmProviderId) => {
     setProvider(id);
+    setApiKey("");
     setModel("");
     setChatModel("");
   };
@@ -231,15 +233,29 @@ function SetupView({
       </div>
 
       {provider === "openrouter" ? (
-        <Button
-          disabled={connecting}
-          onClick={async () => {
-            setConnecting(true);
-            await startOpenRouterAuth(window.location.pathname);
-          }}
-        >
-          {connecting ? "Redirecting…" : "Connect with OpenRouter"}
-        </Button>
+        <>
+          <Button
+            disabled={connecting}
+            onClick={async () => {
+              setConnecting(true);
+              try {
+                await startOpenRouterAuth(window.location.pathname);
+              } catch (e) {
+                setConnecting(false);
+                setConnectError(
+                  e instanceof Error ? e.message : "Could not start OpenRouter sign-in.",
+                );
+              }
+            }}
+          >
+            {connecting ? "Redirecting…" : "Connect with OpenRouter"}
+          </Button>
+          {connectError && (
+            <Alert variant="destructive">
+              <AlertDescription>{connectError}</AlertDescription>
+            </Alert>
+          )}
+        </>
       ) : (
         <>
           <label className="block text-xs text-text-muted">
