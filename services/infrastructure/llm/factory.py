@@ -59,7 +59,7 @@ def server_llm_available(settings: Settings) -> bool:
     blocked when there is nothing to fall back to (public/fail-closed mode).
     """
     provider = settings.llm_provider
-    return provider == "ollama" or _resolve_api_key(provider, settings) is not None
+    return provider == "ollama" or bool(_resolve_api_key(provider, settings))
 
 
 def _require_cloud_allowed(provider: str, settings: Settings) -> None:

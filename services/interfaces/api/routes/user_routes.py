@@ -216,9 +216,6 @@ async def set_llm_provider(
 ) -> None:
     _require_user_keys(container)
     store = container[UserLLMConfigStore]
-    preset = PRESETS[body.provider]
-    model = body.model or preset.model
-    chat_model = body.chat_model or preset.chat_model
     api_key = body.api_key.strip() if body.api_key is not None else None
     if api_key is not None and not 8 <= len(api_key) <= 512:
         raise HTTPException(
@@ -226,6 +223,15 @@ async def set_llm_provider(
             detail="api_key must be between 8 and 512 characters.",
         )
     if api_key is None:
+        entry = await store.get_entry(auth.workspace_id, auth.user_id)
+        if entry is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No LLM provider configured — add a key first.",
+            )
+        preset = PRESETS[entry.provider]
+        model = body.model or preset.model
+        chat_model = body.chat_model or preset.chat_model
         if not await store.update_models(
             auth.workspace_id,
             auth.user_id,
@@ -237,6 +243,9 @@ async def set_llm_provider(
                 detail="No LLM provider configured — add a key first.",
             )
         return
+    preset = PRESETS[body.provider]
+    model = body.model or preset.model
+    chat_model = body.chat_model or preset.chat_model
     await store.set(
         auth.workspace_id,
         auth.user_id,

@@ -113,6 +113,15 @@ def test_put_without_key_updates_models_only() -> None:
     assert store.set_calls == []
 
 
+def test_put_without_key_fills_blanks_from_stored_provider_not_body_provider() -> None:
+    # Body names "gemini" (just picking the models UI is on), but the stored
+    # entry is "openrouter" — the blank-fill must use the STORED preset.
+    store = FakeStore(entry=ENTRY)
+    resp = _client(store).put("/user/llm-provider", json={"provider": "gemini", "model": ""})
+    assert resp.status_code == 204
+    assert store.update_calls == [{"model": "openai/gpt-5-mini", "chat_model": "openai/gpt-5"}]
+
+
 def test_put_without_key_and_without_row_is_404() -> None:
     resp = _client(FakeStore()).put("/user/llm-provider", json={"provider": "openrouter", "model": "x"})
     assert resp.status_code == 404

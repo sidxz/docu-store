@@ -106,11 +106,12 @@ class MongoUserLLMProviderStore:
             return None
         try:
             return _doc_to_config(doc, self._fernet)
-        except InvalidToken:
-            # Secret rotated without re-keying: resolve as "unconfigured" (the
+        except (InvalidToken, KeyError):
+            # Secret rotated without re-keying, or the stored provider isn't in
+            # PRESETS (e.g. deprecated/renamed): resolve as "unconfigured" (the
             # call site fails closed) instead of crashing every enrichment.
             log.exception(
-                "user_llm_providers.undecryptable",
+                "user_llm_providers.unresolvable",
                 workspace_id=str(workspace_id),
                 user_id=str(user_id),
             )

@@ -144,6 +144,15 @@ async def test_undecryptable_row_resolves_to_none_but_entry_survives() -> None:
     assert (await store.get_entry(ws, user)).key_last4 == "1234"
 
 
+async def test_unresolvable_provider_resolves_to_none_but_entry_survives() -> None:
+    store, coll = _store()
+    ws, user = uuid4(), uuid4()
+    await store.set(ws, user, provider="openai", api_key=KEY, model="m", chat_model="c")
+    coll.docs[(str(ws), str(user))]["provider"] = "azure"  # not in PRESETS
+    assert await store.get(ws, user) is None
+    assert (await store.get_entry(ws, user)).provider == "azure"
+
+
 async def test_ensure_indexes_creates_unique_ws_user_index() -> None:
     store, coll = _store()
     await store.ensure_indexes()

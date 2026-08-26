@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -309,6 +309,29 @@ class Settings(BaseSettings):
         validation_alias="LLM_REASONING",
         description="Reasoning/thinking effort for batch LLM. 'off' disables it.",
     )
+
+    @model_validator(mode="after")
+    def _require_user_llm_keys_secret(self) -> "Settings":
+        """USER_LLM_KEYS_ENABLED=true needs a Fernet key; fail every process at import,
+        where the API lifespan's best-effort try/except cannot swallow it.
+        """
+        if not self.user_llm_keys_enabled:
+            return self
+        from cryptography.fernet import Fernet
+
+        hint = (
+            "python -c 'from cryptography.fernet import Fernet; "
+            "print(Fernet.generate_key().decode())'"
+        )
+        if not self.user_llm_keys_secret:
+            msg = f"USER_LLM_KEYS_SECRET is required when USER_LLM_KEYS_ENABLED=true. Generate one: {hint}"
+            raise ValueError(msg)
+        try:
+            Fernet(self.user_llm_keys_secret)
+        except ValueError as exc:
+            msg = f"USER_LLM_KEYS_SECRET is not a valid Fernet key. Generate one: {hint}"
+            raise ValueError(msg) from exc
+        return self
 
     # LLM (shared infrastructure — used by summarization and future features)
     llm_provider: Literal["ollama", "openai", "anthropic", "gemini"] = Field(

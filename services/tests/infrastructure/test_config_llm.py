@@ -53,7 +53,10 @@ def test_user_llm_keys_flag_defaults_off(monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 def test_user_llm_keys_flag_reads_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    from cryptography.fernet import Fernet
+
     monkeypatch.setenv("USER_LLM_KEYS_ENABLED", "true")
+    monkeypatch.setenv("USER_LLM_KEYS_SECRET", Fernet.generate_key().decode())
     assert Settings(_env_file=None).user_llm_keys_enabled is True
 
 
@@ -65,3 +68,29 @@ def test_user_llm_keys_secret_defaults_to_none(monkeypatch: pytest.MonkeyPatch) 
 def test_user_llm_providers_collection_default(monkeypatch: pytest.MonkeyPatch) -> None:
     s = _isolated_settings(monkeypatch, "MONGO_USER_LLM_PROVIDERS_COLLECTION")
     assert s.mongo_user_llm_providers_collection == "user_llm_providers"
+
+
+def test_flag_on_without_secret_fails_settings_construction(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in ("USER_LLM_KEYS_ENABLED", "USER_LLM_KEYS_SECRET"):
+        monkeypatch.delenv(name, raising=False)
+    # Settings has no populate_by_name — only the validation_alias (the env
+    # var name) is a valid init kwarg, not the snake_case field name.
+    with pytest.raises(ValueError, match="USER_LLM_KEYS_SECRET"):
+        Settings(_env_file=None, USER_LLM_KEYS_ENABLED=True, USER_LLM_KEYS_SECRET=None)
+    with pytest.raises(ValueError, match="not a valid Fernet key"):
+        Settings(_env_file=None, USER_LLM_KEYS_ENABLED=True, USER_LLM_KEYS_SECRET="nope")
+
+
+def test_flag_on_with_valid_secret_constructs(monkeypatch: pytest.MonkeyPatch) -> None:
+    from cryptography.fernet import Fernet
+
+    for name in ("USER_LLM_KEYS_ENABLED", "USER_LLM_KEYS_SECRET"):
+        monkeypatch.delenv(name, raising=False)
+    s = Settings(_env_file=None, USER_LLM_KEYS_ENABLED=True, USER_LLM_KEYS_SECRET=Fernet.generate_key().decode())
+    assert s.user_llm_keys_enabled is True
+
+
+def test_flag_off_needs_no_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in ("USER_LLM_KEYS_ENABLED", "USER_LLM_KEYS_SECRET"):
+        monkeypatch.delenv(name, raising=False)
+    assert Settings(_env_file=None).user_llm_keys_secret is None

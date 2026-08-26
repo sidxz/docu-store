@@ -28,3 +28,8 @@ def test_cloud_provider_without_any_key_is_unavailable() -> None:
 def test_cloud_provider_with_specific_or_generic_key() -> None:
     assert server_llm_available(_s("openai", openai="k")) is True
     assert server_llm_available(_s("gemini", generic="k")) is True
+
+
+def test_blank_env_key_counts_as_missing() -> None:
+    assert server_llm_available(_s("openai", openai="")) is False
+    assert server_llm_available(_s("gemini", generic="")) is False
