@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { LlmProviderBanner } from "@/components/layout/LlmProviderBanner";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { AuthGuardWrapper } from "@/components/providers/AuthGuardWrapper";
@@ -33,6 +34,7 @@ export default async function WorkspaceLayout({
         <Sidebar workspaceSlug={workspace} />
         <div className="flex flex-1 flex-col overflow-hidden transition-[margin] duration-200">
           <Topbar />
+          <LlmProviderBanner />
           <main className="flex-1 overflow-y-auto bg-surface-sunken p-6 transition-colors duration-200 page-enter">
             {children}
           </main>
