@@ -7,6 +7,11 @@ from temporalio import activity
 
 from application.use_cases.aggregate_artifact_tags_use_case import AggregateArtifactTagsUseCase
 from application.use_cases.extract_page_entities_use_case import ExtractPageEntitiesUseCase
+from domain.exceptions import LLMError
+from infrastructure.temporal.activities.errors import (
+    failure_to_application_error,
+    llm_error_to_application_error,
+)
 
 logger = structlog.get_logger()
 
@@ -21,42 +26,39 @@ def create_extract_page_entities_activity(
         logger.info("extract_page_entities_activity.start", page_id=page_id)
 
         try:
-            page_uuid = UUID(page_id)
-            result = await use_case.execute(page_id=page_uuid)
-        except Exception as e:
-            logger.exception(
-                "extract_page_entities_activity.exception",
+            result = await use_case.execute(page_id=UUID(page_id))
+        except LLMError as e:
+            logger.error(  # noqa: TRY400 -- expected/typed failure, no traceback needed
+                "extract_page_entities_activity.llm_error",
                 page_id=page_id,
                 error=str(e),
+                retryable=e.retryable,
+            )
+            raise llm_error_to_application_error(e) from e
+        except Exception as e:
+            logger.exception(
+                "extract_page_entities_activity.exception", page_id=page_id, error=str(e)
             )
             raise
-        else:
-            if isinstance(result, Success):
-                payload = result.unwrap()
-                logger.info(
-                    "extract_page_entities_activity.success",
-                    page_id=page_id,
-                    entity_count=payload.get("entity_count", 0),
-                    status=payload.get("status"),
-                )
-                return payload
 
-            error = result.failure()
-            logger.error(
-                "extract_page_entities_activity.failed",
+        if isinstance(result, Success):
+            payload = result.unwrap()
+            logger.info(
+                "extract_page_entities_activity.success",
                 page_id=page_id,
-                error_code=error.category,
-                error_message=error.message,
+                entity_count=payload.get("entity_count", 0),
+                status=payload.get("status"),
             )
-            if error.category == "concurrency":
-                msg = f"Concurrency conflict (will retry): {error.message}"
-                raise RuntimeError(msg)
-            return {
-                "status": "failed",
-                "page_id": page_id,
-                "error_code": error.category,
-                "error_message": error.message,
-            }
+            return payload
+
+        error = result.failure()
+        logger.error(
+            "extract_page_entities_activity.failed",
+            page_id=page_id,
+            error_code=error.category,
+            error_message=error.message,
+        )
+        raise failure_to_application_error(error)
 
     return extract_page_entities_activity
 
@@ -71,8 +73,15 @@ def create_aggregate_artifact_tags_activity(
         logger.info("aggregate_artifact_tags_activity.start", artifact_id=artifact_id)
 
         try:
-            artifact_uuid = UUID(artifact_id)
-            result = await use_case.execute(artifact_id=artifact_uuid)
+            result = await use_case.execute(artifact_id=UUID(artifact_id))
+        except LLMError as e:
+            logger.error(  # noqa: TRY400 -- expected/typed failure, no traceback needed
+                "aggregate_artifact_tags_activity.llm_error",
+                artifact_id=artifact_id,
+                error=str(e),
+                retryable=e.retryable,
+            )
+            raise llm_error_to_application_error(e) from e
         except Exception as e:
             logger.exception(
                 "aggregate_artifact_tags_activity.exception",
@@ -80,31 +89,23 @@ def create_aggregate_artifact_tags_activity(
                 error=str(e),
             )
             raise
-        else:
-            if isinstance(result, Success):
-                payload = result.unwrap()
-                logger.info(
-                    "aggregate_artifact_tags_activity.success",
-                    artifact_id=artifact_id,
-                    tag_count=payload.get("tag_count", 0),
-                )
-                return payload
 
-            error = result.failure()
-            logger.error(
-                "aggregate_artifact_tags_activity.failed",
+        if isinstance(result, Success):
+            payload = result.unwrap()
+            logger.info(
+                "aggregate_artifact_tags_activity.success",
                 artifact_id=artifact_id,
-                error_code=error.category,
-                error_message=error.message,
+                tag_count=payload.get("tag_count", 0),
             )
-            if error.category == "concurrency":
-                msg = f"Concurrency conflict (will retry): {error.message}"
-                raise RuntimeError(msg)
-            return {
-                "status": "failed",
-                "artifact_id": artifact_id,
-                "error_code": error.category,
-                "error_message": error.message,
-            }
+            return payload
+
+        error = result.failure()
+        logger.error(
+            "aggregate_artifact_tags_activity.failed",
+            artifact_id=artifact_id,
+            error_code=error.category,
+            error_message=error.message,
+        )
+        raise failure_to_application_error(error)
 
     return aggregate_artifact_tags_activity
