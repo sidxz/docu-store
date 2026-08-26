@@ -18,7 +18,7 @@ from infrastructure.read_repositories.mongo_user_llm_provider_store import (
     user_llm_fernet,
 )
 
-KEY = "sk-or-v1-secretsecret1234"
+KEY = "not-a-real-key-abcdef1234"
 
 
 class _FakeColl:
