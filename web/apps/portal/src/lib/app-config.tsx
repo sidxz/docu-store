@@ -6,6 +6,8 @@ export interface AppConfig {
   apiUrl: string;
   appUrl: string;
   duarUrl: string;
+  /** Duar SELF_SERVE_ENABLED mirror — shows sign-up / invite links (public instances only). */
+  selfServeEnabled: boolean;
   googleClientId: string;
   githubClientId: string;
   entraIdClientId: string;
@@ -17,6 +19,7 @@ const defaultConfig: AppConfig = {
   apiUrl: "http://localhost:8000",
   appUrl: "http://localhost:15000",
   duarUrl: "http://localhost:9003",
+  selfServeEnabled: false,
   googleClientId: "",
   githubClientId: "",
   entraIdClientId: "",
@@ -63,6 +66,7 @@ export async function fetchAppConfig(): Promise<AppConfig> {
     appUrl: process.env.NEXT_PUBLIC_APP_URL ?? defaultConfig.appUrl,
     duarUrl:
       process.env.NEXT_PUBLIC_DUAR_URL ?? defaultConfig.duarUrl,
+    selfServeEnabled: process.env.NEXT_PUBLIC_SELF_SERVE_ENABLED === "true",
     googleClientId:
       process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? defaultConfig.googleClientId,
     githubClientId:
