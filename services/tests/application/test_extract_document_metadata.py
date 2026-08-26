@@ -144,3 +144,80 @@ async def test_fully_corrected_artifact_not_overwritten() -> None:
     assert publisher.artifact_updated_called is False  # no misleading DocumentMetadataUpdated
     # Sanity: the human values survived.
     assert repo.get_by_id(artifact.id).title_mention.title == "Human Title"
+
+
+# ── Fields found before the LLM lane survive an LLM failure (Phase 3 fold-in) ──
+
+
+class _NoTitle:
+    def extract_title(self, _path: str, _index: int) -> None:
+        return None
+
+
+class _BoomLLM:
+    async def complete_structured(self, prompt: str, schema: dict, **kwargs) -> dict:  # noqa: ANN003, ARG002
+        from domain.exceptions import LLMAuthError
+
+        raise LLMAuthError("The provider rejected the key (401).")
+
+
+def _incomplete_setup(llm):  # noqa: ANN001
+    page = Page.create(name="Page 1", artifact_id=uuid4(), index=0)
+    page.update_text_mention(TextMention(text="Bob Jones presented on 2024-01-15.", confidence=0.9))
+    page_repo = MockPageRepository()
+    page_repo.save(page)
+    artifact = Artifact.create(
+        source_uri=None,
+        source_filename="deck.pdf",
+        artifact_type=ArtifactType.SCIENTIFIC_PRESENTATION,
+        mime_type=MimeType.PDF,
+        storage_location="blobs/deck.pdf",
+    )
+    artifact.add_pages([page.id])
+    repo = MockArtifactRepository()
+    repo.save(artifact)
+    repo.save_called = False
+    publisher = MockExternalEventPublisher()
+    uc = object.__new__(ExtractDocumentMetadataUseCase)
+    uc.artifact_repository = repo
+    uc.page_repository = page_repo
+    uc.structured_extractor = _StubExtractor()  # authors + date, no title → LLM runs
+    uc.title_extractor = _NoTitle()
+    uc.blob_store = _StubBlob()
+    uc.llm_client = llm
+    uc.prompt_repository = _StubPromptRepo()
+    uc.external_event_publisher = publisher
+    uc.token_usage_store = None
+    uc.llm_scope = None
+    return uc, artifact, page, repo, publisher
+
+
+@pytest.mark.asyncio
+async def test_gliner_fields_persist_before_a_failing_llm_fallback() -> None:
+    from domain.exceptions import LLMAuthError
+
+    uc, artifact, page, repo, publisher = _incomplete_setup(_BoomLLM())
+
+    with pytest.raises(LLMAuthError):
+        await uc.execute(artifact.id, page.id)
+
+    saved = repo.get_by_id(artifact.id)
+    assert repo.save_called is True
+    assert [a.name for a in saved.author_mentions] == ["Bob Jones"]
+    assert saved.presentation_date is not None
+    assert saved.title_mention is None  # the LLM never delivered one
+    assert publisher.artifact_updated_called is True
+
+
+@pytest.mark.asyncio
+async def test_llm_fills_only_missing_fields_after_the_first_persist() -> None:
+    uc, artifact, page, repo, _ = _incomplete_setup(_StubLLM())
+
+    result = await uc.execute(artifact.id, page.id)
+
+    assert result.unwrap()["status"] == "success"
+    saved = repo.get_by_id(artifact.id)
+    assert saved.title_mention.title == "Inhibitor study"  # from the LLM
+    assert saved.title_mention.model_name == "llm-fallback"
+    assert [a.name for a in saved.author_mentions] == ["Bob Jones"]  # GLiNER kept, not "A. Smith"
+    assert saved.presentation_date.date.year == 2024

@@ -201,8 +201,12 @@ class ExtractDocumentMetadataUseCase:
                 logger.info("extract_doc_metadata.skip_no_pages", artifact_id=str(artifact_id))
                 return Success({"status": "skipped", "reason": "no usable pages"})
 
-            # LLM fallback for any still-missing fields
+            # LLM fallback for any still-missing fields. Persist what font/GLiNER
+            # found first: an LLMError propagates (Phase 2) and must not discard
+            # fields we already have.
+            persisted: set[str] = set()
             if not raw.is_complete and first_page_text:
+                persisted = await self._persist(raw, artifact, now, self._ready_fields(raw, now))
                 async with owner_scope(self.llm_scope, artifact):
                     await self._apply_llm_fallback(raw, first_page_text, artifact)
 
@@ -210,40 +214,14 @@ class ExtractDocumentMetadataUseCase:
             if not raw.has_date and artifact.source_filename:
                 self._try_filename_date(raw, artifact.source_filename)
 
-            # Build domain VOs and update aggregate
+            # Second pass: everything ready that isn't already on the aggregate,
+            # plus fields the LLM/filename lanes replaced since the first pass.
+            ready = self._ready_fields(raw, now)
+            await self._persist(raw, artifact, now, ready - (persisted - self._llm_touched(raw)))
+
             title_mention = self._build_title(raw, now)
             author_mentions = self._build_authors(raw, now)
             presentation_date = self._build_date(raw, now)
-
-            # A human-corrected field is off-limits to machine extraction. The
-            # aggregate's update_* methods already no-op in that case; mirror the
-            # guard here so we don't save + notify for a write that didn't land.
-            applied_title = (
-                bool(title_mention) and "title_mention" not in artifact.human_corrections
-            )
-            applied_authors = bool(author_mentions) and (
-                "author_mentions" not in artifact.human_corrections
-            )
-            applied_date = presentation_date is not None and (
-                "presentation_date" not in artifact.human_corrections
-            )
-            if applied_title:
-                artifact.update_title_mention(title_mention)
-            if applied_authors:
-                artifact.update_author_mentions(author_mentions)
-            if applied_date:
-                artifact.update_presentation_date(presentation_date)
-            if applied_title or applied_authors or applied_date:
-                self.artifact_repository.save(artifact)
-
-                if self.external_event_publisher:
-                    from application.mappers.artifact_mappers import ArtifactMapper
-
-                    artifact_response = ArtifactMapper.to_artifact_response(artifact)
-                    await self.external_event_publisher.notify_artifact_updated(
-                        artifact_response,
-                        sub_type="DocumentMetadataUpdated",
-                    )
 
             logger.info(
                 "extract_doc_metadata.success",
@@ -336,6 +314,70 @@ class ExtractDocumentMetadataUseCase:
             target.date_confidence = source.date_confidence
             target.date_from_llm = source.date_from_llm
             target.date_source = source.date_source
+
+    def _ready_fields(self, raw: _RawMetadata, now: datetime) -> set[str]:
+        """Fields whose builder currently yields a value (mirrors the old apply guards)."""
+        return {
+            name
+            for name, present in (
+                ("title", self._build_title(raw, now) is not None),
+                ("authors", bool(self._build_authors(raw, now))),
+                ("date", self._build_date(raw, now) is not None),
+            )
+            if present
+        }
+
+    @staticmethod
+    def _llm_touched(raw: _RawMetadata) -> set[str]:
+        """Fields (re)written after the first persist — by the LLM or the filename lane."""
+        return {
+            name
+            for name, touched in (
+                ("title", raw.title_from_llm),
+                ("authors", raw.authors_from_llm),
+                ("date", raw.date_from_llm or raw.date_source == "filename"),
+            )
+            if touched
+        }
+
+    async def _persist(
+        self,
+        raw: _RawMetadata,
+        artifact: Artifact,
+        now: datetime,
+        fields: set[str],
+    ) -> set[str]:
+        """Apply ``fields`` from ``raw`` to the aggregate, save + notify if anything
+        landed, and return what did. Human-corrected fields are skipped (the
+        aggregate's update_* no-op them too; the guard here avoids a save + notify
+        for a write that didn't land).
+        """
+        applied: set[str] = set()
+        if "title" in fields and "title_mention" not in artifact.human_corrections:
+            title_mention = self._build_title(raw, now)
+            if title_mention:
+                artifact.update_title_mention(title_mention)
+                applied.add("title")
+        if "authors" in fields and "author_mentions" not in artifact.human_corrections:
+            author_mentions = self._build_authors(raw, now)
+            if author_mentions:
+                artifact.update_author_mentions(author_mentions)
+                applied.add("authors")
+        if "date" in fields and "presentation_date" not in artifact.human_corrections:
+            presentation_date = self._build_date(raw, now)
+            if presentation_date is not None:
+                artifact.update_presentation_date(presentation_date)
+                applied.add("date")
+        if applied:
+            self.artifact_repository.save(artifact)
+            if self.external_event_publisher:
+                from application.mappers.artifact_mappers import ArtifactMapper
+
+                await self.external_event_publisher.notify_artifact_updated(
+                    ArtifactMapper.to_artifact_response(artifact),
+                    sub_type="DocumentMetadataUpdated",
+                )
+        return applied
 
     async def _apply_llm_fallback(self, raw: _RawMetadata, text: str, artifact: Artifact) -> None:
         logger.info(
