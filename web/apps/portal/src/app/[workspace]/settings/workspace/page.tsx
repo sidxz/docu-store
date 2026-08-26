@@ -4,10 +4,13 @@ import { Plug, CheckCircle, Loader2 } from "lucide-react";
 
 import { Card, CardHeader } from "@/components/ui/Card";
 import { useSession } from "@/lib/auth";
+import { useAppConfig } from "@/lib/app-config";
+import { inviteUrl } from "@/lib/onboard";
 import { usePlugins } from "@/plugins";
 
 export default function WorkspaceSettingsPage() {
   const { workspace } = useSession();
+  const { duarUrl, appUrl, selfServeEnabled } = useAppConfig();
   const { plugins, isLoading: pluginsLoading } = usePlugins();
 
   return (
@@ -27,6 +30,17 @@ export default function WorkspaceSettingsPage() {
             <span className="text-text-muted">ID</span>
             <span className="font-mono text-text-muted">{workspace.id}</span>
           </div>
+          {selfServeEnabled && (
+            <div className="pt-1">
+              <a
+                href={inviteUrl(duarUrl, appUrl, workspace.id)}
+                className="text-sm underline"
+                style={{ color: "#2563eb" }}
+              >
+                Invite people
+              </a>
+            </div>
+          )}
         </div>
       </Card>
 
