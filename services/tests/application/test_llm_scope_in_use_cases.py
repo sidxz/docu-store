@@ -98,10 +98,13 @@ async def test_summarize_page_resolves_owner_config_around_llm_calls() -> None:
 
 
 @pytest.mark.parametrize("exc", [LLMAuthError("401"), LLMNotConfiguredError("no key"), LLMRateLimitedError("429")])
-async def test_summarize_page_lets_llm_errors_escape(exc) -> None:
-    uc, page = _page_use_case(MockLLMClient(raise_on_call=exc))
+async def test_summarize_page_lets_llm_errors_escape_and_resets_scope(exc) -> None:
+    store = _Store()
+    uc, page = _page_use_case(MockLLMClient(raise_on_call=exc), UserLLMScope(store, enabled=True))
     with pytest.raises(type(exc)):
         await uc.execute(page.id)
+    assert store.calls == [(WS, OWNER)]
+    assert get_user_config() is None  # scope reset even though the LLM raised
 
 
 async def test_summarize_page_still_wraps_unknown_errors() -> None:

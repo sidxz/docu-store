@@ -671,7 +671,8 @@ def create_container() -> Container:
     # USER_LLM_KEYS_ENABLED=false keeps every call on the env defaults.
     container[UserLLMConfigStore] = lambda _: NullUserLLMConfigStore()
     container[UserLLMScope] = lambda c: UserLLMScope(
-        c[UserLLMConfigStore], enabled=settings.user_llm_keys_enabled,
+        c[UserLLMConfigStore],
+        enabled=settings.user_llm_keys_enabled,
     )
 
     # Summarization Use Cases

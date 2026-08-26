@@ -63,7 +63,10 @@ def test_existing_llm_error_is_returned_as_is() -> None:
 
 
 def test_message_carries_status_not_secrets() -> None:
-    assert "HTTP 401" in str(classify(_SdkStatus(401)))
+    err = classify(_SdkStatus(401))
+    assert "HTTP 401" in str(err)
+    assert "_SdkStatus" in str(err)
+    assert "http 401" not in str(err)  # provider's own message text is not copied
 
 
 def test_translate_reraises_typed_and_passes_unknown_through() -> None:

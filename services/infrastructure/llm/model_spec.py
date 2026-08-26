@@ -52,12 +52,10 @@ def effective_spec(defaults: ModelSpec, lane: str | None) -> ModelSpec:
     return replace(spec, reasoning=get_lane_override(lane) or spec.reasoning)
 
 
+# ponytail: OrderedDict LRU of 8 per adapter; promote to a process-wide
+# cache if adapters multiply.
 class ModelCache:
-    """Bounded per-adapter cache of built chat models keyed by ModelSpec.
-
-    # ponytail: OrderedDict LRU of 8 per adapter; promote to a process-wide
-    # cache if adapters multiply.
-    """
+    """Bounded per-adapter cache of built chat models keyed by ModelSpec."""
 
     def __init__(self, maxsize: int = 8) -> None:
         self._models: OrderedDict[ModelSpec, BaseChatModel] = OrderedDict()

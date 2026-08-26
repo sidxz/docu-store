@@ -35,9 +35,13 @@ def classify(exc: BaseException) -> LLMError | None:
             return cur
         code = _status(cur)
         if code in _AUTH_STATUSES:
-            return LLMAuthError(f"LLM provider rejected the request (HTTP {code}): {cur}")
+            return LLMAuthError(
+                f"LLM provider rejected the request (HTTP {code}: {type(cur).__name__})"
+            )
         if code == 429:
-            return LLMRateLimitedError(f"LLM provider rate-limited the request: {cur}")
+            return LLMRateLimitedError(
+                f"LLM provider rate-limited the request (HTTP 429: {type(cur).__name__})"
+            )
         cur = getattr(cur, "original", None) or cur.__cause__
     return None
 

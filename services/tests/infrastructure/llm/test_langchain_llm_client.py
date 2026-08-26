@@ -273,3 +273,30 @@ async def test_get_model_info_reflects_user_config() -> None:
         assert await client.get_model_info() == {"provider": "openai", "model_name": "gpt-5-mini"}
     finally:
         llm_context.reset_user_config(tok)
+
+
+async def test_stream_translates_provider_error_mid_stream() -> None:
+    from domain.exceptions import LLMRateLimitedError
+
+    class _Throttled(Exception):
+        status_code = 429
+
+    class _FailingStream(_FakeChatModel):
+        async def astream(self, messages, config=None):  # noqa: ANN001, ARG002
+            yield _FakeAIMessage("he")
+            raise _Throttled("slow down")
+
+    client = LangChainLLMClient(provider="openai", model_name="m", chat_model=_FailingStream())
+    seen: list[str] = []
+    with pytest.raises(LLMRateLimitedError):
+        async for piece in client.stream("q"):
+            seen.append(piece)
+    assert seen == ["he"]  # chunks before the failure were delivered
+
+
+async def test_stream_early_break_does_not_raise() -> None:
+    client, _ = _client()
+    agen = client.stream("q")
+    first = await anext(agen)
+    await agen.aclose()  # consumer stopped early — must not surface any error
+    assert first == "he"
