@@ -157,7 +157,7 @@ from infrastructure.auth import duar
 from infrastructure.blob_stores.fsspec_blob_store import FsspecBlobStore
 from infrastructure.chat.run_registry import ChatRunRegistry
 from infrastructure.chemistry.rdkit_smiles_validator import RdkitSmilesValidator
-from infrastructure.config import settings
+from infrastructure.config import Settings, settings
 from infrastructure.cser.cser_pipeline_service import CserPipelineService
 from infrastructure.embeddings.chemberta_generator import ChemBertaEmbeddingGenerator
 from infrastructure.embeddings.sentence_transformer_generator import SentenceTransformerGenerator
@@ -221,8 +221,23 @@ class DocuStoreApplication(Application):
         transcoder.register(PydanticTranscoding(EmbeddingMetadata))
 
 
+def _fernet_for_user_keys(settings: Settings):
+    """The Fernet for per-user LLM keys, or None when the feature is off.
+
+    A missing/invalid secret with the flag on is a deployment error — surface
+    it at boot, not on the first user's first upload.
+    """
+    if not settings.user_llm_keys_enabled:
+        return None
+    from infrastructure.read_repositories.mongo_user_llm_provider_store import user_llm_fernet
+
+    return user_llm_fernet(settings.user_llm_keys_secret)
+
+
 def create_container() -> Container:
     container = Container()
+    container[Settings] = settings
+    user_keys_fernet = _fernet_for_user_keys(settings)
 
     # Initialize our custom Application subclass
     docu_store_application = DocuStoreApplication(
@@ -667,9 +682,21 @@ def create_container() -> Container:
     container[LLMClientPort] = lambda _: create_llm_client(settings)
     container[PromptRepositoryPort] = lambda _: create_prompt_repository(settings)
 
-    # Per-user LLM config (BYO key). Phase 3 replaces the Null store with Mongo;
-    # USER_LLM_KEYS_ENABLED=false keeps every call on the env defaults.
-    container[UserLLMConfigStore] = lambda _: NullUserLLMConfigStore()
+    # Per-user LLM config (BYO key). USER_LLM_KEYS_ENABLED=false keeps every
+    # call on the env defaults via the Null store.
+    if user_keys_fernet is None:
+        container[UserLLMConfigStore] = lambda _: NullUserLLMConfigStore()
+    else:
+        from infrastructure.read_repositories.mongo_user_llm_provider_store import (
+            MongoUserLLMProviderStore,
+        )
+
+        container[UserLLMConfigStore] = lambda c: MongoUserLLMProviderStore(
+            client=c[AsyncIOMotorClient],
+            db_name=settings.mongo_db,
+            collection_name=settings.mongo_user_llm_providers_collection,
+            fernet=user_keys_fernet,
+        )
     container[UserLLMScope] = lambda c: UserLLMScope(
         c[UserLLMConfigStore],
         enabled=settings.user_llm_keys_enabled,

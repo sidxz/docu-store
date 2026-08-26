@@ -104,6 +104,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             await limit_store.ensure_indexes()
             logger.info("mongodb_token_limits_indexes_initialized")
 
+            # Ensure per-user LLM provider indexes (no-op on the Null store)
+            from application.ports.user_llm_config import UserLLMConfigStore
+
+            await container[UserLLMConfigStore].ensure_indexes()
+            logger.info("mongodb_user_llm_providers_indexes_initialized")
+
             # Ensure workflow status cache indexes
             from application.ports.workflow_status_cache import WorkflowStatusCache
 
