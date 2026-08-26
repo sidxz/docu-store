@@ -85,6 +85,10 @@ class Settings(BaseSettings):
         default="token_limits",
         validation_alias="MONGO_TOKEN_LIMITS_COLLECTION",
     )
+    mongo_user_llm_providers_collection: str = Field(
+        default="user_llm_providers",
+        validation_alias="MONGO_USER_LLM_PROVIDERS_COLLECTION",
+    )
 
     # Blob Storage
     blob_base_url: str = Field(
@@ -289,6 +293,15 @@ class Settings(BaseSettings):
             "When True, LLM calls first look up the caller's own provider config "
             "(UserLLMConfigStore) before falling back to the env LLM_* defaults. "
             "Public/BYO-LLM deployments set this; the default keeps today's behavior."
+        ),
+    )
+    user_llm_keys_secret: str | None = Field(
+        default=None,
+        validation_alias="USER_LLM_KEYS_SECRET",
+        description=(
+            "Fernet key that encrypts per-user LLM API keys at rest. Required when "
+            "USER_LLM_KEYS_ENABLED=true. Generate: python -c 'from cryptography.fernet "
+            "import Fernet; print(Fernet.generate_key().decode())'"
         ),
     )
     llm_reasoning: Literal["off", "low", "medium", "high"] = Field(

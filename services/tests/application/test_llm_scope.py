@@ -84,3 +84,18 @@ def test_container_registers_null_store_and_scope() -> None:
     container = create_container()
     assert isinstance(container[UserLLMConfigStore], NullUserLLMConfigStore)
     assert isinstance(container[UserLLMScope], UserLLMScope)
+
+
+async def test_null_store_is_empty_and_refuses_writes() -> None:
+    from application.ports.user_llm_config import NullUserLLMConfigStore
+    import pytest
+
+    store = NullUserLLMConfigStore()
+    ws, user = uuid4(), uuid4()
+    assert await store.get(ws, user) is None
+    assert await store.get_entry(ws, user) is None
+    assert await store.update_models(ws, user, model="m", chat_model="c") is False
+    await store.delete(ws, user)  # no-op
+    await store.ensure_indexes()  # no-op
+    with pytest.raises(RuntimeError, match="USER_LLM_KEYS_ENABLED"):
+        await store.set(ws, user, provider="openai", api_key="k", model="m", chat_model="c")

@@ -55,3 +55,13 @@ def test_user_llm_keys_flag_defaults_off(monkeypatch: pytest.MonkeyPatch) -> Non
 def test_user_llm_keys_flag_reads_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("USER_LLM_KEYS_ENABLED", "true")
     assert Settings(_env_file=None).user_llm_keys_enabled is True
+
+
+def test_user_llm_keys_secret_defaults_to_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    s = _isolated_settings(monkeypatch, "USER_LLM_KEYS_SECRET")
+    assert s.user_llm_keys_secret is None
+
+
+def test_user_llm_providers_collection_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    s = _isolated_settings(monkeypatch, "MONGO_USER_LLM_PROVIDERS_COLLECTION")
+    assert s.mongo_user_llm_providers_collection == "user_llm_providers"
