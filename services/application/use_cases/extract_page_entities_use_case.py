@@ -9,6 +9,7 @@ import structlog
 from returns.result import Failure, Result, Success
 
 from application.dtos.errors import AppError
+from application.services.llm_scope import owner_scope
 from domain.services.bioactivity_reducer import associate_bioactivities
 from domain.value_objects.tag_mention import TagMention
 
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
     from application.ports.ner_extractor import NERExtractorPort
     from application.ports.repositories.artifact_repository import ArtifactRepository
     from application.ports.repositories.page_repository import PageRepository
+    from application.services.llm_scope import UserLLMScope
 
 logger = structlog.get_logger()
 
@@ -37,11 +39,13 @@ class ExtractPageEntitiesUseCase:
         artifact_repository: ArtifactRepository,
         ner_extractor: NERExtractorPort,
         external_event_publisher: ExternalEventPublisher | None = None,
+        llm_scope: UserLLMScope | None = None,
     ) -> None:
         self.page_repository = page_repository
         self.artifact_repository = artifact_repository
         self.ner_extractor = ner_extractor
         self.external_event_publisher = external_event_publisher
+        self.llm_scope = llm_scope
 
     async def execute(self, page_id: UUID) -> Result[dict, AppError]:
         try:
@@ -63,7 +67,8 @@ class ExtractPageEntitiesUseCase:
                 text_len=len(page.text_mention.text),
             )
 
-            raw_entities = await self.ner_extractor.extract(page.text_mention.text)
+            async with owner_scope(self.llm_scope, artifact):
+                raw_entities = await self.ner_extractor.extract(page.text_mention.text)
 
             tag_mentions = [
                 TagMention(
@@ -112,8 +117,10 @@ class ExtractPageEntitiesUseCase:
             )
 
         except Exception as e:
-            from domain.exceptions import AggregateNotFoundError, ConcurrencyError
+            from domain.exceptions import AggregateNotFoundError, ConcurrencyError, LLMError
 
+            if isinstance(e, LLMError):
+                raise  # typed — the activity maps retryable vs. non-retryable
             if isinstance(e, AggregateNotFoundError):
                 return Failure(AppError("not_found", str(e)))
             if isinstance(e, ConcurrencyError):

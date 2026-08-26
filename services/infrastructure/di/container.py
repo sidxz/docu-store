@@ -566,6 +566,7 @@ def create_container() -> Container:
         artifact_repository=c[ArtifactRepository],
         ner_extractor=c[NERExtractorPort],
         external_event_publisher=c[ExternalEventPublisher],
+        llm_scope=c[UserLLMScope],
     )
     container[AggregateArtifactTagsUseCase] = lambda c: AggregateArtifactTagsUseCase(
         artifact_repository=c[ArtifactRepository],
@@ -587,6 +588,7 @@ def create_container() -> Container:
         blob_store=c[BlobStore],
         external_event_publisher=c[ExternalEventPublisher],
         token_usage_store=c[TokenUsageStore],
+        llm_scope=c[UserLLMScope],
     )
     container[TriggerDocMetadataExtractionUseCase] = lambda c: TriggerDocMetadataExtractionUseCase(
         page_repository=c[PageRepository],
@@ -681,6 +683,7 @@ def create_container() -> Container:
         blob_store=c[BlobStore],
         external_event_publisher=c[ExternalEventPublisher],
         token_usage_store=c[TokenUsageStore],
+        llm_scope=c[UserLLMScope],
     )
     container[TriggerPageSummarizationUseCase] = lambda c: TriggerPageSummarizationUseCase(
         workflow_orchestrator=c[WorkflowOrchestrator],
@@ -695,6 +698,7 @@ def create_container() -> Container:
         external_event_publisher=c[ExternalEventPublisher],
         batch_size=settings.artifact_summarization_batch_size,
         token_usage_store=c[TokenUsageStore],
+        llm_scope=c[UserLLMScope],
     )
     container[TriggerArtifactSummarizationUseCase] = lambda c: TriggerArtifactSummarizationUseCase(
         artifact_repository=c[ArtifactRepository],

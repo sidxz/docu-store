@@ -54,16 +54,19 @@ async def test_llm_extract_uses_structured_output() -> None:
 
 
 @pytest.mark.asyncio
-async def test_llm_extract_swallows_errors() -> None:
+async def test_llm_extract_propagates_errors() -> None:
+    from domain.exceptions import LLMAuthError
+
     class _Boom:
         async def complete_structured(self, *a, **k):  # noqa: ANN002, ANN003
-            raise RuntimeError("provider down")
+            raise LLMAuthError("401")
 
     uc = object.__new__(ExtractDocumentMetadataUseCase)
     uc.prompt_repository = _StubPromptRepo()
     uc.llm_client = _Boom()
 
-    assert await uc._llm_extract("text") is None
+    with pytest.raises(LLMAuthError):
+        await uc._llm_extract("text")
 
 
 # ── Fully human-corrected artifact must not be overwritten by extraction ──

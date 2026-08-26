@@ -10,6 +10,7 @@ import structlog
 from returns.result import Failure, Result, Success
 
 from application.dtos.errors import AppError
+from application.services.llm_scope import owner_scope
 from application.services.usage_recording import ingestion_counter, record_ingestion_usage
 from application.use_cases.storage_keys import render_pdf_key
 from domain.value_objects.author_mention import AuthorMention
@@ -28,6 +29,7 @@ if TYPE_CHECKING:
     from application.ports.structured_extractor import ExtractedField, StructuredExtractorPort
     from application.ports.title_extractor import TitleExtractorPort
     from application.ports.token_usage_store import TokenUsageStore
+    from application.services.llm_scope import UserLLMScope
     from domain.aggregates.artifact import Artifact
     from domain.aggregates.page import Page
 
@@ -114,6 +116,7 @@ class ExtractDocumentMetadataUseCase:
         blob_store: BlobStore,
         external_event_publisher: ExternalEventPublisher | None = None,
         token_usage_store: TokenUsageStore | None = None,
+        llm_scope: UserLLMScope | None = None,
     ) -> None:
         self.page_repository = page_repository
         self.artifact_repository = artifact_repository
@@ -124,6 +127,7 @@ class ExtractDocumentMetadataUseCase:
         self.blob_store = blob_store
         self.external_event_publisher = external_event_publisher
         self.token_usage_store = token_usage_store
+        self.llm_scope = llm_scope
 
     async def execute(self, artifact_id: UUID, page_id: UUID) -> Result[dict, AppError]:
         try:
@@ -199,7 +203,8 @@ class ExtractDocumentMetadataUseCase:
 
             # LLM fallback for any still-missing fields
             if not raw.is_complete and first_page_text:
-                await self._apply_llm_fallback(raw, first_page_text, artifact)
+                async with owner_scope(self.llm_scope, artifact):
+                    await self._apply_llm_fallback(raw, first_page_text, artifact)
 
             # Filename date fallback — many files contain dates in their name
             if not raw.has_date and artifact.source_filename:
@@ -261,8 +266,10 @@ class ExtractDocumentMetadataUseCase:
             )
 
         except Exception as e:
-            from domain.exceptions import AggregateNotFoundError, ConcurrencyError
+            from domain.exceptions import AggregateNotFoundError, ConcurrencyError, LLMError
 
+            if isinstance(e, LLMError):
+                raise  # typed — the activity maps retryable vs. non-retryable
             if isinstance(e, AggregateNotFoundError):
                 return Failure(AppError("not_found", str(e)))
             if isinstance(e, ConcurrencyError):
@@ -445,16 +452,14 @@ class ExtractDocumentMetadataUseCase:
         )
 
     async def _llm_extract(self, text: str) -> dict | None:
-        """Use LLM structured output to extract metadata when primary methods fail."""
-        try:
-            prompt = await self.prompt_repository.render_prompt(
-                "document_metadata_extraction",
-                page_text=text[:3000],
-            )
-            return await self.llm_client.complete_structured(prompt, _LLM_METADATA_SCHEMA)
-        except Exception:
-            logger.exception("extract_doc_metadata.llm_fallback_failed")
-            return None
+        """LLM structured-output fallback. Failures propagate — a silent None
+        would persist GLiNER-only metadata as if the LLM had run.
+        """
+        prompt = await self.prompt_repository.render_prompt(
+            "document_metadata_extraction",
+            page_text=text[:3000],
+        )
+        return await self.llm_client.complete_structured(prompt, _LLM_METADATA_SCHEMA)
 
     @staticmethod
     def _parse_date(date_str: str) -> datetime | None:
