@@ -282,6 +282,15 @@ class Settings(BaseSettings):
             "deployments where only local Ollama is permitted."
         ),
     )
+    user_llm_keys_enabled: bool = Field(
+        default=False,
+        validation_alias="USER_LLM_KEYS_ENABLED",
+        description=(
+            "When True, LLM calls first look up the caller's own provider config "
+            "(UserLLMConfigStore) before falling back to the env LLM_* defaults. "
+            "Public/BYO-LLM deployments set this; the default keeps today's behavior."
+        ),
+    )
     llm_reasoning: Literal["off", "low", "medium", "high"] = Field(
         default="off",
         validation_alias="LLM_REASONING",

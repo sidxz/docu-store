@@ -45,3 +45,13 @@ def test_per_lane_reasoning_defaults_none(monkeypatch: pytest.MonkeyPatch) -> No
     s = _isolated_settings(monkeypatch, "CHAT_SYNTHESIS_REASONING", "CHAT_RETRIEVAL_REASONING")
     assert s.chat_synthesis_reasoning is None
     assert s.chat_retrieval_reasoning is None
+
+
+def test_user_llm_keys_flag_defaults_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    s = _isolated_settings(monkeypatch, "USER_LLM_KEYS_ENABLED")
+    assert s.user_llm_keys_enabled is False
+
+
+def test_user_llm_keys_flag_reads_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("USER_LLM_KEYS_ENABLED", "true")
+    assert Settings(_env_file=None).user_llm_keys_enabled is True
