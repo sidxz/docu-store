@@ -5,11 +5,16 @@ Not event-sourced. Simple operational metadata storage.
 
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
-from lagom import Container
 from duar_auth import RequestAuth
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from lagom import Container
 
 from application.dtos.user_dtos import (
+    LLMLaneTestResult,
+    LLMProviderPreset,
+    LLMProviderRequest,
+    LLMProviderResponse,
+    LLMProviderTestResponse,
     RecentDocumentEntry,
     RecordDocumentOpenRequest,
     RecordSearchActivityRequest,
@@ -19,6 +24,10 @@ from application.dtos.user_dtos import (
 )
 from application.ports.repositories.user_activity_store import UserActivityStore
 from application.ports.repositories.user_preferences_store import UserPreferencesStore
+from application.ports.user_llm_config import UserLLMConfigStore
+from application.services.llm_providers import PRESETS
+from infrastructure.config import Settings
+from infrastructure.llm.provider_probe import probe_user_llm_config
 from interfaces.dependencies import get_auth, get_container
 
 router = APIRouter(prefix="/user", tags=["user"])
@@ -157,3 +166,104 @@ async def get_recent_documents(
         user_id=auth.user_id,
         limit=limit,
     )
+
+
+# ── BYO LLM provider ─────────────────────────────────────────────────────────
+
+
+def _presets_dto() -> dict[str, LLMProviderPreset]:
+    return {
+        pid: LLMProviderPreset(model=p.model, chat_model=p.chat_model) for pid, p in PRESETS.items()
+    }
+
+
+def _require_user_keys(container: Container) -> Settings:
+    settings = container[Settings]
+    if not settings.user_llm_keys_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Per-user LLM providers are not enabled on this deployment.",
+        )
+    return settings
+
+
+@router.get("/llm-provider", status_code=status.HTTP_200_OK)
+async def get_llm_provider(
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> LLMProviderResponse:
+    """The caller's provider (never the key) plus presets for the settings UI."""
+    settings = container[Settings]
+    entry = None
+    if settings.user_llm_keys_enabled:
+        entry = await container[UserLLMConfigStore].get_entry(auth.workspace_id, auth.user_id)
+    return LLMProviderResponse(
+        enabled=settings.user_llm_keys_enabled,
+        configured=entry is not None,
+        provider=entry.provider if entry else None,
+        key_last4=entry.key_last4 if entry else None,
+        model=entry.model if entry else None,
+        chat_model=entry.chat_model if entry else None,
+        presets=_presets_dto(),
+    )
+
+
+@router.put("/llm-provider", status_code=status.HTTP_204_NO_CONTENT)
+async def set_llm_provider(
+    body: LLMProviderRequest,
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> None:
+    _require_user_keys(container)
+    store = container[UserLLMConfigStore]
+    preset = PRESETS[body.provider]
+    model = body.model or preset.model
+    chat_model = body.chat_model or preset.chat_model
+    if body.api_key is None:
+        if not await store.update_models(
+            auth.workspace_id,
+            auth.user_id,
+            model=model,
+            chat_model=chat_model,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No LLM provider configured — add a key first.",
+            )
+        return
+    await store.set(
+        auth.workspace_id,
+        auth.user_id,
+        provider=body.provider,
+        api_key=body.api_key,
+        model=model,
+        chat_model=chat_model,
+    )
+
+
+@router.delete("/llm-provider", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_llm_provider(
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> None:
+    _require_user_keys(container)
+    await container[UserLLMConfigStore].delete(auth.workspace_id, auth.user_id)
+
+
+@router.post("/llm-provider/test", status_code=status.HTTP_200_OK)
+async def probe_llm_provider(
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> LLMProviderTestResponse:
+    """Probe the *stored* config — one tiny completion per distinct lane model."""
+    settings = _require_user_keys(container)
+    cfg = await container[UserLLMConfigStore].get(auth.workspace_id, auth.user_id)
+    if cfg is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No LLM provider configured."
+        )
+    results = await probe_user_llm_config(cfg, allow_cloud=settings.allow_cloud_llm)
+    lanes = {
+        lane: LLMLaneTestResult(ok=ok, detail=detail) for lane, (ok, detail) in results.items()
+    }
+    return LLMProviderTestResponse(ok=all(r.ok for r in lanes.values()), lanes=lanes)
