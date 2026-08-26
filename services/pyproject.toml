@@ -114,6 +114,15 @@ ignore = [
     "B905",   # zip() without strict parameter
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101",   # Use of assert (standard in tests)
+    "N818",   # Exception name should end with Error (test doubles)
+    "TRY301", # Abstract raise to inner function (test control flow)
+    "EM101",  # Exception must not use string literal (test cases)
+    "PT017",  # Found assertion on exception in except (test verification)
+]
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
