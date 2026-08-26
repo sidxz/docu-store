@@ -19,7 +19,7 @@ const btnBase =
 
 export default function LoginPage() {
   const { login, isAuthenticated, isLoading } = useAuthz();
-  const { googleClientId, githubClientId, entraIdClientId, duarUrl, appUrl, selfServeEnabled } =
+  const { googleClientId, githubClientId, entraIdClientId, duarUrl, selfServeEnabled } =
     useAppConfig();
   const router = useRouter();
 
@@ -174,7 +174,7 @@ export default function LoginPage() {
               >
                 New here?{" "}
                 <a
-                  href={onboardUrl(duarUrl, appUrl)}
+                  href={onboardUrl(duarUrl)}
                   className="underline transition-colors"
                   style={{ color: "#2563eb" }}
                 >

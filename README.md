@@ -197,6 +197,7 @@ DUAR_IDP_JWKS_URL=https://www.googleapis.com/oauth2/v3/certs
 
 # Frontend — tells the browser where to redirect for login
 APP_DUAR_URL=https://duar.example.com
+# APP_SELF_SERVE_ENABLED=true   # public edition only — shows sign-up/invite links; requires Duar SELF_SERVE_ENABLED=true
 APP_GOOGLE_CLIENT_ID=185792...       # OAuth client ID from Google Console
 APP_GITHUB_CLIENT_ID=Iv1_...         # OAuth app from GitHub Settings
 # APP_ENTRA_ID_CLIENT_ID=            # Azure AD (optional)
@@ -215,6 +216,7 @@ The frontend needs to know where the API lives. Set `APP_API_URL` to the backend
 APP_API_URL=https://api.example.com        # Backend API URL (public, reachable from browser)
 APP_URL=https://app.example.com            # Frontend's own URL (for OAuth redirects)
 APP_DUAR_URL=https://duar.example.com
+# APP_SELF_SERVE_ENABLED=true   # public edition only — shows sign-up/invite links; requires Duar SELF_SERVE_ENABLED=true
 APP_GOOGLE_CLIENT_ID=...
 APP_GITHUB_CLIENT_ID=...
 ```

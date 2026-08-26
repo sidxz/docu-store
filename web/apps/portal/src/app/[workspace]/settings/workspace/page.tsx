@@ -10,7 +10,7 @@ import { usePlugins } from "@/plugins";
 
 export default function WorkspaceSettingsPage() {
   const { workspace } = useSession();
-  const { duarUrl, appUrl, selfServeEnabled } = useAppConfig();
+  const { duarUrl, selfServeEnabled } = useAppConfig();
   const { plugins, isLoading: pluginsLoading } = usePlugins();
 
   return (
@@ -33,7 +33,7 @@ export default function WorkspaceSettingsPage() {
           {selfServeEnabled && (
             <div className="pt-1">
               <a
-                href={inviteUrl(duarUrl, appUrl, workspace.id)}
+                href={inviteUrl(duarUrl, workspace.id)}
                 className="text-sm underline"
                 style={{ color: "#2563eb" }}
               >

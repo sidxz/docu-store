@@ -2,7 +2,7 @@
 #
 # Configuration is loaded at RUNTIME via /api/config endpoint,
 # not baked at build time. Set APP_* env vars in docker-compose:
-#   APP_API_URL, APP_URL, APP_DUAR_URL,
+#   APP_API_URL, APP_URL, APP_DUAR_URL, APP_SELF_SERVE_ENABLED,
 #   APP_GOOGLE_CLIENT_ID, APP_GITHUB_CLIENT_ID,
 #   APP_UMAMI_URL, APP_UMAMI_WEBSITE_ID
 

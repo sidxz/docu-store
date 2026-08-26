@@ -11,7 +11,7 @@ import { WorkspaceSelector } from "./workspace-selector";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
-  const { duarUrl, appUrl, selfServeEnabled } = useAppConfig();
+  const { duarUrl, selfServeEnabled } = useAppConfig();
 
   return (
     <AuthzCallback
@@ -40,6 +40,9 @@ export default function AuthCallbackPage() {
         </AuthShell>
       }
       errorComponent={(error) => {
+        // Matches the zero-workspace error thrown by @duar-auth/react
+        // (sdks/react/src/authz-callback.tsx: "No workspaces available. …").
+        // If the SDK copy changes, the raw message + "Back to login" still render.
         const noWorkspace =
           selfServeEnabled && error.message.startsWith("No workspaces available");
         return (
@@ -58,7 +61,7 @@ export default function AuthCallbackPage() {
               </p>
               {noWorkspace && (
                 <a
-                  href={onboardUrl(duarUrl, appUrl)}
+                  href={onboardUrl(duarUrl)}
                   className="mb-3 block text-sm underline transition-colors"
                   style={{ color: "#2563eb" }}
                 >
