@@ -13,10 +13,16 @@ Strategy:
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING
 
 import structlog
 
 from application.ports.ner_extractor import NEREntity, NERExtractorPort
+from domain.exceptions import LLMNotConfiguredError
+from infrastructure.llm.errors import translate_provider_errors
+
+if TYPE_CHECKING:
+    from structflo.ner import NERExtractor
 
 logger = structlog.get_logger()
 
@@ -30,16 +36,24 @@ FAST_TARGET_TYPES: frozenset[str] = frozenset(
 # → dictionary-only NER, since langextract has no provider for them.
 LANGEXTRACT_PROVIDERS: frozenset[str] = frozenset({"ollama", "openai", "gemini"})
 
+# Providers whose langextract model accepts a base URL (Gemini's does not).
+BASE_URL_PROVIDERS: frozenset[str] = frozenset({"ollama", "openai"})
+
 
 class StructfloNERExtractor(NERExtractorPort):
     """Runs fast + LLM NER and merges results.
+
+    The LLM extractor is built per call from the effective config — the
+    caller's ``UserLLMConfig`` (contextvar) overlaid on these constructor
+    defaults — so the same adapter serves every user. Construction is cheap
+    (structflo stores fields; langextract routing happens inside ``extract``).
 
     Args:
         model_id:  Model name (e.g. "gemma3:27b", "gpt-4o")
         provider:  langextract provider ("ollama"/"openai"/"gemini"). Providers
             outside that set degrade to dictionary-only NER.
         api_key:   API key for cloud providers (None for Ollama).
-        model_url: Ollama base URL; ignored for cloud providers.
+        model_url: Base URL for ollama/openai (OpenRouter); ignored for gemini.
 
     """
 
@@ -51,43 +65,64 @@ class StructfloNERExtractor(NERExtractorPort):
         model_url: str | None = None,
         max_char_buffer: int = 5000,
     ) -> None:
+        import langextract.providers as lx_providers
         from structflo.ner import TB
         from structflo.ner.fast import FastNERExtractor
 
+        # langextract 1.1.1: the explicit-provider factory path skips
+        # load_builtins_once(), so a fresh process has an empty registry and
+        # resolve_provider("ollama") raises InferenceConfigError. Register
+        # builtins here until structflo-ner does it itself at construction.
+        lx_providers.load_builtins_once()
+
         self._fast_extractor = FastNERExtractor(fuzzy_threshold=0)
         self._tb_profile = TB
-
-        if provider in LANGEXTRACT_PROVIDERS:
-            import langextract.providers as lx_providers
-            from structflo.ner import NERExtractor
-
-            # langextract 1.1.1: the explicit-provider factory path skips
-            # load_builtins_once(), so a fresh process has an empty registry and
-            # resolve_provider("ollama") raises InferenceConfigError — every LLM
-            # extract silently degrades to dictionary-only. Register builtins
-            # here until structflo-ner does it itself at construction.
-            lx_providers.load_builtins_once()
-
-            self._llm_extractor = NERExtractor(
-                model_id=model_id,
-                provider=provider,
-                api_key=api_key,
-                model_url=model_url if provider == "ollama" else None,
-                profile=TB,
-                langextract_kwargs={"max_char_buffer": max_char_buffer},
-            )
-        else:
-            # langextract can't route this provider — run dictionary-only NER
-            # rather than crashing on the first extract() call.
-            self._llm_extractor = None
-            logger.warning("structflo_ner_llm_provider_unsupported", provider=provider)
+        self._model_id = model_id
+        self._provider = provider
+        self._api_key = api_key
+        self._model_url = model_url
+        self._max_char_buffer = max_char_buffer
 
         logger.info(
             "structflo_ner_extractor_initialized",
             model_id=model_id,
             provider=provider,
-            llm_enabled=self._llm_extractor is not None,
+            llm_routable=provider in LANGEXTRACT_PROVIDERS,
             max_char_buffer=max_char_buffer,
+        )
+
+    def _llm_extractor(self) -> NERExtractor | None:
+        """Structflo NERExtractor for the effective config; None when langextract can't route it.
+
+        Raises:
+            LLMNotConfiguredError: cloud provider with no key (fail closed).
+
+        """
+        from structflo.ner import NERExtractor
+
+        from infrastructure.llm.llm_context import get_user_config
+
+        cfg = get_user_config()
+        if cfg is not None:
+            provider, model_id = cfg.provider, cfg.model or self._model_id
+            api_key, model_url = cfg.api_key, cfg.base_url
+        else:
+            provider, model_id = self._provider, self._model_id
+            api_key, model_url = self._api_key, self._model_url
+
+        if provider not in LANGEXTRACT_PROVIDERS:
+            logger.warning("structflo_ner_llm_provider_unsupported", provider=provider)
+            return None
+        if provider != "ollama" and not api_key:
+            msg = f"No API key for NER provider {provider!r} — add one in your LLM settings."
+            raise LLMNotConfiguredError(msg)
+        return NERExtractor(
+            model_id=model_id,
+            provider=provider,
+            api_key=api_key,
+            model_url=model_url if provider in BASE_URL_PROVIDERS else None,
+            profile=self._tb_profile,
+            langextract_kwargs={"max_char_buffer": self._max_char_buffer},
         )
 
     async def extract(self, text: str) -> list[NEREntity]:
@@ -121,27 +156,23 @@ class StructfloNERExtractor(NERExtractorPort):
             return []
 
     async def _run_llm(self, text: str) -> list[NEREntity]:
-        if self._llm_extractor is None:
+        """LLM NER. Failures propagate (typed where the provider tells us why) —
+        an empty list here would be persisted as a finished extraction.
+        """
+        extractor = self._llm_extractor()
+        if extractor is None:
             return []
-        try:
-            result = await asyncio.to_thread(
-                self._llm_extractor.extract,
-                text,
-                self._tb_profile,
+        with translate_provider_errors():
+            result = await asyncio.to_thread(extractor.extract, text, self._tb_profile)
+        return [
+            NEREntity(
+                text=e.text,
+                entity_type=e.entity_type,
+                confidence=getattr(e, "confidence", None),
+                attributes=dict(e.attributes) if e.attributes else {},
             )
-            entities = result.all_entities()  # type: ignore[union-attr]
-            return [
-                NEREntity(
-                    text=e.text,
-                    entity_type=e.entity_type,
-                    confidence=getattr(e, "confidence", None),
-                    attributes=dict(e.attributes) if e.attributes else {},
-                )
-                for e in entities
-            ]
-        except Exception:
-            logger.exception("structflo_ner_llm_extractor_failed")
-            return []
+            for e in result.all_entities()  # type: ignore[union-attr]
+        ]
 
     @staticmethod
     def _merge(

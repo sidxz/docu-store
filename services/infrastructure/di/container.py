@@ -375,13 +375,16 @@ def create_container() -> Container:
 
     # Register NER Extractor (dual-mode: fast + LLM). NER LLM config is separate
     # from the batch LLM (NER_LLM_*), each field falling back to the llm_* field.
+    # A missing key is legal (BYO-key deployments): the adapter fails closed per
+    # call. Env base URLs are Ollama URLs — never handed to a cloud provider.
     _ner_provider = settings.ner_llm_provider or settings.llm_provider
-    _ner_api_key = settings.ner_llm_api_key or _resolve_api_key(_ner_provider, settings)
     container[NERExtractorPort] = lambda _: StructfloNERExtractor(
         model_id=settings.ner_llm_model_name or settings.llm_model_name,
         provider=_ner_provider,
-        api_key=_ner_api_key,
-        model_url=settings.ner_llm_base_url or settings.llm_base_url,
+        api_key=settings.ner_llm_api_key or _resolve_api_key(_ner_provider, settings),
+        model_url=(settings.ner_llm_base_url or settings.llm_base_url)
+        if _ner_provider == "ollama"
+        else None,
         max_char_buffer=settings.ner_max_char_buffer,
     )
 
