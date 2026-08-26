@@ -9,6 +9,8 @@ from returns.result import Failure, Success
 
 from application.dtos.chat_dtos import AgentEvent
 from application.dtos.errors import AppError
+from application.ports.user_llm_config import NullUserLLMConfigStore
+from application.services.llm_scope import UserLLMScope
 from application.use_cases.chat_use_cases import SendMessageUseCase
 from application.use_cases.token_limit_use_cases import CheckTokenQuotaUseCase
 from infrastructure.chat.run_registry import ChatRunRegistry
@@ -51,6 +53,7 @@ def _client(*, quota: FakeQuota, role: str = "editor") -> TestClient:
             CheckTokenQuotaUseCase: quota,
             SendMessageUseCase: FakeSendUseCase(),
             ChatRunRegistry: ChatRunRegistry(),
+            UserLLMScope: UserLLMScope(NullUserLLMConfigStore(), enabled=False),
         },
     )
     app.dependency_overrides[get_auth] = lambda: FakeAuth(

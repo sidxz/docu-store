@@ -8,6 +8,8 @@ from fastapi.testclient import TestClient
 from returns.result import Success
 
 from application.dtos.chat_dtos import AgentEvent
+from application.ports.user_llm_config import NullUserLLMConfigStore
+from application.services.llm_scope import UserLLMScope
 from application.use_cases.chat_use_cases import (
     DeleteConversationUseCase,
     GetConversationUseCase,
@@ -90,6 +92,7 @@ def _client(
             GetConversationUseCase: get_uc or FakeGetConversation(),
             DeleteConversationUseCase: delete_uc or FakeDeleteConversation(),
             ChatRunRegistry: registry,
+            UserLLMScope: UserLLMScope(NullUserLLMConfigStore(), enabled=False),
         },
     )
     app.dependency_overrides[get_auth] = lambda: FakeAuth(
