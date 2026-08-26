@@ -73,6 +73,7 @@ class MockExternalEventPublisher:
         self.artifact_created_called = False
         self.artifact_deleted_called = False
         self.artifact_updated_called = False
+        self.artifact_updated_calls = 0
         self.page_created_called = False
         self.page_updated_called = False
         self.page_deleted_called = False
@@ -86,6 +87,7 @@ class MockExternalEventPublisher:
 
     async def notify_artifact_updated(self, artifact: Any, *, sub_type: str | None = None) -> None:
         self.artifact_updated_called = True
+        self.artifact_updated_calls += 1
 
     async def notify_artifact_deleted(self, artifact_id: UUID) -> None:
         self.artifact_deleted_called = True

@@ -207,11 +207,12 @@ async def test_gliner_fields_persist_before_a_failing_llm_fallback() -> None:
     assert saved.presentation_date is not None
     assert saved.title_mention is None  # the LLM never delivered one
     assert publisher.artifact_updated_called is True
+    assert publisher.artifact_updated_calls == 1  # one notify for the GLiNER fields; the LLM lane raised before the second pass
 
 
 @pytest.mark.asyncio
 async def test_llm_fills_only_missing_fields_after_the_first_persist() -> None:
-    uc, artifact, page, repo, _ = _incomplete_setup(_StubLLM())
+    uc, artifact, page, repo, publisher = _incomplete_setup(_StubLLM())
 
     result = await uc.execute(artifact.id, page.id)
 
@@ -220,4 +221,5 @@ async def test_llm_fills_only_missing_fields_after_the_first_persist() -> None:
     assert saved.title_mention.title == "Inhibitor study"  # from the LLM
     assert saved.title_mention.model_name == "llm-fallback"
     assert [a.name for a in saved.author_mentions] == ["Bob Jones"]  # GLiNER kept, not "A. Smith"
+    assert publisher.artifact_updated_calls == 2  # GLiNER pass + LLM pass (accepted: full-artifact events, idempotent consumers)
     assert saved.presentation_date.date.year == 2024
