@@ -25,6 +25,15 @@ export async function startOpenRouterAuth(returnTo: string): Promise<void> {
   window.location.assign(url.toString());
 }
 
+/** Clear a stale verifier (e.g. the callback came back with no `code`). */
+export function clearOpenRouterVerifier(): void {
+  try {
+    sessionStorage.removeItem(VERIFIER_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Where to go after the exchange (read once, then cleared). */
 export function takeOpenRouterReturnTo(): string {
   try {

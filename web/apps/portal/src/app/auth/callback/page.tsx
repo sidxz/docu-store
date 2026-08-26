@@ -17,9 +17,17 @@ export default function AuthCallbackPage() {
       onSuccess={(user, returnTo) => {
         // A stale returnTo (e.g. captured in another tab before a workspace
         // switch) must not land this workspace's token on another workspace's
-        // URLs — honor it only inside the entered workspace.
+        // URLs — honor it only inside the entered workspace. Onboarding routes
+        // are workspace-agnostic (the authz token carries the workspace) and
+        // are honored too — e.g. the OpenRouter PKCE callback's returnTo after
+        // a silent re-auth.
         const home = `/${user.workspaceSlug}`;
-        const dest = returnTo === home || returnTo?.startsWith(`${home}/`) ? returnTo : home;
+        const onboarding =
+          returnTo === "/onboarding" || returnTo?.startsWith("/onboarding/");
+        const dest =
+          returnTo === home || returnTo?.startsWith(`${home}/`) || onboarding
+            ? (returnTo ?? home)
+            : home;
         router.replace(dest);
       }}
       onError={() => {

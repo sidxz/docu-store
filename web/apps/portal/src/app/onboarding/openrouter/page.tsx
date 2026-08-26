@@ -6,7 +6,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { AuthGuardWrapper } from "@/components/providers/AuthGuardWrapper";
 import { useSaveLlmProvider } from "@/hooks/use-llm-provider";
-import { exchangeOpenRouterCode, takeOpenRouterReturnTo } from "@/lib/openrouter-pkce";
+import {
+  clearOpenRouterVerifier,
+  exchangeOpenRouterCode,
+  takeOpenRouterReturnTo,
+} from "@/lib/openrouter-pkce";
 
 export default function OpenRouterCallbackPage() {
   return (
@@ -34,6 +38,7 @@ function Exchange() {
     setReturnTo(dest);
     const code = params.get("code");
     if (!code) {
+      clearOpenRouterVerifier();
       setError("OpenRouter returned no authorization code.");
       return;
     }

@@ -7,6 +7,7 @@ import { AuthShell } from "@/components/auth/AuthShell";
 import { AuthGuardWrapper } from "@/components/providers/AuthGuardWrapper";
 import { LlmProviderForm } from "@/components/settings/LlmProviderForm";
 import { LogoMark } from "@/components/ui/LogoMark";
+import { Button } from "@/components/ui/button";
 import { skipLlmOnboarding } from "@/hooks/use-llm-onboarding-gate";
 import { useLlmProvider } from "@/hooks/use-llm-provider";
 import { useSession } from "@/lib/auth";
@@ -45,17 +46,23 @@ function Onboarding() {
           never see your spend. Reading and search work without one; uploads and chat need it.
         </p>
         <LlmProviderForm onConfigured={() => router.replace(home)} />
-        <button
-          type="button"
-          className="mt-6 text-sm underline"
-          style={{ color: "#64748b" }}
-          onClick={() => {
-            skipLlmOnboarding();
-            router.replace(home);
-          }}
-        >
-          Skip for now
-        </button>
+        {provider.data?.configured ? (
+          <Button className="mt-6" onClick={() => router.replace(home)}>
+            Continue to DocuStore
+          </Button>
+        ) : (
+          <button
+            type="button"
+            className="mt-6 text-sm underline"
+            style={{ color: "#64748b" }}
+            onClick={() => {
+              skipLlmOnboarding();
+              router.replace(home);
+            }}
+          >
+            Skip for now
+          </button>
+        )}
       </div>
     </AuthShell>
   );

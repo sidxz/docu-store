@@ -118,8 +118,12 @@ function ConnectedView({
   const dirty = model !== (status.model ?? "") || chatModel !== (status.chat_model ?? "");
 
   const runTest = async () => {
-    const result = await test.mutateAsync();
-    if (result.ok) onConfigured?.();
+    try {
+      const result = await test.mutateAsync();
+      if (result.ok) onConfigured?.();
+    } catch {
+      /* surfaced via test.isError */
+    }
   };
 
   return (
