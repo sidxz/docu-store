@@ -36,7 +36,7 @@ export function useLlmOnboardingGate(): void {
 
   useEffect(() => {
     if (!data?.enabled || data.configured) return;
-    if (pathname.startsWith("/onboarding") || skipped()) return;
+    if (pathname === "/onboarding" || pathname.startsWith("/onboarding/") || skipped()) return;
     router.replace("/onboarding");
   }, [data, pathname, router]);
 }
