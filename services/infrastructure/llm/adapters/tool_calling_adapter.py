@@ -17,6 +17,8 @@ from application.ports.tool_calling_llm import (
     ToolCallResult,
     ToolDefinition,
 )
+from infrastructure.llm.errors import translate_provider_errors
+from infrastructure.llm.model_spec import ModelCache, ModelSpec, effective_spec
 from infrastructure.llm.token_counter import call_config
 
 log = structlog.get_logger(__name__)
@@ -92,14 +94,14 @@ def _parse_react_response(text: str) -> ToolCallResult:
 
 
 class _BaseToolCallingAdapter:
-    """Shared init and lazy model construction for both tool-calling adapters."""
+    """Shared init and lazy, per-call-resolved model construction for both adapters."""
 
     def __init__(
         self,
         provider: str,
         model_name: str,
         api_key: str | None = None,
-        base_url: str = "http://localhost:11434",
+        base_url: str | None = "http://localhost:11434",
         temperature: float = 0.3,
         reasoning: str | None = None,
         num_ctx: int | None = None,
@@ -107,36 +109,22 @@ class _BaseToolCallingAdapter:
         lane: str | None = None,
         langfuse_handler: Any | None = None,
     ) -> None:
-        self._provider = provider
-        self._model_name = model_name
-        self._api_key = api_key
-        self._base_url = base_url
-        self._temperature = temperature
-        self._reasoning = reasoning
-        self._num_ctx = num_ctx
-        self._allow_cloud = allow_cloud
+        self._spec = ModelSpec(
+            provider=provider,
+            model_name=model_name,
+            temperature=temperature,
+            api_key=api_key,
+            base_url=base_url,
+            reasoning=reasoning,
+            num_ctx=num_ctx,
+            allow_cloud=allow_cloud,
+        )
         self._lane = lane
         self._langfuse_handler = langfuse_handler
-        self._models: dict[str, Any] = {}
+        self._models = ModelCache()
 
     def _get_llm(self) -> Any:
-        from infrastructure.llm.model_builder import build_chat_model
-        from infrastructure.llm.reasoning_context import get_lane_override
-
-        level = get_lane_override(self._lane) or self._reasoning
-        key = level or "off"
-        if key not in self._models:
-            self._models[key] = build_chat_model(
-                provider=self._provider,
-                model_name=self._model_name,
-                temperature=self._temperature,
-                api_key=self._api_key,
-                base_url=self._base_url,
-                reasoning=level,
-                num_ctx=self._num_ctx,
-                allow_cloud=self._allow_cloud,
-            )
-        return self._models[key]
+        return self._models.get(effective_spec(self._spec, self._lane))
 
 
 class NativeToolCallingAdapter(_BaseToolCallingAdapter):
@@ -210,7 +198,8 @@ class NativeToolCallingAdapter(_BaseToolCallingAdapter):
                 )
 
         config = call_config(self._langfuse_handler)
-        response: AIMessage = await llm_with_tools.ainvoke(lc_messages, config=config)
+        with translate_provider_errors():
+            response: AIMessage = await llm_with_tools.ainvoke(lc_messages, config=config)
 
         # Parse response
         if response.tool_calls:
@@ -280,7 +269,8 @@ class ReactToolCallingAdapter(_BaseToolCallingAdapter):
                 )
 
         config = call_config(self._langfuse_handler)
-        response = await llm.ainvoke(lc_messages, config=config)
+        with translate_provider_errors():
+            response = await llm.ainvoke(lc_messages, config=config)
         raw_text = str(response.content)
 
         log.debug("react.raw_response", text=raw_text[:500])

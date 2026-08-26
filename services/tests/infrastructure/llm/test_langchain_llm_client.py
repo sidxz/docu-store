@@ -217,3 +217,59 @@ def test_get_llm_ignores_override_for_unlaned_client(monkeypatch) -> None:
     finally:
         reasoning_context.reset_reasoning_override(tok)
     assert built == ["off"]  # batch/unlaned: override never applies
+
+
+# ---------------------------------------------------------------------------
+# Per-user config + provider error translation (Phase 2)
+# ---------------------------------------------------------------------------
+
+
+async def test_provider_error_is_translated_to_llm_error() -> None:
+    from domain.exceptions import LLMAuthError
+
+    class _Boom(Exception):
+        status_code = 402
+
+    class _FailingModel(_FakeChatModel):
+        async def ainvoke(self, messages, config=None):  # noqa: ANN001, ARG002
+            raise _Boom("insufficient credits")
+
+    client = LangChainLLMClient(provider="openai", model_name="m", chat_model=_FailingModel())
+    with pytest.raises(LLMAuthError):
+        await client.complete("q")
+
+
+def test_user_config_changes_cache_fingerprint(monkeypatch) -> None:
+    from application.ports.user_llm_config import UserLLMConfig
+    from infrastructure.llm import llm_context
+
+    built: list[dict] = []
+    monkeypatch.setattr(
+        "infrastructure.llm.model_builder.build_chat_model",
+        lambda **kw: built.append(kw) or object(),
+    )
+    client = LangChainLLMClient(provider="ollama", model_name="m", lane="base")
+    client._get_llm()
+    tok = llm_context.set_user_config(UserLLMConfig(provider="openai", api_key="k", chat_model="gpt-5"))
+    try:
+        client._get_llm()
+        client._get_llm()  # cached under the user's fingerprint
+    finally:
+        llm_context.reset_user_config(tok)
+    client._get_llm()  # back to the env fingerprint, still cached
+    assert [b["provider"] for b in built] == ["ollama", "openai"]
+    assert built[1]["model_name"] == "gpt-5"
+    assert built[1]["api_key"] == "k"
+
+
+async def test_get_model_info_reflects_user_config() -> None:
+    from application.ports.user_llm_config import UserLLMConfig
+    from infrastructure.llm import llm_context
+
+    client = LangChainLLMClient(provider="ollama", model_name="gemma4:31b")
+    assert await client.get_model_info() == {"provider": "ollama", "model_name": "gemma4:31b"}
+    tok = llm_context.set_user_config(UserLLMConfig(provider="openai", api_key="k", model="gpt-5-mini"))
+    try:
+        assert await client.get_model_info() == {"provider": "openai", "model_name": "gpt-5-mini"}
+    finally:
+        llm_context.reset_user_config(tok)

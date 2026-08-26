@@ -59,19 +59,19 @@ def test_native_for_anthropic_under_auto() -> None:
         _settings(chat_llm_provider="anthropic", anthropic_api_key="k"),
     )
     assert isinstance(adapter, NativeToolCallingAdapter)
-    assert adapter._provider == "anthropic"
+    assert adapter._spec.provider == "anthropic"
 
 
 def test_retrieval_reasoning_knob_applied() -> None:
     adapter = factory.create_tool_calling_llm_client(_settings(chat_retrieval_reasoning="high"))
-    assert adapter._reasoning == "high"
+    assert adapter._spec.reasoning == "high"
 
 
 def test_retrieval_reasoning_inherits_base_when_unset() -> None:
     adapter = factory.create_tool_calling_llm_client(
         _settings(chat_llm_reasoning="medium", chat_retrieval_reasoning=None),
     )
-    assert adapter._reasoning == "medium"
+    assert adapter._spec.reasoning == "medium"
 
 
 def test_tool_calling_refuses_cloud_when_disabled() -> None:

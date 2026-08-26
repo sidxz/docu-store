@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import structlog
 
+from infrastructure.llm.errors import translate_provider_errors
+from infrastructure.llm.model_spec import ModelCache, ModelSpec, effective_spec
 from infrastructure.llm.token_counter import call_config
 
 if TYPE_CHECKING:
@@ -60,39 +62,25 @@ class LangChainLLMClient:
         langfuse_handler: Any | None = None,
         chat_model: BaseChatModel | None = None,
     ) -> None:
-        self._provider = provider
-        self._model_name = model_name
-        self._temperature = temperature
-        self._api_key = api_key
-        self._base_url = base_url
-        self._reasoning = reasoning
-        self._num_ctx = num_ctx
-        self._allow_cloud = allow_cloud
+        self._spec = ModelSpec(
+            provider=provider,
+            model_name=model_name,
+            temperature=temperature,
+            api_key=api_key,
+            base_url=base_url,
+            reasoning=reasoning,
+            num_ctx=num_ctx,
+            allow_cloud=allow_cloud,
+        )
         self._lane = lane
         self._langfuse_handler = langfuse_handler
         self._injected = chat_model
-        self._models: dict[str, Any] = {}
+        self._models = ModelCache()
 
     def _get_llm(self) -> BaseChatModel:
         if self._injected is not None:
             return self._injected
-        from infrastructure.llm.model_builder import build_chat_model
-        from infrastructure.llm.reasoning_context import get_lane_override
-
-        level = get_lane_override(self._lane) or self._reasoning
-        key = level or "off"
-        if key not in self._models:
-            self._models[key] = build_chat_model(
-                provider=self._provider,
-                model_name=self._model_name,
-                temperature=self._temperature,
-                api_key=self._api_key,
-                base_url=self._base_url,
-                reasoning=level,
-                num_ctx=self._num_ctx,
-                allow_cloud=self._allow_cloud,
-            )
-        return self._models[key]
+        return self._models.get(effective_spec(self._spec, self._lane))
 
     def _config(self) -> dict:
         # Counting callback is always attached; Langfuse trace attribution
@@ -135,7 +123,10 @@ class LangChainLLMClient:
         llm = self._get_llm()
         if temperature is not None:
             llm = llm.bind(temperature=temperature)
-        response = await llm.ainvoke(self._text_messages(prompt, system_prompt), config=self._config())
+        with translate_provider_errors():
+            response = await llm.ainvoke(
+                self._text_messages(prompt, system_prompt), config=self._config()
+            )
         return str(response.content)
 
     async def stream_with_reasoning(
@@ -154,12 +145,13 @@ class LangChainLLMClient:
             if images_b64
             else self._text_messages(prompt, system_prompt)
         )
-        async for chunk in llm.astream(messages, config=self._config()):
-            reasoning = chunk.additional_kwargs.get("reasoning_content")
-            if reasoning:
-                yield ("reasoning", str(reasoning))
-            if chunk.content:
-                yield ("content", str(chunk.content))
+        with translate_provider_errors():
+            async for chunk in llm.astream(messages, config=self._config()):
+                reasoning = chunk.additional_kwargs.get("reasoning_content")
+                if reasoning:
+                    yield ("reasoning", str(reasoning))
+                if chunk.content:
+                    yield ("content", str(chunk.content))
 
     async def stream(
         self,
@@ -187,7 +179,8 @@ class LangChainLLMClient:
     ) -> str:
         llm = self._get_llm()
         messages = self._image_messages(prompt, [image_b64], system_prompt)
-        response = await llm.ainvoke(messages, config=self._config())
+        with translate_provider_errors():
+            response = await llm.ainvoke(messages, config=self._config())
         return str(response.content)
 
     async def complete_structured(
@@ -204,9 +197,11 @@ class LangChainLLMClient:
             schema = {"title": "response", **schema}
         # function_calling is the portable method across ollama/openai/anthropic/gemini.
         llm = self._get_llm().with_structured_output(schema, method="function_calling")
-        result = await llm.ainvoke(
-            self._text_messages(prompt, system_prompt), config=self._config(),
-        )
+        with translate_provider_errors():
+            result = await llm.ainvoke(
+                self._text_messages(prompt, system_prompt),
+                config=self._config(),
+            )
         # Usage is captured by the token-counting callback in _config() (fires
         # on the underlying LLM call even though structured output wraps it).
         if hasattr(result, "model_dump"):
@@ -214,4 +209,5 @@ class LangChainLLMClient:
         return dict(result)
 
     async def get_model_info(self) -> dict[str, str]:
-        return {"provider": self._provider, "model_name": self._model_name}
+        spec = effective_spec(self._spec, self._lane)
+        return {"provider": spec.provider, "model_name": spec.model_name}

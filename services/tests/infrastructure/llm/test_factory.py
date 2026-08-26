@@ -40,43 +40,43 @@ def _settings(**overrides):
 def test_create_llm_client_returns_generic_ollama() -> None:
     client = factory.create_llm_client(_settings())
     assert isinstance(client, LangChainLLMClient)
-    assert client._provider == "ollama"
-    assert client._allow_cloud is True
+    assert client._spec.provider == "ollama"
+    assert client._spec.allow_cloud is True
 
 
 def test_create_llm_client_resolves_anthropic_key() -> None:
     client = factory.create_llm_client(
         _settings(llm_provider="anthropic", anthropic_api_key="sk-ant"),
     )
-    assert client._provider == "anthropic"
-    assert client._api_key == "sk-ant"
+    assert client._spec.provider == "anthropic"
+    assert client._spec.api_key == "sk-ant"
 
 
 def test_create_chat_llm_client_falls_back_to_batch() -> None:
     client = factory.create_chat_llm_client(_settings(llm_model_name="gemma4:27b"))
     assert isinstance(client, LangChainLLMClient)
-    assert client._model_name == "gemma4:27b"  # inherited from batch
-    assert client._reasoning == "off"
+    assert client._spec.model_name == "gemma4:27b"  # inherited from batch
+    assert client._spec.reasoning == "off"
 
 
 def test_create_chat_llm_client_reasoning_override() -> None:
     # The container passes a resolved reasoning level for the synthesis client.
     client = factory.create_chat_llm_client(_settings(chat_llm_reasoning="off"), reasoning="high")
-    assert client._reasoning == "high"
+    assert client._spec.reasoning == "high"
 
 
 def test_create_chat_llm_client_reasoning_defaults_to_base() -> None:
     client = factory.create_chat_llm_client(_settings(chat_llm_reasoning="medium"))
-    assert client._reasoning == "medium"
+    assert client._spec.reasoning == "medium"
 
 
 def test_create_chat_llm_client_overrides_provider() -> None:
     client = factory.create_chat_llm_client(
         _settings(chat_llm_provider="openai", chat_llm_model_name="gpt-5", openai_api_key="sk"),
     )
-    assert client._provider == "openai"
-    assert client._model_name == "gpt-5"
-    assert client._api_key == "sk"
+    assert client._spec.provider == "openai"
+    assert client._spec.model_name == "gpt-5"
+    assert client._spec.api_key == "sk"
 
 
 def test_create_llm_client_raises_when_cloud_key_missing() -> None:
@@ -88,7 +88,7 @@ def test_resolve_api_key_uses_generic_llm_api_key_fallback() -> None:
     client = factory.create_llm_client(
         _settings(llm_provider="openai", openai_api_key=None, llm_api_key="generic-key"),
     )
-    assert client._api_key == "generic-key"
+    assert client._spec.api_key == "generic-key"
 
 
 def test_create_llm_client_refuses_cloud_when_disabled() -> None:
@@ -107,4 +107,4 @@ def test_create_chat_llm_client_refuses_cloud_when_disabled() -> None:
 
 def test_ollama_allowed_when_cloud_disabled() -> None:
     client = factory.create_llm_client(_settings(allow_cloud_llm=False))
-    assert client._provider == "ollama"
+    assert client._spec.provider == "ollama"
