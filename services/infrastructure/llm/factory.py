@@ -52,6 +52,16 @@ def _resolve_api_key(provider: str, settings: Settings) -> str | None:
     return None  # ollama — no key
 
 
+def server_llm_available(settings: Settings) -> bool:
+    """Can the env defaults serve a call? A local provider, or a cloud one with a key.
+
+    Used by the API's BYO-key gate: a user without their own key is only
+    blocked when there is nothing to fall back to (public/fail-closed mode).
+    """
+    provider = settings.llm_provider
+    return provider == "ollama" or _resolve_api_key(provider, settings) is not None
+
+
 def _require_cloud_allowed(provider: str, settings: Settings) -> None:
     if provider != "ollama" and not settings.allow_cloud_llm:
         msg = f"Cloud LLM provider {provider!r} is disabled (ALLOW_CLOUD_LLM=false)."

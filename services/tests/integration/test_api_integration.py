@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
@@ -19,6 +20,7 @@ from application.use_cases.page_use_cases import AddCompoundMentionsUseCase, Cre
 from application.use_cases.token_limit_use_cases import CheckTokenQuotaUseCase
 from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.mime_type import MimeType
+from infrastructure.config import Settings
 from interfaces.api.main import app
 from interfaces.dependencies import get_auth, get_container
 from tests.fakes.fake_auth import FakeAuth
@@ -133,6 +135,7 @@ def _build_use_cases() -> tuple[dict[type, object], MockArtifactRepository, Mock
     page_repo = MockPageRepository()
 
     use_cases: dict[type, object] = {
+        Settings: SimpleNamespace(user_llm_keys_enabled=False),
         CreateArtifactUseCase: CreateArtifactUseCase(artifact_repo),
         CreatePageUseCase: CreatePageUseCase(page_repo, artifact_repo),
         AddCompoundMentionsUseCase: AddCompoundMentionsUseCase(page_repo),

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
@@ -29,6 +30,7 @@ from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.compound_mention import CompoundMention
 from domain.value_objects.mime_type import MimeType
 from domain.value_objects.title_mention import TitleMention
+from infrastructure.config import Settings
 from interfaces.api.main import app
 from interfaces.dependencies import get_auth, get_container
 from tests.conftest import strip_authz_middleware
@@ -135,7 +137,9 @@ def make_client() -> Callable[[dict[type, object]], TestClient]:
         overrides: dict[type, object],
         auth: FakeAuth | None = None,
     ) -> TestClient:
-        container = FakeContainer(overrides)
+        container = FakeContainer(
+            {Settings: SimpleNamespace(user_llm_keys_enabled=False), **overrides},
+        )
         fake_auth = auth or FakeAuth(role="editor")
         app.dependency_overrides[get_container] = lambda: container
         app.dependency_overrides[get_auth] = lambda: fake_auth

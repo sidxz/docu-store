@@ -34,7 +34,11 @@ from application.use_cases.chat_use_cases import (
 )
 from infrastructure.chat.run_registry import ChatRunRegistry, RunAlreadyActiveError
 from interfaces.api.middleware import handle_use_case_errors
-from interfaces.api.routes.helpers import _map_app_error_to_http_exception, ensure_within_quota
+from interfaces.api.routes.helpers import (
+    _map_app_error_to_http_exception,
+    ensure_llm_configured,
+    ensure_within_quota,
+)
 from interfaces.api.routes.helpers import get_allowed_artifact_ids as _get_allowed_artifact_ids
 from interfaces.dependencies import get_auth, get_container, llm_user_scope
 
@@ -256,6 +260,7 @@ async def send_message(
 
     Raises 409 if a response is already being generated for this conversation.
     """
+    await ensure_llm_configured(auth, container)
     await ensure_within_quota(auth, container)
     allowed_artifact_ids = await _get_allowed_artifact_ids(auth)
 

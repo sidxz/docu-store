@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -14,6 +15,7 @@ from application.services.llm_scope import UserLLMScope
 from application.use_cases.chat_use_cases import SendMessageUseCase
 from application.use_cases.token_limit_use_cases import CheckTokenQuotaUseCase
 from infrastructure.chat.run_registry import ChatRunRegistry
+from infrastructure.config import Settings
 from interfaces.api.main import app
 from interfaces.dependencies import get_auth, get_container
 from tests.conftest import strip_authz_middleware
@@ -50,6 +52,7 @@ def _client(*, quota: FakeQuota, role: str = "editor") -> TestClient:
     strip_authz_middleware(app)
     app.dependency_overrides[get_container] = lambda: FakeContainer(
         {
+            Settings: SimpleNamespace(user_llm_keys_enabled=False),
             CheckTokenQuotaUseCase: quota,
             SendMessageUseCase: FakeSendUseCase(),
             ChatRunRegistry: ChatRunRegistry(),
