@@ -90,10 +90,36 @@ def test_cloud_refused_by_default(capture) -> None:
 
 
 def test_cloud_requires_api_key(capture) -> None:
-    with pytest.raises(ValueError, match="API key"):
+    from domain.exceptions import LLMNotConfiguredError
+
+    with pytest.raises(LLMNotConfiguredError):
         model_builder.build_chat_model(
             provider="openai", model_name="gpt-5", temperature=0.1, allow_cloud=True,
         )
+    assert capture == {}  # never reached init_chat_model
+
+
+def test_openai_forwards_base_url(capture) -> None:
+    model_builder.build_chat_model(
+        provider="openai", model_name="gpt-5", temperature=0.1, api_key="sk",
+        base_url="https://openrouter.ai/api/v1", allow_cloud=True,
+    )
+    assert capture["base_url"] == "https://openrouter.ai/api/v1"
+
+
+def test_gemini_forwards_base_url(capture) -> None:
+    model_builder.build_chat_model(
+        provider="gemini", model_name="g", temperature=0.1, api_key="g",
+        base_url="https://proxy.example/v1", allow_cloud=True,
+    )
+    assert capture["base_url"] == "https://proxy.example/v1"
+
+
+def test_cloud_without_base_url_omits_it(capture) -> None:
+    model_builder.build_chat_model(
+        provider="openai", model_name="gpt-5", temperature=0.1, api_key="sk", allow_cloud=True,
+    )
+    assert "base_url" not in capture
 
 
 def test_unknown_provider_raises(capture) -> None:

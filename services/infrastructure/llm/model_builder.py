@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, Any
 import structlog
 from langchain.chat_models import init_chat_model
 
+from domain.exceptions import LLMNotConfiguredError
+
 if TYPE_CHECKING:
     from langchain_core.language_models.chat_models import BaseChatModel
 
@@ -66,8 +68,9 @@ def build_chat_model(
     cloud providers explicitly, so a forgotten flag can never reach the internet.
 
     Raises:
-        ValueError: unknown provider; a cloud provider while ``allow_cloud`` is
-            False; or a missing API key for a cloud provider.
+        ValueError: unknown provider, or a cloud provider while ``allow_cloud``
+            is False.
+        LLMNotConfiguredError: a cloud provider with no API key (fail closed).
 
     """
     if provider not in _PROVIDER_MAP:
@@ -96,10 +99,17 @@ def build_chat_model(
             kwargs["num_ctx"] = num_ctx
     else:
         if not api_key:
-            msg = f"API key required for cloud provider {provider!r}."
-            raise ValueError(msg)
+            msg = (
+                f"No API key for cloud provider {provider!r} — add one in your LLM "
+                "settings or set the provider's key / LLM_API_KEY."
+            )
+            raise LLMNotConfiguredError(msg)
         # Gemini's LangChain integration expects google_api_key.
         kwargs["google_api_key" if provider == "gemini" else "api_key"] = api_key
+        if base_url:
+            # OpenAI-compatible gateways (OpenRouter). Only ever set via
+            # UserLLMConfig — env base URLs are Ollama URLs (see factory).
+            kwargs["base_url"] = base_url
 
     if provider == "openai":
         # Without this, OpenAI streamed responses report zero token usage.
