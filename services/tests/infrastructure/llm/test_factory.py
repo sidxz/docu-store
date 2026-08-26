@@ -79,9 +79,31 @@ def test_create_chat_llm_client_overrides_provider() -> None:
     assert client._spec.api_key == "sk"
 
 
-def test_create_llm_client_raises_when_cloud_key_missing() -> None:
-    with pytest.raises(ValueError, match="API key"):
-        factory.create_llm_client(_settings(llm_provider="anthropic"))
+def test_keyless_cloud_constructs_and_fails_closed_on_first_call() -> None:
+    from domain.exceptions import LLMNotConfiguredError
+
+    client = factory.create_llm_client(_settings(llm_provider="anthropic"))
+    assert client._spec.api_key is None
+    with pytest.raises(LLMNotConfiguredError):
+        client._get_llm()
+
+
+def test_keyless_cloud_chat_client_constructs() -> None:
+    client = factory.create_chat_llm_client(_settings(chat_llm_provider="openai"))
+    assert client._spec.provider == "openai"
+    assert client._spec.api_key is None
+
+
+def test_cloud_provider_never_gets_env_base_url() -> None:
+    client = factory.create_chat_llm_client(
+        _settings(chat_llm_provider="openai", openai_api_key="sk", llm_base_url="http://ollama:11434"),
+    )
+    assert client._spec.base_url is None
+
+
+def test_ollama_keeps_env_base_url() -> None:
+    client = factory.create_llm_client(_settings(llm_base_url="http://ollama:11434"))
+    assert client._spec.base_url == "http://ollama:11434"
 
 
 def test_resolve_api_key_uses_generic_llm_api_key_fallback() -> None:

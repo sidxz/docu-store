@@ -84,3 +84,11 @@ def test_tool_calling_refuses_cloud_when_disabled() -> None:
 def test_tool_calling_client_is_retrieval_lane() -> None:
     adapter = factory.create_tool_calling_llm_client(_settings())
     assert adapter._lane == "retrieval"
+
+
+def test_keyless_cloud_tool_adapter_constructs_without_env_base_url() -> None:
+    adapter = factory.create_tool_calling_llm_client(
+        _settings(chat_llm_provider="openai", llm_base_url="http://ollama:11434"),
+    )
+    assert adapter._spec.api_key is None
+    assert adapter._spec.base_url is None

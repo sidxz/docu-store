@@ -52,25 +52,45 @@ def _resolve_api_key(provider: str, settings: Settings) -> str | None:
     return None  # ollama — no key
 
 
-def create_llm_client(settings: Settings) -> LLMClientPort:
-    """Instantiate the LLM adapter selected by LLM_PROVIDER in config."""
-    from infrastructure.llm.adapters.langchain_llm_client import LangChainLLMClient
-
-    provider = settings.llm_provider
-    api_key = _resolve_api_key(provider, settings)
+def _require_cloud_allowed(provider: str, settings: Settings) -> None:
     if provider != "ollama" and not settings.allow_cloud_llm:
         msg = f"Cloud LLM provider {provider!r} is disabled (ALLOW_CLOUD_LLM=false)."
         raise ValueError(msg)
+
+
+def _ollama_base_url(provider: str, base_url: str | None) -> str | None:
+    """Env base URLs are Ollama URLs (LLM_BASE_URL defaults to localhost:11434 and
+    CHAT_/NER_ fall back to it) — never hand one to a cloud provider. A cloud
+    base_url (OpenRouter) only ever arrives via UserLLMConfig.
+    """
+    return base_url if provider == "ollama" else None
+
+
+def _warn_if_keyless(provider: str, api_key: str | None, lane: str) -> None:
+    """A keyless cloud lane is legal (BYO-key deployments); calls fail closed at call time."""
     if provider != "ollama" and not api_key:
-        msg = f"No API key configured for cloud provider {provider!r}. Set the provider's API key or LLM_API_KEY."
-        raise ValueError(msg)
+        log.warning("llm.factory.no_server_key", provider=provider, lane=lane)
+
+
+def create_llm_client(settings: Settings) -> LLMClientPort:
+    """Instantiate the LLM adapter selected by LLM_PROVIDER in config.
+
+    Never raises for a missing key: models are built lazily and a keyless cloud
+    provider raises ``LLMNotConfiguredError`` at call time (fail closed).
+    """
+    from infrastructure.llm.adapters.langchain_llm_client import LangChainLLMClient
+
+    provider = settings.llm_provider
+    _require_cloud_allowed(provider, settings)
+    api_key = _resolve_api_key(provider, settings)
+    _warn_if_keyless(provider, api_key, "batch")
     log.info("llm.factory", provider=provider, model=settings.llm_model_name)
     return LangChainLLMClient(
         provider=provider,
         model_name=settings.llm_model_name,
         temperature=settings.llm_temperature,
         api_key=api_key,
-        base_url=settings.llm_base_url,
+        base_url=_ollama_base_url(provider, settings.llm_base_url),
         reasoning=settings.llm_reasoning,
         num_ctx=settings.llm_num_ctx,
         allow_cloud=settings.allow_cloud_llm,
@@ -79,7 +99,9 @@ def create_llm_client(settings: Settings) -> LLMClientPort:
     )
 
 
-def create_chat_llm_client(settings: Settings, *, reasoning: str | None = None, lane: str = "base") -> LLMClientPort:
+def create_chat_llm_client(
+    settings: Settings, *, reasoning: str | None = None, lane: str = "base"
+) -> LLMClientPort:
     """Instantiate a chat LLM client, falling back to batch LLM settings.
 
     ``reasoning`` overrides the reasoning effort for this client; when None it
@@ -90,26 +112,21 @@ def create_chat_llm_client(settings: Settings, *, reasoning: str | None = None, 
 
     provider = settings.chat_llm_provider or settings.llm_provider
     model = settings.chat_llm_model_name or settings.llm_model_name
-    base_url = settings.chat_llm_base_url or settings.llm_base_url
+    _require_cloud_allowed(provider, settings)
     # Chat key: explicit chat key → per-provider key → generic.
     api_key = (
         None
         if provider == "ollama"
         else (settings.chat_llm_api_key or _resolve_api_key(provider, settings))
     )
-    if provider != "ollama" and not settings.allow_cloud_llm:
-        msg = f"Cloud LLM provider {provider!r} is disabled (ALLOW_CLOUD_LLM=false)."
-        raise ValueError(msg)
-    if provider != "ollama" and not api_key:
-        msg = f"No API key configured for cloud chat provider {provider!r}. Set CHAT_LLM_API_KEY or the provider's API key or LLM_API_KEY."
-        raise ValueError(msg)
+    _warn_if_keyless(provider, api_key, lane)
     log.info("llm.factory.chat", provider=provider, model=model)
     return LangChainLLMClient(
         provider=provider,
         model_name=model,
         temperature=settings.chat_llm_temperature,
         api_key=api_key,
-        base_url=base_url,
+        base_url=_ollama_base_url(provider, settings.chat_llm_base_url or settings.llm_base_url),
         reasoning=reasoning if reasoning is not None else settings.chat_llm_reasoning,
         num_ctx=settings.llm_num_ctx,
         allow_cloud=settings.allow_cloud_llm,
@@ -132,23 +149,21 @@ def create_tool_calling_llm_client(settings: Settings) -> ToolCallingLLMPort:
 
     effective_provider = settings.chat_llm_provider or settings.llm_provider
     effective_model = settings.chat_llm_model_name or settings.llm_model_name
-    effective_base_url = settings.chat_llm_base_url or settings.llm_base_url
+    _require_cloud_allowed(effective_provider, settings)
     effective_api_key = (
         None
         if effective_provider == "ollama"
         else (settings.chat_llm_api_key or _resolve_api_key(effective_provider, settings))
     )
-    effective_temperature = settings.chat_llm_temperature
+    _warn_if_keyless(effective_provider, effective_api_key, "retrieval")
+    effective_base_url = _ollama_base_url(
+        effective_provider,
+        settings.chat_llm_base_url or settings.llm_base_url,
+    )
     mode = settings.chat_agent_tool_calling_mode
-
-    if effective_provider != "ollama" and not settings.allow_cloud_llm:
-        msg = f"Cloud LLM provider {effective_provider!r} is disabled (ALLOW_CLOUD_LLM=false)."
-        raise ValueError(msg)
-
     # Native tool calling for all providers (modern Ollama models support it).
     # ReAct is an explicit opt-in for old local models that lack native tools.
     use_native = mode != "react"
-
     log.info(
         "llm.factory.tool_calling",
         provider=effective_provider,
@@ -156,34 +171,20 @@ def create_tool_calling_llm_client(settings: Settings) -> ToolCallingLLMPort:
         mode=mode,
         use_native=use_native,
     )
-
-    langfuse_handler = _make_langfuse_callback_handler(settings)
-
-    if use_native:
-        return NativeToolCallingAdapter(
-            provider=effective_provider,
-            model_name=effective_model,
-            api_key=effective_api_key,
-            base_url=effective_base_url,
-            temperature=effective_temperature,
-            reasoning=settings.chat_retrieval_reasoning or settings.chat_llm_reasoning,
-            num_ctx=settings.llm_num_ctx,
-            allow_cloud=settings.allow_cloud_llm,
-            lane="retrieval",
-            langfuse_handler=langfuse_handler,
-        )
-
-    return ReactToolCallingAdapter(
+    adapter_cls = NativeToolCallingAdapter if use_native else ReactToolCallingAdapter
+    return adapter_cls(
         provider=effective_provider,
         model_name=effective_model,
         api_key=effective_api_key,
         base_url=effective_base_url,
-        temperature=effective_temperature,
-        reasoning=settings.chat_llm_reasoning,
+        temperature=settings.chat_llm_temperature,
+        reasoning=(settings.chat_retrieval_reasoning or settings.chat_llm_reasoning)
+        if use_native
+        else settings.chat_llm_reasoning,
         num_ctx=settings.llm_num_ctx,
         allow_cloud=settings.allow_cloud_llm,
         lane="retrieval",
-        langfuse_handler=langfuse_handler,
+        langfuse_handler=_make_langfuse_callback_handler(settings),
     )
 
 
