@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthz } from "@duar-auth/react";
 import { useAppConfig } from "@/lib/app-config";
+import { onboardUrl } from "@/lib/onboard";
 import { ShapeGrid } from "@/components/backgrounds/ShapeGrid";
 import { LogoMark } from "@/components/ui/LogoMark";
 
@@ -18,7 +19,8 @@ const btnBase =
 
 export default function LoginPage() {
   const { login, isAuthenticated, isLoading } = useAuthz();
-  const { googleClientId, githubClientId, entraIdClientId } = useAppConfig();
+  const { googleClientId, githubClientId, entraIdClientId, duarUrl, appUrl, selfServeEnabled } =
+    useAppConfig();
   const router = useRouter();
 
   useEffect(() => {
@@ -164,6 +166,22 @@ export default function LoginPage() {
                 Continue with Entra ID
               </button>
             </div>
+
+            {selfServeEnabled && (
+              <p
+                className="mt-6 text-center text-sm"
+                style={{ color: "#64748b", animation: "auth-enter 0.5s ease-out 0.35s both" }}
+              >
+                New here?{" "}
+                <a
+                  href={onboardUrl(duarUrl, appUrl)}
+                  className="underline transition-colors"
+                  style={{ color: "#2563eb" }}
+                >
+                  Sign up or join a workspace
+                </a>
+              </p>
+            )}
 
             {/* Mobile-only: footer */}
             <div
