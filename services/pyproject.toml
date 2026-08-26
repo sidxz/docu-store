@@ -53,6 +53,7 @@ dependencies = [
     # returns 0 compounds. Linux/x86_64 only, matching the other nvidia-*-cu12
     # wheels (absent on macOS where TF has no CUDA). See XLA_FLAGS in Dockerfile.
     "nvidia-cuda-nvcc-cu12>=12.8,<12.9; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "cryptography>=44",
 ]
 
 
