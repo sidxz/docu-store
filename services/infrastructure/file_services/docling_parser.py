@@ -71,6 +71,7 @@ class DoclingParser(DocumentParser):
 
     def _get_converter(self):
         if self._converter is None:
+            from docling.backend.docling_parse_backend import DoclingParseDocumentBackend
             from docling.datamodel.base_models import InputFormat
             from docling.datamodel.pipeline_options import PdfPipelineOptions
             from docling.document_converter import DocumentConverter, PdfFormatOption
@@ -81,7 +82,17 @@ class DoclingParser(DocumentParser):
             # stored page PNGs feed chat page-references and VLM summarization.
             opts.images_scale = 4.0
             self._converter = DocumentConverter(
-                format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=opts)},
+                format_options={
+                    # Explicit classic backend. docling 2.123 made the threaded
+                    # docling-parse backend the default; on this stack it returned
+                    # PARTIAL_SUCCESS with pages dropped (two-page fixture → 1 page,
+                    # no page image) and segfaulted once under pytest. We parse one
+                    # document per subprocess, so its throughput gain buys nothing.
+                    InputFormat.PDF: PdfFormatOption(
+                        pipeline_options=opts,
+                        backend=DoclingParseDocumentBackend,
+                    ),
+                },
             )
         return self._converter
 

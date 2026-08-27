@@ -9,7 +9,11 @@ dependencies = [
     "confluent-kafka>=2.13.0",
     "dateparser>=1.2.0",
     "eventsourcing>=9.5.2",
-    "gliner2>=1.2.0",
+    # gliner2 2.0 imports peft unconditionally but declares it only in extras that
+    # also cap transformers<5 (docling needs 5); peft itself has no cap and the
+    # combination is runtime-verified (fastino/gliner2-large-v1 on transformers 5.8).
+    "gliner2>=2.0.0",
+    "peft>=0.20",
     "eventsourcing-kurrentdb>=1.2.2",
     "fastapi>=0.128.0",
     "fsspec>=2026.1.0",
@@ -45,7 +49,7 @@ dependencies = [
     "langchain-openai>=1.3.3",
     "langchain-anthropic>=1.4.7",
     "langchain-google-genai>=4.2.5",
-    "docling>=2.107.0",
+    "docling>=2.123.0",
     # DECIMER's SavedModel runs XLA-compiled convolutions on GPU (baked-in
     # jit_compile via _jit_compiled_convolution_op) which need CUDA's
     # nvvm/libdevice + ptxas. TF's transitive CUDA-12.8 wheels ship everything
