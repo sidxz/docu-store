@@ -6,7 +6,13 @@ import { AuthShell } from "@/components/auth/AuthShell";
 import { forgetWorkspace } from "@/lib/workspace-memory";
 import { useAppConfig } from "@/lib/app-config";
 import { onboardUrl } from "@/lib/onboard";
+import { LogoMark } from "@/components/ui/LogoMark";
 import { WorkspaceSelector } from "./workspace-selector";
+
+// Wordmark is always the brand font, regardless of the user's app font setting
+const wordmark = {
+  fontFamily: "var(--font-overused-grotesk), ui-sans-serif, sans-serif",
+};
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -55,30 +61,41 @@ export default function AuthCallbackPage() {
         return (
           <AuthShell>
             <div
-              className="w-full max-w-sm rounded-xl border bg-white p-8 text-center"
+              className="w-full max-w-md border bg-white p-10 text-center"
               style={{
                 borderColor: "#e2e8f0",
                 animation: "auth-enter 0.6s ease-out forwards",
               }}
             >
-              <p className="mb-4 text-sm" style={{ color: noWorkspace ? "#0f172a" : "#dc2626" }}>
-                {noWorkspace
-                  ? "No workspace yet — sign up to create or join one."
-                  : error.message}
-              </p>
-              {noWorkspace && (
-                <a
-                  href={onboardUrl(duarUrl)}
-                  className="mb-3 block text-sm underline transition-colors"
-                  style={{ color: "#2563eb" }}
-                >
-                  Sign up or join a workspace
-                </a>
+              {noWorkspace ? (
+                <>
+                  <LogoMark className="mx-auto mb-6 h-10 w-10" />
+                  <h1
+                    className="text-2xl"
+                    style={{ ...wordmark, color: "#0f172a", fontWeight: 500, letterSpacing: "-0.02em" }}
+                  >
+                    You&rsquo;re not part of a workspace yet.
+                  </h1>
+                  <h2 className="mt-3 text-base font-normal" style={{ color: "#475569" }}>
+                    Join your group or create a new one.
+                  </h2>
+                  <a
+                    href={onboardUrl(duarUrl)}
+                    className="mt-8 flex h-11 w-full items-center justify-center rounded-none px-4 text-sm font-medium text-white transition-colors"
+                    style={{ background: "#0f172a" }}
+                  >
+                    Join or create a workspace
+                  </a>
+                </>
+              ) : (
+                <p className="mb-4 text-sm" style={{ color: "#dc2626" }}>
+                  {error.message}
+                </p>
               )}
               <a
                 href="/login"
-                className="text-sm underline transition-colors"
-                style={{ color: "#2563eb" }}
+                className="mt-4 block text-sm transition-colors hover:underline"
+                style={{ color: "#64748b" }}
               >
                 Back to login
               </a>
