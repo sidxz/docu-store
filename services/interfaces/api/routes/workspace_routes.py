@@ -1,15 +1,24 @@
 """Workspace routes — Duar member/group proxies + admin token-limit config."""
 
+import asyncio
+from datetime import UTC, datetime
+from io import BytesIO
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from lagom import Container
 from pydantic import BaseModel, Field
 from duar_auth import RequestAuth
 
 from application.dtos.usage_dtos import TokenLimitEntry
+from application.ports.blob_store import BlobStore
+from application.ports.repositories.artifact_read_models import ArtifactReadModel
+from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.token_limit_store import TokenLimitStore
+from application.use_cases.cser_export_use_case import build_cser_export_zip
+from interfaces.api.routes.helpers import require_action
 from interfaces.dependencies import get_auth, get_container
 
 router = APIRouter(prefix="/workspace", tags=["workspace"])
@@ -109,3 +118,57 @@ async def delete_user_token_limit(
     """Remove a per-user override so the user falls back to the workspace default."""
     _require_admin(auth)
     await container[TokenLimitStore].delete(auth.workspace_id, user_id)
+
+
+# ── CSER training export ────────────────────────────────────────────────────
+
+
+async def _source_filenames_by_artifact_id(
+    pages: list[dict], auth: RequestAuth, container: Container
+) -> dict[str, str | None]:
+    """Look up each distinct page artifact's `source_filename`.
+
+    Pages don't carry the filename themselves; the artifact document does.
+    """
+    artifact_ids = {page["artifact_id"] for page in pages}
+    repo = container[ArtifactReadModel]
+    artifacts = await asyncio.gather(
+        *(repo.get_artifact_by_id(UUID(artifact_id), workspace_id=auth.workspace_id) for artifact_id in artifact_ids)
+    )
+    return {
+        artifact_id: artifact.source_filename if artifact else None
+        for artifact_id, artifact in zip(artifact_ids, artifacts, strict=True)
+    }
+
+
+@router.get("/cser-training-export")
+async def export_cser_training_data(
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+    only_reviewed: Annotated[bool, Query(description="Human-reviewed pages only")] = True,
+    since: Annotated[datetime | None, Query(description="Only corrections at or after this time")] = None,
+) -> StreamingResponse:
+    """Download this workspace's CSER annotations as a structflo-cser data_dir.
+
+    Unzips into images/ + ground_truth/ + labels/, ready for
+    `sf-train-relmatch --data-dir <dir>` and for YOLO detector training.
+
+    Defaults to human-reviewed pages only. `only_reviewed=false` adds machine
+    output for bootstrapping — useful, but explicitly not ground truth.
+    """
+    await require_action(auth, "artifacts:hiledit")
+
+    read_model = container[PageReadModel]
+    pages = await read_model.get_pages_for_cser_export(
+        auth.workspace_id, only_reviewed=only_reviewed, since=since
+    )
+    artifact_filenames = await _source_filenames_by_artifact_id(pages, auth, container)
+    payload = build_cser_export_zip(
+        pages, container[BlobStore], auth.workspace_id, datetime.now(UTC), artifact_filenames
+    )
+    filename = f"cser-training-{auth.workspace_id}.zip"
+    return StreamingResponse(
+        BytesIO(payload),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
