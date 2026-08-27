@@ -14,7 +14,7 @@ export function LlmProviderBanner() {
   return (
     <div className="flex items-center gap-3 border-b border-amber-300 bg-amber-50 px-6 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
       <KeyRound className="h-4 w-4 shrink-0" />
-      <span>No AI provider connected. Uploads and chat are off until you add one.</span>
+      <span>No AI provider connected. Connect one to enable document uploads and chat.</span>
       <Link href={`/${workspace}/settings/llm`} className="ml-auto font-medium underline">
         Connect a provider
       </Link>

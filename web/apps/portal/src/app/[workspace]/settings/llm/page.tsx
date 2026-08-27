@@ -16,7 +16,7 @@ export default function LlmProviderSettingsPage() {
       <EmptyState
         icon={KeyRound}
         title="Not available"
-        description="This DocuStore uses a shared AI provider. There is nothing to set up here."
+        description="AI is already configured for this DocuStore. No setup is needed."
       />
     );
   }
@@ -25,7 +25,7 @@ export default function LlmProviderSettingsPage() {
     <div className="max-w-2xl">
       <SettingsSectionHeader
         title="AI Provider"
-        subtitle="Uploads and chat use your own AI provider account. Your key is encrypted and never shown again."
+        subtitle="Connect your own AI provider for document processing and chat."
       />
       <Card>
         <LlmProviderForm />

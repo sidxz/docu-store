@@ -42,8 +42,8 @@ function Onboarding() {
           <h1 className="text-xl font-medium">Connect your AI provider</h1>
         </div>
         <p className="mb-6 text-sm" style={{ color: "#475569" }}>
-          Connect an AI provider to upload documents and chat. You pay your provider directly.
-          Reading and search work without one.
+          Connect an AI provider to upload documents and chat with them. AI usage is billed
+          directly by your provider.
         </p>
         <LlmProviderForm onConfigured={() => router.replace(home)} />
         {provider.data?.configured ? (

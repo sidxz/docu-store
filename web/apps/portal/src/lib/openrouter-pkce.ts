@@ -48,7 +48,7 @@ export function takeOpenRouterReturnTo(): string {
 export async function exchangeOpenRouterCode(code: string): Promise<string> {
   const verifier = sessionStorage.getItem(VERIFIER_KEY);
   sessionStorage.removeItem(VERIFIER_KEY);
-  if (!verifier) throw new Error("OpenRouter sign-in expired. Please start again.");
+  if (!verifier) throw new Error("Your OpenRouter sign-in expired. Please try again.");
   const res = await fetch("https://openrouter.ai/api/v1/auth/keys", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
