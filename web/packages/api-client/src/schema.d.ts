@@ -24,6 +24,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/artifacts/processing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Processing Artifacts
+         * @description The caller's own documents still moving through the pipeline (topbar badge).
+         */
+        get: operations["list_processing_artifacts_artifacts_processing_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/artifacts/{artifact_id}": {
         parameters: {
             query?: never;
@@ -314,7 +334,10 @@ export interface paths {
          *
          *     Returns the pre-rendered page image from blob storage. Page images
          *     are generated during PDF ingestion. Pass ?size=thumb for a lightweight
-         *     JPEG thumbnail (~200px wide) suitable for table/list views.
+         *     JPEG thumbnail (~200px wide) suitable for table/list views, or
+         *     ?size=cser for the exact render CSER compound bounding boxes are pixel
+         *     coordinates of (404s if that render is missing rather than falling back
+         *     to the docling page render, which is a different scale).
          */
         get: operations["stream_page_image_artifacts__artifact_id__pages__page_index__image_get"];
         put?: never;
@@ -1685,6 +1708,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/user/llm-provider": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Llm Provider
+         * @description The caller's provider (never the key) plus presets for the settings UI.
+         */
+        get: operations["get_llm_provider_user_llm_provider_get"];
+        /** Set Llm Provider */
+        put: operations["set_llm_provider_user_llm_provider_put"];
+        post?: never;
+        /** Delete Llm Provider */
+        delete: operations["delete_llm_provider_user_llm_provider_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/user/llm-provider/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Probe Llm Provider
+         * @description Probe the *stored* config — one tiny completion per distinct lane model.
+         */
+        post: operations["probe_llm_provider_user_llm_provider_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspace/members": {
         parameters: {
             query?: never;
@@ -2409,6 +2474,26 @@ export interface components {
              * @description Primary chemical identifier as extracted from the document
              */
             extracted_id?: string | null;
+            /**
+             * Structure Bbox
+             * @description Structure box [x1, y1, x2, y2] in PIXELS of this page's CSER render (blob artifacts/{artifact_id}/pages/{index}_cser.png). Meaningless without that image, which is why the image is persisted, never re-derived.
+             */
+            structure_bbox?: number[] | null;
+            /**
+             * Label Bbox
+             * @description Label box [x1, y1, x2, y2] in the same pixel space; None for an unlabelled structure
+             */
+            label_bbox?: number[] | null;
+            /**
+             * Structure Confidence
+             * @description Detector confidence for the structure box, when it came from the detector
+             */
+            structure_confidence?: number | null;
+            /**
+             * Label Confidence
+             * @description Detector confidence for the label box, when it came from the detector
+             */
+            label_confidence?: number | null;
         };
         /**
          * CompoundPageRefDTO
@@ -2752,6 +2837,10 @@ export interface components {
             chembl_id?: string | null;
             /** Pdb Id */
             pdb_id?: string | null;
+            /** Structure Bbox */
+            structure_bbox?: number[] | null;
+            /** Label Bbox */
+            label_bbox?: number[] | null;
         };
         /**
          * CorrectedTagInput
@@ -3097,6 +3186,69 @@ export interface components {
             /** Total Gap Entities */
             total_gap_entities: number;
         };
+        /** LLMLaneTestResult */
+        LLMLaneTestResult: {
+            /** Ok */
+            ok: boolean;
+            /** Detail */
+            detail?: string | null;
+        };
+        /** LLMProviderPreset */
+        LLMProviderPreset: {
+            /** Model */
+            model: string;
+            /** Chat Model */
+            chat_model: string;
+        };
+        /**
+         * LLMProviderRequest
+         * @description PUT /user/llm-provider. Blank models fall back to the provider preset;
+         *     omit ``api_key`` to change models only (the stored key is kept).
+         */
+        LLMProviderRequest: {
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "openrouter" | "openai" | "gemini";
+            /** Api Key */
+            api_key?: string | null;
+            /** Model */
+            model?: string | null;
+            /** Chat Model */
+            chat_model?: string | null;
+        };
+        /**
+         * LLMProviderResponse
+         * @description GET /user/llm-provider — the key is write-only; only its last 4 are shown.
+         */
+        LLMProviderResponse: {
+            /** Enabled */
+            enabled: boolean;
+            /** Configured */
+            configured: boolean;
+            /** Provider */
+            provider?: string | null;
+            /** Key Last4 */
+            key_last4?: string | null;
+            /** Model */
+            model?: string | null;
+            /** Chat Model */
+            chat_model?: string | null;
+            /** Presets */
+            presets: {
+                [key: string]: components["schemas"]["LLMProviderPreset"];
+            };
+        };
+        /** LLMProviderTestResponse */
+        LLMProviderTestResponse: {
+            /** Ok */
+            ok: boolean;
+            /** Lanes */
+            lanes: {
+                [key: string]: components["schemas"]["LLMLaneTestResult"];
+            };
+        };
         /**
          * MemberTokenUsage
          * @description Per-member usage split by kind, for the admin stats view.
@@ -3276,6 +3428,32 @@ export interface components {
              * @description Extraction method that produced this date (e.g. 'gliner2', 'llm').
              */
             source?: string | null;
+        };
+        /**
+         * ProcessingArtifactResponse
+         * @description One row of the topbar 'documents being processed' badge.
+         */
+        ProcessingArtifactResponse: {
+            /** Artifact Id */
+            artifact_id: string;
+            /** Source Filename */
+            source_filename?: string | null;
+            /** Total */
+            total: number;
+            /** Completed */
+            completed: number;
+            /** Running */
+            running: number;
+            /** Failed */
+            failed: number;
+            /** Percent */
+            percent: number;
+            /** Stage */
+            stage: string;
+            /** Active */
+            active: boolean;
+            /** Last Activity At */
+            last_activity_at?: string | null;
         };
         /**
          * QueryContextDTO
@@ -4522,6 +4700,26 @@ export interface operations {
             };
         };
     };
+    list_processing_artifacts_artifacts_processing_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessingArtifactResponse"][];
+                };
+            };
+        };
+    };
     get_artifact_artifacts__artifact_id__get: {
         parameters: {
             query?: never;
@@ -4977,7 +5175,7 @@ export interface operations {
     stream_page_image_artifacts__artifact_id__pages__page_index__image_get: {
         parameters: {
             query?: {
-                /** @description 'thumb' for lightweight JPEG thumbnail */
+                /** @description 'thumb' for a lightweight JPEG thumbnail, 'cser' for the render compound coordinates refer to */
                 size?: string | null;
             };
             header?: never;
@@ -7107,6 +7305,95 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_llm_provider_user_llm_provider_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMProviderResponse"];
+                };
+            };
+        };
+    };
+    set_llm_provider_user_llm_provider_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LLMProviderRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_llm_provider_user_llm_provider_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    probe_llm_provider_user_llm_provider_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMProviderTestResponse"];
                 };
             };
         };

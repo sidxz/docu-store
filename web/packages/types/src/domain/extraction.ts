@@ -48,6 +48,12 @@ export interface CompoundMention extends ExtractionMetadata {
   pdb_id: string | null;        // RCSB Protein Data Bank
   other_ids: string[] | null;   // Any additional identifiers not categorized above
   extracted_id: string | null;  // Raw ID string as found in the source document
+  // Pixel coordinates [x1, y1, x2, y2] on the CSER render (artifacts/{id}/pages/{index}_cser.png).
+  // Meaningless without that image, which is why it's persisted, never re-derived.
+  structure_bbox: number[] | null;
+  label_bbox: number[] | null;
+  structure_confidence: number | null;
+  label_confidence: number | null;
 }
 
 export interface AuthorMention extends ExtractionMetadata {

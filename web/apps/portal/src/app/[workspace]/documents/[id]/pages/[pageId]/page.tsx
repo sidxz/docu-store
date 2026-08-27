@@ -16,6 +16,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { EntityTagPanel } from "@/components/EntityTagPanel";
 import { PdfEmbed } from "@/components/PdfEmbed";
 import { CompoundGrid } from "@/components/documents/CompoundGrid";
+import { StructureAnnotationsSection } from "@/components/documents/StructureAnnotationsSection";
 import { ExtractedTextSection } from "@/components/documents/ExtractedTextSection";
 import { WorkflowList, parseWorkflows } from "@/components/WorkflowList";
 import { useArtifact } from "@/hooks/use-artifacts";
@@ -244,6 +245,12 @@ export default function PageViewerPage() {
           humanCorrection={page.human_corrections?.compound_mentions}
         />
       )}
+
+      <StructureAnnotationsSection
+        artifactId={id}
+        pageIndex={page.index}
+        compounds={(page.compound_mentions as CompoundMention[]) ?? []}
+      />
 
       {/* Extracted Text — collapsed by default */}
       <ExtractedTextSection textMention={page.text_mention as TextMention | null | undefined} />
