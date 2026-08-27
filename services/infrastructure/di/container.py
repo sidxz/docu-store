@@ -365,6 +365,13 @@ def create_container() -> Container:
         cache=c[WorkflowStatusCache],
     )
 
+    from application.use_cases.processing_artifacts_use_case import ListProcessingArtifactsUseCase
+
+    container[ListProcessingArtifactsUseCase] = lambda c: ListProcessingArtifactsUseCase(
+        artifact_read_model=c[ArtifactReadModel],
+        orchestrator=c[WorkflowOrchestrator],
+    )
+
     # Permission Registrar (Duar entity-level permissions)
     container[PermissionRegistrar] = lambda _: DuarPermissionRegistrar(duar.permissions)
     container[TriggerResourceRegistrationUseCase] = lambda c: TriggerResourceRegistrationUseCase(

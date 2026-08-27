@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
+from infrastructure.temporal.orchestrator import pipeline_workflow_ids
+
 if TYPE_CHECKING:
     from uuid import UUID
 
@@ -22,6 +24,9 @@ if TYPE_CHECKING:
     from application.ports.workflow_status_cache import WorkflowStatusCache
 
 logger = structlog.get_logger()
+
+
+_TERMINAL = frozenset({"COMPLETED", "FAILED", "TIMED_OUT", "TERMINATED", "CANCELED"})
 
 
 class CachingWorkflowOrchestrator:
@@ -56,6 +61,36 @@ class CachingWorkflowOrchestrator:
     ) -> dict[str, TemporalWorkflowInfo]:
         results = await self._inner.get_artifact_workflow_statuses(artifact_id)
         return await self._apply_cache(results, str(artifact_id), "artifact")
+
+    async def get_workflow_statuses(
+        self,
+        workflow_ids: dict[str, str],
+    ) -> dict[str, TemporalWorkflowInfo]:
+        return await self._inner.get_workflow_statuses(workflow_ids)
+
+    async def get_artifact_pipeline_statuses(
+        self,
+        artifact_id: UUID,
+        page_ids: list[UUID],
+    ) -> dict[str, TemporalWorkflowInfo]:
+        """Cache-first: terminal statuses come from Mongo, only the rest hit Temporal.
+
+        Polled every few seconds by the topbar badge, so a 40-page deck must not
+        cost ~300 describes per poll once its workflows have finished.
+        """
+        ids = pipeline_workflow_ids(artifact_id, page_ids)
+        results: dict[str, TemporalWorkflowInfo] = {}
+        try:
+            cached = await self._cache.get_cached_statuses(ids)
+        except Exception:
+            logger.warning("workflow_status_cache_read_failed", exc_info=True)
+            cached = {}
+        results.update({n: i for n, i in cached.items() if i.status in _TERMINAL})
+        remaining = {n: wid for n, wid in ids.items() if n not in results}
+        if remaining:
+            live = await self._inner.get_workflow_statuses(remaining)
+            results.update(await self._apply_cache(live, str(artifact_id), "artifact"))
+        return results
 
     async def _apply_cache(
         self,

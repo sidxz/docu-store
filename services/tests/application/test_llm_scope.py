@@ -77,11 +77,13 @@ async def test_config_reaches_task_created_inside_scope() -> None:
     assert await task is CFG
 
 
-def test_container_registers_null_store_and_scope() -> None:
+def test_container_registers_null_store_and_scope(monkeypatch) -> None:  # noqa: ANN001
     from application.ports.user_llm_config import NullUserLLMConfigStore, UserLLMConfigStore
-    from infrastructure.di.container import create_container
+    from infrastructure.di import container as container_module
 
-    container = create_container()
+    # Flag off regardless of the developer's .env (BYO mode swaps in the Mongo store).
+    monkeypatch.setattr(container_module.settings, "user_llm_keys_enabled", False)
+    container = container_module.create_container()
     assert isinstance(container[UserLLMConfigStore], NullUserLLMConfigStore)
     assert isinstance(container[UserLLMScope], UserLLMScope)
 

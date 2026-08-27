@@ -271,3 +271,27 @@ class WorkflowOrchestrator(Protocol):
     ) -> dict[str, TemporalWorkflowInfo]:
         """Query Temporal for the status of all workflows associated with an artifact."""
         ...
+
+    @abstractmethod
+    async def get_workflow_statuses(
+        self,
+        workflow_ids: dict[str, str],
+    ) -> dict[str, TemporalWorkflowInfo]:
+        """Describe arbitrary workflows (name -> Temporal workflow id)."""
+        ...
+
+    @abstractmethod
+    async def get_artifact_pipeline_statuses(
+        self,
+        artifact_id: UUID,
+        page_ids: list[UUID],
+    ) -> dict[str, TemporalWorkflowInfo]:
+        """Status of every pipeline workflow for an artifact and its pages.
+
+        Keys: artifact-level ``parse``, ``doc_metadata``, ``tag_aggregation``,
+        ``artifact_summarization``, ``artifact_summary_embedding``; per page
+        ``<kind>:<page_id>`` for ``ner``, ``page_summarization``,
+        ``page_summary_embedding``, ``embedding``, ``compound_extraction``,
+        ``smiles_embedding``, ``reconcile_compound_labels``.
+        """
+        ...

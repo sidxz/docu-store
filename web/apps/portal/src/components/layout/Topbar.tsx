@@ -13,6 +13,7 @@ import { useUserTokenUsage } from "@/hooks/use-usage";
 import { useThemeStore } from "@/lib/stores/theme-store";
 import { useScopeStore } from "@/lib/stores/scope-store";
 import { SearchCommand } from "./SearchCommand";
+import { ProcessingIndicator } from "./ProcessingIndicator";
 import { getInitials, formatTokens } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -105,6 +106,9 @@ export function Topbar() {
 
       {/* Right section */}
       <div className="flex items-center gap-1">
+        {/* Documents still moving through the pipeline */}
+        <ProcessingIndicator />
+
         {/* User token usage total */}
         {usage.data?.month && (usage.data.month.total > 0 || usage.data.month.limit !== null) && (
           <TokenBadge month={usage.data.month} />

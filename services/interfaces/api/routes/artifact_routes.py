@@ -4,9 +4,9 @@ from pathlib import PurePosixPath
 from typing import Annotated
 from uuid import UUID
 
+from duar_auth import RequestAuth
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
-from duar_auth import RequestAuth
 
 from application.dtos.artifact_dtos import ArtifactResponse, CreateArtifactRequest
 from application.dtos.blob_dtos import UploadBlobRequest
@@ -19,6 +19,7 @@ from application.dtos.permission_dtos import (
     VisibilityResponse,
 )
 from application.dtos.workflow_dtos import (
+    ProcessingArtifactResponse,
     SummaryDetailResponse,
     WorkflowStartedResponse,
     WorkflowStatusMapResponse,
@@ -35,6 +36,7 @@ from application.use_cases.artifact_use_cases import (
     UpdateSummaryCandidateUseCase,
 )
 from application.use_cases.correct_metadata_use_cases import CorrectArtifactMetadataUseCase
+from application.use_cases.processing_artifacts_use_case import ListProcessingArtifactsUseCase
 from application.use_cases.storage_keys import render_pdf_key
 from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.summary_candidate import SummaryCandidate
@@ -73,6 +75,20 @@ async def list_artifacts(
         allowed_artifact_ids=allowed_artifact_ids,
         sort_by=sort_by,
         sort_order=sort_order,
+    )
+
+
+@router.get("/processing", status_code=status.HTTP_200_OK)
+async def list_processing_artifacts(
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> list[ProcessingArtifactResponse]:
+    """The caller's own documents still moving through the pipeline (topbar badge)."""
+    allowed_artifact_ids = await _get_allowed_artifact_ids(auth)
+    return await container[ListProcessingArtifactsUseCase].execute(
+        workspace_id=auth.workspace_id,
+        user_id=auth.user_id,
+        allowed_artifact_ids=allowed_artifact_ids,
     )
 
 

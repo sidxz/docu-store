@@ -22,6 +22,39 @@ from infrastructure.config import settings
 logger = structlog.get_logger()
 
 
+# Every workflow the pipeline runs for one artifact, keyed by a stable name.
+# Patterns mirror the workflow_id built by the start_* methods below.
+ARTIFACT_WORKFLOW_IDS = {
+    "parse": "artifact-parse-{id}",
+    "doc_metadata": "doc-metadata-{id}",
+    "tag_aggregation": "artifact-tag-aggregation-{id}",
+    "artifact_summarization": "artifact-summarization-{id}",
+    "artifact_summary_embedding": "artifact-summary-embedding-{id}",
+}
+PAGE_WORKFLOW_IDS = {
+    "ner": "ner-extraction-{id}",
+    "page_summarization": "page-summarization-{id}",
+    "page_summary_embedding": "page-summary-embedding-{id}",
+    "embedding": "embedding-{id}",
+    "compound_extraction": "compound-extraction-{id}",
+    "smiles_embedding": "smiles-embedding-{id}",
+    "reconcile_compound_labels": "reconcile-compound-labels-{id}",
+}
+
+
+def pipeline_workflow_ids(artifact_id: UUID, page_ids: list[UUID]) -> dict[str, str]:
+    """Name -> Temporal workflow id for everything the pipeline runs on an artifact."""
+    ids = {name: pat.format(id=artifact_id) for name, pat in ARTIFACT_WORKFLOW_IDS.items()}
+    for page_id in page_ids:
+        ids.update(
+            {
+                f"{name}:{page_id}": pat.format(id=page_id)
+                for name, pat in PAGE_WORKFLOW_IDS.items()
+            },
+        )
+    return ids
+
+
 class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
     """Orchestrates artifact processing pipelines using Temporal.
 
@@ -490,6 +523,21 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
             "doc_metadata_extraction": f"doc-metadata-{artifact_id}",
         }
         return await self._query_workflow_statuses(workflow_ids)
+
+    async def get_workflow_statuses(
+        self,
+        workflow_ids: dict[str, str],
+    ) -> dict[str, TemporalWorkflowInfo]:
+        """Describe arbitrary workflows (name -> id)."""
+        await self._ensure_client()
+        return await self._query_workflow_statuses(workflow_ids)
+
+    async def get_artifact_pipeline_statuses(
+        self,
+        artifact_id: UUID,
+        page_ids: list[UUID],
+    ) -> dict[str, TemporalWorkflowInfo]:
+        return await self.get_workflow_statuses(pipeline_workflow_ids(artifact_id, page_ids))
 
     async def _query_workflow_statuses(
         self,

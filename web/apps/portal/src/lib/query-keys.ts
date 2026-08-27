@@ -25,6 +25,7 @@ export const queryKeys = {
   artifacts: {
     all: ["artifacts"] as const,
     list: () => [...queryKeys.artifacts.all, "list"] as const,
+    processing: () => [...queryKeys.artifacts.all, "processing"] as const,
     detail: (id: string) => [...queryKeys.artifacts.all, id] as const,
     workflows: (id: string) =>
       [...queryKeys.artifacts.all, id, "workflows"] as const,

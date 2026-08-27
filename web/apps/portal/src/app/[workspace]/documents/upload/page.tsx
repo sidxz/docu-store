@@ -81,6 +81,8 @@ export default function UploadPage() {
           file_size_kb: Math.round((f.size ?? 0) / 1024),
         });
       }
+      // New uploads start processing immediately — refresh the topbar badge.
+      queryClient.invalidateQueries({ queryKey: queryKeys.artifacts.processing() });
       for (const f of result.failed ?? []) {
         trackEvent("upload_failed", {
           file_type: ext(f.name),

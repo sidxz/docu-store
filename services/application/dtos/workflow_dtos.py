@@ -20,6 +20,21 @@ class TemporalWorkflowInfo(BaseModel):
     from_cache: bool = False
 
 
+class ProcessingArtifactResponse(BaseModel):
+    """One row of the topbar 'documents being processed' badge."""
+
+    artifact_id: str
+    source_filename: str | None = None
+    total: int  # workflows observed for this artifact (not NOT_FOUND)
+    completed: int
+    running: int
+    failed: int
+    percent: int  # completed / total
+    stage: str  # parsing | extracting | indexing | finishing | failed
+    active: bool  # something running, or within the post-stage grace period
+    last_activity_at: datetime | None = None
+
+
 class WorkflowTriggerReason(StrEnum):
     INITIAL_RUN = "initial_run"
     MANUAL_RERUN = "manual_rerun"
