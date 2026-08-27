@@ -201,7 +201,10 @@ class TestExtractCompoundMentionsUseCase:
         page_repo.pages[page.id] = page
 
         class ExplodingCser:
-            def extract_compounds_from_pdf_page(self, storage_key, page_index):
+            def extract_compounds_from_pdf_page(self, storage_key, page_index, render_key):
+                raise RuntimeError("CSER crashed")
+
+            def render_page_only(self, storage_key, page_index, render_key):
                 raise RuntimeError("CSER crashed")
 
         use_case = ExtractCompoundMentionsUseCase(

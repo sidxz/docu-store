@@ -371,13 +371,20 @@ class MockCserService:
     def __init__(self, results: list[CserCompoundResult] | None = None) -> None:
         self._results = results or []
         self.extract_calls: list[dict] = []
+        self.render_calls: list[dict] = []
 
     def extract_compounds_from_pdf_page(
-        self, storage_key: str, page_index: int,
+        self, storage_key: str, page_index: int, render_key: str,
     ) -> list[CserCompoundResult]:
-        self.extract_calls.append({"storage_key": storage_key, "page_index": page_index})
+        self.extract_calls.append(
+            {"storage_key": storage_key, "page_index": page_index, "render_key": render_key},
+        )
         return self._results
 
+    def render_page_only(self, storage_key: str, page_index: int, render_key: str) -> None:
+        self.render_calls.append(
+            {"storage_key": storage_key, "page_index": page_index, "render_key": render_key},
+        )
 
 class MockSmilesValidator:
     """Mock implementation of SmilesValidator."""

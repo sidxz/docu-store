@@ -8,7 +8,7 @@ from returns.result import Failure, Result, Success
 
 from application.dtos.errors import AppError
 from application.mappers.page_mappers import PageMapper
-from application.use_cases.storage_keys import render_pdf_key
+from application.use_cases.storage_keys import cser_render_key, render_pdf_key
 from domain.exceptions import AggregateNotFoundError, ConcurrencyError, ValidationError
 
 if TYPE_CHECKING:
@@ -72,6 +72,10 @@ class ExtractCompoundMentionsUseCase:
             confidence=result.match_confidence,
             date_extracted=datetime.now(UTC),
             model_name=_MODEL_NAME,
+            structure_bbox=result.structure_bbox,
+            label_bbox=result.label_bbox,
+            structure_confidence=result.structure_confidence,
+            label_confidence=result.label_confidence,
         )
 
     async def execute(self, page_id: UUID) -> Result[PageResponse, AppError]:
@@ -80,6 +84,26 @@ class ExtractCompoundMentionsUseCase:
 
             page = self.page_repository.get_by_id(page_id)
             artifact = self.artifact_repository.get_by_id(page.artifact_id)
+
+            render_key = cser_render_key(page.artifact_id, page.index)
+
+            # The aggregate silently drops machine updates on a human-corrected
+            # page (page.py:118). Check here too, so we don't pay for inference
+            # whose result is discarded — and so a machine run can never
+            # disturb coordinates a human owns. The render is still written:
+            # the overlay and the training export need the image regardless.
+            if "compound_mentions" in page.human_corrections:
+                self.cser_service.render_page_only(
+                    storage_key=render_pdf_key(artifact),
+                    page_index=page.index,
+                    render_key=render_key,
+                )
+                logger.info(
+                    "extract_compound_mentions_skipped_human_corrected",
+                    page_id=str(page_id),
+                    render_key=render_key,
+                )
+                return Success(PageMapper.to_page_response(page))
 
             logger.info(
                 "extract_compound_mentions_running_cser",
@@ -92,6 +116,7 @@ class ExtractCompoundMentionsUseCase:
                 self.cser_service.extract_compounds_from_pdf_page(
                     storage_key=render_pdf_key(artifact),
                     page_index=page.index,
+                    render_key=render_key,
                 )
             )
 
