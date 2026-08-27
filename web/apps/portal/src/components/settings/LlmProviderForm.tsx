@@ -23,13 +23,13 @@ const PROVIDERS: { id: LlmProviderId; label: string; hint: string }[] = [
   {
     id: "openrouter",
     label: "OpenRouter",
-    hint: "Sign in with OpenRouter — pay-as-you-go across hundreds of models. Recommended.",
+    hint: "Sign in with OpenRouter to use hundreds of models with one account. Recommended.",
   },
   { id: "openai", label: "OpenAI", hint: "Paste an API key from platform.openai.com." },
   {
     id: "gemini",
     label: "Google Gemini",
-    hint: "Paste a Google AI Studio key. Paid tier recommended — the free tier's rate limit fails document ingestion.",
+    hint: "Paste a Google AI Studio key. Use a paid plan. The free plan is too limited for document processing.",
   },
 ];
 
@@ -293,8 +293,8 @@ function SetupView({
         </>
       )}
       <p className="text-xs text-text-muted">
-        Keys are encrypted at rest and never shown again. Model fields default to the
-        values shown; edit them to use a different model.
+        Your key is encrypted and never shown again. The models shown are defaults. Change
+        them if you like.
       </p>
       {save.isError && (
         <Alert variant="destructive">

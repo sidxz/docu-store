@@ -39,11 +39,11 @@ function Onboarding() {
       >
         <div className="mb-6 flex items-center gap-3" style={{ color: "#0f172a" }}>
           <LogoMark className="h-8 w-8" />
-          <h1 className="text-xl font-medium">Connect your LLM</h1>
+          <h1 className="text-xl font-medium">Connect your AI provider</h1>
         </div>
         <p className="mb-6 text-sm" style={{ color: "#475569" }}>
-          DocuStore runs on your own model account — you pay your provider directly and we
-          never see your spend. Reading and search work without one; uploads and chat need it.
+          Connect an AI provider to upload documents and chat. You pay your provider directly.
+          Reading and search work without one.
         </p>
         <LlmProviderForm onConfigured={() => router.replace(home)} />
         {provider.data?.configured ? (
