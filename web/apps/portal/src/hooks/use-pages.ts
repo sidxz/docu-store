@@ -94,6 +94,8 @@ export interface CorrectedCompoundInput {
   cdd_id?: string | null;
   chembl_id?: string | null;
   pdb_id?: string | null;
+  structure_bbox?: number[] | null;
+  label_bbox?: number[] | null;
 }
 
 /** hiledit: full-replace correction of a page's compound mentions, with provenance recorded server-side. */

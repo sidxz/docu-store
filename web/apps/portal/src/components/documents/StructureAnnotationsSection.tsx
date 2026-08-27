@@ -6,7 +6,9 @@ import { ChevronDown } from "lucide-react";
 import { useAuthBlobUrl } from "@/hooks/use-auth-blob-url";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { API_URL } from "@/lib/constants";
+import { useCorrectPageCompounds } from "@/hooks/use-pages";
 import type { CompoundMention } from "@docu-store/types";
 
 /** A mention we can actually draw: coordinates present. */
@@ -88,22 +90,46 @@ export function StructureAnnotationsSection({
   artifactId,
   pageIndex,
   compounds,
+  pageId,
+  editable,
 }: {
   artifactId: string;
   pageIndex: number;
   compounds: CompoundMention[];
+  pageId: string;
+  editable: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
+  const [editing, setEditing] = useState(false);
   const { blobUrl, error } = useAuthBlobUrl(
     expanded ? `${API_URL}/artifacts/${artifactId}/pages/${pageIndex}/image?size=cser` : "",
   );
+  const correct = useCorrectPageCompounds(pageId);
 
   if (compounds.length === 0) return null;
 
   const located = compounds.filter(isLocated);
   const missingCoordinates = compounds.length - located.length;
+
+  // Byte-identical round-trip: the server's identity comparison keys on
+  // (smiles, extracted_id, internal_id, cdd_id, chembl_id, pdb_id, structure_bbox,
+  // label_bbox) — build straight from the loaded mention, no re-derivation.
+  const toInput = (m: CompoundMention) => ({
+    smiles: m.smiles,
+    extracted_id: m.extracted_id ?? null,
+    internal_id: m.internal_id ?? null,
+    cdd_id: m.cdd_id ?? null,
+    chembl_id: m.chembl_id ?? null,
+    pdb_id: m.pdb_id ?? null,
+    structure_bbox: m.structure_bbox ?? null,
+    label_bbox: m.label_bbox ?? null,
+  });
+
+  const approve = () => correct.mutateAsync({ compound_mentions: compounds.map(toInput) });
+
+  const markEmpty = () => correct.mutateAsync({ compound_mentions: [] });
 
   return (
     <Card className="mt-6">
@@ -122,6 +148,20 @@ export function StructureAnnotationsSection({
 
       {expanded && (
         <div className="mt-3 space-y-4">
+          {editable && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" onClick={approve} disabled={correct.isPending}>
+                Approve as correct
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setEditing((v) => !v)}>
+                {editing ? "Cancel editing" : "Edit boxes"}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={markEmpty} disabled={correct.isPending}>
+                No compounds on this page
+              </Button>
+            </div>
+          )}
+
           {missingCoordinates > 0 && (
             <p className="text-sm text-text-muted">
               {missingCoordinates} compound{missingCoordinates === 1 ? "" : "s"} extracted before

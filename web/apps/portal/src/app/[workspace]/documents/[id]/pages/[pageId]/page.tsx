@@ -250,6 +250,8 @@ export default function PageViewerPage() {
         artifactId={id}
         pageIndex={page.index}
         compounds={(page.compound_mentions as CompoundMention[]) ?? []}
+        pageId={pageId}
+        editable={canEdit}
       />
 
       {/* Extracted Text — collapsed by default */}
