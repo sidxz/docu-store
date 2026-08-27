@@ -20,16 +20,32 @@ class CserService(Protocol):
         self,
         storage_key: str,
         page_index: int,
+        render_key: str,
     ) -> list[CserCompoundResult]:
-        """Render a PDF page and extract all compound structure-label pairs.
+        """Render a PDF page, persist that render, and extract compound pairs.
 
         Args:
             storage_key: Blob store key pointing to the source PDF file.
             page_index: Zero-based page number to process.
+            render_key: Blob store key to write the render to. Returned bounding
+                boxes are in that image's pixel coordinates.
 
         Returns:
-            List of raw compound results (smiles, label_text, match_confidence).
-            May be empty if no compounds are detected.
+            List of raw compound results. May be empty if nothing is detected.
 
+        """
+        ...
+
+    def render_page_only(
+        self,
+        storage_key: str,
+        page_index: int,
+        render_key: str,
+    ) -> None:
+        """Persist the render for a page WITHOUT running inference.
+
+        For pages whose compound mentions are human-owned: the overlay and the
+        training export still need the image, but re-running the model would be
+        wasted work and its output would be discarded by the aggregate anyway.
         """
         ...
