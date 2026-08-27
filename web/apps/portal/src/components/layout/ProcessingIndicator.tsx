@@ -13,6 +13,7 @@ import { type ProcessingArtifact, useProcessingArtifacts } from "@/hooks/use-pro
 const STAGE_LABEL: Record<ProcessingArtifact["stage"], string> = {
   parsing: "Reading pages",
   extracting: "Extracting content",
+  extracting_structures: "Extracting structures",
   indexing: "Indexing",
   finishing: "Finishing up",
   failed: "Needs attention",

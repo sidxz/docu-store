@@ -43,8 +43,11 @@ def test_percent_and_stage_priority() -> None:
     assert row.stage == "indexing"  # indexing outranks finishing
 
 
-def test_structure_extraction_counts_as_extracting() -> None:
+def test_structure_extraction_is_its_own_stage() -> None:
     s = {"parse": _wf("COMPLETED", timedelta(seconds=30)), "compound_extraction:p1": _wf("RUNNING")}
+    assert summarize(uuid4(), "a.pdf", s, NOW).stage == "extracting_structures"
+    # content extraction outranks it when both run
+    s["ner:p1"] = _wf("RUNNING")
     assert summarize(uuid4(), "a.pdf", s, NOW).stage == "extracting"
 
 

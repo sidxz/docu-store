@@ -5,7 +5,13 @@ import { useQuery } from "@tanstack/react-query";
 import { authFetchJson } from "@/lib/auth-fetch";
 import { queryKeys } from "@/lib/query-keys";
 
-export type ProcessingStage = "parsing" | "extracting" | "indexing" | "finishing" | "failed";
+export type ProcessingStage =
+  | "parsing"
+  | "extracting"
+  | "extracting_structures"
+  | "indexing"
+  | "finishing"
+  | "failed";
 
 /** One row of GET /artifacts/processing — the caller's own in-flight documents. */
 export interface ProcessingArtifact {

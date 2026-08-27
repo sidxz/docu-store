@@ -30,7 +30,7 @@ class ProcessingArtifactResponse(BaseModel):
     running: int
     failed: int
     percent: int  # completed / total
-    stage: str  # parsing | extracting | indexing | finishing | failed
+    stage: str  # parsing | extracting | extracting_structures | indexing | finishing | failed
     active: bool  # something running, or within the post-stage grace period
     last_activity_at: datetime | None = None
 

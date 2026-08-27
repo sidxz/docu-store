@@ -37,10 +37,10 @@ _STAGES: tuple[tuple[str, frozenset[str]], ...] = (
                 "doc_metadata",
                 "page_summarization",
                 "artifact_summarization",
-                "compound_extraction",  # structure extraction (CSER) is extraction, not indexing
             },
         ),
     ),
+    ("extracting_structures", frozenset({"compound_extraction"})),  # CSER on page images
     (
         "indexing",
         frozenset(
