@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import tempfile
 import threading
 from typing import TYPE_CHECKING
 
 import structlog
-from PIL import Image
 
 from application.dtos.cser_dtos import CserCompoundResult
 from application.ports.cser_service import CserService
@@ -47,35 +47,41 @@ class CserPipelineService(CserService):
         storage_key: str,
         page_index: int,
     ) -> list[CserCompoundResult]:
-        """Render a PDF page to an image and run ChemPipeline on it."""
+        """Hand the page to structflo-cser's own PDF path.
+
+        Rendering (DPI, colour space) follows the library's contract rather than
+        a constant kept here: the pipeline is scale-sensitive around its
+        operating point. On the PMC9250831 deck our former 2x (144 dpi) render
+        lost one of two structure/label pairs that the library's default render
+        finds, and 200+ dpi finds none (pages are letterboxed to imgsz=1280).
+        The library owns that number; consumers must not guess it.
+        """
         import fitz  # PyMuPDF — already a project dependency
 
         self._ensure_pipeline_loaded()
-
         logger.info(
             "cser_extracting_compounds",
             storage_key=storage_key,
             page_index=page_index,
         )
-
-        with self._blob_store.get_file(storage_key) as pdf_path:
-            doc = fitz.open(pdf_path)
-            page = doc[page_index]
-            # 2x zoom gives ~144 dpi — good balance of quality vs. speed
-            mat = fitz.Matrix(2, 2)
-            pix = page.get_pixmap(matrix=mat)
-            image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-            doc.close()
-
-        pairs = self._pipeline.process(image)
-
+        with (
+            self._blob_store.get_file(storage_key) as pdf_path,
+            tempfile.NamedTemporaryFile(suffix=".pdf") as one_page,
+        ):
+            source = fitz.open(pdf_path)
+            single = fitz.open()
+            single.insert_pdf(source, from_page=page_index, to_page=page_index)
+            single.save(one_page.name)
+            single.close()
+            source.close()
+            per_page = self._pipeline.process_pdf(one_page.name)
+        pairs = per_page[0] if per_page else []
         logger.info(
             "cser_extraction_complete",
             storage_key=storage_key,
             page_index=page_index,
             num_pairs=len(pairs),
         )
-
         return [
             CserCompoundResult(
                 smiles=pair.smiles,
