@@ -52,7 +52,7 @@ async def test_terminal_cached_statuses_skip_temporal_and_live_ones_write_throug
     assert out["parse"].from_cache is True
     assert out[f"ner:{p}"].status == "COMPLETED"
     assert any(name == f"ner:{p}" for name, *_ in cache.upserts)  # write-through
-    assert len(out) == 5 + 7
+    assert len(out) == 6 + 7
 
 
 async def test_cache_read_failure_falls_back_to_temporal() -> None:
@@ -63,7 +63,7 @@ async def test_cache_read_failure_falls_back_to_temporal() -> None:
     inner = FakeInner({})
     orch = CachingWorkflowOrchestrator(inner=inner, cache=BrokenCache({}))
     out = await orch.get_artifact_pipeline_statuses(uuid4(), [])
-    assert len(inner.asked[0]) == 5 and all(i.status == "NOT_FOUND" for i in out.values())
+    assert len(inner.asked[0]) == 6 and all(i.status == "NOT_FOUND" for i in out.values())
 
 
 async def test_starting_a_workflow_forgets_its_cached_status() -> None:

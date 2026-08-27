@@ -31,6 +31,9 @@ ARTIFACT_WORKFLOW_IDS = {
     "tag_aggregation": "artifact-tag-aggregation-{id}",
     "artifact_summarization": "artifact-summarization-{id}",
     "artifact_summary_embedding": "artifact-summary-embedding-{id}",
+    # Automatic once all page summaries exist (pipeline_worker); the
+    # batch-reembed-smiles / -summaries variants are admin bulk tools, not pipeline.
+    "batch_reembed": "batch-reembed-{id}",
 }
 PAGE_WORKFLOW_IDS = {
     "ner": "ner-extraction-{id}",

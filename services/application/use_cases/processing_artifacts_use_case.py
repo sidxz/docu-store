@@ -31,7 +31,15 @@ _STAGES: tuple[tuple[str, frozenset[str]], ...] = (
     ("parsing", frozenset({"parse"})),
     (
         "extracting",
-        frozenset({"ner", "doc_metadata", "page_summarization", "artifact_summarization"}),
+        frozenset(
+            {
+                "ner",
+                "doc_metadata",
+                "page_summarization",
+                "artifact_summarization",
+                "compound_extraction",  # structure extraction (CSER) is extraction, not indexing
+            },
+        ),
     ),
     (
         "indexing",
@@ -41,7 +49,7 @@ _STAGES: tuple[tuple[str, frozenset[str]], ...] = (
                 "page_summary_embedding",
                 "artifact_summary_embedding",
                 "smiles_embedding",
-                "compound_extraction",
+                "batch_reembed",
             },
         ),
     ),

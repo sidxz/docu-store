@@ -43,6 +43,11 @@ def test_percent_and_stage_priority() -> None:
     assert row.stage == "indexing"  # indexing outranks finishing
 
 
+def test_structure_extraction_counts_as_extracting() -> None:
+    s = {"parse": _wf("COMPLETED", timedelta(seconds=30)), "compound_extraction:p1": _wf("RUNNING")}
+    assert summarize(uuid4(), "a.pdf", s, NOW).stage == "extracting"
+
+
 def test_all_done_stays_active_during_grace_then_drops() -> None:
     s = {"parse": _wf("COMPLETED", timedelta(seconds=10)), "ner:p1": _wf("COMPLETED", timedelta(seconds=5))}
     row = summarize(uuid4(), "a.pdf", s, NOW)
