@@ -56,12 +56,19 @@ function toRenderPixels(evt: React.PointerEvent, svg: SVGSVGElement) {
   return { x: Math.round(local.x), y: Math.round(local.y) };
 }
 
-/** Round + clamp a [x1,y1,x2,y2] box to the image bounds — a box dragged past the edge
- *  would otherwise export coordinates outside its own image. */
+/** Normalise + round + clamp a [x1,y1,x2,y2] box to the image bounds. Normalising first
+ *  means a resize dragged past its own opposite corner (x2 < x1 or y2 < y1 — every
+ *  coordinate individually in bounds, but the box degenerate) still commits a valid
+ *  box instead of writing an inverted one verbatim into exported training data. */
 function clampToImage(bbox: number[], w: number, h: number): number[] {
   const clamp = (v: number, max: number) => Math.max(0, Math.min(max, Math.round(v)));
   const [x1, y1, x2, y2] = bbox;
-  return [clamp(x1, w), clamp(y1, h), clamp(x2, w), clamp(y2, h)];
+  return [
+    clamp(Math.min(x1, x2), w),
+    clamp(Math.min(y1, y2), h),
+    clamp(Math.max(x1, x2), w),
+    clamp(Math.max(y1, y2), h),
+  ];
 }
 
 type DragState =
