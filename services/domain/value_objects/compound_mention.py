@@ -48,11 +48,11 @@ class CompoundMention(ExtractionMetadata):
     )
     structure_confidence: float | None = Field(
         None,
-        description="Detector confidence for the structure box; None when a human placed it",
+        description="Detector confidence for the structure box, when it came from the detector",
     )
     label_confidence: float | None = Field(
         None,
-        description="Detector confidence for the label box; None when a human placed it",
+        description="Detector confidence for the label box, when it came from the detector",
     )
 
     @field_validator("smiles")
