@@ -34,6 +34,26 @@ class CompoundMention(ExtractionMetadata):
         None,
         description="Primary chemical identifier as extracted from the document",
     )
+    structure_bbox: list[int] | None = Field(
+        None,
+        description=(
+            "Structure box [x1, y1, x2, y2] in PIXELS of this page's CSER render "
+            "(blob artifacts/{artifact_id}/pages/{index}_cser.png). Meaningless "
+            "without that image, which is why the image is persisted, never re-derived."
+        ),
+    )
+    label_bbox: list[int] | None = Field(
+        None,
+        description="Label box [x1, y1, x2, y2] in the same pixel space; None for an unlabelled structure",
+    )
+    structure_confidence: float | None = Field(
+        None,
+        description="Detector confidence for the structure box; None when a human placed it",
+    )
+    label_confidence: float | None = Field(
+        None,
+        description="Detector confidence for the label box; None when a human placed it",
+    )
 
     @field_validator("smiles")
     @classmethod
