@@ -326,3 +326,75 @@ class TestCorrectPageCompoundMentionsUseCase:
 
         assert isinstance(result, Failure)
         assert result.failure().category == "not_found"
+
+    @pytest.mark.asyncio
+    async def test_human_placed_coordinates_are_persisted(
+        self,
+        fake_page_repo: MockPageRepository,
+        make_saved_page,
+        smiles_validator: FakeSmilesValidator,
+        auth_editor: FakeAuth,
+    ) -> None:
+        """A corrected pair keeps its boxes, and claims no detector confidence."""
+        page = make_saved_page(with_mention=True)
+        uc = CorrectPageCompoundMentionsUseCase(
+            page_repository=fake_page_repo,
+            smiles_validator=smiles_validator,
+        )
+
+        result = await uc.execute(
+            page_id=page.id,
+            request=CorrectPageCompoundMentionsRequest(
+                compound_mentions=[
+                    CorrectedCompoundInput(
+                        smiles="CCO",
+                        extracted_id="1a",
+                        structure_bbox=[10, 20, 110, 220],
+                        label_bbox=[10, 230, 60, 250],
+                    ),
+                ],
+            ),
+            auth=auth_editor,
+        )
+
+        assert isinstance(result, Success)
+        mention = fake_page_repo.get_by_id(page.id).compound_mentions[0]
+        assert mention.structure_bbox == [10, 20, 110, 220]
+        assert mention.label_bbox == [10, 230, 60, 250]
+        # Not accepted from clients: a reviewer has no detector confidence.
+        assert mention.structure_confidence is None
+        assert mention.label_confidence is None
+
+    @pytest.mark.asyncio
+    async def test_an_unlabelled_structure_is_accepted(
+        self,
+        fake_page_repo: MockPageRepository,
+        make_saved_page,
+        smiles_validator: FakeSmilesValidator,
+        auth_editor: FakeAuth,
+    ) -> None:
+        """The training format allows "label_bbox": null, so the VO must too."""
+        page = make_saved_page(with_mention=True)
+        uc = CorrectPageCompoundMentionsUseCase(
+            page_repository=fake_page_repo,
+            smiles_validator=smiles_validator,
+        )
+
+        result = await uc.execute(
+            page_id=page.id,
+            request=CorrectPageCompoundMentionsRequest(
+                compound_mentions=[
+                    CorrectedCompoundInput(
+                        smiles="CCO",
+                        structure_bbox=[10, 20, 110, 220],
+                        label_bbox=None,
+                    ),
+                ],
+            ),
+            auth=auth_editor,
+        )
+
+        assert isinstance(result, Success)
+        mention = fake_page_repo.get_by_id(page.id).compound_mentions[0]
+        assert mention.structure_bbox == [10, 20, 110, 220]
+        assert mention.label_bbox is None

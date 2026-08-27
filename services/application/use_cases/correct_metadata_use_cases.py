@@ -222,6 +222,10 @@ class CorrectPageCompoundMentionsUseCase:
                     cdd_id=item.cdd_id,
                     chembl_id=item.chembl_id,
                     pdb_id=item.pdb_id,
+                    structure_bbox=item.structure_bbox,
+                    label_bbox=item.label_bbox,
+                    # Confidences are not accepted from clients, so they land as None
+                    # here — including on an "approve" that resubmits machine output.
                     date_extracted=now,
                 ),
             )

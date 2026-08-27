@@ -39,6 +39,8 @@ class CorrectedCompoundInput(BaseModel):
     cdd_id: str | None = None
     chembl_id: str | None = None
     pdb_id: str | None = None
+    structure_bbox: list[int] | None = None
+    label_bbox: list[int] | None = None
 
 
 class CorrectPageCompoundMentionsRequest(BaseModel):
