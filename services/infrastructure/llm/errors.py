@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from domain.exceptions import LLMAuthError, LLMError, LLMRateLimitedError
+from domain.exceptions import LLMAuthError, LLMBadRequestError, LLMError, LLMRateLimitedError
 
 _AUTH_STATUSES = frozenset({401, 402, 403})
 _MAX_DEPTH = 5
@@ -23,6 +23,18 @@ def _status(exc: BaseException) -> int | None:
         if isinstance(code, int) and not isinstance(code, bool):
             return code
     return None
+
+
+def _provider_message(exc: BaseException) -> str:
+    """The provider's own explanation of a 4xx, for humans (one line, capped).
+
+    Only used for bad-request errors: auth messages can echo (masked)
+    credentials, so those stay type-only.
+    """
+    body = getattr(exc, "body", None)
+    msg = body.get("error", {}).get("message") if isinstance(body, dict) else None
+    text = str(msg or getattr(exc, "message", "") or exc)
+    return " ".join(text.split())[:300]
 
 
 def classify(exc: BaseException) -> LLMError | None:
@@ -41,6 +53,13 @@ def classify(exc: BaseException) -> LLMError | None:
         if code == 429:
             return LLMRateLimitedError(
                 f"LLM provider rate-limited the request (HTTP 429: {type(cur).__name__})"
+            )
+        if code is not None and 400 <= code < 500:
+            # Any other 4xx is the request itself being wrong (model name, parameter
+            # combination, input size). Retrying cannot change the answer.
+            return LLMBadRequestError(
+                f"LLM provider rejected the request (HTTP {code}: {type(cur).__name__}): "
+                f"{_provider_message(cur)}"
             )
         cur = getattr(cur, "original", None) or cur.__cause__
     return None

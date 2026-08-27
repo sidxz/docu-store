@@ -42,6 +42,8 @@ class CachingWorkflowOrchestrator:
         cache: WorkflowStatusCache,
     ) -> None:
         self._inner = inner
+        # Learn about (re)starts so cached terminal statuses never outlive them.
+        inner.on_workflow_started = self._forget_status
         self._cache = cache
 
     def __getattr__(self, name: str) -> Any:
@@ -61,6 +63,14 @@ class CachingWorkflowOrchestrator:
     ) -> dict[str, TemporalWorkflowInfo]:
         results = await self._inner.get_artifact_workflow_statuses(artifact_id)
         return await self._apply_cache(results, str(artifact_id), "artifact")
+
+    async def _forget_status(self, workflow_id: str) -> None:
+        try:
+            await self._cache.delete_statuses([workflow_id])
+        except Exception:
+            logger.warning(
+                "workflow_status_cache_delete_failed", workflow_id=workflow_id, exc_info=True
+            )
 
     async def get_workflow_statuses(
         self,

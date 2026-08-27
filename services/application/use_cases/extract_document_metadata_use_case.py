@@ -10,6 +10,7 @@ import structlog
 from returns.result import Failure, Result, Success
 
 from application.dtos.errors import AppError
+from application.services.aggregate_commit import commit
 from application.services.llm_scope import owner_scope
 from application.services.usage_recording import ingestion_counter, record_ingestion_usage
 from application.use_cases.storage_keys import render_pdf_key
@@ -347,36 +348,55 @@ class ExtractDocumentMetadataUseCase:
         now: datetime,
         fields: set[str],
     ) -> set[str]:
-        """Apply ``fields`` from ``raw`` to the aggregate, save + notify if anything
-        landed, and return what did. Human-corrected fields are skipped (the
-        aggregate's update_* no-op them too; the guard here avoids a save + notify
-        for a write that didn't land).
-        """
-        applied: set[str] = set()
-        if "title" in fields and "title_mention" not in artifact.human_corrections:
-            title_mention = self._build_title(raw, now)
-            if title_mention:
-                artifact.update_title_mention(title_mention)
-                applied.add("title")
-        if "authors" in fields and "author_mentions" not in artifact.human_corrections:
-            author_mentions = self._build_authors(raw, now)
-            if author_mentions:
-                artifact.update_author_mentions(author_mentions)
-                applied.add("authors")
-        if "date" in fields and "presentation_date" not in artifact.human_corrections:
-            presentation_date = self._build_date(raw, now)
-            if presentation_date is not None:
-                artifact.update_presentation_date(presentation_date)
-                applied.add("date")
-        if applied:
-            self.artifact_repository.save(artifact)
-            if self.external_event_publisher:
-                from application.mappers.artifact_mappers import ArtifactMapper
+        """Apply ``fields`` from ``raw`` to a freshly loaded aggregate, save + notify
+        if anything landed, and return what did.
 
-                await self.external_event_publisher.notify_artifact_updated(
-                    ArtifactMapper.to_artifact_response(artifact),
-                    sub_type="DocumentMetadataUpdated",
-                )
+        The aggregate is reloaded inside ``commit`` so the optimistic-lock window
+        excludes the LLM call that precedes the second pass. Values already on the
+        aggregate are not re-applied: a retried activity must not re-emit identical
+        events. Human-corrected fields are skipped (the aggregate no-ops them too;
+        the guard here avoids a save + notify for a write that didn't land).
+        """
+        title = self._build_title(raw, now) if "title" in fields else None
+        authors = self._build_authors(raw, now) if "authors" in fields else []
+        date = self._build_date(raw, now) if "date" in fields else None
+        applied: set[str] = set()
+
+        def mutate(fresh: Artifact) -> bool:
+            applied.clear()
+            if (
+                title
+                and "title_mention" not in fresh.human_corrections
+                and not (fresh.title_mention and fresh.title_mention.title == title.title)
+            ):
+                fresh.update_title_mention(title)
+                applied.add("title")
+            if (
+                authors
+                and "author_mentions" not in fresh.human_corrections
+                and [a.name for a in fresh.author_mentions] != [a.name for a in authors]
+            ):
+                fresh.update_author_mentions(authors)
+                applied.add("authors")
+            if (
+                date is not None
+                and "presentation_date" not in fresh.human_corrections
+                and not (fresh.presentation_date and fresh.presentation_date.date == date.date)
+            ):
+                fresh.update_presentation_date(date)
+                applied.add("date")
+            return bool(applied)
+
+        saved = commit(self.artifact_repository, artifact.id, mutate)
+        if saved is None:
+            return set()
+        if self.external_event_publisher:
+            from application.mappers.artifact_mappers import ArtifactMapper
+
+            await self.external_event_publisher.notify_artifact_updated(
+                ArtifactMapper.to_artifact_response(saved),
+                sub_type="DocumentMetadataUpdated",
+            )
         return applied
 
     async def _apply_llm_fallback(self, raw: _RawMetadata, text: str, artifact: Artifact) -> None:

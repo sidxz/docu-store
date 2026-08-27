@@ -64,3 +64,24 @@ async def test_cache_read_failure_falls_back_to_temporal() -> None:
     orch = CachingWorkflowOrchestrator(inner=inner, cache=BrokenCache({}))
     out = await orch.get_artifact_pipeline_statuses(uuid4(), [])
     assert len(inner.asked[0]) == 5 and all(i.status == "NOT_FOUND" for i in out.values())
+
+
+async def test_starting_a_workflow_forgets_its_cached_status() -> None:
+    """Workflow ids are reused on re-run, so a cached FAILED must not outlive a restart."""
+
+    class ForgettingCache(FakeCache):
+        def __init__(self) -> None:
+            super().__init__({})
+            self.deleted: list[list[str]] = []
+
+        async def delete_statuses(self, workflow_ids: list[str]) -> None:
+            self.deleted.append(list(workflow_ids))
+
+    class HookedInner(FakeInner):
+        on_workflow_started = None
+
+    inner, cache = HookedInner({}), ForgettingCache()
+    CachingWorkflowOrchestrator(inner=inner, cache=cache)
+    assert inner.on_workflow_started is not None  # wrapper subscribed to starts
+    await inner.on_workflow_started("doc-metadata-abc")
+    assert cache.deleted == [["doc-metadata-abc"]]

@@ -31,24 +31,35 @@ _PROVIDER_MAP = {
 }
 
 
-def _reasoning_kwargs(provider: str, reasoning: str | None) -> dict[str, Any]:
+def _is_openai_gpt5x(model_name: str) -> bool:
+    """gpt-5.1 and later (dotted minor version) — accepts an OpenRouter slug too."""
+    return model_name.lower().rsplit("/", 1)[-1].startswith("gpt-5.")
+
+
+def _reasoning_kwargs(provider: str, reasoning: str | None, model_name: str) -> dict[str, Any]:
     """Translate a normalized reasoning effort to provider-specific init kwargs.
 
     ``off``/None → no reasoning. The effort string is one of off|low|medium|high.
     """
     if not reasoning or reasoning == "off":
-        return {}
-    if provider == "ollama":
-        return {"reasoning": True}
-    if provider == "anthropic":
+        # PROVIDER QUIRK (OpenAI, observed 2026-08-27 on gpt-5.6-luna): reasoning
+        # models apply a default effort when none is sent, and /v1/chat/completions
+        # then rejects function tools — "Function tools with reasoning_effort are
+        # not supported ... set reasoning_effort to 'none'". Our "off" therefore
+        # has to be explicit. Only the gpt-5.x generation documents 'none'; the
+        # original gpt-5 family and o-series accept tools with their default
+        # effort and are left untouched so existing deployments do not change.
+        explicit_off = provider == "openai" and _is_openai_gpt5x(model_name)
+        return {"reasoning_effort": "none"} if explicit_off else {}
+    by_provider: dict[str, dict[str, Any]] = {
+        "ollama": {"reasoning": True},
         # ponytail: fixed 2048-token budget; make it a config knob if a deploy
         # needs deeper thinking. Newer Opus may prefer {"type": "adaptive"}.
-        return {"thinking": {"type": "enabled", "budget_tokens": 2048}}
-    if provider == "openai":
-        return {"reasoning_effort": reasoning}
-    if provider == "gemini":
-        return {"thinking_budget": 2048}
-    return {}
+        "anthropic": {"thinking": {"type": "enabled", "budget_tokens": 2048}},
+        "openai": {"reasoning_effort": reasoning},
+        "gemini": {"thinking_budget": 2048},
+    }
+    return by_provider.get(provider, {})
 
 
 def build_chat_model(
@@ -115,7 +126,7 @@ def build_chat_model(
         # Without this, OpenAI streamed responses report zero token usage.
         kwargs["stream_usage"] = True
 
-    reasoning_kw = _reasoning_kwargs(provider, reasoning)
+    reasoning_kw = _reasoning_kwargs(provider, reasoning, model_name)
     if provider == "anthropic" and reasoning_kw:
         # Anthropic extended thinking requires temperature == 1.
         kwargs["temperature"] = 1.0

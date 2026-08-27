@@ -9,6 +9,7 @@ import structlog
 from returns.result import Failure, Result, Success
 
 from application.dtos.errors import AppError
+from application.services.aggregate_commit import commit
 from application.services.llm_scope import owner_scope
 from domain.services.bioactivity_reducer import associate_bioactivities
 from domain.value_objects.tag_mention import TagMention
@@ -21,6 +22,7 @@ if TYPE_CHECKING:
     from application.ports.repositories.artifact_repository import ArtifactRepository
     from application.ports.repositories.page_repository import PageRepository
     from application.services.llm_scope import UserLLMScope
+    from domain.aggregates.page import Page
 
 logger = structlog.get_logger()
 
@@ -89,8 +91,12 @@ class ExtractPageEntitiesUseCase:
             # orphan bioactivities (no compound link) are discarded.
             tag_mentions = associate_bioactivities(tag_mentions)
 
-            page.update_tag_mentions(tag_mentions)
-            self.page_repository.save(page)
+            # Reload right before the write: the NER call above left our copy stale.
+            def apply_tags(fresh_page: Page) -> bool:
+                fresh_page.update_tag_mentions(tag_mentions)
+                return True
+
+            page = commit(self.page_repository, page_id, apply_tags) or page
 
             if self.external_event_publisher:
                 from application.mappers.page_mappers import PageMapper

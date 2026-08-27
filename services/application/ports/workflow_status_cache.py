@@ -28,6 +28,12 @@ class WorkflowStatusCache(Protocol):
         """
         ...
 
+    async def delete_statuses(self, workflow_ids: list[str]) -> None:
+        """Forget cached entries — called when a workflow id is (re)started, since
+        Temporal reuses ids and a cached terminal status must not outlive a restart.
+        """
+        ...
+
     async def bulk_upsert_statuses(
         self,
         entries: list[tuple[str, str, str, TemporalWorkflowInfo]],

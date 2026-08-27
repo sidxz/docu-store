@@ -223,3 +223,21 @@ async def test_llm_fills_only_missing_fields_after_the_first_persist() -> None:
     assert [a.name for a in saved.author_mentions] == ["Bob Jones"]  # GLiNER kept, not "A. Smith"
     assert publisher.artifact_updated_calls == 2  # GLiNER pass + LLM pass (accepted: full-artifact events, idempotent consumers)
     assert saved.presentation_date.date.year == 2024
+
+
+@pytest.mark.asyncio
+async def test_retry_does_not_reapply_values_already_on_the_aggregate() -> None:
+    """A retried activity must not re-emit identical metadata events (stream churn +
+    needless optimistic-lock conflicts)."""
+    from domain.exceptions import LLMAuthError
+
+    uc, artifact, page, repo, publisher = _incomplete_setup(_BoomLLM())
+    with pytest.raises(LLMAuthError):
+        await uc.execute(artifact.id, page.id)
+    assert publisher.artifact_updated_calls == 1
+
+    repo.save_called = False
+    with pytest.raises(LLMAuthError):  # the retry: same GLiNER values, LLM still failing
+        await uc.execute(artifact.id, page.id)
+    assert repo.save_called is False
+    assert publisher.artifact_updated_calls == 1

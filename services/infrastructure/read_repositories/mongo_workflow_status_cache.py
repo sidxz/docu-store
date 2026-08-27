@@ -58,6 +58,10 @@ class MongoWorkflowStatusCache:
                 )
         return results
 
+    async def delete_statuses(self, workflow_ids: list[str]) -> None:
+        if workflow_ids:
+            await self._collection.delete_many({"workflow_id": {"$in": list(workflow_ids)}})
+
     async def bulk_upsert_statuses(
         self,
         entries: list[tuple[str, str, str, TemporalWorkflowInfo]],

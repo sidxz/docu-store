@@ -6,13 +6,14 @@ The domain and application layers only depend on the WorkflowOrchestrator port.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from temporalio.client import Client
 from temporalio.service import RPCError
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
     from uuid import UUID
 
 from application.dtos.workflow_dtos import TemporalWorkflowInfo
@@ -72,6 +73,9 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
 
         """
         self._client = client
+        # Set by CachingWorkflowOrchestrator: Temporal reuses workflow ids on re-run,
+        # so the status cache must forget an id the moment it is started again.
+        self.on_workflow_started: Callable[[str], Awaitable[None]] | None = None
         self._initialized = client is not None
 
     async def _ensure_client(self) -> None:
@@ -99,7 +103,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         input_data = {"page_id": str(page_id), "skip_sparse": skip_sparse}
 
         try:
-            await self._client.start_workflow(
+            await self._start_workflow(
                 "GeneratePageEmbeddingWorkflow",
                 input_data,
                 id=workflow_id,
@@ -128,7 +132,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         workflow_id = f"compound-extraction-{page_id}"
 
         try:
-            await self._client.start_workflow(
+            await self._start_workflow(
                 "ExtractCompoundMentionsWorkflow",
                 str(page_id),
                 id=workflow_id,
@@ -152,7 +156,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         workflow_id = f"smiles-embedding-{page_id}"
 
         try:
-            await self._client.start_workflow(
+            await self._start_workflow(
                 "EmbedCompoundSmilesWorkflow",
                 str(page_id),
                 id=workflow_id,
@@ -178,7 +182,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         workflow_id = f"reconcile-compound-labels-{page_id}"
 
         try:
-            await self._client.start_workflow(
+            await self._start_workflow(
                 "ReconcileCompoundLabelsWorkflow",
                 str(page_id),
                 id=workflow_id,
@@ -203,7 +207,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         workflow_id = f"page-summarization-{page_id}"
 
         try:
-            await self._client.start_workflow(
+            await self._start_workflow(
                 "PageSummarizationWorkflow",
                 str(page_id),
                 id=workflow_id,
@@ -233,7 +237,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         workflow_id = f"artifact-summarization-{artifact_id}"
 
         try:
-            await self._client.start_workflow(
+            await self._start_workflow(
                 "ArtifactSummarizationWorkflow",
                 str(artifact_id),
                 id=workflow_id,
@@ -258,7 +262,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         workflow_id = f"page-summary-embedding-{page_id}"
 
         try:
-            await self._client.start_workflow(
+            await self._start_workflow(
                 "PageSummaryEmbeddingWorkflow",
                 str(page_id),
                 id=workflow_id,
@@ -284,7 +288,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         workflow_id = f"artifact-summary-embedding-{artifact_id}"
 
         try:
-            await self._client.start_workflow(
+            await self._start_workflow(
                 "ArtifactSummaryEmbeddingWorkflow",
                 str(artifact_id),
                 id=workflow_id,
@@ -312,7 +316,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         workflow_id = f"doc-metadata-{artifact_id}"
 
         try:
-            await self._client.start_workflow(
+            await self._start_workflow(
                 "DocumentMetadataExtractionWorkflow",
                 args=[str(artifact_id), str(page_id)],
                 id=workflow_id,
@@ -341,7 +345,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         workflow_id = f"ner-extraction-{page_id}"
 
         try:
-            await self._client.start_workflow(
+            await self._start_workflow(
                 "NERExtractionWorkflow",
                 str(page_id),
                 id=workflow_id,
@@ -365,7 +369,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         workflow_id = f"artifact-tag-aggregation-{artifact_id}"
 
         try:
-            await self._client.start_workflow(
+            await self._start_workflow(
                 "ArtifactTagAggregationWorkflow",
                 str(artifact_id),
                 id=workflow_id,
@@ -392,7 +396,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         workflow_id = f"batch-reembed-{artifact_id}"
 
         try:
-            await self._client.start_workflow(
+            await self._start_workflow(
                 "BatchReEmbedArtifactPagesWorkflow",
                 str(artifact_id),
                 id=workflow_id,
@@ -420,7 +424,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         workflow_id = f"artifact-parse-{artifact_id}"
 
         try:
-            await self._client.start_workflow(
+            await self._start_workflow(
                 "ParseArtifactWorkflow",
                 str(artifact_id),
                 id=workflow_id,
@@ -446,7 +450,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         workflow_id = f"batch-reembed-smiles-{artifact_id}"
 
         try:
-            await self._client.start_workflow(
+            await self._start_workflow(
                 "BatchReEmbedSmilesWorkflow",
                 str(artifact_id),
                 id=workflow_id,
@@ -476,7 +480,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         workflow_id = f"batch-reembed-summaries-{artifact_id}"
 
         try:
-            await self._client.start_workflow(
+            await self._start_workflow(
                 "BatchReEmbedSummariesWorkflow",
                 str(artifact_id),
                 id=workflow_id,
@@ -538,6 +542,14 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         page_ids: list[UUID],
     ) -> dict[str, TemporalWorkflowInfo]:
         return await self.get_workflow_statuses(pipeline_workflow_ids(artifact_id, page_ids))
+
+    async def _start_workflow(self, *args: Any, id: str, **kwargs: Any) -> None:  # noqa: A002 — mirrors temporalio's kwarg
+        """Every workflow start funnels through here so a subscriber (the status
+        cache) learns which id was just (re)started.
+        """
+        await self._client.start_workflow(*args, id=id, **kwargs)
+        if self.on_workflow_started is not None:
+            await self.on_workflow_started(id)
 
     async def _query_workflow_statuses(
         self,

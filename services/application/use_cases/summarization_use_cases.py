@@ -10,6 +10,7 @@ from returns.result import Failure, Result, Success
 from application.dtos.errors import AppError
 from application.mappers.artifact_mappers import ArtifactMapper
 from application.mappers.page_mappers import PageMapper
+from application.services.aggregate_commit import commit
 from application.services.llm_scope import owner_scope
 from application.services.usage_recording import ingestion_counter, record_ingestion_usage
 from domain.exceptions import AggregateNotFoundError, ConcurrencyError, LLMError, ValidationError
@@ -28,6 +29,8 @@ if TYPE_CHECKING:
     from application.ports.repositories.page_repository import PageRepository
     from application.ports.token_usage_store import TokenUsageStore
     from application.services.llm_scope import UserLLMScope
+    from domain.aggregates.artifact import Artifact
+    from domain.aggregates.page import Page
 
 log = structlog.get_logger(__name__)
 
@@ -171,9 +174,13 @@ class SummarizePageUseCase:
                 is_locked=False,
                 hil_correction=None,
             )
-            page.update_summary_candidate(candidate)
 
-            self.page_repository.save(page)
+            # Reload right before the write: the LLM call above left our copy stale.
+            def apply_summary(fresh_page: Page) -> bool:
+                fresh_page.update_summary_candidate(candidate)
+                return True
+
+            page = commit(self.page_repository, page_id, apply_summary) or page
             result = PageMapper.to_page_response(page)
 
             if self.external_event_publisher:
@@ -327,9 +334,13 @@ class SummarizeArtifactUseCase:
                 is_locked=False,
                 hil_correction=None,
             )
-            artifact.update_summary_candidate(candidate)
-            self.artifact_repository.save(artifact)
 
+            # Reload right before the write: the LLM calls above left our copy stale.
+            def apply_summary(fresh: Artifact) -> bool:
+                fresh.update_summary_candidate(candidate)
+                return True
+
+            artifact = commit(self.artifact_repository, artifact_id, apply_summary) or artifact
             result = ArtifactMapper.to_artifact_response(artifact)
 
             if self.external_event_publisher:

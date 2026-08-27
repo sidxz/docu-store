@@ -39,6 +39,13 @@ class LLMAuthError(LLMError):
     """The provider rejected our credentials or billing (HTTP 401/402/403)."""
 
 
+class LLMBadRequestError(LLMError):
+    """The provider rejected the request itself (HTTP 4xx other than auth or
+    rate-limit): unknown model, unsupported parameter combination, oversize input.
+    Deterministic, so never retried.
+    """
+
+
 class LLMRateLimitedError(LLMError):
     """The provider rate-limited the call (HTTP 429) — worth retrying."""
 
