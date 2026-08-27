@@ -20,17 +20,28 @@ def test_reviewed_filter_keys_on_the_correction_existing():
     assert "compound_mentions" not in query
 
 
-def test_reviewed_filter_scopes_to_the_workspace_and_skips_deleted():
+def test_reviewed_filter_scopes_to_the_workspace():
     query = build_cser_export_query(WORKSPACE, only_reviewed=True, since=None)
 
     assert query["workspace_id"] == str(WORKSPACE)
-    assert query["is_deleted"] == {"$ne": True}
+    # No is_deleted clause: deletion is a hard delete_one on the read model,
+    # so a deleted page is already absent from the collection. A filter term
+    # on a field that never exists would just be dead weight.
+    assert "is_deleted" not in query
 
 
-def test_since_filters_on_the_correction_timestamp():
+def test_since_filters_on_the_correction_timestamp_as_an_iso_string():
     query = build_cser_export_query(WORKSPACE, only_reviewed=True, since=SINCE)
 
-    assert query["human_corrections.compound_mentions.corrected_at"] == {"$gte": SINCE}
+    # corrected_at is stored by the projector as `.isoformat()` — a STRING,
+    # not a BSON date. Mongo never equates a date to a string, so comparing
+    # with a raw datetime here would silently match zero documents. Do NOT
+    # "helpfully" change this back to `SINCE` (a datetime) — ISO-8601 sorts
+    # lexicographically in chronological order, so the string form is
+    # correct for $gte, and the raw-datetime form is the bug this guards.
+    value = query["human_corrections.compound_mentions.corrected_at"]
+    assert value == {"$gte": SINCE.isoformat()}
+    assert isinstance(value["$gte"], str)
 
 
 def test_since_is_ignored_when_not_filtering_to_reviewed_pages():
