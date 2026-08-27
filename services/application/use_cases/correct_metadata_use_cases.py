@@ -77,6 +77,32 @@ def _merge_authors(existing: list[AuthorMention], submitted: list[str]) -> list[
     return merged
 
 
+def _mention_identity(
+    smiles: str,
+    extracted_id: str | None,
+    internal_id: str | None,
+    cdd_id: str | None,
+    chembl_id: str | None,
+    pdb_id: str | None,
+    structure_bbox: list[int] | None,
+    label_bbox: list[int] | None,
+) -> tuple:
+    """Identity key for round-trip-vs-rebuild dedupe. Boxes participate: a box-only
+    edit (same SMILES/ids, moved/resized box) must NOT match the existing mention,
+    or the edit is silently discarded. Lists aren't hashable, so tuple-ify.
+    """
+    return (
+        smiles,
+        extracted_id,
+        internal_id,
+        cdd_id,
+        chembl_id,
+        pdb_id,
+        tuple(structure_bbox) if structure_bbox else None,
+        tuple(label_bbox) if label_bbox else None,
+    )
+
+
 class CorrectArtifactMetadataUseCase:
     """hiledit: apply human corrections to artifact metadata with provenance."""
 
@@ -188,22 +214,29 @@ class CorrectPageCompoundMentionsUseCase:
         # Round-trip an unchanged mention verbatim so its machine provenance
         # (confidence/model_name/pipeline_run_id/other_ids/date_extracted) survives
         # a correction that only touches a *sibling* mention. Identity keyed on the
-        # human-editable fields the client can send.
+        # human-editable fields the client can send, including the boxes: a
+        # box-only edit must fall through to a fresh CompoundMention, not be
+        # silently discarded by round-tripping the old one.
         by_key = {
-            (m.smiles, m.extracted_id, m.internal_id, m.cdd_id, m.chembl_id, m.pdb_id): m
+            _mention_identity(
+                m.smiles, m.extracted_id, m.internal_id, m.cdd_id, m.chembl_id, m.pdb_id,
+                m.structure_bbox, m.label_bbox,
+            ): m
             for m in page.compound_mentions
         }
         now = datetime.now(UTC)
         mentions: list[CompoundMention] = []
         for item in request.compound_mentions:
             existing = by_key.get(
-                (
+                _mention_identity(
                     item.smiles,
                     item.extracted_id,
                     item.internal_id,
                     item.cdd_id,
                     item.chembl_id,
                     item.pdb_id,
+                    item.structure_bbox,
+                    item.label_bbox,
                 ),
             )
             if existing is not None:

@@ -398,3 +398,52 @@ class TestCorrectPageCompoundMentionsUseCase:
         mention = fake_page_repo.get_by_id(page.id).compound_mentions[0]
         assert mention.structure_bbox == [10, 20, 110, 220]
         assert mention.label_bbox is None
+
+    @pytest.mark.asyncio
+    async def test_box_only_edit_is_not_discarded(
+        self,
+        fake_page_repo: MockPageRepository,
+        smiles_validator: FakeSmilesValidator,
+        auth_editor: FakeAuth,
+    ) -> None:
+        """Moving/resizing a box with SMILES and label unchanged must still persist.
+
+        Regression: the round-trip identity key used to ignore the boxes, so a
+        resubmission with the same smiles/extracted_id matched the *old* mention
+        and round-tripped it verbatim — silently discarding the reviewer's box edit.
+        """
+        page = Page.create(name="Page 1", artifact_id=uuid4(), index=0)
+        mention = CompoundMention(
+            smiles="c1ccccc1",
+            canonical_smiles="c1ccccc1",
+            is_smiles_valid=True,
+            extracted_id="A1",
+            structure_bbox=[10, 20, 110, 220],
+            label_bbox=[10, 230, 60, 250],
+        )
+        page.update_compound_mentions([mention])
+        fake_page_repo.save(page)
+
+        uc = CorrectPageCompoundMentionsUseCase(
+            page_repository=fake_page_repo,
+            smiles_validator=smiles_validator,
+        )
+
+        result = await uc.execute(
+            page_id=page.id,
+            request=CorrectPageCompoundMentionsRequest(
+                compound_mentions=[
+                    CorrectedCompoundInput(
+                        smiles="c1ccccc1",
+                        extracted_id="A1",
+                        structure_bbox=[500, 600, 700, 800],  # moved
+                        label_bbox=[10, 230, 60, 250],  # unchanged
+                    ),
+                ],
+            ),
+            auth=auth_editor,
+        )
+
+        assert isinstance(result, Success)
+        saved = fake_page_repo.get_by_id(page.id).compound_mentions[0]
+        assert saved.structure_bbox == [500, 600, 700, 800]
