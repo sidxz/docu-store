@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import datetime
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 
@@ -96,6 +97,15 @@ class FakePageReadModel(PageReadModel):
         workspace_id: UUID | None = None,
     ) -> list[PageResponse]:
         return [p for p in self._pages.values() if p.artifact_id in artifact_ids]
+
+    async def get_pages_for_cser_export(
+        self,
+        workspace_id: UUID,
+        *,
+        only_reviewed: bool,
+        since: datetime | None,
+    ) -> list[dict]:
+        return []
 
 
 class FakeUserPreferencesStore(UserPreferencesStore):

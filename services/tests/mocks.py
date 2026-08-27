@@ -556,6 +556,15 @@ class MockPageReadModel:
             and getattr(p, "summary_candidate", None)
         )
 
+    async def get_pages_for_cser_export(
+        self,
+        workspace_id: UUID,
+        *,
+        only_reviewed: bool,
+        since: Any = None,
+    ) -> list:
+        return list(self._pages.values())
+
 
 class MockArtifactReadModel:
     """Mock implementation of ArtifactReadModel."""

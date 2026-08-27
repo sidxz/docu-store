@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from datetime import datetime
 from uuid import UUID
 
 from application.dtos.page_dtos import PageResponse
@@ -32,3 +33,19 @@ class PageReadModel(ABC):
         workspace_id: UUID | None = None,
     ) -> list[PageResponse]:
         """Return pages belonging to the given artifacts, sorted by index."""
+
+    @abstractmethod
+    async def get_pages_for_cser_export(
+        self,
+        workspace_id: UUID,
+        *,
+        only_reviewed: bool,
+        since: datetime | None,
+    ) -> list[dict]:
+        """Pages whose compound annotations should go into a training export.
+
+        ``only_reviewed`` (the default for the endpoint) means a human signed
+        off: ``human_corrections.compound_mentions`` exists. That includes
+        pages corrected to an EMPTY list — a reviewed negative, which the
+        detector needs as much as a positive.
+        """

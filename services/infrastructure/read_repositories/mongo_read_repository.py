@@ -21,6 +21,7 @@ from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.tag_browse_read_model import TagBrowseReadModel
 from application.ports.repositories.tag_dictionary_read_model import TagDictionaryReadModel
 from infrastructure.config import Settings
+from infrastructure.read_repositories.cser_export_query import build_cser_export_query
 
 _dashboard_cache: dict[tuple, tuple[float, DashboardStatsResponse]] = {}
 _DASHBOARD_CACHE_TTL = 60.0  # seconds
@@ -113,6 +114,16 @@ class MongoReadRepository(
             doc["page_id"] = doc.get("page_id") or str(doc.pop("_id"))
             pages.append(PageResponse(**doc))
         return pages
+
+    async def get_pages_for_cser_export(
+        self,
+        workspace_id: UUID,
+        *,
+        only_reviewed: bool,
+        since: datetime | None,
+    ) -> list[dict]:
+        query = build_cser_export_query(workspace_id, only_reviewed=only_reviewed, since=since)
+        return [doc async for doc in self.pages.find(query)]
 
     async def get_artifact_by_id(
         self,
