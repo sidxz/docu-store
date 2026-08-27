@@ -37,7 +37,7 @@ from application.use_cases.artifact_use_cases import (
 )
 from application.use_cases.correct_metadata_use_cases import CorrectArtifactMetadataUseCase
 from application.use_cases.processing_artifacts_use_case import ListProcessingArtifactsUseCase
-from application.use_cases.storage_keys import render_pdf_key
+from application.use_cases.storage_keys import cser_render_key, render_pdf_key
 from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.summary_candidate import SummaryCandidate
 from interfaces.api.middleware import handle_use_case_errors
@@ -399,34 +399,33 @@ async def stream_artifact_pdf(
     )
 
 
-@router.get("/{artifact_id}/pages/{page_index}/image", status_code=status.HTTP_200_OK)
-async def stream_page_image(
+def resolve_page_image(
+    blob_store: BlobStore,
     artifact_id: UUID,
     page_index: int,
-    container: Annotated[Container, Depends(get_container)],
-    auth: Annotated[RequestAuth, Depends(get_auth)],
-    size: Annotated[str | None, Query(description="'thumb' for lightweight JPEG thumbnail")] = None,
-) -> StreamingResponse:
-    """Stream the rendered page image for a specific page of an artifact.
+    size: str | None,
+) -> tuple[bytes, str]:
+    """Pick which stored render to serve for a page, and its media type.
 
-    Returns the pre-rendered page image from blob storage. Page images
-    are generated during PDF ingestion. Pass ?size=thumb for a lightweight
-    JPEG thumbnail (~200px wide) suitable for table/list views.
+    ``cser`` never falls back to the docling render: compound bounding boxes
+    are pixels of the CSER render specifically, so serving a different image
+    would place every box wrongly. A missing CSER render is a 404 the client
+    handles by offering to re-run extraction.
     """
-    await require_workspace_artifact(artifact_id, auth, container)
-    await require_artifact_permission(artifact_id, auth, "view")
-    blob_store = container[BlobStore]
+    if size == "cser":
+        cser_key = cser_render_key(artifact_id, page_index)
+        if not blob_store.exists(cser_key):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No CSER render for this page — re-run compound extraction",
+            )
+        return blob_store.get_bytes(cser_key), "image/png"
 
-    # Try thumbnail first if requested
     if size == "thumb":
         thumb_key = f"artifacts/{artifact_id}/pages/{page_index}_thumb.jpg"
         if blob_store.exists(thumb_key):
-            thumb_bytes = blob_store.get_bytes(thumb_key)
-            return StreamingResponse(
-                BytesIO(thumb_bytes),
-                media_type="image/jpeg",
-            )
-        # Fall through to full PNG if thumbnail doesn't exist
+            return blob_store.get_bytes(thumb_key), "image/jpeg"
+        # Fall through to the full PNG if no thumbnail was generated.
 
     image_key = f"artifacts/{artifact_id}/pages/{page_index}.png"
 
@@ -436,12 +435,37 @@ async def stream_page_image(
             detail=f"Page image not found for index {page_index}",
         )
 
-    image_bytes = blob_store.get_bytes(image_key)
+    return blob_store.get_bytes(image_key), "image/png"
 
-    return StreamingResponse(
-        BytesIO(image_bytes),
-        media_type="image/png",
-    )
+
+@router.get("/{artifact_id}/pages/{page_index}/image", status_code=status.HTTP_200_OK)
+async def stream_page_image(
+    artifact_id: UUID,
+    page_index: int,
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+    size: Annotated[
+        str | None,
+        Query(
+            description="'thumb' for a lightweight JPEG thumbnail, "
+            "'cser' for the render compound coordinates refer to"
+        ),
+    ] = None,
+) -> StreamingResponse:
+    """Stream the rendered page image for a specific page of an artifact.
+
+    Returns the pre-rendered page image from blob storage. Page images
+    are generated during PDF ingestion. Pass ?size=thumb for a lightweight
+    JPEG thumbnail (~200px wide) suitable for table/list views, or
+    ?size=cser for the exact render CSER compound bounding boxes are pixel
+    coordinates of (404s if that render is missing rather than falling back
+    to the docling page render, which is a different scale).
+    """
+    await require_workspace_artifact(artifact_id, auth, container)
+    await require_artifact_permission(artifact_id, auth, "view")
+    blob_store = container[BlobStore]
+    content, media_type = resolve_page_image(blob_store, artifact_id, page_index, size)
+    return StreamingResponse(BytesIO(content), media_type=media_type)
 
 
 # ---------------------------------------------------------------------------
