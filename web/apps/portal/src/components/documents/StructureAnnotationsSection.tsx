@@ -423,6 +423,22 @@ export function StructureAnnotationsSection({
     label_bbox: m.label_bbox ?? null,
   });
 
+  // Every correction here is a HUMAN assertion about what is printed on the page, and it
+  // is only truthful about a page the human can actually see. With no render there is
+  // nothing to see, so all FOUR write paths — approve, markEmpty, save, and entering edit
+  // mode at all — are blind, and the empty one is a trap: "No compounds on this page" (or
+  // a draft emptied card-by-card and saved, which is byte-identical) on a never-analysed
+  // page exports that page as a confirmed negative — a sheet full of molecules teaching
+  // the detector there is nothing there — and sets `human_corrections.compound_mentions`,
+  // after which the extraction guard means a re-run can only re-render, never re-detect.
+  // Blocked until the image is on screen; stated as text because browsers swallow `title`
+  // on a disabled button.
+  const blindReason = error
+    ? "No page render — run compound extraction first; you can't confirm what you can't see."
+    : !blobUrl
+      ? "Waiting for the page render…"
+      : null;
+
   const approve = () => correct.mutateAsync({ compound_mentions: compounds.map(toInput) });
 
   const markEmpty = () => correct.mutateAsync({ compound_mentions: [] });
@@ -446,7 +462,13 @@ export function StructureAnnotationsSection({
   };
 
   const save = async () => {
-    if (!working) return;
+    // Guarded by the button's disabled state; re-checked because the render can disappear
+    // while a draft lives on. `editing`/`working` are plain state and nothing resets them:
+    // collapsing the card sets the blob URL argument to "" and drops `blobUrl` to null,
+    // re-expanding does not unmount, and the per-card delete X is driven by `working`
+    // alone — so a draft can be emptied and saved with no image on screen, which is the
+    // same permanent false negative `markEmpty` is blocked from writing.
+    if (!working || blindReason) return;
     await correct.mutateAsync({ compound_mentions: working.map(toInput) });
     setEditing(false);
     resetDraft();
@@ -535,20 +557,6 @@ export function StructureAnnotationsSection({
     setDrawMode(null);
   };
 
-  // Every correction here is a HUMAN assertion about what is printed on the page, and it
-  // is only truthful about a page the human can actually see. With no render there is
-  // nothing to see, so all three write paths are blind — and the empty one is a trap:
-  // "No compounds on this page" on a never-analysed page exports that page as a confirmed
-  // negative (a sheet full of molecules teaching the detector there is nothing there) and
-  // sets `human_corrections.compound_mentions`, after which the extraction guard means a
-  // re-run can only re-render, never re-detect. Blocked until the image is on screen;
-  // stated as text because browsers swallow `title` on a disabled button.
-  const blindReason = error
-    ? "No page render — run compound extraction first; you can't confirm what you can't see."
-    : !blobUrl
-      ? "Waiting for the page render…"
-      : null;
-
   // "Add label" attaches to a selection, so it has two ways of being unavailable. Both
   // are rendered as text next to the button — a greyed-out button with no stated reason
   // reads as broken.
@@ -612,7 +620,11 @@ export function StructureAnnotationsSection({
                   </>
                 ) : (
                   <>
-                    <Button size="sm" onClick={save} disabled={correct.isPending}>
+                    <Button
+                      size="sm"
+                      onClick={save}
+                      disabled={correct.isPending || blindReason !== null}
+                    >
                       Save changes
                     </Button>
                     <Button
@@ -638,6 +650,11 @@ export function StructureAnnotationsSection({
                     <Button size="sm" variant="ghost" onClick={toggleEditing} disabled={correct.isPending}>
                       Cancel editing
                     </Button>
+                    {blindReason && (
+                      <span className="text-xs text-text-muted">
+                        {blindReason} Your edits are still here — nothing is lost.
+                      </span>
+                    )}
                     {labelDrawBlocked && (
                       <span className="text-xs text-text-muted">{labelDrawBlocked}</span>
                     )}
