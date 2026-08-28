@@ -71,9 +71,25 @@ function clampToImage(bbox: number[], w: number, h: number): number[] {
   ];
 }
 
+/** Which of a pair's two boxes a gesture is acting on — YOLO class 0 vs class 1. */
+type BoxKind = "structure" | "label";
+/** null = not drawing; otherwise the class of box the next drag creates. */
+type DrawMode = BoxKind | null;
+
+const STRUCTURE_COLOR = "#22c55e";
+const LABEL_COLOR = "#3b82f6";
+
 type DragState =
-  | { kind: "move"; srcIndex: number; startX: number; startY: number; startBbox: number[]; moved: boolean }
-  | { kind: "resize"; srcIndex: number; startBbox: number[] };
+  | {
+      kind: "move";
+      srcIndex: number;
+      box: BoxKind;
+      startX: number;
+      startY: number;
+      startBbox: number[];
+      moved: boolean;
+    }
+  | { kind: "resize"; srcIndex: number; box: BoxKind; startBbox: number[] };
 
 function BoxOverlay({
   mentions,
@@ -84,6 +100,7 @@ function BoxOverlay({
   drawMode,
   pairSource,
   onStructureChange,
+  onLabelChange,
   onStructureClick,
   onLabelClick,
   onDraw,
@@ -93,9 +110,10 @@ function BoxOverlay({
   activeIndex: number | null;
   onHover: (i: number | null) => void;
   editing: boolean;
-  drawMode: boolean;
+  drawMode: DrawMode;
   pairSource: number | null;
   onStructureChange: (srcIndex: number, bbox: number[]) => void;
+  onLabelChange: (srcIndex: number, bbox: number[]) => void;
   onStructureClick: (srcIndex: number) => void;
   onLabelClick: (srcIndex: number) => void;
   onDraw: (bbox: number[]) => void;
@@ -104,29 +122,40 @@ function BoxOverlay({
   const drawStartRef = useRef<{ x: number; y: number } | null>(null);
   const [drawBox, setDrawBox] = useState<number[] | null>(null);
 
-  const startStructureDrag = (
+  /** Both box classes share one drag machine; `box` only picks which setter commits. */
+  const startBoxDrag = (
     e: React.PointerEvent<SVGRectElement>,
     srcIndex: number,
+    box: BoxKind,
     bbox: number[],
   ) => {
-    if (!editing || drawMode) return;
+    if (!editing || drawMode !== null) return;
     e.preventDefault();
     const svg = e.currentTarget.ownerSVGElement;
     const p = svg && toRenderPixels(e, svg);
     if (!p) return;
     e.currentTarget.setPointerCapture(e.pointerId);
-    dragRef.current = { kind: "move", srcIndex, startX: p.x, startY: p.y, startBbox: bbox, moved: false };
+    dragRef.current = {
+      kind: "move",
+      srcIndex,
+      box,
+      startX: p.x,
+      startY: p.y,
+      startBbox: bbox,
+      moved: false,
+    };
   };
 
   const startResizeDrag = (
     e: React.PointerEvent<SVGRectElement>,
     srcIndex: number,
+    box: BoxKind,
     bbox: number[],
   ) => {
-    if (!editing || drawMode) return;
+    if (!editing || drawMode !== null) return;
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
-    dragRef.current = { kind: "resize", srcIndex, startBbox: bbox };
+    dragRef.current = { kind: "resize", srcIndex, box, startBbox: bbox };
   };
 
   const handleRectPointerMove = (e: React.PointerEvent<SVGRectElement>) => {
@@ -135,32 +164,36 @@ function BoxOverlay({
     const svg = e.currentTarget.ownerSVGElement;
     const p = svg && toRenderPixels(e, svg);
     if (!p) return;
+    const commit = drag.box === "label" ? onLabelChange : onStructureChange;
     if (drag.kind === "move") {
       const dx = p.x - drag.startX;
       const dy = p.y - drag.startY;
       if (Math.abs(dx) > 2 || Math.abs(dy) > 2) drag.moved = true;
       const [x1, y1, x2, y2] = drag.startBbox;
-      onStructureChange(
-        drag.srcIndex,
-        clampToImage([x1 + dx, y1 + dy, x2 + dx, y2 + dy], natural.w, natural.h),
-      );
+      commit(drag.srcIndex, clampToImage([x1 + dx, y1 + dy, x2 + dx, y2 + dy], natural.w, natural.h));
     } else {
       const [x1, y1] = drag.startBbox;
-      onStructureChange(drag.srcIndex, clampToImage([x1, y1, p.x, p.y], natural.w, natural.h));
+      commit(drag.srcIndex, clampToImage([x1, y1, p.x, p.y], natural.w, natural.h));
     }
   };
 
+  /** A press that never travelled more than the 2px slop is a click, not a drag — that is
+   *  the ONLY place either click fires. Label boxes deliberately carry no `onClick`: routing
+   *  their click-to-re-pair through this same gate is what stops a label drag from arming or
+   *  committing a re-pair on the way past. */
   const handleRectPointerUp = (e: React.PointerEvent<SVGRectElement>) => {
     const drag = dragRef.current;
     dragRef.current = null;
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
-    if (drag?.kind === "move" && !drag.moved) onStructureClick(drag.srcIndex);
+    if (drag?.kind === "move" && !drag.moved) {
+      (drag.box === "label" ? onLabelClick : onStructureClick)(drag.srcIndex);
+    }
   };
 
   const handleBackgroundPointerDown = (e: React.PointerEvent<SVGRectElement>) => {
-    if (!editing || !drawMode) return;
+    if (!editing || drawMode === null) return;
     e.preventDefault();
     const svg = e.currentTarget.ownerSVGElement;
     const p = svg && toRenderPixels(e, svg);
@@ -211,7 +244,7 @@ function BoxOverlay({
         width={natural.w}
         height={natural.h}
         fill="transparent"
-        style={{ pointerEvents: editing && drawMode ? "auto" : "none", cursor: "crosshair" }}
+        style={{ pointerEvents: editing && drawMode !== null ? "auto" : "none", cursor: "crosshair" }}
         onPointerDown={handleBackgroundPointerDown}
         onPointerMove={handleBackgroundPointerMove}
         onPointerUp={handleBackgroundPointerUp}
@@ -228,7 +261,7 @@ function BoxOverlay({
           <g
             key={i}
             className="cursor-pointer"
-            style={{ pointerEvents: editing && drawMode ? "none" : "auto" }}
+            style={{ pointerEvents: editing && drawMode !== null ? "none" : "auto" }}
             onMouseEnter={() => onHover(i)}
             onMouseLeave={() => onHover(null)}
             opacity={activeIndex === null || active ? 1 : 0.35}
@@ -239,11 +272,11 @@ function BoxOverlay({
               width={sx2 - sx1}
               height={sy2 - sy1}
               fill="none"
-              stroke="#22c55e"
+              stroke={STRUCTURE_COLOR}
               strokeWidth={active ? stroke * 2 : stroke}
               strokeDasharray={isPairSource ? `${stroke * 2} ${stroke}` : undefined}
               style={{ cursor: editing ? "move" : "pointer" }}
-              onPointerDown={(e) => startStructureDrag(e, m.__srcIndex, [sx1, sy1, sx2, sy2])}
+              onPointerDown={(e) => startBoxDrag(e, m.__srcIndex, "structure", [sx1, sy1, sx2, sy2])}
               onPointerMove={handleRectPointerMove}
               onPointerUp={handleRectPointerUp}
             />
@@ -253,9 +286,9 @@ function BoxOverlay({
                 y={sy2 - handleSize / 2}
                 width={handleSize}
                 height={handleSize}
-                fill="#22c55e"
+                fill={STRUCTURE_COLOR}
                 style={{ cursor: "nwse-resize" }}
-                onPointerDown={(e) => startResizeDrag(e, m.__srcIndex, [sx1, sy1, sx2, sy2])}
+                onPointerDown={(e) => startResizeDrag(e, m.__srcIndex, "structure", [sx1, sy1, sx2, sy2])}
                 onPointerMove={handleRectPointerMove}
                 onPointerUp={handleRectPointerUp}
               />
@@ -268,11 +301,35 @@ function BoxOverlay({
                   width={label[2] - label[0]}
                   height={label[3] - label[1]}
                   fill="none"
-                  stroke="#3b82f6"
+                  stroke={LABEL_COLOR}
                   strokeWidth={active ? stroke * 2 : stroke}
-                  style={{ cursor: editing && !drawMode ? "pointer" : "default" }}
-                  onClick={() => editing && !drawMode && onLabelClick(m.__srcIndex)}
+                  style={{ cursor: editing ? "move" : "default" }}
+                  onPointerDown={(e) =>
+                    startBoxDrag(e, m.__srcIndex, "label", [label[0], label[1], label[2], label[3]])
+                  }
+                  onPointerMove={handleRectPointerMove}
+                  onPointerUp={handleRectPointerUp}
                 />
+                {editing && (
+                  <rect
+                    x={label[2] - handleSize / 2}
+                    y={label[3] - handleSize / 2}
+                    width={handleSize}
+                    height={handleSize}
+                    fill={LABEL_COLOR}
+                    style={{ cursor: "nwse-resize" }}
+                    onPointerDown={(e) =>
+                      startResizeDrag(e, m.__srcIndex, "label", [
+                        label[0],
+                        label[1],
+                        label[2],
+                        label[3],
+                      ])
+                    }
+                    onPointerMove={handleRectPointerMove}
+                    onPointerUp={handleRectPointerUp}
+                  />
+                )}
                 <line
                   x1={(sx1 + sx2) / 2}
                   y1={(sy1 + sy2) / 2}
@@ -281,6 +338,8 @@ function BoxOverlay({
                   stroke="#f97316"
                   strokeWidth={stroke}
                   strokeDasharray={`${stroke * 3} ${stroke * 2}`}
+                  /* Decorative: never let the connector swallow a press meant for a box handle. */
+                  style={{ pointerEvents: "none" }}
                 />
               </>
             )}
@@ -294,8 +353,8 @@ function BoxOverlay({
           y={drawBox[1]}
           width={drawBox[2] - drawBox[0]}
           height={drawBox[3] - drawBox[1]}
-          fill="rgba(34,197,94,0.15)"
-          stroke="#22c55e"
+          fill={drawMode === "label" ? "rgba(59,130,246,0.15)" : "rgba(34,197,94,0.15)"}
+          stroke={drawMode === "label" ? LABEL_COLOR : STRUCTURE_COLOR}
           strokeDasharray="4 3"
         />
       )}
@@ -321,9 +380,11 @@ export function StructureAnnotationsSection({
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [editing, setEditing] = useState(false);
   const [working, setWorking] = useState<CompoundMention[] | null>(null);
-  const [drawMode, setDrawMode] = useState(false);
+  const [drawMode, setDrawMode] = useState<DrawMode>(null);
   const [pairSource, setPairSource] = useState<number | null>(null);
   const [pendingDrawBbox, setPendingDrawBbox] = useState<number[] | null>(null);
+  /** srcIndex whose label text is being edited — the words inside its label box. */
+  const [pendingLabelIndex, setPendingLabelIndex] = useState<number | null>(null);
   const { blobUrl, error } = useAuthBlobUrl(
     expanded ? `${API_URL}/artifacts/${artifactId}/pages/${pageIndex}/image?size=cser` : "",
   );
@@ -363,9 +424,10 @@ export function StructureAnnotationsSection({
 
   const resetDraft = () => {
     setWorking(null);
-    setDrawMode(false);
+    setDrawMode(null);
     setPairSource(null);
     setPendingDrawBbox(null);
+    setPendingLabelIndex(null);
   };
 
   const toggleEditing = () => {
@@ -385,8 +447,16 @@ export function StructureAnnotationsSection({
     resetDraft();
   };
 
+  /** Every committed box lands here, and only here, already normalised + clamped by
+   *  `clampToImage` at the gesture end that produced it. */
+  const setBox = (srcIndex: number, key: "structure_bbox" | "label_bbox", bbox: number[]) =>
+    setWorking((prev) => prev && prev.map((m, i) => (i === srcIndex ? { ...m, [key]: bbox } : m)));
+
   const handleStructureChange = (srcIndex: number, bbox: number[]) =>
-    setWorking((prev) => prev && prev.map((m, i) => (i === srcIndex ? { ...m, structure_bbox: bbox } : m)));
+    setBox(srcIndex, "structure_bbox", bbox);
+
+  const handleLabelChange = (srcIndex: number, bbox: number[]) =>
+    setBox(srcIndex, "label_bbox", bbox);
 
   const handleStructureClick = (srcIndex: number) =>
     setPairSource((prev) => (prev === srcIndex ? null : srcIndex));
@@ -429,12 +499,46 @@ export function StructureAnnotationsSection({
   const handleDelete = (srcIndex: number) => {
     setWorking((prev) => prev && prev.filter((_, i) => i !== srcIndex));
     setPairSource(null);
+    setPendingLabelIndex(null);
   };
 
+  /** Drop only the caption, keep the structure: `label_bbox: null` is a first-class
+   *  annotation the training format allows, and a structure whose caption genuinely
+   *  isn't printed on the page must be expressible without deleting the pair.
+   *  The text goes with the box for the same reason the re-pair swap carries it —
+   *  `extracted_id` is exported as `label_text`, the words inside that rectangle, so
+   *  keeping it would ship a caption that owns no box. */
+  const handleDeleteLabel = (srcIndex: number) =>
+    setWorking(
+      (prev) =>
+        prev &&
+        prev.map((m, i) => (i === srcIndex ? { ...m, label_bbox: null, extracted_id: null } : m)),
+    );
+
   const handleDraw = (bbox: number[]) => {
-    setPendingDrawBbox(bbox);
-    setDrawMode(false);
+    if (drawMode === "label") {
+      // Guarded by the button's disabled state; re-checked because state could have
+      // moved between arming the mode and finishing the drag.
+      if (pairSource !== null) {
+        setBox(pairSource, "label_bbox", bbox);
+        // A box with no words teaches the relation matcher nothing — ask for the text now.
+        setPendingLabelIndex(pairSource);
+      }
+    } else {
+      setPendingDrawBbox(bbox);
+    }
+    setDrawMode(null);
   };
+
+  // "Add label" attaches to a selection, so it has two ways of being unavailable. Both
+  // are rendered as text next to the button — a greyed-out button with no stated reason
+  // reads as broken.
+  const labelDrawBlocked =
+    pairSource === null
+      ? "Click a structure box first — the new label attaches to it."
+      : source[pairSource]?.label_bbox
+        ? "That structure already has a label box. Remove it first, or drag the existing one."
+        : null;
 
   return (
     <>
@@ -477,14 +581,30 @@ export function StructureAnnotationsSection({
                     </Button>
                     <Button
                       size="sm"
-                      variant={drawMode ? "default" : "outline"}
-                      onClick={() => setDrawMode((v) => !v)}
+                      variant={drawMode === "structure" ? "default" : "outline"}
+                      onClick={() => setDrawMode((v) => (v === "structure" ? null : "structure"))}
+                      title="Draw a new structure box and give it a SMILES"
                     >
-                      {drawMode ? "Drawing — drag on image" : "Add pair"}
+                      {drawMode === "structure" ? "Drawing structure — drag on image" : "Add structure"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={drawMode === "label" ? "default" : "outline"}
+                      onClick={() => setDrawMode((v) => (v === "label" ? null : "label"))}
+                      disabled={labelDrawBlocked !== null}
+                      title={
+                        labelDrawBlocked ??
+                        "Draw the caption box for the selected structure, then type its text"
+                      }
+                    >
+                      {drawMode === "label" ? "Drawing label — drag on image" : "Add label"}
                     </Button>
                     <Button size="sm" variant="ghost" onClick={toggleEditing} disabled={correct.isPending}>
                       Cancel editing
                     </Button>
+                    {labelDrawBlocked && (
+                      <span className="text-xs text-text-muted">{labelDrawBlocked}</span>
+                    )}
                   </>
                 )}
               </div>
@@ -529,6 +649,7 @@ export function StructureAnnotationsSection({
                       drawMode={drawMode}
                       pairSource={pairSource}
                       onStructureChange={handleStructureChange}
+                      onLabelChange={handleLabelChange}
                       onStructureClick={handleStructureClick}
                       onLabelClick={handleLabelClick}
                       onDraw={handleDraw}
@@ -554,16 +675,31 @@ export function StructureAnnotationsSection({
                     {editing && (
                       <button
                         type="button"
-                        aria-label="Delete pair"
+                        aria-label="Delete this whole pair — structure and label"
+                        title="Delete this whole pair — structure and label"
                         onClick={() => handleDelete(m.__srcIndex)}
                         className="absolute right-2 top-2 rounded-sm p-0.5 text-text-muted opacity-0 transition-opacity hover:text-ds-error group-hover/ann:opacity-100"
                       >
                         <X className="size-3.5" />
                       </button>
                     )}
-                    <div className="text-sm font-medium text-text-primary">
-                      {m.extracted_id ?? "unlabelled"}
-                    </div>
+                    {/* Only a pair that HAS a label box can have label text: the words belong to
+                        the rectangle, so no rectangle means nothing to type. This is also the way
+                        back in if the dialog was dismissed right after drawing the box. */}
+                    {editing && m.label_bbox ? (
+                      <button
+                        type="button"
+                        onClick={() => setPendingLabelIndex(m.__srcIndex)}
+                        title="Edit the words printed inside the label box"
+                        className="text-left text-sm font-medium text-text-primary underline decoration-dotted underline-offset-4 hover:text-primary"
+                      >
+                        {m.extracted_id ?? "unlabelled"}
+                      </button>
+                    ) : (
+                      <div className="text-sm font-medium text-text-primary">
+                        {m.extracted_id ?? "unlabelled"}
+                      </div>
+                    )}
                     <div className="mt-1 break-all font-mono text-xs text-text-muted">
                       {m.smiles}
                     </div>
@@ -572,7 +708,26 @@ export function StructureAnnotationsSection({
                       {m.structure_confidence != null && (
                         <span>structure {(m.structure_confidence * 100).toFixed(0)}%</span>
                       )}
+                      {m.label_confidence != null && (
+                        <span>label {(m.label_confidence * 100).toFixed(0)}%</span>
+                      )}
                     </div>
+                    {editing && m.label_bbox && !m.extracted_id && (
+                      <p className="mt-2 text-xs text-ds-error">
+                        Label box has no text — the relation matcher needs the words.
+                      </p>
+                    )}
+                    {editing && m.label_bbox && (
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        className="mt-2 -ml-2 text-text-muted hover:text-ds-error"
+                        onClick={() => handleDeleteLabel(m.__srcIndex)}
+                        title="This structure has no printed caption — drop the label box, keep the structure"
+                      >
+                        Remove label box
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -581,26 +736,36 @@ export function StructureAnnotationsSection({
         )}
       </Card>
 
+      {/* One editor, two entry points: a freshly drawn structure needs its SMILES, and a
+          freshly drawn (or mis-transcribed) label needs its text. `extracted_id` is the
+          dialog's "Label" field and the exported `label_text`, so this is already the right
+          editor for both — a second one would be a second definition of the same field. */}
       {editable && (
         <EditCompoundDialog
-          open={pendingDrawBbox !== null}
-          onOpenChange={(open) => !open && setPendingDrawBbox(null)}
-          compound={null}
+          open={pendingDrawBbox !== null || pendingLabelIndex !== null}
+          onOpenChange={(open) => {
+            if (open) return;
+            setPendingDrawBbox(null);
+            setPendingLabelIndex(null);
+          }}
+          compound={pendingLabelIndex !== null ? (working?.[pendingLabelIndex] ?? null) : null}
           onSave={async (item) => {
+            const fields = {
+              smiles: item.smiles,
+              extracted_id: item.extracted_id ?? null,
+              internal_id: item.internal_id ?? null,
+              cdd_id: item.cdd_id ?? null,
+              chembl_id: item.chembl_id ?? null,
+              pdb_id: item.pdb_id ?? null,
+            };
+            if (pendingLabelIndex !== null) {
+              const srcIndex = pendingLabelIndex;
+              setWorking((prev) => prev && prev.map((m, i) => (i === srcIndex ? { ...m, ...fields } : m)));
+              setPendingLabelIndex(null);
+              return;
+            }
             if (!pendingDrawBbox) return;
-            const bbox = pendingDrawBbox;
-            setWorking((prev) => [
-              ...(prev ?? []),
-              {
-                ...blankMention(bbox),
-                smiles: item.smiles,
-                extracted_id: item.extracted_id ?? null,
-                internal_id: item.internal_id ?? null,
-                cdd_id: item.cdd_id ?? null,
-                chembl_id: item.chembl_id ?? null,
-                pdb_id: item.pdb_id ?? null,
-              },
-            ]);
+            setWorking((prev) => [...(prev ?? []), { ...blankMention(pendingDrawBbox), ...fields }]);
             setPendingDrawBbox(null);
           }}
         />
