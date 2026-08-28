@@ -204,10 +204,11 @@ async def analyze_compound_box(
     pixels of the stored CSER render; 404 if that render does not exist.
 
     DO NOT "optimise away" the both-boxes-null case: it is a deliberate warm-up
-    the client fires when the user opens edit mode. The first OCSR call in a
-    process pays a ~94 s DECIMER weight load (~0.5 s once warm), so the load
-    happens while the user is still drawing instead of after they hit Analyse.
-    Synchronous on purpose — a warm call is ~2.3 s, far below workflow overhead.
+    the client fires when the user opens edit mode. It loads the OCSR (DECIMER)
+    and OCR models — ~2 min in a cold process, near-instant once warm — by
+    running them over a throwaway blank image, so that cost lands while the user
+    is still drawing instead of on their first Analyse. Synchronous on purpose:
+    once warm a real call is ~2.3 s, far below workflow overhead.
     """
     await require_action(auth, "artifacts:hiledit")
     page = await require_workspace_page(page_id, auth, container)

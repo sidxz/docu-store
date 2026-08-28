@@ -170,16 +170,54 @@ def test_both_boxes_run_both_extractors(tmp_path, monkeypatch):
     assert len(pipeline.text_calls) == 1
 
 
-def test_no_boxes_is_a_warm_up_that_still_loads_the_pipeline(tmp_path, monkeypatch):
-    # The client fires this when edit mode opens so the ~94 s DECIMER weight
-    # load happens while the user is drawing. Deleting it is not an optimisation.
+def test_no_boxes_warms_both_models_not_just_the_pipeline_object(tmp_path, monkeypatch):
+    # Constructing ChemPipeline is ~0.2 s and loads no weights; DECIMER and the
+    # OCR reader load on first extract. So the warm-up MUST run both extractors,
+    # or the user still eats the ~150 s load on their first real Analyse.
     pipeline = RecordingPipeline()
     service, loaded = _service(tmp_path, pipeline, monkeypatch)
 
     assert service.analyze_boxes("k", None, None) == (None, None)
     assert loaded == [True]
-    assert pipeline.smiles_calls == []
-    assert pipeline.text_calls == []
+    assert len(pipeline.smiles_calls) == 1
+    assert len(pipeline.text_calls) == 1
+
+    # ...and warming twice does not pay for it twice.
+    service.analyze_boxes("k", None, None)
+    assert len(pipeline.smiles_calls) == 1
+
+
+def test_a_warm_up_that_blows_up_is_swallowed(tmp_path, monkeypatch):
+    # A blank crop legitimately makes extractors return None or raise; the
+    # weights are loaded either way, so it must never surface as a 500.
+    class ExplodingPipeline(RecordingPipeline):
+        def extract_smiles(self, image, pair):
+            super().extract_smiles(image, pair)
+            raise RuntimeError("blank crop")
+
+        def extract_text(self, image, pair):
+            super().extract_text(image, pair)
+            raise RuntimeError("blank crop")
+
+    pipeline = ExplodingPipeline()
+    service, _ = _service(tmp_path, pipeline, monkeypatch)
+
+    assert service.analyze_boxes("k", None, None) == (None, None)
+    assert len(pipeline.smiles_calls) == 1
+    assert len(pipeline.text_calls) == 1
+
+
+def test_the_warm_up_never_reads_the_page_render(tmp_path, monkeypatch):
+    # It must not depend on a blob existing, nor pay a full-page decode.
+    pipeline = RecordingPipeline()
+    service, _ = _service(tmp_path, pipeline, monkeypatch)
+
+    def explode(key):
+        raise AssertionError("warm-up must not touch the blob store")
+
+    monkeypatch.setattr(service._blob_store, "get_file", explode)
+
+    assert service.analyze_boxes("k", None, None) == (None, None)
 
 
 def test_unreadable_structure_yields_none_rather_than_raising(tmp_path, monkeypatch):

@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import threading
+import time
 from io import BytesIO
 from typing import TYPE_CHECKING
 
 import structlog
 from PIL import Image
-from structflo.cser.pipeline import render_page
+from structflo.cser.pipeline import BBox, CompoundPair, Detection, render_page
 
 from application.dtos.cser_dtos import CserCompoundResult
 from application.ports.cser_service import CserService
@@ -29,6 +30,7 @@ class CserPipelineService(CserService):
     def __init__(self, blob_store: BlobStore) -> None:
         self._blob_store = blob_store
         self._pipeline = None
+        self._warmed = False
         self._lock = threading.Lock()
 
     def _ensure_pipeline_loaded(self) -> None:
@@ -114,16 +116,16 @@ class CserPipelineService(CserService):
     ) -> tuple[str | None, str | None]:
         """Read one human-drawn box pair on an already-stored render.
 
-        Loading the pipeline is the expensive part (~94 s of DECIMER weights,
-        once per process); the reads themselves are ~0.5 s (OCSR) and ~1.8 s
-        (OCR). So the warm-up call — both boxes None — is honoured here: the
-        weights load and nothing is cropped.
+        Both boxes None is the warm-up call: it forces the OCSR and OCR models
+        to load (~2 min cold, near-instant afterwards) and returns nothing.
+        Constructing ChemPipeline alone does NOT do that — DECIMER and the OCR
+        reader load their weights on first extract — so the warm-up runs both
+        extractors over a throwaway blank image for the side effect.
         """
         self._ensure_pipeline_loaded()
         if structure_bbox is None and label_bbox is None:
+            self._warm_extractors()
             return None, None
-
-        from structflo.cser.pipeline import BBox, CompoundPair, Detection
 
         with self._blob_store.get_file(render_key) as path:
             image = Image.open(path).convert("RGB")
@@ -146,3 +148,26 @@ class CserPipelineService(CserService):
             read_smiles=smiles is not None,
         )
         return smiles, label_text
+
+    def _warm_extractors(self) -> None:
+        """Force DECIMER + the OCR reader to load their weights. Best-effort.
+
+        A blank crop makes both extractors return None or raise, which is fine:
+        the weights are in memory either way, and a failed warm-up must never
+        reach the caller as an error.
+        """
+        if self._warmed:
+            return
+        # Measured: 104.6 s cold, but ~8 s on every repeat (DECIMER runs on the
+        # blank crop), and the client fires this on each edit-mode open.
+        started = time.monotonic()
+        image = Image.new("RGB", (64, 64), "white")
+        box = Detection(bbox=BBox(0, 0, 64, 64), conf=1.0, class_id=0)
+        pair = CompoundPair(structure=box, label=box, match_distance=0.0)
+        for extract in (self._pipeline.extract_smiles, self._pipeline.extract_text):
+            try:
+                extract(image, pair)
+            except Exception:  # warm-up is best-effort by design
+                logger.debug("cser_warmup_extractor_failed", extractor=extract.__name__)
+        self._warmed = True
+        logger.info("cser_models_warmed", elapsed_seconds=round(time.monotonic() - started, 1))
