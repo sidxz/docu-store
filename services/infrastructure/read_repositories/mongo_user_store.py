@@ -13,14 +13,16 @@ from pymongo import ASCENDING, DESCENDING, IndexModel, ReturnDocument
 from application.dtos.user_dtos import (
     RecentDocumentEntry,
     SearchHistoryEntry,
+    TermsAcceptanceDTO,
     UserPreferencesDTO,
 )
+from application.ports.repositories.terms_acceptance_store import TermsAcceptanceStore
 from application.ports.repositories.user_activity_store import UserActivityStore
 from application.ports.repositories.user_preferences_store import UserPreferencesStore
 from infrastructure.config import Settings
 
 
-class MongoUserStore(UserPreferencesStore, UserActivityStore):
+class MongoUserStore(UserPreferencesStore, UserActivityStore, TermsAcceptanceStore):
     """Direct CRUD storage for user preferences and activity.
 
     Not event-sourced. Not a read model projection.
@@ -32,6 +34,7 @@ class MongoUserStore(UserPreferencesStore, UserActivityStore):
         db = client[settings.mongo_db]
         self.user_preferences = db[settings.mongo_user_preferences_collection]
         self.user_activity = db[settings.mongo_user_activity_collection]
+        self.terms_acceptance = db[settings.mongo_terms_acceptance_collection]
 
     # ── UserPreferencesStore ─────────────────────────────────────────────────
 
@@ -83,6 +86,28 @@ class MongoUserStore(UserPreferencesStore, UserActivityStore):
             font_family=doc.get("font_family", "plex"),
         )
 
+    # ── TermsAcceptanceStore ─────────────────────────────────────────────────
+
+    async def get_acceptance(self, user_id: UUID) -> TermsAcceptanceDTO | None:
+        doc = await self.terms_acceptance.find_one(
+            {"user_id": str(user_id)},
+            sort=[("accepted_at", DESCENDING)],
+        )
+        if not doc:
+            return None
+        return TermsAcceptanceDTO(version=doc["version"], accepted_at=doc["accepted_at"])
+
+    async def record_acceptance(self, user_id: UUID, version: str) -> TermsAcceptanceDTO:
+        # Idempotent per (user, version): re-accepting the same version keeps the
+        # original timestamp, which is the one that matters as evidence.
+        doc = await self.terms_acceptance.find_one_and_update(
+            {"user_id": str(user_id), "version": version},
+            {"$setOnInsert": {"accepted_at": datetime.now(UTC)}},
+            upsert=True,
+            return_document=ReturnDocument.AFTER,
+        )
+        return TermsAcceptanceDTO(version=doc["version"], accepted_at=doc["accepted_at"])
+
     async def ensure_indexes(self) -> None:
         await self.user_preferences.create_indexes(
             [
@@ -91,6 +116,9 @@ class MongoUserStore(UserPreferencesStore, UserActivityStore):
                     unique=True,
                 ),
             ],
+        )
+        await self.terms_acceptance.create_indexes(
+            [IndexModel([("user_id", ASCENDING), ("version", ASCENDING)], unique=True)],
         )
         await self.user_activity.create_indexes(
             [

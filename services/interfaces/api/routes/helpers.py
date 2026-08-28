@@ -182,3 +182,32 @@ async def ensure_llm_configured(auth: RequestAuth, container: Container) -> None
         status_code=status.HTTP_428_PRECONDITION_REQUIRED,
         detail=LLM_NOT_CONFIGURED_DETAIL,
     )
+
+
+TERMS_NOT_ACCEPTED_DETAIL = (
+    "Review and accept the Terms of Use and Privacy Policy before uploading."
+)
+
+
+async def ensure_terms_accepted(auth: RequestAuth, container: Container) -> None:
+    """Pre-flight Terms/Privacy gate for the public edition (upload/create).
+
+    The portal gates this in the UI too, but the UI gate only stops honest
+    callers — this is what actually holds, and it sits on upload because that
+    is where the "you have the rights to this document" warranty bites.
+    No-op when self-serve is off: internal and consortium deployments are
+    covered by their own agreements.
+    """
+    from application.ports.repositories.terms_acceptance_store import TermsAcceptanceStore
+    from infrastructure.config import Settings
+
+    settings = container[Settings]
+    if not settings.self_serve_enabled:
+        return
+    accepted = await container[TermsAcceptanceStore].get_acceptance(auth.user_id)
+    if accepted is not None and accepted.version == settings.terms_version:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_451_UNAVAILABLE_FOR_LEGAL_REASONS,
+        detail=TERMS_NOT_ACCEPTED_DETAIL,
+    )

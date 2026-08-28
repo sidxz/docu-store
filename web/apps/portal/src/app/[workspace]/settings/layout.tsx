@@ -7,6 +7,7 @@ import { useAuthzHasRole } from "@duar-auth/react";
 
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useLlmProvider } from "@/hooks/use-llm-provider";
+import { useAppConfig } from "@/lib/app-config";
 
 interface SettingsTab {
   label: string;
@@ -26,6 +27,12 @@ const ADMIN_TABS: SettingsTab[] = [
   { label: "Status", segment: "status" },
 ];
 
+/** Public edition only — what the user agreed to at sign-up, kept reachable. */
+const LEGAL_LINKS = [
+  { label: "Terms of Use", href: "https://docustore.io/terms" },
+  { label: "Privacy Policy", href: "https://docustore.io/privacy" },
+];
+
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { workspace } = useParams<{ workspace: string }>();
@@ -33,6 +40,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   // Training export is gated server side on `artifacts:hiledit`, held by editor and above.
   const canExportTraining = useAuthzHasRole("editor");
   const provider = useLlmProvider();
+  const { selfServeEnabled } = useAppConfig();
   const tabs = [
     ...TABS,
     ...(canExportTraining ? [{ label: "Training Export", segment: "training-export" }] : []),
@@ -73,6 +81,22 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
             <>
               <div className="my-2 border-t border-border-default" />
               {ADMIN_TABS.map(renderTab)}
+            </>
+          )}
+          {selfServeEnabled && (
+            <>
+              <div className="my-2 border-t border-border-default" />
+              {LEGAL_LINKS.map(({ label, href }) => (
+                <a
+                  key={href}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-md px-3 py-2 text-sm text-text-muted transition-colors hover:bg-surface-hover hover:text-text-default"
+                >
+                  {label}
+                </a>
+              ))}
             </>
           )}
         </nav>

@@ -6,11 +6,14 @@ import { useEffect, type ReactNode } from "react";
 
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useLlmOnboardingGate } from "@/hooks/use-llm-onboarding-gate";
+import { useTermsGate } from "@/hooks/use-terms";
 import { usePreferencesSync } from "@/hooks/use-preferences-sync";
 
 /** Runs hooks that require authentication context. */
 function AuthenticatedShell({ children }: { children: ReactNode }) {
   usePreferencesSync();
+  // Terms first: nobody should be asked for an API key before they have agreed.
+  useTermsGate();
   useLlmOnboardingGate();
   return <>{children}</>;
 }

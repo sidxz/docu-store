@@ -329,6 +329,7 @@ def create_container() -> Container:
     container[TagDictionaryReadModel] = mongo_repository_factory
     container[DashboardReadModel] = mongo_repository_factory
 
+    from application.ports.repositories.terms_acceptance_store import TermsAcceptanceStore
     from application.ports.repositories.user_activity_store import UserActivityStore
     from application.ports.repositories.user_preferences_store import UserPreferencesStore
     from infrastructure.read_repositories.mongo_user_store import MongoUserStore
@@ -341,6 +342,7 @@ def create_container() -> Container:
 
     container[UserPreferencesStore] = user_store_factory
     container[UserActivityStore] = user_store_factory
+    container[TermsAcceptanceStore] = user_store_factory
 
     from application.ports.analytics_read_model import AnalyticsReadModel
     from infrastructure.read_repositories.mongo_analytics_store import (

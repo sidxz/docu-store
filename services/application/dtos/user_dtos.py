@@ -14,6 +14,34 @@ class UserPreferencesDTO(BaseModel):
     font_family: str = Field(default="plex")
 
 
+class TermsAcceptanceDTO(BaseModel):
+    """One user's recorded acceptance of the Terms of Use / Privacy Policy."""
+
+    version: str
+    accepted_at: datetime
+
+
+class TermsStatusDTO(BaseModel):
+    """Whether this caller still needs to accept, and what they'd be accepting.
+
+    ``required`` is False on internal/consortium deployments (self-serve off),
+    where the gate does not apply at all.
+    """
+
+    required: bool
+    current_version: str
+    accepted_version: str | None = None
+    accepted_at: datetime | None = None
+
+
+class AcceptTermsRequest(BaseModel):
+    """The version the client is agreeing to — echoed back so a stale tab
+    cannot silently record acceptance of terms the user never saw.
+    """
+
+    version: str
+
+
 class UpdatePreferencesRequest(BaseModel):
     """Partial update — only set fields are applied."""
 

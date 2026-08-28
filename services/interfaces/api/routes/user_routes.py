@@ -11,6 +11,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, s
 from lagom import Container
 
 from application.dtos.user_dtos import (
+    AcceptTermsRequest,
     LLMLaneTestResult,
     LLMProviderEntry,
     LLMProviderPreset,
@@ -22,9 +23,11 @@ from application.dtos.user_dtos import (
     RecordDocumentOpenRequest,
     RecordSearchActivityRequest,
     SearchHistoryEntry,
+    TermsStatusDTO,
     UpdatePreferencesRequest,
     UserPreferencesDTO,
 )
+from application.ports.repositories.terms_acceptance_store import TermsAcceptanceStore
 from application.ports.repositories.user_activity_store import UserActivityStore
 from application.ports.repositories.user_preferences_store import UserPreferencesStore
 from application.ports.user_llm_config import UserLLMConfig, UserLLMConfigStore
@@ -34,6 +37,52 @@ from infrastructure.llm.provider_probe import probe_ner_support, probe_user_llm_
 from interfaces.dependencies import get_auth, get_container
 
 router = APIRouter(prefix="/user", tags=["user"])
+
+
+# ── Terms of Use / Privacy acceptance ────────────────────────────────────────
+
+
+async def _terms_status(container: Container, auth: RequestAuth) -> TermsStatusDTO:
+    settings = container[Settings]
+    current = settings.terms_version
+    if not settings.self_serve_enabled:
+        # Internal/consortium deployments are covered by their own agreements.
+        return TermsStatusDTO(required=False, current_version=current)
+    accepted = await container[TermsAcceptanceStore].get_acceptance(auth.user_id)
+    return TermsStatusDTO(
+        required=accepted is None or accepted.version != current,
+        current_version=current,
+        accepted_version=accepted.version if accepted else None,
+        accepted_at=accepted.accepted_at if accepted else None,
+    )
+
+
+@router.get("/terms", status_code=status.HTTP_200_OK)
+async def get_terms_status(
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> TermsStatusDTO:
+    """Whether this caller still has to accept the current Terms/Privacy version."""
+    return await _terms_status(container, auth)
+
+
+@router.post("/terms/accept", status_code=status.HTTP_200_OK)
+async def accept_terms(
+    body: AcceptTermsRequest,
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> TermsStatusDTO:
+    """Record acceptance. The client echoes the version it displayed, so a tab
+    left open across a terms change cannot record assent to text never shown.
+    """
+    settings = container[Settings]
+    if body.version != settings.terms_version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="These terms have been updated. Reload and review the current version.",
+        )
+    await container[TermsAcceptanceStore].record_acceptance(auth.user_id, body.version)
+    return await _terms_status(container, auth)
 
 
 # ── Preferences ──────────────────────────────────────────────────────────────

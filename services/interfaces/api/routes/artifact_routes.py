@@ -43,6 +43,7 @@ from domain.value_objects.summary_candidate import SummaryCandidate
 from interfaces.api.middleware import handle_use_case_errors
 from interfaces.api.routes.helpers import (
     ensure_llm_configured,
+    ensure_terms_accepted,
     ensure_within_quota,
     require_action,
     require_artifact_permission,
@@ -120,6 +121,7 @@ async def create_artifact(
 
     """
     await require_action(auth, "artifacts:create")
+    await ensure_terms_accepted(auth, container)
     await ensure_llm_configured(auth, container)
     await ensure_within_quota(auth, container)
     use_case = container[CreateArtifactUseCase]
@@ -138,6 +140,7 @@ async def upload_blob(
 ) -> ArtifactResponse:
     """Upload a blob to the blob store and create an artifact."""
     await require_action(auth, "artifacts:create")
+    await ensure_terms_accepted(auth, container)
     await ensure_llm_configured(auth, container)
     await ensure_within_quota(auth, container)
     saga = container[ArtifactUploadSaga]

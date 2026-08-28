@@ -183,6 +183,33 @@ export default function LoginPage() {
               </p>
             )}
 
+            {selfServeEnabled && (
+              <p
+                className="mt-6 text-center text-xs leading-relaxed"
+                style={{ color: "#94a3b8", animation: "auth-enter 0.5s ease-out 0.38s both" }}
+              >
+                By continuing you agree to our{" "}
+                <a
+                  href="https://docustore.io/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2"
+                >
+                  Terms of Use
+                </a>{" "}
+                and{" "}
+                <a
+                  href="https://docustore.io/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2"
+                >
+                  Privacy Policy
+                </a>
+                .
+              </p>
+            )}
+
             {/* Mobile-only: footer */}
             <div
               className="mt-10 text-center md:hidden"

@@ -77,6 +77,10 @@ class Settings(BaseSettings):
         default="user_activity",
         validation_alias="MONGO_USER_ACTIVITY_COLLECTION",
     )
+    mongo_terms_acceptance_collection: str = Field(
+        default="terms_acceptance",
+        validation_alias="MONGO_TERMS_ACCEPTANCE_COLLECTION",
+    )
     mongo_token_usage_collection: str = Field(
         default="token_usage_events",
         validation_alias="MONGO_TOKEN_USAGE_COLLECTION",
@@ -539,6 +543,13 @@ class Settings(BaseSettings):
         validation_alias="CHAT_SMILES_MAX_RESULTS",
         description="Max compound results per detected SMILES in chat.",
     )
+
+    # Public edition (self-serve signup). Mirrors Duar's SELF_SERVE_ENABLED and
+    # the portal's APP_SELF_SERVE_ENABLED. Internal/consortium deployments run
+    # with this off and are covered by their own agreements, so the terms gate
+    # never fires for them.
+    self_serve_enabled: bool = Field(default=False, validation_alias="APP_SELF_SERVE_ENABLED")
+    terms_version: str = Field(default="2026-08-28", validation_alias="APP_TERMS_VERSION")
 
     # Duar (AuthZ mode)
     duar_url: str = Field(default="http://localhost:9003", validation_alias="DUAR_URL")
