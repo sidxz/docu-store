@@ -420,6 +420,12 @@ export function StructureAnnotationsSection({
   const [analyzingBox, setAnalyzingBox] = useState<string | null>(null);
   /** srcIndex whose Analyse button is armed to overwrite hand-typed values (second click). */
   const [confirmIndex, setConfirmIndex] = useState<number | null>(null);
+  /** Bumped on every entry to and exit from edit mode. An in-flight analyse is never
+   *  cancelled — leaving edit mode only nulls state — and `working` is rebuilt from the same
+   *  `compounds` prop on re-entry, so the same index can hold the same box again with a
+   *  hand-typed correction in it. Without a session identity that stale answer would pass the
+   *  box check and overwrite the correction with no arm/confirm step. */
+  const editSession = useRef(0);
   const { blobUrl, error } = useAuthBlobUrl(
     expanded ? `${API_URL}/artifacts/${artifactId}/pages/${pageIndex}/image?size=cser` : "",
   );
@@ -485,6 +491,7 @@ export function StructureAnnotationsSection({
   };
 
   const toggleEditing = () => {
+    editSession.current += 1;
     if (editing) {
       setEditing(false);
       resetDraft();
@@ -506,9 +513,13 @@ export function StructureAnnotationsSection({
    *  seeing it happen; the two ways out are both one click away on the card (type the SMILES,
    *  or delete the pair). */
   const unsaveable = working ? working.filter(isUnsaveable).length : 0;
-  const saveBlockedReason = unsaveable
-    ? `${unsaveable} drawn ${unsaveable === 1 ? "box has" : "boxes have"} no SMILES yet. Analyse ${unsaveable === 1 ? "it" : "them"}, type the SMILES in by hand, or delete ${unsaveable === 1 ? "it" : "them"} — nothing is saved until then, so no box is dropped behind your back.`
-    : null;
+  // Saving mid-analyse ends the editing session while a ~95s answer is still coming, which is
+  // half of what makes a stale write-back reachable at all. Cheaper to just wait for it.
+  const saveBlockedReason = analyzingBox
+    ? "Reading a box with the models — Save unlocks when it finishes."
+    : unsaveable
+      ? `${unsaveable} drawn ${unsaveable === 1 ? "box has" : "boxes have"} no SMILES yet. Analyse ${unsaveable === 1 ? "it" : "them"}, type the SMILES in by hand, or delete ${unsaveable === 1 ? "it" : "them"} — nothing is saved until then, so no box is dropped behind your back.`
+      : null;
 
   const save = async () => {
     // Guarded by the button's disabled state; re-checked because the render can disappear
@@ -520,8 +531,9 @@ export function StructureAnnotationsSection({
     // The unsaveable re-check is the same kind of guard: a pair can become SMILES-less
     // after the button was last rendered (a re-analyse that came back empty), and a blank
     // `smiles` would either be rejected by the server or stored as a compound that is not one.
-    if (!working || blindReason || working.some(isUnsaveable)) return;
+    if (!working || blindReason || analyzingBox || working.some(isUnsaveable)) return;
     await correct.mutateAsync({ compound_mentions: working.map(toInput) });
+    editSession.current += 1;
     setEditing(false);
     resetDraft();
   };
@@ -634,21 +646,31 @@ export function StructureAnnotationsSection({
     }
     setConfirmIndex(null);
     const sent = target.structure_bbox;
+    const sentLabel = target.label_bbox ?? null;
+    const session = editSession.current;
     setAnalyzingBox(JSON.stringify(sent));
     try {
       const result = await analyze.mutateAsync({
         structure_bbox: sent,
-        label_bbox: target.label_bbox ?? null,
+        label_bbox: sentLabel,
       });
+      // The draft this answer was asked for is gone (Cancel, or a Save that closed edit mode),
+      // and the one on screen only looks identical. Drop it.
+      if (session !== editSession.current) return;
       const smiles = result.smiles?.trim() ?? "";
       const labelText = result.label_text?.trim() || null;
       setWorking((prev) => {
         if (!prev) return prev;
         const current = prev[srcIndex];
         // A cold call runs ~95s; in that time the pair can be deleted (which shifts every
-        // later index) or re-drawn. Write back only if this slot is still the box we asked
-        // about — a machine SMILES landing on the wrong molecule is worse than no answer.
-        if (!current || JSON.stringify(current.structure_bbox) !== JSON.stringify(sent)) {
+        // later index), re-drawn, or have either box dragged. Write back only if this slot
+        // still holds BOTH boxes we asked about — a machine SMILES on the wrong molecule, or
+        // OCR from the label box's old position, is worse than no answer.
+        if (
+          !current ||
+          JSON.stringify(current.structure_bbox) !== JSON.stringify(sent) ||
+          JSON.stringify(current.label_bbox ?? null) !== JSON.stringify(sentLabel)
+        ) {
           return prev;
         }
         return prev.map((m, i) =>
@@ -668,9 +690,13 @@ export function StructureAnnotationsSection({
         );
       });
     } catch (err) {
-      toast.error("Could not analyse this box", { description: getErrorMessage(err) });
+      // Same session test: a failure the reviewer already walked away from is not news, and
+      // clearing the spinner would clear it for whatever the NEXT session has in flight.
+      if (session === editSession.current) {
+        toast.error("Could not analyse this box", { description: getErrorMessage(err) });
+      }
     } finally {
-      setAnalyzingBox(null);
+      if (session === editSession.current) setAnalyzingBox(null);
     }
   };
 
@@ -778,7 +804,9 @@ export function StructureAnnotationsSection({
                       <span className="text-xs text-text-muted">{labelDrawBlocked}</span>
                     )}
                     {saveBlockedReason && (
-                      <span className="text-xs text-ds-error">{saveBlockedReason}</span>
+                      <span className={`text-xs ${unsaveable ? "text-ds-error" : "text-text-muted"}`}>
+                        {saveBlockedReason}
+                      </span>
                     )}
                   </>
                 )}

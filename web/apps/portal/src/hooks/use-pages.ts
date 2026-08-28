@@ -5,8 +5,7 @@ import { apiClient } from "@docu-store/api-client";
 import type { WorkflowMap } from "@docu-store/types";
 import { queryKeys, workflowPollingInterval } from "@/lib/query-keys";
 import { throwApiError } from "@/lib/api-error";
-import { getAuthzClient } from "@/lib/authz-client";
-import { API_URL } from "@/lib/constants";
+import { authFetchJson } from "@/lib/auth-fetch";
 
 export function usePage(pageId: string) {
   return useQuery({
@@ -148,24 +147,21 @@ export interface AnalyzeBoxResult {
  * so firing one when the reviewer enters edit mode is what makes the real Analyse feel
  * instant. 404 means the page has no stored CSER render.
  *
- * ponytail: plain fetch rather than `apiClient` — this route is not in the generated
+ * ponytail: `authFetchJson` rather than `apiClient` — this route is not in the generated
  * OpenAPI schema yet; move it to apiClient.POST after the backend ships and `pnpm generate`
- * runs. Neither fetch nor openapi-fetch imposes a timeout here, and none is wanted: a cold
- * call legitimately runs ~95s.
+ * runs. authFetchJson is the house wrapper for exactly that gap and refreshes + retries once
+ * on 401, which matters most here: this is the longest-lived request in the app and the one
+ * most likely to straddle a token boundary. No timeout is imposed anywhere in this client,
+ * and none is wanted: a cold call legitimately runs ~95s.
  */
 export function useAnalyzeBox(pageId: string) {
   return useMutation({
-    mutationFn: async (body: AnalyzeBoxInput): Promise<AnalyzeBoxResult> => {
-      const res = await fetch(`${API_URL}/pages/${pageId}/compounds/analyze-box`, {
+    mutationFn: (body: AnalyzeBoxInput) =>
+      authFetchJson<AnalyzeBoxResult>(`/pages/${pageId}/compounds/analyze-box`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...getAuthzClient().getHeaders() },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        throwApiError("Failed to analyse box", await res.json().catch(() => null), res.status);
-      }
-      return res.json();
-    },
+      }),
   });
 }
 
