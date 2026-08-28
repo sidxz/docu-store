@@ -176,3 +176,22 @@ def test_retrieval_metrics_omitted_when_no_gold_documents():
     ):
         assert key not in metrics, f"{key} is undefined with no gold, must be omitted"
     assert "abstained" in metrics, "answer scoring must still run"
+
+
+def test_aggregate_metrics_averages_only_present_values():
+    rows = [
+        {"success": 1.0, "value_match": 1.0},
+        {"success": 0.0},
+        {"success": 1.0},
+        {"success": 1.0},
+    ]
+    agg = aggregate_metrics(rows)
+
+    assert agg["success"] == 0.75
+    # value_match is defined for one query and it passed. Averaging it over
+    # four would report 0.25 for a metric that was never 0.25 for anything.
+    assert agg["value_match"] == 1.0
+
+
+def test_aggregate_metrics_drops_a_key_no_row_defines():
+    assert "value_match" not in aggregate_metrics([{"success": 1.0}])
