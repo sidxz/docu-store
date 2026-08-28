@@ -96,8 +96,11 @@ async def test_null_store_is_empty_and_refuses_writes() -> None:
     ws, user = uuid4(), uuid4()
     assert await store.get(ws, user) is None
     assert await store.get_entry(ws, user) is None
-    assert await store.update_models(ws, user, model="m", chat_model="c") is False
-    await store.delete(ws, user)  # no-op
+    assert await store.list_entries(ws, user) == []
+    assert await store.get_config(ws, user, "openai") is None
+    assert await store.update_models(ws, user, provider="openai", model="m", chat_model="c") is False
+    assert await store.activate(ws, user, "openai") is False
+    assert await store.delete(ws, user, "openai") is False
     await store.ensure_indexes()  # no-op
     with pytest.raises(RuntimeError, match="USER_LLM_KEYS_ENABLED"):
         await store.set(ws, user, provider="openai", api_key="k", model="m", chat_model="c")

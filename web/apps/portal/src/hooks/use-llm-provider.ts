@@ -12,15 +12,26 @@ export interface LlmProviderPreset {
   chat_model: string;
 }
 
-/** GET /user/llm-provider — the key is write-only; only `key_last4` comes back. */
+/** One configured provider. Exactly one of them is `active`. */
+export interface LlmProviderEntry {
+  provider: LlmProviderId;
+  model: string;
+  chat_model: string;
+  key_last4: string;
+  active: boolean;
+  updated_at: string | null;
+}
+
+/** GET /user/llm-provider — keys are write-only; only `key_last4` comes back. */
 export interface LlmProviderStatus {
   enabled: boolean;
+  /** An active provider exists — i.e. there is something to run on. */
   configured: boolean;
-  provider: LlmProviderId | null;
-  key_last4: string | null;
-  model: string | null;
-  chat_model: string | null;
+  providers: LlmProviderEntry[];
   presets: Record<LlmProviderId, LlmProviderPreset>;
+  /** Model names to offer per provider — a hint, not a contract. Empty for
+   *  OpenRouter, and absent altogether from a backend older than this field. */
+  suggestions?: Record<LlmProviderId, string[]>;
 }
 
 /** PUT body. Omit `api_key` to change models only (the stored key is kept). */
@@ -71,14 +82,42 @@ export function useSaveLlmProvider() {
 export function useDeleteLlmProvider() {
   const invalidate = useInvalidateProvider();
   return useMutation({
-    mutationFn: () => authFetchJson<void>("/user/llm-provider", { method: "DELETE" }),
+    mutationFn: (provider: LlmProviderId) =>
+      authFetchJson<void>(`/user/llm-provider/${provider}`, { method: "DELETE" }),
     onSuccess: invalidate,
   });
 }
 
+/** Switch what everything runs on. Refused if the model cannot do entity extraction. */
+export function useActivateLlmProvider() {
+  const invalidate = useInvalidateProvider();
+  return useMutation({
+    mutationFn: (provider: LlmProviderId) =>
+      authFetchJson<void>(`/user/llm-provider/${provider}/activate`, { method: "POST" }),
+    onSuccess: invalidate,
+  });
+}
+
+/**
+ * Probe any stored provider, active or not — the point is to find out before
+ * switching. `model`/`chat_model` override what is stored, so the form can test
+ * what is typed; blanks resolve to the preset exactly as a save would. The key
+ * is never sent, only ever the stored one.
+ */
 export function useTestLlmProvider() {
   return useMutation({
-    mutationFn: () =>
-      authFetchJson<LlmProviderTestResult>("/user/llm-provider/test", { method: "POST" }),
+    mutationFn: ({
+      provider,
+      ...models
+    }: {
+      provider: LlmProviderId;
+      model?: string;
+      chat_model?: string;
+    }) =>
+      authFetchJson<LlmProviderTestResult>(`/user/llm-provider/${provider}/test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(models),
+      }),
   });
 }

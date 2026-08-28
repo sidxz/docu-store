@@ -1,6 +1,10 @@
 """Per-user LLM provider configuration (BYO key).
 
-Phase 2 defined the shape and the port; Phase 3 grows the port for the settings API and registers the Mongo store in the container when USER_LLM_KEYS_ENABLED is on.
+A user may keep one entry per provider and one of them is *active* — the config
+every ingestion, chat and NER call resolves to. Switching is therefore additive:
+connecting a second provider never destroys the credential of the first, so a
+provider that turns out not to work costs one click to back out of rather than
+a key you may no longer have.
 """
 
 from __future__ import annotations
@@ -9,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
+    from datetime import datetime
     from uuid import UUID
 
 
@@ -29,14 +34,35 @@ class UserLLMProviderEntry:
     model: str
     chat_model: str
     key_last4: str
+    active: bool = False
+    updated_at: datetime | None = None
 
 
 class UserLLMConfigStore(Protocol):
     async def get(self, workspace_id: UUID, user_id: UUID) -> UserLLMConfig | None:
-        """Resolver path: decrypted config with the *effective* provider/base_url."""
+        """Resolver path: the *active* config, decrypted, with the effective provider/base_url."""
         ...
 
-    async def get_entry(self, workspace_id: UUID, user_id: UUID) -> UserLLMProviderEntry | None: ...
+    async def get_config(
+        self,
+        workspace_id: UUID,
+        user_id: UUID,
+        provider: str,
+    ) -> UserLLMConfig | None:
+        """One stored provider, active or not — so the UI can test before switching."""
+        ...
+
+    async def get_entry(self, workspace_id: UUID, user_id: UUID) -> UserLLMProviderEntry | None:
+        """The active entry, or None when nothing is active — i.e. "has a usable LLM"."""
+        ...
+
+    async def list_entries(
+        self,
+        workspace_id: UUID,
+        user_id: UUID,
+    ) -> list[UserLLMProviderEntry]:
+        """Everything the caller has configured, newest first."""
+        ...
 
     async def set(
         self,
@@ -48,7 +74,7 @@ class UserLLMConfigStore(Protocol):
         model: str,
         chat_model: str,
     ) -> None:
-        """Upsert the caller's row (one per (workspace, user))."""
+        """Upsert this provider's entry and make it the active one. Others are kept."""
         ...
 
     async def update_models(
@@ -56,13 +82,20 @@ class UserLLMConfigStore(Protocol):
         workspace_id: UUID,
         user_id: UUID,
         *,
+        provider: str,
         model: str,
         chat_model: str,
     ) -> bool:
-        """Change lane models without re-entering the key. False when no row exists."""
+        """Change one entry's lane models, keeping its key. False when it does not exist."""
         ...
 
-    async def delete(self, workspace_id: UUID, user_id: UUID) -> None: ...
+    async def activate(self, workspace_id: UUID, user_id: UUID, provider: str) -> bool:
+        """Make a stored provider the active one. False when it does not exist."""
+        ...
+
+    async def delete(self, workspace_id: UUID, user_id: UUID, provider: str) -> bool:
+        """Forget one provider. Deleting the active one leaves nothing active."""
+        ...
 
     async def ensure_indexes(self) -> None: ...
 
@@ -73,8 +106,23 @@ class NullUserLLMConfigStore:
     async def get(self, workspace_id: UUID, user_id: UUID) -> UserLLMConfig | None:
         return None
 
+    async def get_config(
+        self,
+        workspace_id: UUID,
+        user_id: UUID,
+        provider: str,
+    ) -> UserLLMConfig | None:
+        return None
+
     async def get_entry(self, workspace_id: UUID, user_id: UUID) -> UserLLMProviderEntry | None:
         return None
+
+    async def list_entries(
+        self,
+        workspace_id: UUID,
+        user_id: UUID,
+    ) -> list[UserLLMProviderEntry]:
+        return []
 
     async def set(
         self,
@@ -94,13 +142,17 @@ class NullUserLLMConfigStore:
         workspace_id: UUID,
         user_id: UUID,
         *,
+        provider: str,
         model: str,
         chat_model: str,
     ) -> bool:
         return False
 
-    async def delete(self, workspace_id: UUID, user_id: UUID) -> None:
-        return None
+    async def activate(self, workspace_id: UUID, user_id: UUID, provider: str) -> bool:
+        return False
+
+    async def delete(self, workspace_id: UUID, user_id: UUID, provider: str) -> bool:
+        return False
 
     async def ensure_indexes(self) -> None:
         return None

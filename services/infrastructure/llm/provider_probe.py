@@ -74,32 +74,44 @@ async def _verdict_without_asking(cfg: UserLLMConfig, *, allow_cloud: bool) -> N
         return NerProbe(ok=False, detail="Cloud LLM providers are disabled on this deployment.")
     if not cfg.model:
         return NerProbe(ok=False, detail="No ingestion model configured.")
-    return await _catalogued_refusal(cfg)
+    return await _catalogued_verdict(cfg)
 
 
-async def _catalogued_refusal(cfg: UserLLMConfig) -> NerProbe | None:
-    """OpenRouter's own answer, when it has one. None → go ask the model.
+async def _catalogued_verdict(cfg: UserLLMConfig) -> NerProbe | None:
+    """OpenRouter's catalog, read two ways. None → go ask the model.
 
-    Only an absent capability short-circuits. A listed one is the union across
-    every upstream route the model id can take, so it still has to be proven by
-    the live call below. An unreachable catalog is not evidence either way.
+    For an OpenRouter config, a *missing* capability is a refusal while a listed
+    one still has to be proven live: ``supported_parameters`` is the union across
+    every upstream route the id can take.
+
+    For OpenAI and Gemini it inverts. Their catalog entries route to one upstream
+    — the vendor's own API, the same endpoint the probe would call — so a listed
+    capability is as good as a live answer and saves the call. Absence is not
+    evidence there: OpenRouter lists what it resells, not what Google ships.
     """
     from application.services.llm_providers import OPENROUTER_BASE_URL
-    from infrastructure.llm.openrouter_catalog import supports_structured_outputs
+    from infrastructure.llm import openrouter_catalog
 
-    if cfg.base_url != OPENROUTER_BASE_URL or not cfg.model:
+    if not cfg.model:
         return None
-    if await supports_structured_outputs(cfg.model) is not False:
+    if cfg.base_url == OPENROUTER_BASE_URL:
+        if await openrouter_catalog.supports_structured_outputs(cfg.model) is not False:
+            return None
+        return NerProbe(
+            ok=False,
+            detail=(
+                f"OpenRouter lists no structured-output support for {cfg.model!r}, "
+                f"which entity extraction requires. Pick a model whose supported "
+                f"parameters include 'structured_outputs'."
+            ),
+            refused=True,
+        )
+    if cfg.base_url is not None:  # some other OpenAI-compatible endpoint; not ours to judge
         return None
-    return NerProbe(
-        ok=False,
-        detail=(
-            f"OpenRouter lists no structured-output support for {cfg.model!r}, "
-            f"which entity extraction requires. Pick a model whose supported "
-            f"parameters include 'structured_outputs'."
-        ),
-        refused=True,
-    )
+    model_id = openrouter_catalog.catalog_id(cfg.provider, cfg.model)
+    if model_id and await openrouter_catalog.supports_structured_outputs(model_id):
+        return NerProbe(ok=True)
+    return None
 
 
 async def probe_ner_support(cfg: UserLLMConfig, *, allow_cloud: bool) -> NerProbe:
@@ -114,7 +126,8 @@ async def probe_ner_support(cfg: UserLLMConfig, *, allow_cloud: bool) -> NerProb
     capability check, not an extraction-quality check.
 
     OpenRouter publishes the answer, so a model it lists as incapable is refused
-    without spending a call at all — see ``_catalogued_refusal``.
+    without spending a call at all — and one it lists as capable *on the vendor's
+    own API* is accepted the same way. See ``_catalogued_verdict``.
     """
     settled = await _verdict_without_asking(cfg, allow_cloud=allow_cloud)
     if settled is not None:

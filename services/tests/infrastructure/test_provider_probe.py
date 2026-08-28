@@ -236,12 +236,53 @@ async def test_an_unreachable_catalog_falls_through_to_the_live_call(
     assert len(built) == 1
 
 
-async def test_a_direct_openai_config_never_consults_the_catalog(
+async def test_a_vouched_for_direct_model_is_accepted_without_a_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """OpenAI's own entry routes to OpenAI, the endpoint we would have called."""
+    built = _patch_ner(monkeypatch, None)
+    asked = _patch_catalog(monkeypatch, True)
+    cfg = UserLLMConfig(provider="openai", api_key="key-x", base_url=None, model="gpt-5-mini")
+
+    assert (await provider_probe.probe_ner_support(cfg, allow_cloud=True)).ok
+    assert asked == ["openai/gpt-5-mini"]
+    assert built == []  # nothing was spent
+
+
+async def test_a_direct_gemini_model_is_looked_up_under_googles_prefix(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_ner(monkeypatch, None)
-    asked = _patch_catalog(monkeypatch, False)
-    cfg = UserLLMConfig(provider="openai", api_key="key-x", base_url=None, model="gpt-5-mini")
+    asked = _patch_catalog(monkeypatch, True)
+    cfg = UserLLMConfig(provider="gemini", api_key="key-x", base_url=None, model="gemini-2.5-flash")
+
+    assert (await provider_probe.probe_ner_support(cfg, allow_cloud=True)).ok
+    assert asked == ["google/gemini-2.5-flash"]
+
+
+@pytest.mark.parametrize("verdict", [False, None])
+async def test_a_direct_model_the_catalog_does_not_vouch_for_is_probed_not_refused(
+    monkeypatch: pytest.MonkeyPatch, verdict: bool | None,
+) -> None:
+    """OpenRouter lists what it resells, not what a vendor ships — absence is not a no."""
+    built = _patch_ner(monkeypatch, None)
+    _patch_catalog(monkeypatch, verdict)
+    cfg = UserLLMConfig(provider="openai", api_key="key-x", base_url=None, model="gpt-6-unreleased")
+
+    probe = await provider_probe.probe_ner_support(cfg, allow_cloud=True)
+    assert probe.ok and not probe.refused
+    assert len(built) == 1
+
+
+async def test_some_other_openai_compatible_endpoint_is_not_judged_by_the_catalog(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A self-hosted gateway shares OpenAI's model names but not its capabilities."""
+    _patch_ner(monkeypatch, None)
+    asked = _patch_catalog(monkeypatch, True)
+    cfg = UserLLMConfig(
+        provider="openai", api_key="key-x", base_url="http://vllm.internal/v1", model="gpt-5-mini",
+    )
 
     assert (await provider_probe.probe_ner_support(cfg, allow_cloud=True)).ok
     assert asked == []
