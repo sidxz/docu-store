@@ -7,14 +7,13 @@ from io import BytesIO
 from typing import TYPE_CHECKING
 
 import structlog
+from PIL import Image
 from structflo.cser.pipeline import render_page
 
 from application.dtos.cser_dtos import CserCompoundResult
 from application.ports.cser_service import CserService
 
 if TYPE_CHECKING:
-    from PIL import Image
-
     from application.ports.blob_store import BlobStore
 
 logger = structlog.get_logger()
@@ -106,3 +105,44 @@ class CserPipelineService(CserService):
             image = render_page(pdf_path, page_index)
         self._persist_render(image, render_key)
         logger.info("cser_render_persisted", render_key=render_key, page_index=page_index)
+
+    def analyze_boxes(
+        self,
+        render_key: str,
+        structure_bbox: list[float] | None,
+        label_bbox: list[float] | None,
+    ) -> tuple[str | None, str | None]:
+        """Read one human-drawn box pair on an already-stored render.
+
+        Loading the pipeline is the expensive part (~94 s of DECIMER weights,
+        once per process); the reads themselves are ~0.5 s (OCSR) and ~1.8 s
+        (OCR). So the warm-up call — both boxes None — is honoured here: the
+        weights load and nothing is cropped.
+        """
+        self._ensure_pipeline_loaded()
+        if structure_bbox is None and label_bbox is None:
+            return None, None
+
+        from structflo.cser.pipeline import BBox, CompoundPair, Detection
+
+        with self._blob_store.get_file(render_key) as path:
+            image = Image.open(path).convert("RGB")
+
+        # Both sides of CompoundPair are required, so the box that was NOT sent
+        # gets a placeholder — never passed to an extractor, only constructed.
+        placeholder = [0.0, 0.0, 1.0, 1.0]
+        pair = CompoundPair(
+            structure=Detection(bbox=BBox(*(structure_bbox or placeholder)), conf=1.0, class_id=0),
+            label=Detection(bbox=BBox(*(label_bbox or placeholder)), conf=1.0, class_id=1),
+            match_distance=0.0,
+        )
+        smiles = self._pipeline.extract_smiles(image, pair) if structure_bbox else None
+        label_text = self._pipeline.extract_text(image, pair) if label_bbox else None
+        logger.info(
+            "cser_box_analyzed",
+            render_key=render_key,
+            has_structure=structure_bbox is not None,
+            has_label=label_bbox is not None,
+            read_smiles=smiles is not None,
+        )
+        return smiles, label_text

@@ -93,3 +93,97 @@ def test_render_page_only_writes_the_image_without_touching_the_pipeline(monkeyp
     )
 
     assert Image.open(BytesIO(blob.puts["renders/3_cser.png"])).size == (1275, 1650)
+
+
+# ---------------------------------------------------------------------------
+# analyze_boxes — human-drawn boxes, machine-read chemistry
+# ---------------------------------------------------------------------------
+
+
+class RenderBlobStore:
+    """Serves one on-disk PNG as the page's CSER render."""
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+
+    @contextlib.contextmanager
+    def get_file(self, key: str):
+        yield self._path
+
+
+class RecordingPipeline:
+    def __init__(self, smiles="CCO", text="1a") -> None:
+        self.smiles_calls: list = []
+        self.text_calls: list = []
+        self._smiles = smiles
+        self._text = text
+
+    def extract_smiles(self, image, pair):
+        self.smiles_calls.append(pair)
+        return self._smiles
+
+    def extract_text(self, image, pair):
+        self.text_calls.append(pair)
+        return self._text
+
+
+def _service(tmp_path, pipeline, monkeypatch):
+    render = tmp_path / "render.png"
+    Image.new("RGB", (600, 800), "white").save(render)
+    service = CserPipelineService(RenderBlobStore(render))
+    service._pipeline = pipeline
+    loaded = []
+    monkeypatch.setattr(service, "_ensure_pipeline_loaded", lambda: loaded.append(True))
+    return service, loaded
+
+
+def test_structure_box_only_runs_ocsr_and_never_ocr(tmp_path, monkeypatch):
+    pipeline = RecordingPipeline()
+    service, _ = _service(tmp_path, pipeline, monkeypatch)
+
+    smiles, label_text = service.analyze_boxes("k", [10, 20, 110, 220], None)
+
+    assert (smiles, label_text) == ("CCO", None)
+    assert len(pipeline.smiles_calls) == 1
+    assert pipeline.text_calls == []
+    # The box the human drew is what gets cropped.
+    assert pipeline.smiles_calls[0].structure.bbox.as_list() == [10, 20, 110, 220]
+
+
+def test_label_box_only_runs_ocr_and_never_ocsr(tmp_path, monkeypatch):
+    pipeline = RecordingPipeline()
+    service, _ = _service(tmp_path, pipeline, monkeypatch)
+
+    smiles, label_text = service.analyze_boxes("k", None, [10, 230, 60, 250])
+
+    assert (smiles, label_text) == (None, "1a")
+    assert pipeline.smiles_calls == []
+    assert pipeline.text_calls[0].label.bbox.as_list() == [10, 230, 60, 250]
+
+
+def test_both_boxes_run_both_extractors(tmp_path, monkeypatch):
+    pipeline = RecordingPipeline()
+    service, _ = _service(tmp_path, pipeline, monkeypatch)
+
+    assert service.analyze_boxes("k", [1, 2, 3, 4], [5, 6, 7, 8]) == ("CCO", "1a")
+    assert len(pipeline.smiles_calls) == 1
+    assert len(pipeline.text_calls) == 1
+
+
+def test_no_boxes_is_a_warm_up_that_still_loads_the_pipeline(tmp_path, monkeypatch):
+    # The client fires this when edit mode opens so the ~94 s DECIMER weight
+    # load happens while the user is drawing. Deleting it is not an optimisation.
+    pipeline = RecordingPipeline()
+    service, loaded = _service(tmp_path, pipeline, monkeypatch)
+
+    assert service.analyze_boxes("k", None, None) == (None, None)
+    assert loaded == [True]
+    assert pipeline.smiles_calls == []
+    assert pipeline.text_calls == []
+
+
+def test_unreadable_structure_yields_none_rather_than_raising(tmp_path, monkeypatch):
+    pipeline = RecordingPipeline(smiles=None)
+    service, _ = _service(tmp_path, pipeline, monkeypatch)
+
+    assert service.analyze_boxes("k", [1, 2, 3, 4], None) == (None, None)

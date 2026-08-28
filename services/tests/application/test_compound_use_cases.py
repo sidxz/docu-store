@@ -207,6 +207,9 @@ class TestExtractCompoundMentionsUseCase:
             def render_page_only(self, storage_key, page_index, render_key):
                 raise RuntimeError("CSER crashed")
 
+            def analyze_boxes(self, render_key, structure_bbox, label_bbox):
+                raise RuntimeError("CSER crashed")
+
         use_case = ExtractCompoundMentionsUseCase(
             page_repository=page_repo,
             artifact_repository=artifact_repo,

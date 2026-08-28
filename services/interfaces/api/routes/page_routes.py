@@ -1,3 +1,4 @@
+import asyncio
 from typing import Annotated
 from uuid import UUID
 
@@ -6,12 +7,18 @@ from lagom import Container
 from duar_auth import RequestAuth
 
 from application.dtos.correction_dtos import CorrectPageCompoundMentionsRequest
+from application.dtos.cser_dtos import (
+    AnalyzeCompoundBoxRequest,
+    AnalyzeCompoundBoxResponse,
+)
 from application.dtos.page_dtos import AddCompoundMentionsRequest, CreatePageRequest, PageResponse
 from application.dtos.workflow_dtos import (
     SummaryDetailResponse,
     WorkflowStartedResponse,
     WorkflowStatusMapResponse,
 )
+from application.ports.blob_store import BlobStore
+from application.ports.cser_service import CserService
 from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.use_cases.correct_metadata_use_cases import CorrectPageCompoundMentionsUseCase
 from application.use_cases.page_use_cases import (
@@ -22,6 +29,7 @@ from application.use_cases.page_use_cases import (
     UpdateTagMentionsUseCase,
     UpdateTextMentionUseCase,
 )
+from application.use_cases.storage_keys import cser_render_key
 from application.workflow_use_cases.trigger_compound_extraction_use_case import (
     TriggerCompoundExtractionUseCase,
 )
@@ -178,6 +186,48 @@ async def correct_page_compound_mentions(
     await require_page_permission(page, auth, "edit")
     use_case = container[CorrectPageCompoundMentionsUseCase]
     return await use_case.execute(page_id=page_id, request=request, auth=auth)
+
+
+@router.post("/{page_id}/compounds/analyze-box", status_code=status.HTTP_200_OK)
+async def analyze_compound_box(
+    page_id: UUID,
+    request: AnalyzeCompoundBoxRequest,
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> AnalyzeCompoundBoxResponse:
+    """hiledit: read a hand-drawn box pair on the page's CSER render.
+
+    The annotator draws the boxes; the models read the chemistry. A structure
+    box is run through OCSR (DECIMER) for its SMILES, a label box through OCR
+    for its printed caption. Either side may come back null — that means the
+    model could not read the crop, not that the request failed. Coordinates are
+    pixels of the stored CSER render; 404 if that render does not exist.
+
+    DO NOT "optimise away" the both-boxes-null case: it is a deliberate warm-up
+    the client fires when the user opens edit mode. The first OCSR call in a
+    process pays a ~94 s DECIMER weight load (~0.5 s once warm), so the load
+    happens while the user is still drawing instead of after they hit Analyse.
+    Synchronous on purpose — a warm call is ~2.3 s, far below workflow overhead.
+    """
+    await require_action(auth, "artifacts:hiledit")
+    page = await require_workspace_page(page_id, auth, container)
+    await require_page_permission(page, auth, "edit")
+
+    render_key = cser_render_key(page.artifact_id, page.index)
+    blob_store = container[BlobStore]
+    if not await asyncio.to_thread(blob_store.exists, render_key):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="This page has no CSER render to crop from",
+        )
+
+    smiles, label_text = await asyncio.to_thread(
+        container[CserService].analyze_boxes,
+        render_key,
+        request.structure_bbox,
+        request.label_bbox,
+    )
+    return AnalyzeCompoundBoxResponse(smiles=smiles, label_text=label_text)
 
 
 @router.post("/{page_id}/embeddings/generate", status_code=status.HTTP_202_ACCEPTED)

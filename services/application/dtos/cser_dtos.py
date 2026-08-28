@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+from typing import Annotated
+
+from pydantic import BaseModel, Field
 
 
 class CserCompoundResult(BaseModel):
@@ -15,3 +17,26 @@ class CserCompoundResult(BaseModel):
     label_bbox: list[int] | None = None
     structure_confidence: float | None = None
     label_confidence: float | None = None
+
+
+Bbox = Annotated[list[float], Field(min_length=4, max_length=4)]
+
+
+class AnalyzeCompoundBoxRequest(BaseModel):
+    """Human-drawn boxes to read, in pixels of the page's CSER render."""
+
+    structure_bbox: Bbox | None = Field(
+        default=None,
+        description="[x1, y1, x2, y2] to read a SMILES from; omit to skip OCSR.",
+    )
+    label_bbox: Bbox | None = Field(
+        default=None,
+        description="[x1, y1, x2, y2] to read caption text from; omit to skip OCR.",
+    )
+
+
+class AnalyzeCompoundBoxResponse(BaseModel):
+    """What the models read. Null means 'not asked' or 'could not read'."""
+
+    smiles: str | None = None
+    label_text: str | None = None

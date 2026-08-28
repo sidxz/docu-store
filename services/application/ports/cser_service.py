@@ -49,3 +49,25 @@ class CserService(Protocol):
         wasted work and its output would be discarded by the aggregate anyway.
         """
         ...
+
+    def analyze_boxes(
+        self,
+        render_key: str,
+        structure_bbox: list[float] | None,
+        label_bbox: list[float] | None,
+    ) -> tuple[str | None, str | None]:
+        """Read a human-drawn box pair on a stored render: SMILES + label text.
+
+        Args:
+            render_key: Blob key of the CSER render the coordinates refer to.
+            structure_bbox: ``[x1, y1, x2, y2]`` to run OCSR on, or None to skip.
+            label_bbox: ``[x1, y1, x2, y2]`` to run OCR on, or None to skip.
+
+        Returns:
+            ``(smiles, label_text)``; either side is None when its box was not
+            supplied or the model could not read the crop. Both None with both
+            boxes None is the deliberate warm-up call — it still loads the
+            pipeline.
+
+        """
+        ...

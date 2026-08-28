@@ -372,6 +372,7 @@ class MockCserService:
         self._results = results or []
         self.extract_calls: list[dict] = []
         self.render_calls: list[dict] = []
+        self.analyze_calls: list[dict] = []
 
     def extract_compounds_from_pdf_page(
         self, storage_key: str, page_index: int, render_key: str,
@@ -384,6 +385,24 @@ class MockCserService:
     def render_page_only(self, storage_key: str, page_index: int, render_key: str) -> None:
         self.render_calls.append(
             {"storage_key": storage_key, "page_index": page_index, "render_key": render_key},
+        )
+
+    def analyze_boxes(
+        self,
+        render_key: str,
+        structure_bbox: list[float] | None,
+        label_bbox: list[float] | None,
+    ) -> tuple[str | None, str | None]:
+        self.analyze_calls.append(
+            {
+                "render_key": render_key,
+                "structure_bbox": structure_bbox,
+                "label_bbox": label_bbox,
+            },
+        )
+        return (
+            "CCO" if structure_bbox else None,
+            "1a" if label_bbox else None,
         )
 
 class MockSmilesValidator:
