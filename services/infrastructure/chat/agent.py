@@ -336,6 +336,7 @@ class ChatAgent:
                 sources=used_citations,
                 prompt_tokens=counter.prompt_tokens if counter else 0,
                 completion_tokens=counter.completion_tokens if counter else 0,
+                model=counter.model if counter else None,
             )
 
         except Exception as exc:

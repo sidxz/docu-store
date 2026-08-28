@@ -36,6 +36,7 @@ class TokenCounter:
     __slots__ = (
         "_token",
         "completion_tokens",
+        "models",
         "prompt_tokens",
         "session_id",
         "tags",
@@ -55,16 +56,29 @@ class TokenCounter:
         self.prompt_tokens: int = 0
         self.completion_tokens: int = 0
         self.total_tokens: int = 0
+        self.models: list[str] = []
         self._token = None
         self.user_id = user_id
         self.session_id = session_id
         self.workspace_id = workspace_id
         self.tags = tags
 
-    def add(self, prompt: int, completion: int) -> None:
+    def add(self, prompt: int, completion: int, model: str | None = None) -> None:
         self.prompt_tokens += prompt
         self.completion_tokens += completion
         self.total_tokens += prompt + completion
+        if model and model not in self.models:
+            self.models.append(model)
+
+    @property
+    def model(self) -> str | None:
+        """Which model did the work, in the order the scope reached for them.
+
+        Joined when a scope used more than one — a chat turn can route a cheap
+        model at one stage and the answer model at another — because picking one
+        to name would be a guess about which tokens belong to which.
+        """
+        return ", ".join(self.models) or None
 
     def __enter__(self) -> TokenCounter:
         self._token = _active_counter.set(self)
@@ -86,11 +100,11 @@ def get_active_counter() -> TokenCounter | None:
     return _active_counter.get()
 
 
-def record_usage(prompt: int, completion: int) -> None:
+def record_usage(prompt: int, completion: int, model: str | None = None) -> None:
     """Record token usage on the active counter, if any."""
     counter = _active_counter.get()
     if counter is not None:
-        counter.add(prompt, completion)
+        counter.add(prompt, completion, model)
 
 
 def extract_usage_from_response(response: object) -> tuple[int, int]:
@@ -135,6 +149,28 @@ def extract_usage_from_llm_result(result: object) -> tuple[int, int]:
     return 0, 0
 
 
+def extract_model_from_llm_result(result: object) -> str | None:
+    """The model name a LangChain ``LLMResult`` reports, if it reports one.
+
+    Providers disagree on where it lives: OpenAI-compatible ones put
+    ``model_name`` in ``llm_output``, Ollama puts ``model`` in the message's
+    ``response_metadata``. The name is the *resolved* one, so an OpenRouter
+    route answers with the id it actually served.
+    """
+    out = getattr(result, "llm_output", None) or {}
+    if isinstance(out, dict):
+        name = out.get("model_name") or out.get("model")
+        if name:
+            return str(name)
+    for gens in getattr(result, "generations", None) or []:
+        for gen in gens:
+            meta = getattr(getattr(gen, "message", None), "response_metadata", None) or {}
+            name = meta.get("model_name") or meta.get("model")
+            if name:
+                return str(name)
+    return None
+
+
 class TokenCountingCallbackHandler(AsyncCallbackHandler):
     """Feeds every LLM call's usage into the active ``TokenCounter``.
 
@@ -148,7 +184,7 @@ class TokenCountingCallbackHandler(AsyncCallbackHandler):
     async def on_llm_end(self, response: object, **kwargs: object) -> None:
         prompt, completion = extract_usage_from_llm_result(response)
         if prompt or completion:
-            record_usage(prompt, completion)
+            record_usage(prompt, completion, extract_model_from_llm_result(response))
 
 
 # Stateless (reads the contextvar) — one shared instance is safe across requests.

@@ -68,6 +68,9 @@ export interface TokenUsage {
   prompt: number;
   completion: number;
   total: number;
+  /** What the provider reported answering with — the resolved name, comma-joined
+   *  if the turn used more than one. Null on messages predating this. */
+  model: string | null;
 }
 
 export interface MonthTokenUsage {
@@ -168,6 +171,7 @@ export interface AgentEvent {
   block?: ContentBlock;
   message_id?: string;
   total_tokens?: number;
+  model?: string;
   duration_ms?: number;
   error_message?: string;
   grounding_is_grounded?: boolean;

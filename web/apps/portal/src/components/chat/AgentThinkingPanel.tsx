@@ -291,13 +291,18 @@ function DevPipelineSummary({
   trace: AgentTrace;
   steps: AgentStep[];
   stepTimings: { step: string; durationMs: number | null }[];
-  doneEvent: { duration_ms?: number | null; total_tokens?: number | null } | null;
+  doneEvent: {
+    duration_ms?: number | null;
+    total_tokens?: number | null;
+    model?: string | null;
+  } | null;
   rawEvents: unknown[];
   isStreaming?: boolean;
 }) {
   // Use server-side total or client-side doneEvent
   const totalMs = trace.total_duration_ms ?? doneEvent?.duration_ms;
   const totalTokens = doneEvent?.total_tokens;
+  const model = doneEvent?.model;
 
   // Compute step durations from either source
   const durations = steps.map((s) => ({
@@ -317,6 +322,9 @@ function DevPipelineSummary({
         )}
         {totalTokens != null && (
           <span>tokens: <span className="text-feature-search">{totalTokens}</span></span>
+        )}
+        {model && (
+          <span>model: <span className="text-accent-text">{model}</span></span>
         )}
         {trace.retry_count > 0 && (
           <span className="text-ds-warning">retries: {trace.retry_count}</span>

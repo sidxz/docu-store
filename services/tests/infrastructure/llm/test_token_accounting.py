@@ -17,6 +17,7 @@ from infrastructure.llm.adapters.tool_calling_adapter import NativeToolCallingAd
 from infrastructure.llm.token_counter import (
     TokenCounter,
     TokenCountingCallbackHandler,
+    extract_model_from_llm_result,
     extract_usage_from_llm_result,
 )
 
@@ -137,3 +138,65 @@ def test_call_config_keeps_token_and_langfuse_handlers() -> None:
     cfg = call_config(sentinel)
     assert sentinel in cfg["callbacks"]
     assert any(isinstance(cb, TokenCountingCallbackHandler) for cb in cfg["callbacks"])
+
+
+# ── Which model actually answered, alongside how much it cost ──
+
+
+def _result_with_model(prompt: int, completion: int, *, llm_output=None, meta=None) -> LLMResult:
+    msg = AIMessage(
+        content="ok",
+        usage_metadata={
+            "input_tokens": prompt,
+            "output_tokens": completion,
+            "total_tokens": prompt + completion,
+        },
+        response_metadata=meta or {},
+    )
+    return LLMResult(generations=[[ChatGeneration(message=msg)]], llm_output=llm_output)
+
+
+def test_model_name_is_read_from_either_place_providers_put_it() -> None:
+    """OpenAI-compatible providers use llm_output.model_name; Ollama uses the
+    message's response_metadata.model."""
+    assert (
+        extract_model_from_llm_result(
+            _result_with_model(1, 1, llm_output={"model_name": "gpt-5.6-luna"})
+        )
+        == "gpt-5.6-luna"
+    )
+    assert (
+        extract_model_from_llm_result(_result_with_model(1, 1, meta={"model": "gemma3:27b"}))
+        == "gemma3:27b"
+    )
+    assert extract_model_from_llm_result(_result_with_model(1, 1)) is None
+
+
+async def test_the_counter_records_what_answered_not_just_how_much() -> None:
+    handler = TokenCountingCallbackHandler()
+    with TokenCounter() as counter:
+        await handler.on_llm_end(_result_with_model(10, 5, llm_output={"model_name": "gpt-5.4"}))
+
+    assert counter.model == "gpt-5.4"
+    assert counter.total_tokens == 15
+
+
+async def test_a_turn_using_two_models_names_both() -> None:
+    """Naming one of them would be a guess about which tokens were whose."""
+    handler = TokenCountingCallbackHandler()
+    with TokenCounter() as counter:
+        await handler.on_llm_end(_result_with_model(10, 5, llm_output={"model_name": "gpt-5.4-mini"}))
+        await handler.on_llm_end(_result_with_model(90, 40, llm_output={"model_name": "gpt-5.6-luna"}))
+        await handler.on_llm_end(_result_with_model(5, 5, llm_output={"model_name": "gpt-5.4-mini"}))
+
+    assert counter.model == "gpt-5.4-mini, gpt-5.6-luna"  # deduped, first use first
+    assert counter.total_tokens == 155
+
+
+async def test_a_provider_that_reports_no_model_leaves_it_unset() -> None:
+    handler = TokenCountingCallbackHandler()
+    with TokenCounter() as counter:
+        await handler.on_llm_end(_result(10, 5))
+
+    assert counter.model is None
+    assert counter.total_tokens == 15

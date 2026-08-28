@@ -41,6 +41,7 @@ class AgentEvent(BaseModel):
     total_tokens: int | None = None
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
+    model: str | None = None  # what actually answered, as the provider named it
     duration_ms: int | None = None
     error_message: str | None = None
     # Grounding verification result (emitted as grounding_result event)
@@ -153,6 +154,10 @@ class TokenUsageDTO(BaseModel):
     prompt: int = 0
     completion: int = 0
     total: int = 0
+    # The model the provider reported answering with — the resolved name, so an
+    # OpenRouter route names the id it served. Comma-joined if a turn used more
+    # than one. None on messages written before this was recorded.
+    model: str | None = None
 
 
 # --- Chat Messages ---

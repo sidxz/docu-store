@@ -149,6 +149,12 @@ export function ChatMessage({ message, workspace, isStreaming, onFeedback }: Cha
           title={`${message.token_usage.prompt.toLocaleString()} prompt + ${message.token_usage.completion.toLocaleString()} completion`}
         >
           {message.token_usage.total.toLocaleString()} tokens
+          {message.token_usage.model && (
+            <>
+              {" · "}
+              <span className="text-text-secondary">{message.token_usage.model}</span>
+            </>
+          )}
         </div>
       )}
 

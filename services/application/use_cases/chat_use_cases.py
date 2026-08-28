@@ -523,6 +523,7 @@ class SendMessageUseCase:
                             prompt=final_event.prompt_tokens or 0,
                             completion=final_event.completion_tokens or 0,
                             total=final_event.total_tokens,
+                            model=counter.model,
                         )
 
                     assistant_msg = ChatMessageDTO(
@@ -588,6 +589,7 @@ class SendMessageUseCase:
             prompt=counter.prompt_tokens,
             completion=counter.completion_tokens,
             total=counter.total_tokens,
+            model=counter.model,
             ref=str(conversation_id),
             created_at=datetime.now(UTC),
         )
