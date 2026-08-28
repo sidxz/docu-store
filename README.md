@@ -309,11 +309,8 @@ docu-store/
 
 ## License
 
-[GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only).
+Copyright (C) 2026 Siddhant Rath.
 
-Free to use, modify, self-host, and run internally — including commercially. The
-condition: if you offer DocuStore to others over a network, you must make the complete
-corresponding source of your modified version available to those users under the same
-license.
+Licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only).
 
 For use without AGPL obligations, contact the copyright holder about a commercial license.
