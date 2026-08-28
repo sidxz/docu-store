@@ -1,8 +1,8 @@
 from typing import Annotated
 
+from duar_auth import RequestAuth
 from fastapi import APIRouter, Depends, status
 from lagom import Container
-from duar_auth import RequestAuth
 
 from application.dtos.dashboard_dtos import DashboardStatsResponse
 from application.ports.repositories.dashboard_read_models import DashboardReadModel

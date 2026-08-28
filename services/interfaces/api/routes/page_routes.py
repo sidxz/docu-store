@@ -2,9 +2,9 @@ import asyncio
 from typing import Annotated
 from uuid import UUID
 
+from duar_auth import RequestAuth
 from fastapi import APIRouter, Depends, HTTPException, status
 from lagom import Container
-from duar_auth import RequestAuth
 
 from application.dtos.correction_dtos import CorrectPageCompoundMentionsRequest
 from application.dtos.cser_dtos import (

@@ -279,10 +279,10 @@ class Artifact(Aggregate):
         *,
         corrected_by_id: str,
         corrected_by_name: str | None,
-        title_mention: TitleMention | None | object = _UNSET,
+        title_mention: TitleMention | object | None = _UNSET,
         tag_mentions: list[TagMention] | object = _UNSET,
         author_mentions: list[AuthorMention] | object = _UNSET,
-        presentation_date: PresentationDate | None | object = _UNSET,
+        presentation_date: PresentationDate | object | None = _UNSET,
     ) -> list[str]:
         """Apply human corrections: value events + one provenance event, atomically."""
         if self.is_deleted:

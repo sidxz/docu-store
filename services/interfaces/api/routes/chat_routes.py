@@ -7,12 +7,12 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 import structlog
+from duar_auth import RequestAuth
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from lagom import Container
 from pydantic import BaseModel, Field
 from returns.result import Failure, Success
-from duar_auth import RequestAuth
 
 from application.dtos.chat_dtos import (
     ChatFeedbackDTO,

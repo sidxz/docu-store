@@ -117,6 +117,10 @@ ignore = [
     "PYI034", # __enter__ methods usually return self
     "DTZ901", # datetime.min without timezone
     "B905",   # zip() without strict parameter
+    # `select = ["ALL"]` enrols every rule a new ruff stabilises, so rules this
+    # project will never adopt are pinned off here rather than rediscovered in CI.
+    "CPY001", # Missing copyright notice at top of file
+    "PLR0917",# Too many positional arguments
 ]
 
 [tool.ruff.format]

@@ -635,9 +635,12 @@ class SearchCompoundStructureTool:
         expanded_lines = [
             f"Compound: {compound_name}",
             f"Chemical structure (SMILES notation): `{anchor_smiles}`",
-            f"Note: The SMILES string above IS the complete molecular structure of {compound_name}. "
-            f"SMILES encodes all atoms, bonds, stereochemistry, and connectivity. "
-            f"A 2D molecule diagram has been rendered for the user from this SMILES.",
+            (
+                f"Note: The SMILES string above IS the complete molecular structure of "
+                f"{compound_name}. SMILES encodes all atoms, bonds, stereochemistry, and "
+                f"connectivity. A 2D molecule diagram has been rendered for the user from "
+                f"this SMILES."
+            ),
             f"Source: artifact {anchor.artifact_id}, page {anchor.page_index}",
         ]
         if similar_lines:

@@ -1,10 +1,10 @@
 from uuid import UUID
 
 import structlog
+from duar_auth import RequestAuth
 from fastapi import HTTPException, status
 from lagom import Container
 from returns.result import Failure
-from duar_auth import RequestAuth
 
 from application.dtos.artifact_dtos import ArtifactResponse
 from application.dtos.errors import AppError

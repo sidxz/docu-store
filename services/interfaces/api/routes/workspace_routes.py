@@ -6,11 +6,11 @@ from io import BytesIO
 from typing import Annotated
 from uuid import UUID
 
+from duar_auth import RequestAuth
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from lagom import Container
 from pydantic import BaseModel, Field
-from duar_auth import RequestAuth
 
 from application.dtos.usage_dtos import TokenLimitEntry
 from application.ports.blob_store import BlobStore

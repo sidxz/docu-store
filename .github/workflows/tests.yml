@@ -26,7 +26,10 @@ jobs:
       - name: Run lint
         # uvx runs ruff as an isolated tool — no project dep install needed.
         # Ruff discovers pyproject.toml automatically from the working directory.
-        run: cd services && uvx ruff check application/ domain/ infrastructure/ interfaces/
+        # Pinned: unpinned uvx resolves the newest ruff, which with `select = ["ALL"]`
+        # enrols newly stabilised rules and reddens CI with no commit involved.
+        # Keep in step with the ruff floor in services/pyproject.toml.
+        run: cd services && uvx ruff@0.14.14 check application/ domain/ infrastructure/ interfaces/
 
   test:
     runs-on: ubuntu-latest

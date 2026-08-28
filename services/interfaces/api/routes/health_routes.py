@@ -3,9 +3,9 @@
 from typing import Annotated
 
 import structlog
+from duar_auth import RequestAuth
 from fastapi import APIRouter, Depends, HTTPException, status
 from lagom import Container
-from duar_auth import RequestAuth
 
 from application.dtos.health_dtos import (
     BulkReEmbedRequest,

@@ -5,9 +5,9 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 import structlog
+from duar_auth import RequestAuth
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from lagom import Container
-from duar_auth import RequestAuth
 from temporalio.client import Client
 
 from application.dtos.stats_dtos import (

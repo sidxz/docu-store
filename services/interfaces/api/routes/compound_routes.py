@@ -2,9 +2,9 @@
 
 from typing import Annotated
 
+from duar_auth import RequestAuth
 from fastapi import APIRouter, Depends, status
 from lagom import Container
-from duar_auth import RequestAuth
 
 from application.dtos.compound_dtos import CompoundProfileDTO
 from application.use_cases.compound_profile_use_case import GetCompoundProfileUseCase
