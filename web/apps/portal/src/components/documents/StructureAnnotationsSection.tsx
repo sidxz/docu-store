@@ -8,7 +8,11 @@ import { Card, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { API_URL } from "@/lib/constants";
-import { useCorrectPageCompounds, type CorrectedCompoundInput } from "@/hooks/use-pages";
+import {
+  useCorrectPageCompounds,
+  useRerunPageWorkflow,
+  type CorrectedCompoundInput,
+} from "@/hooks/use-pages";
 import { EditCompoundDialog } from "@/components/documents/EditCompoundDialog";
 import type { CompoundMention } from "@docu-store/types";
 
@@ -389,6 +393,7 @@ export function StructureAnnotationsSection({
     expanded ? `${API_URL}/artifacts/${artifactId}/pages/${pageIndex}/image?size=cser` : "",
   );
   const correct = useCorrectPageCompounds(pageId);
+  const rerun = useRerunPageWorkflow(pageId);
 
   // A page with no detections is the commonest — and most valuable — negative, so
   // a reviewer must still be able to open it and mark it reviewed-empty (or draw a
@@ -530,6 +535,20 @@ export function StructureAnnotationsSection({
     setDrawMode(null);
   };
 
+  // Every correction here is a HUMAN assertion about what is printed on the page, and it
+  // is only truthful about a page the human can actually see. With no render there is
+  // nothing to see, so all three write paths are blind — and the empty one is a trap:
+  // "No compounds on this page" on a never-analysed page exports that page as a confirmed
+  // negative (a sheet full of molecules teaching the detector there is nothing there) and
+  // sets `human_corrections.compound_mentions`, after which the extraction guard means a
+  // re-run can only re-render, never re-detect. Blocked until the image is on screen;
+  // stated as text because browsers swallow `title` on a disabled button.
+  const blindReason = error
+    ? "No page render — run compound extraction first; you can't confirm what you can't see."
+    : !blobUrl
+      ? "Waiting for the page render…"
+      : null;
+
   // "Add label" attaches to a selection, so it has two ways of being unavailable. Both
   // are rendered as text next to the button — a greyed-out button with no stated reason
   // reads as broken.
@@ -563,16 +582,33 @@ export function StructureAnnotationsSection({
                 {!editing ? (
                   <>
                     {compounds.length > 0 && (
-                      <Button size="sm" onClick={approve} disabled={correct.isPending}>
+                      <Button
+                        size="sm"
+                        onClick={approve}
+                        disabled={correct.isPending || blindReason !== null}
+                      >
                         Approve as correct
                       </Button>
                     )}
-                    <Button size="sm" variant="outline" onClick={toggleEditing}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={toggleEditing}
+                      disabled={blindReason !== null}
+                    >
                       Edit boxes
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={markEmpty} disabled={correct.isPending}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={markEmpty}
+                      disabled={correct.isPending || blindReason !== null}
+                    >
                       No compounds on this page
                     </Button>
+                    {blindReason && (
+                      <span className="text-xs text-text-muted">{blindReason}</span>
+                    )}
                   </>
                 ) : (
                   <>
@@ -618,9 +654,33 @@ export function StructureAnnotationsSection({
             )}
 
             {error ? (
-              <p className="text-sm text-text-muted">
-                No structure render stored for this page — re-run compound extraction.
-              </p>
+              /* The render is written by compound extraction (even when it finds nothing),
+                 so "no render" means extraction never ran here. Telling the reviewer to
+                 re-run it while the only control lives in a section they can't see from
+                 here is a dead end — same mutation, same workflow name, put in reach. */
+              <div className="space-y-2">
+                <p className="text-sm text-text-muted">
+                  No structure render stored for this page — compound extraction has not run
+                  here yet.
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => rerun.mutate("compound_extraction")}
+                    disabled={rerun.isPending || rerun.isSuccess}
+                  >
+                    {rerun.isPending ? "Starting…" : "Run compound extraction"}
+                  </Button>
+                  <span className="text-xs text-text-muted">
+                    {rerun.isSuccess
+                      ? "Started. It runs in the background — reload this page in a minute to see the render."
+                      : rerun.isError
+                        ? "Could not start it. Try again from the Workflows section below."
+                        : "Runs in the background; reload this page once it finishes."}
+                  </span>
+                </div>
+              </div>
             ) : !blobUrl ? (
               <Skeleton className="h-[600px] w-full rounded-lg bg-surface-elevated" />
             ) : (
