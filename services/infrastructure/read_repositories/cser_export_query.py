@@ -15,6 +15,7 @@ def build_cser_export_query(
     *,
     only_reviewed: bool,
     since: datetime | None,
+    allowed_artifact_ids: list[UUID] | None = None,
 ) -> dict:
     """Build the Mongo filter for pages to include in a training export.
 
@@ -27,8 +28,19 @@ def build_cser_export_query(
     read model (see ``MongoReadModelMaterializer.delete_page``), not a soft
     flag, so a deleted page is already absent from the collection — there is
     nothing to filter.
+
+    ``allowed_artifact_ids`` is the caller's per-artifact ACL (None = full
+    access, as ``get_allowed_artifact_ids`` returns it). Workspace scope alone
+    is not enough here: the export ships every render, SMILES and coordinate
+    set it matches, so a reviewer with ``artifacts:hiledit`` but restricted
+    artifact visibility must not be able to download the rest of the workspace.
     """
     query: dict = {"workspace_id": str(workspace_id)}
+
+    if allowed_artifact_ids is not None:
+        # Pages store artifact_id as a string; an empty list matches nothing,
+        # which is the correct answer for a user allowed no artifacts.
+        query["artifact_id"] = {"$in": [str(a) for a in allowed_artifact_ids]}
 
     if only_reviewed:
         query["human_corrections.compound_mentions"] = {"$exists": True}

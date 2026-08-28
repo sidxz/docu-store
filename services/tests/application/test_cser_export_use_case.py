@@ -183,3 +183,25 @@ def test_source_filename_is_none_when_the_map_has_no_entry():
     with zipfile.ZipFile(BytesIO(raw)) as zf:
         manifest = json.loads(zf.read("manifest.json"))
         assert manifest["pages"][0]["source_filename"] is None
+
+
+def test_a_page_whose_mentions_all_lack_coordinates_is_skipped_not_exported_as_empty():
+    # An empty ground_truth is a *claim*: "a human confirmed there are no
+    # structures here". A page whose mentions merely predate coordinates must
+    # not make that claim — it would train the detector to miss real structures.
+    page_id, artifact_id = uuid4(), uuid4()
+    mentions = [{"smiles": "CCO", "extracted_id": "1a", "structure_bbox": None, "label_bbox": None}]
+    blob = FakeBlobStore({cser_render_key(artifact_id, 0): _png(100, 100)})
+
+    raw = build_cser_export_zip([_page(page_id, artifact_id, 0, mentions)], blob, WORKSPACE, EXPORTED_AT)
+
+    with zipfile.ZipFile(BytesIO(raw)) as zf:
+        names = zf.namelist()
+        assert f"ground_truth/{page_id}.json" not in names
+        assert f"images/{page_id}.png" not in names
+        assert f"labels/{page_id}.txt" not in names
+        manifest = json.loads(zf.read("manifest.json"))
+        assert manifest["skipped"] == [
+            {"page_id": str(page_id), "reason": "mentions have no coordinates"}
+        ]
+        assert manifest["pages"] == []

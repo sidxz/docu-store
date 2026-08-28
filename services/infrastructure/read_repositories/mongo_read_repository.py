@@ -121,8 +121,14 @@ class MongoReadRepository(
         *,
         only_reviewed: bool,
         since: datetime | None,
+        allowed_artifact_ids: list[UUID] | None = None,
     ) -> list[dict]:
-        query = build_cser_export_query(workspace_id, only_reviewed=only_reviewed, since=since)
+        query = build_cser_export_query(
+            workspace_id,
+            only_reviewed=only_reviewed,
+            since=since,
+            allowed_artifact_ids=allowed_artifact_ids,
+        )
         return [doc async for doc in self.pages.find(query)]
 
     async def get_artifact_by_id(

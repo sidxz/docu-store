@@ -28,8 +28,18 @@ interface CompoundGridProps {
   humanCorrection?: HumanCorrectionInfo | null;
 }
 
-/** Strips derived/server-computed fields (canonical_smiles, is_smiles_valid, confidence, ...) —
- *  the backend recomputes those on every save. */
+/** Round-trips a fetched mention back into the full-list PUT payload.
+ *
+ *  Only genuinely DERIVED fields are dropped (canonical_smiles, is_smiles_valid,
+ *  confidence, ...) — the backend recomputes those from the SMILES on every save.
+ *
+ *  The bounding boxes are NOT derived and must never be dropped: they are
+ *  human-owned annotation data whose only copy is the one being sent back. The
+ *  server decides "unchanged vs edited" on an identity tuple that includes both
+ *  boxes, so omitting them makes every mention look new, and it rebuilds them all
+ *  with structure_bbox = null. That write also sets human_corrections, which stops
+ *  re-extraction from ever restoring the coordinates — the page then exports as a
+ *  confirmed negative. Anything listed here is load-bearing; do not trim it. */
 function toCorrectedInput(cm: CompoundMention): CorrectedCompoundInput {
   return {
     smiles: cm.smiles,
@@ -38,6 +48,8 @@ function toCorrectedInput(cm: CompoundMention): CorrectedCompoundInput {
     cdd_id: cm.cdd_id,
     chembl_id: cm.chembl_id,
     pdb_id: cm.pdb_id,
+    structure_bbox: cm.structure_bbox,
+    label_bbox: cm.label_bbox,
   };
 }
 
@@ -58,9 +70,15 @@ export function CompoundGrid({
   // current list, built from the *fetched* mentions so untouched cards round-trip verbatim.
   const handleSave = async (item: CorrectedCompoundInput) => {
     const base = compounds.map(toCorrectedInput);
+    // The dialog edits identifiers only and returns no coordinates, so carry the
+    // edited card's existing boxes across instead of letting them fall out.
     const next =
       editor && editor !== "add"
-        ? base.map((c, i) => (i === editor.index ? item : c))
+        ? base.map((c, i) =>
+            i === editor.index
+              ? { ...item, structure_bbox: c.structure_bbox, label_bbox: c.label_bbox }
+              : c,
+          )
         : [...base, item];
     await correctMutation.mutateAsync({ compound_mentions: next });
     toast.success(editor === "add" ? "Compound added" : "Compound updated");

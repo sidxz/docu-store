@@ -562,6 +562,7 @@ class MockPageReadModel:
         *,
         only_reviewed: bool,
         since: Any = None,
+        allowed_artifact_ids: Any = None,
     ) -> list:
         return list(self._pages.values())
 

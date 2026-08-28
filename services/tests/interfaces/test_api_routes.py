@@ -104,6 +104,7 @@ class FakePageReadModel(PageReadModel):
         *,
         only_reviewed: bool,
         since: datetime | None,
+        allowed_artifact_ids: list[UUID] | None = None,
     ) -> list[dict]:
         return []
 

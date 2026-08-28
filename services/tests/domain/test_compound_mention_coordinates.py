@@ -1,5 +1,8 @@
 """Coordinate fields on CompoundMention (pixels of the page's _cser.png)."""
 
+import pytest
+from pydantic import ValidationError
+
 from domain.value_objects.compound_mention import CompoundMention
 
 
@@ -48,3 +51,14 @@ def test_equality_still_keys_on_canonical_smiles_not_coordinates():
 
     assert a == b
     assert hash(a) == hash(b)
+
+
+def test_a_box_that_is_not_four_numbers_is_rejected():
+    # yolo_line in the export unpacks `x1, y1, x2, y2 = box`. A malformed box
+    # stored here would raise there and take down the whole workspace export,
+    # so it is rejected at the only place every writer passes through.
+    for bad in ([1, 2, 3], [1, 2, 3, 4, 5]):
+        with pytest.raises(ValidationError):
+            CompoundMention(smiles="CCO", structure_bbox=bad)
+        with pytest.raises(ValidationError):
+            CompoundMention(smiles="CCO", structure_bbox=[1, 2, 3, 4], label_bbox=bad)

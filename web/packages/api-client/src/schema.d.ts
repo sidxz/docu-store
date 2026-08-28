@@ -1856,6 +1856,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspace/cser-training-export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Cser Training Data
+         * @description Download this workspace's CSER annotations as a structflo-cser data_dir.
+         *
+         *     Unzips into images/ + ground_truth/ + labels/, ready for
+         *     `sf-train-relmatch --data-dir <dir>` and for YOLO detector training.
+         *
+         *     Defaults to human-reviewed pages only. `only_reviewed=false` adds machine
+         *     output for bootstrapping — useful, but explicitly not ground truth.
+         */
+        get: operations["export_cser_training_data_workspace_cser_training_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -7555,6 +7581,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_cser_training_data_workspace_cser_training_export_get: {
+        parameters: {
+            query?: {
+                /** @description Human-reviewed pages only */
+                only_reviewed?: boolean;
+                /** @description Only corrections at or after this time */
+                since?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
             };
             /** @description Validation Error */
             422: {

@@ -55,3 +55,27 @@ def test_bootstrap_mode_takes_any_page_that_has_mentions():
     query = build_cser_export_query(WORKSPACE, only_reviewed=False, since=None)
 
     assert query["compound_mentions"] == {"$exists": True, "$ne": []}
+
+
+def test_restricted_artifact_visibility_is_carried_into_the_filter():
+    # `artifacts:hiledit` is not "see every document": the export must be
+    # scoped to the artifacts this caller can view, or it hands out every
+    # render, SMILES and coordinate set in the workspace.
+    allowed = [UUID("11111111-1111-1111-1111-111111111111")]
+
+    query = build_cser_export_query(
+        WORKSPACE, only_reviewed=True, since=None, allowed_artifact_ids=allowed
+    )
+
+    # Stored as a string on the page document, not a UUID.
+    assert query["artifact_id"] == {"$in": [str(allowed[0])]}
+
+
+def test_full_access_adds_no_artifact_clause():
+    # get_allowed_artifact_ids returns None for full access (and when Duar is
+    # down); None must mean "no extra filter", never "match nothing".
+    query = build_cser_export_query(
+        WORKSPACE, only_reviewed=True, since=None, allowed_artifact_ids=None
+    )
+
+    assert "artifact_id" not in query

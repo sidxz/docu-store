@@ -18,7 +18,7 @@ from application.ports.repositories.artifact_read_models import ArtifactReadMode
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.token_limit_store import TokenLimitStore
 from application.use_cases.cser_export_use_case import build_cser_export_zip
-from interfaces.api.routes.helpers import require_action
+from interfaces.api.routes.helpers import get_allowed_artifact_ids, require_action
 from interfaces.dependencies import get_auth, get_container
 
 router = APIRouter(prefix="/workspace", tags=["workspace"])
@@ -130,7 +130,9 @@ async def _source_filenames_by_artifact_id(
 
     Pages don't carry the filename themselves; the artifact document does.
     """
-    artifact_ids = {page["artifact_id"] for page in pages}
+    # sorted() because the set is iterated twice below and zipped positionally;
+    # set iteration order is stable in practice but nothing guarantees it.
+    artifact_ids = sorted({page["artifact_id"] for page in pages})
     repo = container[ArtifactReadModel]
     artifacts = await asyncio.gather(
         *(repo.get_artifact_by_id(UUID(artifact_id), workspace_id=auth.workspace_id) for artifact_id in artifact_ids)
@@ -157,10 +159,17 @@ async def export_cser_training_data(
     output for bootstrapping — useful, but explicitly not ground truth.
     """
     await require_action(auth, "artifacts:hiledit")
+    # hiledit says "may review annotations", not "may see every document": filter
+    # to the artifacts this caller can actually view, like every other
+    # multi-artifact endpoint does.
+    allowed_artifact_ids = await get_allowed_artifact_ids(auth)
 
     read_model = container[PageReadModel]
     pages = await read_model.get_pages_for_cser_export(
-        auth.workspace_id, only_reviewed=only_reviewed, since=since
+        auth.workspace_id,
+        only_reviewed=only_reviewed,
+        since=since,
+        allowed_artifact_ids=allowed_artifact_ids,
     )
     artifact_filenames = await _source_filenames_by_artifact_id(pages, auth, container)
     payload = build_cser_export_zip(

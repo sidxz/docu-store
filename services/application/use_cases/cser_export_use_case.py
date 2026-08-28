@@ -77,13 +77,13 @@ def build_cser_export_zip(
                 continue
 
             image_bytes = blob_store.get_bytes(render_key)
-            archive.writestr(f"images/{page_id}.png", image_bytes)
             with Image.open(BytesIO(image_bytes)) as image:
                 width, height = image.size
 
+            mentions = page.get("compound_mentions") or []
             ground_truth: list[dict] = []
             yolo_lines: list[str] = []
-            for mention in page.get("compound_mentions") or []:
+            for mention in mentions:
                 structure_box = mention.get("structure_bbox")
                 if not structure_box:
                     continue  # extracted before coordinates existed
@@ -100,6 +100,15 @@ def build_cser_export_zip(
                 if label_box:
                     yolo_lines.append(yolo_line(LABEL_CLASS, label_box, width, height))
 
+            if mentions and not ground_truth:
+                # Every mention on the page predates coordinates. Writing `[]` here
+                # would be indistinguishable from a human-confirmed empty page — a
+                # real negative the detector trains on — so teach it nothing rather
+                # than teach it "no structures here" about a page full of them.
+                skipped.append({"page_id": page_id, "reason": "mentions have no coordinates"})
+                continue
+
+            archive.writestr(f"images/{page_id}.png", image_bytes)
             # [] is meaningful: a page a human confirmed has no structures.
             archive.writestr(f"ground_truth/{page_id}.json", json.dumps(ground_truth, indent=2))
             if yolo_lines:

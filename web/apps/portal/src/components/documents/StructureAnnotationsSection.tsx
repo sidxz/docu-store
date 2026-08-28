@@ -329,7 +329,10 @@ export function StructureAnnotationsSection({
   );
   const correct = useCorrectPageCompounds(pageId);
 
-  if (compounds.length === 0) return null;
+  // A page with no detections is the commonest — and most valuable — negative, so
+  // a reviewer must still be able to open it and mark it reviewed-empty (or draw a
+  // box the detector missed). Only the read-only view has nothing to show.
+  if (compounds.length === 0 && !editable) return null;
 
   // While editing, the draft (`working`) is the source of truth for both the overlay
   // and the card grid below it; otherwise it's the loaded `compounds` as-is.
@@ -388,15 +391,37 @@ export function StructureAnnotationsSection({
   const handleStructureClick = (srcIndex: number) =>
     setPairSource((prev) => (prev === srcIndex ? null : srcIndex));
 
+  /** Re-pair: the clicked label box (on `srcIndex`) belongs to the structure picked
+   *  first (`target`). This SWAPS the label box and its text between the two, never
+   *  copies: one box on two mentions would export twice and claim two owners. The
+   *  text travels with the box because `extracted_id` becomes the exported
+   *  `label_text` — the words physically inside that rectangle — so leaving it
+   *  behind would ship a box captioned with someone else's label. Swapping (rather
+   *  than clearing the source) fixes the usual cause in one gesture — two structures
+   *  holding each other's labels — and destroys nothing: when the target is
+   *  unlabelled it hands back null, which is exactly a move. */
   const handleLabelClick = (srcIndex: number) => {
-    if (pairSource === null) return;
+    if (pairSource === null || pairSource === srcIndex) return;
     const target = pairSource;
     setWorking((prev) => {
       if (!prev) return prev;
-      const label = prev[srcIndex]?.label_bbox;
-      if (!label) return prev;
-      const bbox = [...label];
-      return prev.map((m, i) => (i === target ? { ...m, label_bbox: bbox } : m));
+      const from = prev[srcIndex];
+      const to = prev[target];
+      const label = from?.label_bbox;
+      if (!from || !to || !label) return prev;
+      return prev.map((m, i) => {
+        if (i === target) {
+          return { ...m, label_bbox: [...label], extracted_id: from.extracted_id ?? null };
+        }
+        if (i === srcIndex) {
+          return {
+            ...m,
+            label_bbox: to.label_bbox ? [...to.label_bbox] : null,
+            extracted_id: to.extracted_id ?? null,
+          };
+        }
+        return m;
+      });
     });
     setPairSource(null);
   };
@@ -433,9 +458,11 @@ export function StructureAnnotationsSection({
               <div className="flex flex-wrap items-center gap-2">
                 {!editing ? (
                   <>
-                    <Button size="sm" onClick={approve} disabled={correct.isPending}>
-                      Approve as correct
-                    </Button>
+                    {compounds.length > 0 && (
+                      <Button size="sm" onClick={approve} disabled={correct.isPending}>
+                        Approve as correct
+                      </Button>
+                    )}
                     <Button size="sm" variant="outline" onClick={toggleEditing}>
                       Edit boxes
                     </Button>

@@ -1,6 +1,15 @@
+from typing import Annotated
+
 from pydantic import ConfigDict, Field, field_validator
 
 from domain.value_objects.extraction_metadata import ExtractionMetadata
+
+# Exactly four ints, always [x1, y1, x2, y2]. Constrained here rather than in the
+# DTO because every writer — detector adapter and human correction alike — builds
+# a CompoundMention, so this is the one place a malformed box can be stopped. A
+# 3- or 5-element box unpacks fatally in the export's `yolo_line`, which would take
+# down the whole workspace export for one bad row.
+BBox = Annotated[list[int], Field(min_length=4, max_length=4)]
 
 
 class CompoundMention(ExtractionMetadata):
@@ -34,7 +43,7 @@ class CompoundMention(ExtractionMetadata):
         None,
         description="Primary chemical identifier as extracted from the document",
     )
-    structure_bbox: list[int] | None = Field(
+    structure_bbox: BBox | None = Field(
         None,
         description=(
             "Structure box [x1, y1, x2, y2] in PIXELS of this page's CSER render "
@@ -42,7 +51,7 @@ class CompoundMention(ExtractionMetadata):
             "without that image, which is why the image is persisted, never re-derived."
         ),
     )
-    label_bbox: list[int] | None = Field(
+    label_bbox: BBox | None = Field(
         None,
         description="Label box [x1, y1, x2, y2] in the same pixel space; None for an unlabelled structure",
     )
