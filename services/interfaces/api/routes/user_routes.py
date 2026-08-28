@@ -3,6 +3,7 @@
 Not event-sourced. Simple operational metadata storage.
 """
 
+from dataclasses import replace
 from typing import Annotated
 
 from duar_auth import RequestAuth
@@ -24,10 +25,10 @@ from application.dtos.user_dtos import (
 )
 from application.ports.repositories.user_activity_store import UserActivityStore
 from application.ports.repositories.user_preferences_store import UserPreferencesStore
-from application.ports.user_llm_config import UserLLMConfigStore
+from application.ports.user_llm_config import UserLLMConfig, UserLLMConfigStore
 from application.services.llm_providers import PRESETS
 from infrastructure.config import Settings
-from infrastructure.llm.provider_probe import probe_user_llm_config
+from infrastructure.llm.provider_probe import probe_ner_support, probe_user_llm_config
 from interfaces.dependencies import get_auth, get_container
 
 router = APIRouter(prefix="/user", tags=["user"])
@@ -208,13 +209,31 @@ async def get_llm_provider(
     )
 
 
+async def _require_ner_capable(cfg: UserLLMConfig, settings: Settings) -> None:
+    """Refuse a config whose ingestion model cannot run entity extraction.
+
+    Entity extraction is not an optional lane here — a document ingested without
+    it is missing most of what makes it findable — so a model that rejects the
+    structured-output request NER makes must never reach storage. Only an outright
+    provider refusal blocks: a timeout or a 5xx still saves, or an outage would
+    lock the user out of the very settings page they need to fix it.
+    """
+    probe = await probe_ner_support(cfg, allow_cloud=settings.allow_cloud_llm)
+    if probe.refused:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"This model cannot run entity extraction, which this workspace "
+            f"requires: {probe.detail}",
+        )
+
+
 @router.put("/llm-provider", status_code=status.HTTP_204_NO_CONTENT)
 async def set_llm_provider(
     body: LLMProviderRequest,
     container: Annotated[Container, Depends(get_container)],
     auth: Annotated[RequestAuth, Depends(get_auth)],
 ) -> None:
-    _require_user_keys(container)
+    settings = _require_user_keys(container)
     store = container[UserLLMConfigStore]
     api_key = body.api_key.strip() if body.api_key is not None else None
     if api_key is not None and not 8 <= len(api_key) <= 512:
@@ -232,6 +251,11 @@ async def set_llm_provider(
         preset = PRESETS[entry.provider]
         model = body.model or preset.model
         chat_model = body.chat_model or preset.chat_model
+        stored = await store.get(auth.workspace_id, auth.user_id)
+        if stored is not None:
+            await _require_ner_capable(
+                replace(stored, model=model, chat_model=chat_model), settings
+            )
         if not await store.update_models(
             auth.workspace_id,
             auth.user_id,
@@ -246,6 +270,16 @@ async def set_llm_provider(
     preset = PRESETS[body.provider]
     model = body.model or preset.model
     chat_model = body.chat_model or preset.chat_model
+    await _require_ner_capable(
+        UserLLMConfig(
+            provider=preset.provider,
+            api_key=api_key,
+            base_url=preset.base_url,
+            model=model,
+            chat_model=chat_model,
+        ),
+        settings,
+    )
     await store.set(
         auth.workspace_id,
         auth.user_id,

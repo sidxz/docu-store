@@ -38,7 +38,7 @@ export interface LlmLaneTestResult {
 
 export interface LlmProviderTestResult {
   ok: boolean;
-  lanes: Record<"batch" | "chat", LlmLaneTestResult>;
+  lanes: Record<"batch" | "chat" | "ner", LlmLaneTestResult>;
 }
 
 export function useLlmProvider() {

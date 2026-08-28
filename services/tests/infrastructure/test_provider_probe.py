@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import sys
+import types
+from types import SimpleNamespace
+
 import pytest
 
 from application.ports.user_llm_config import UserLLMConfig
-from domain.exceptions import LLMAuthError
+from domain.exceptions import LLMAuthError, LLMBadRequestError, LLMRateLimitedError
 from infrastructure.llm import provider_probe
 
 
@@ -30,11 +34,41 @@ def _patch(monkeypatch: pytest.MonkeyPatch, failures: dict[str, Exception | None
     return calls
 
 
+def _patch_ner(monkeypatch: pytest.MonkeyPatch, fail: Exception | None, compounds=("Gefitinib",)):
+    """Stub the extractor so probing never leaves the machine."""
+
+    class _FakeExtractor:
+        def __init__(self, **kwargs) -> None:
+            self.kwargs = kwargs
+            built.append(kwargs)
+
+        def extract(self, text):
+            if fail:
+                raise fail
+            return SimpleNamespace(compounds=list(compounds))
+
+    built: list[dict] = []
+    module = types.ModuleType("structflo.ner")
+    module.NERExtractor = _FakeExtractor
+    profiles = types.ModuleType("structflo.ner.profiles")
+    profiles.CHEMISTRY = object()
+    monkeypatch.setitem(sys.modules, "structflo.ner", module)
+    monkeypatch.setitem(sys.modules, "structflo.ner.profiles", profiles)
+    return built
+
+
+@pytest.fixture(autouse=True)
+def _no_live_ner(monkeypatch: pytest.MonkeyPatch):
+    """Nothing in this file may reach a provider; tests that care re-stub explicitly."""
+    _patch_ner(monkeypatch, None)
+
+
 async def test_same_model_for_both_lanes_is_probed_once(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = _patch(monkeypatch, {})
+    _patch_ner(monkeypatch, None)
     cfg = UserLLMConfig(provider="openai", api_key="key-x", model="gpt-5-mini", chat_model=None)
     out = await provider_probe.probe_user_llm_config(cfg, allow_cloud=True)
-    assert out == {"batch": (True, None), "chat": (True, None)}
+    assert out == {"batch": (True, None), "chat": (True, None), "ner": (True, None)}
     assert len(calls) == 1
     assert calls[0]["api_key"] == "key-x" and calls[0]["allow_cloud"] is True
 
@@ -61,3 +95,79 @@ async def test_missing_model_is_a_soft_failure(monkeypatch: pytest.MonkeyPatch) 
     out = await provider_probe.probe_user_llm_config(cfg, allow_cloud=True)
     assert out["batch"] == (False, "No model configured.")
     assert calls == []
+
+
+# ── NER lane: entity extraction is not optional, so it gets its own verdict ──
+
+
+async def test_ner_lane_probes_the_real_extractor_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch(monkeypatch, {})
+    built = _patch_ner(monkeypatch, None)
+    cfg = UserLLMConfig(
+        provider="openai", api_key="key-x", base_url="https://openrouter.ai/api/v1", model="m",
+    )
+    probe = await provider_probe.probe_ner_support(cfg, allow_cloud=True)
+
+    assert probe.ok and not probe.refused
+    # The OpenRouter base URL has to reach the extractor or NER silently hits OpenAI.
+    assert built[0]["model_url"] == "https://openrouter.ai/api/v1"
+    assert built[0]["provider"] == "openai"
+
+
+async def test_a_model_that_rejects_the_schema_is_a_refusal(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Plain completion fine, structured call 4xx → the schema is the difference."""
+    _patch(monkeypatch, {})
+    _patch_ner(monkeypatch, LLMBadRequestError("response_format json_schema is not supported"))
+    cfg = UserLLMConfig(provider="openai", api_key="key-x", model="m")
+    probe = await provider_probe.probe_ner_support(cfg, allow_cloud=True)
+
+    assert not probe.ok
+    assert probe.refused
+
+
+async def test_a_bad_key_is_not_mistaken_for_a_refusal(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Gemini answers a malformed key with a 400 too — blocking the save on that
+    would lock the user out of the settings page they need to fix it."""
+    _patch(monkeypatch, {"m": LLMAuthError("The provider rejected the key (401).")})
+    _patch_ner(monkeypatch, LLMBadRequestError("API key not valid"))
+    cfg = UserLLMConfig(provider="gemini", api_key="bad", model="m")
+    probe = await provider_probe.probe_ner_support(cfg, allow_cloud=True)
+
+    assert not probe.ok
+    assert not probe.refused
+
+
+async def test_transient_failures_never_refuse(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch(monkeypatch, {})
+    _patch_ner(monkeypatch, LLMRateLimitedError("rate limited"))
+    cfg = UserLLMConfig(provider="openai", api_key="key-x", model="m")
+
+    assert not (await provider_probe.probe_ner_support(cfg, allow_cloud=True)).refused
+
+
+async def test_a_model_that_answers_but_extracts_nothing_fails_without_blocking(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch(monkeypatch, {})
+    _patch_ner(monkeypatch, None, compounds=())
+    cfg = UserLLMConfig(provider="openai", api_key="key-x", model="m")
+    probe = await provider_probe.probe_ner_support(cfg, allow_cloud=True)
+
+    assert not probe.ok
+    assert not probe.refused
+
+
+async def test_a_provider_langextract_cannot_route_is_a_refusal() -> None:
+    cfg = UserLLMConfig(provider="anthropic", api_key="key-x", model="m")
+    probe = await provider_probe.probe_ner_support(cfg, allow_cloud=True)
+
+    assert not probe.ok
+    assert probe.refused
+
+
+async def test_ner_probe_does_not_reach_a_cloud_provider_when_cloud_is_off() -> None:
+    cfg = UserLLMConfig(provider="openai", api_key="key-x", model="m")
+    probe = await provider_probe.probe_ner_support(cfg, allow_cloud=False)
+
+    assert not probe.ok
+    assert not probe.refused

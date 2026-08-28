@@ -14,6 +14,7 @@ from application.ports.user_llm_config import (
     UserLLMProviderEntry,
 )
 from infrastructure.config import Settings
+from infrastructure.llm.provider_probe import NerProbe
 from interfaces.api.main import app
 from interfaces.api.routes import user_routes
 from interfaces.dependencies import get_auth, get_container
@@ -73,6 +74,23 @@ def _client(store: FakeStore, *, enabled: bool = True) -> TestClient:
 def _clear_overrides():
     yield
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def _ner_ok(monkeypatch: pytest.MonkeyPatch):
+    """A saveable config by default; no route test may reach a provider."""
+    _stub_ner(monkeypatch, NerProbe(ok=True))
+
+
+def _stub_ner(monkeypatch: pytest.MonkeyPatch, probe: NerProbe) -> list[UserLLMConfig]:
+    seen: list[UserLLMConfig] = []
+
+    async def fake(cfg, *, allow_cloud):
+        seen.append(cfg)
+        return probe
+
+    monkeypatch.setattr(user_routes, "probe_ner_support", fake)
+    return seen
 
 
 def test_get_flag_off_reports_disabled_with_presets() -> None:
@@ -170,3 +188,61 @@ def test_test_endpoint_maps_lane_results(monkeypatch: pytest.MonkeyPatch) -> Non
     }
     assert seen["cfg"] is CFG and seen["allow_cloud"] is True
     assert KEY not in resp.text
+
+
+# ── Entity extraction is required, so a model that cannot do it never gets stored ──
+
+
+def test_put_rejects_a_model_that_cannot_run_entity_extraction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _stub_ner(monkeypatch, NerProbe(ok=False, detail="json_schema unsupported", refused=True))
+    store = FakeStore()
+    resp = _client(store).put(
+        "/user/llm-provider", json={"provider": "openrouter", "api_key": KEY},
+    )
+
+    assert resp.status_code == 422
+    assert "entity extraction" in resp.json()["detail"]
+    assert store.set_calls == []  # nothing reached storage
+
+
+def test_put_still_saves_when_the_probe_only_failed_transiently(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A provider outage must not lock the user out of their own settings."""
+    _stub_ner(monkeypatch, NerProbe(ok=False, detail="rate limited", refused=False))
+    store = FakeStore()
+    resp = _client(store).put(
+        "/user/llm-provider", json={"provider": "openrouter", "api_key": KEY},
+    )
+
+    assert resp.status_code == 204
+    assert len(store.set_calls) == 1
+
+
+def test_put_probes_the_config_it_is_about_to_write(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen = _stub_ner(monkeypatch, NerProbe(ok=True))
+    _client(FakeStore()).put(
+        "/user/llm-provider",
+        json={"provider": "openrouter", "api_key": KEY, "model": "some/model"},
+    )
+
+    assert len(seen) == 1
+    # openrouter resolves to openai + its base URL before the probe, exactly as the
+    # NER adapter will see it at ingestion time.
+    assert seen[0].provider == "openai"
+    assert seen[0].base_url == "https://openrouter.ai/api/v1"
+    assert seen[0].model == "some/model"
+
+
+def test_a_model_only_update_is_probed_too(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen = _stub_ner(monkeypatch, NerProbe(ok=False, detail="no", refused=True))
+    store = FakeStore(entry=ENTRY, config=CFG)
+    resp = _client(store).put(
+        "/user/llm-provider", json={"provider": "openrouter", "model": "worse/model"},
+    )
+
+    assert resp.status_code == 422
+    assert seen[0].model == "worse/model"
+    assert store.update_calls == []

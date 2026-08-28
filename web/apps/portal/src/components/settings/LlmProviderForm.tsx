@@ -33,7 +33,13 @@ const PROVIDERS: { id: LlmProviderId; label: string; hint: string }[] = [
   },
 ];
 
-const LANE_LABEL = { batch: "Ingestion (summaries, entities, metadata)", chat: "Chat" } as const;
+const LANE_LABEL = {
+  batch: "Ingestion (summaries, metadata)",
+  chat: "Chat",
+  // Its own lane: a model can pass the batch check and still reject the
+  // structured-output request entity extraction makes.
+  ner: "Entity extraction (needs structured output)",
+} as const;
 
 function providerLabel(id: LlmProviderId | null): string {
   return PROVIDERS.find((p) => p.id === id)?.label ?? "Unknown";
