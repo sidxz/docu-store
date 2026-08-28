@@ -145,6 +145,19 @@ function EntityTypeSection({
   );
 }
 
+// A compound merges its aliases under one canonical name, but CSER labelled the
+// structure with whichever surface form it read off the page — so fall back to
+// the synonyms before giving up on a structure.
+function structureFor(tm: TagMentionItem, byLabel: Map<string, string>): string | undefined {
+  const params = tm.additional_model_params as Record<string, unknown> | undefined;
+  const synonyms = (params?.synonyms as string | undefined)?.split(",") ?? [];
+  for (const label of [tm.tag, ...synonyms]) {
+    const hit = byLabel.get(label.trim().toLowerCase());
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
 // ── Compound card ──
 
 function CompoundCard({
@@ -274,7 +287,7 @@ export function EntityTagPanel({
                   expanded={expanded}
                   workspace={workspace}
                   artifactId={artifactId}
-                  structureSmiles={structureByLabel.get(tm.tag.trim().toLowerCase())}
+                  structureSmiles={structureFor(tm, structureByLabel)}
                 />
               ))}
             </div>

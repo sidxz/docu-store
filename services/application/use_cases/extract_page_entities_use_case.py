@@ -12,6 +12,7 @@ from application.dtos.errors import AppError
 from application.services.aggregate_commit import commit
 from application.services.llm_scope import owner_scope
 from domain.services.bioactivity_reducer import associate_bioactivities
+from domain.services.compound_alias_resolver import build_alias_map, merge_compound_aliases
 from domain.value_objects.tag_mention import TagMention
 
 if TYPE_CHECKING:
@@ -87,9 +88,23 @@ class ExtractPageEntitiesUseCase:
                 if entity.text and entity.text.strip()
             ]
 
+            # NER emits an alias as its own compound as well as a synonym of the
+            # primary one, so the structure lands on one surface form and the
+            # activity rows on the other. Resolve the declared synonyms into one
+            # identity first, then join and collapse through it. CSER's resolved
+            # structures are the guard: two labels with different structures on
+            # file are never fused.
+            structures = {
+                cm.extracted_id: cm.canonical_smiles or cm.smiles
+                for cm in page.compound_mentions
+                if cm.extracted_id
+            }
+            alias_map = build_alias_map(tag_mentions, structures)
+
             # Associate bioactivity tags with their parent compounds;
             # orphan bioactivities (no compound link) are discarded.
-            tag_mentions = associate_bioactivities(tag_mentions)
+            tag_mentions = associate_bioactivities(tag_mentions, alias_map)
+            tag_mentions = merge_compound_aliases(tag_mentions, alias_map)
 
             # Reload right before the write: the NER call above left our copy stale.
             def apply_tags(fresh_page: Page) -> bool:

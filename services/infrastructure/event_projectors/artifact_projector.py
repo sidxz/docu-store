@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from domain.services.compound_alias_resolver import is_publishable_alias, synonyms_of
+
 if TYPE_CHECKING:
     from domain.aggregates.artifact import Artifact
     from infrastructure.read_repositories.read_model_materializer import ReadModelMaterializer
@@ -84,6 +86,16 @@ class ArtifactProjector:
         tags = [
             {"tag": tm.tag, "tag_normalized": tm.tag.lower(), "entity_type": tm.entity_type}
             for tm in event.tag_mentions  # type: ignore[attr-defined]
+        ]
+        # An alias merged into its canonical compound must stay findable by its own
+        # name, so publish a dictionary row for it too. Numeric-only aliases are
+        # document-local ("compound 1") and would be noise workspace-wide.
+        tags += [
+            {"tag": alias, "tag_normalized": alias.lower(), "entity_type": "compound_name"}
+            for tm in event.tag_mentions  # type: ignore[attr-defined]
+            if tm.entity_type == "compound_name"
+            for alias in synonyms_of(tm)
+            if is_publishable_alias(alias)
         ]
         self._materializer.upsert_artifact_and_replace_tags(
             artifact_id=str(event.originator_id),  # type: ignore[attr-defined]

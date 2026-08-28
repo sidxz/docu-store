@@ -46,11 +46,17 @@ class AggregateArtifactTagsUseCase:
             artifact = self.artifact_repository.get_by_id(artifact_id)
 
             pages_data = []
+            # Compound label → structure across the whole artifact. Two labels
+            # whose structures disagree are never merged as aliases.
+            structures: dict[str, str] = {}
             pages_loaded = 0
             for page_id in artifact.pages:
                 try:
                     page = self.page_repository.get_by_id(page_id)
                     pages_data.append((page.id, page.index, list(page.tag_mentions)))
+                    for cm in page.compound_mentions:
+                        if cm.extracted_id and cm.extracted_id not in structures:
+                            structures[cm.extracted_id] = cm.canonical_smiles or cm.smiles
                     pages_loaded += 1
                 except Exception:
                     # Skip pages that can't be loaded — partial aggregation is fine
@@ -60,7 +66,7 @@ class AggregateArtifactTagsUseCase:
                         page_id=str(page_id),
                     )
 
-            merged = aggregate_tag_mentions(pages_data)
+            merged = aggregate_tag_mentions(pages_data, structures)
 
             artifact.update_tag_mentions(merged)
             self.artifact_repository.save(artifact)

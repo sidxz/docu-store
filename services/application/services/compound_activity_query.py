@@ -21,6 +21,7 @@ from uuid import UUID
 import structlog
 
 from application.dtos.compound_dtos import BioactivityDTO, CompoundPageRefDTO
+from domain.services.compound_alias_resolver import synonyms_of
 
 if TYPE_CHECKING:
     from application.ports.repositories.artifact_read_models import ArtifactReadModel
@@ -106,7 +107,12 @@ class CompoundActivityQuery:
         for page in pages:
             page_has = False
             for tm in page.tag_mentions:
-                if tm.entity_type == "compound_name" and tm.tag.lower() == lname:
+                # Match the alias too: an aliased compound merges into one mention
+                # under its canonical name, and callers still ask by either name.
+                if tm.entity_type == "compound_name" and (
+                    tm.tag.lower() == lname
+                    or any(s.lower() == lname for s in synonyms_of(tm))
+                ):
                     page_has = True
                     params = tm.additional_model_params or {}
                     for bio in params.get("bioactivities") or []:

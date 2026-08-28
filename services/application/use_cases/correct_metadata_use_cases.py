@@ -18,7 +18,7 @@ from application.use_cases._guards import (
     require_editor,
     require_page_workspace,
 )
-from domain.services.tag_mention_aggregator import _normalize
+from domain.services.compound_alias_resolver import normalize
 from domain.value_objects.author_mention import AuthorMention
 from domain.value_objects.compound_mention import CompoundMention
 from domain.value_objects.presentation_date import PresentationDate
@@ -47,17 +47,17 @@ logger = structlog.get_logger()
 def _merge_tags(existing: list[TagMention], submitted: list[CorrectedTagInput]) -> list[TagMention]:
     """Keep the rich existing mention for tags the human retained; fresh mentions for additions."""
     now = datetime.now(UTC)
-    by_key = {(m.entity_type, _normalize(m.tag)): m for m in existing}
+    by_key = {(m.entity_type, normalize(m.tag)): m for m in existing}
     merged: list[TagMention] = []
     for s in submitted:
-        kept = by_key.get((s.entity_type, _normalize(s.tag)))
+        kept = by_key.get((s.entity_type, normalize(s.tag)))
         merged.append(
             kept
             if kept is not None
             else TagMention(
                 tag=s.tag,
                 entity_type=s.entity_type,
-                tag_normalized=_normalize(s.tag),
+                tag_normalized=normalize(s.tag),
                 date_extracted=now,
             ),
         )

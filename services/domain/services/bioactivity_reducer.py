@@ -8,11 +8,14 @@ TagMention and discards orphan bioactivities.
 
 from __future__ import annotations
 
-from domain.services.tag_mention_aggregator import _normalize
+from domain.services.compound_alias_resolver import build_alias_map, normalize
 from domain.value_objects.tag_mention import TagMention
 
 
-def associate_bioactivities(tag_mentions: list[TagMention]) -> list[TagMention]:
+def associate_bioactivities(
+    tag_mentions: list[TagMention],
+    alias_map: dict[str, str] | None = None,
+) -> list[TagMention]:
     """Reduce bioactivity TagMentions into their parent compound TagMentions.
 
     Algorithm
@@ -20,13 +23,22 @@ def associate_bioactivities(tag_mentions: list[TagMention]) -> list[TagMention]:
     1. Partition tags into compounds, bioactivities, and others.
     2. Index compounds by normalised tag name (first occurrence wins).
     3. For each bioactivity whose ``additional_model_params["compound_name"]``
-       matches a compound, build a structured activity dict and collect it.
+       matches a compound — through ``alias_map``, so a row citing "TAM16" lands
+       on the compound that declared TAM16 as its synonym — build a structured
+       activity dict and collect it.
     4. Return enriched compounds (with ``bioactivities`` list) + others.
        Bioactivity TagMentions are removed from the output entirely.
 
     Bioactivities without a ``compound_name`` or whose compound is not in the
     extracted tags are silently discarded.
+
+    ``alias_map`` is built from the same tags when not supplied; callers that can
+    see the page's resolved structures should build it themselves so the
+    conflicting-structure guard applies.
     """
+    if alias_map is None:
+        alias_map = build_alias_map(tag_mentions)
+
     compounds: list[TagMention] = []
     bioactivities: list[TagMention] = []
     others: list[TagMention] = []
@@ -45,7 +57,7 @@ def associate_bioactivities(tag_mentions: list[TagMention]) -> list[TagMention]:
     # Index compounds by normalised name (first occurrence wins on duplicates)
     compound_index: dict[str, int] = {}
     for i, c in enumerate(compounds):
-        key = _normalize(c.tag)
+        key = normalize(c.tag)
         if key not in compound_index:
             compound_index[key] = i
 
@@ -57,7 +69,8 @@ def associate_bioactivities(tag_mentions: list[TagMention]) -> list[TagMention]:
         if not compound_name:
             continue
 
-        idx = compound_index.get(_normalize(compound_name))
+        key = normalize(compound_name)
+        idx = compound_index.get(alias_map.get(key, key))
         if idx is None:
             continue
 
