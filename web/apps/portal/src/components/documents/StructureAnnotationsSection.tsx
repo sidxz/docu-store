@@ -38,6 +38,22 @@ function isLocated(m: DraftMention): m is WithBbox {
   return Array.isArray(m.structure_bbox) && m.structure_bbox.length === 4;
 }
 
+/** "3 days ago" from an ISO timestamp. `Intl.RelativeTimeFormat` does the wording and the
+ *  pluralisation, so this is the whole of it — no date library. */
+function timeAgo(iso: string): string {
+  const seconds = (Date.parse(iso) - Date.now()) / 1000;
+  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+  const units: [Intl.RelativeTimeFormatUnit, number][] = [
+    ["day", 86400],
+    ["hour", 3600],
+    ["minute", 60],
+  ];
+  for (const [unit, size] of units) {
+    if (Math.abs(seconds) >= size) return rtf.format(Math.round(seconds / size), unit);
+  }
+  return rtf.format(Math.round(seconds), "second");
+}
+
 /** A pair that would be silently dropped, or worse, saved blank: the human drew a box and
  *  no SMILES was ever established for it. The one thing Save must never quietly discard. */
 const isUnsaveable = (m: CompoundMention) => !m.smiles?.trim();
@@ -496,12 +512,6 @@ export function StructureAnnotationsSection({
     }
   };
 
-  /** Which of the two out-of-edit-mode writes is in flight — readable from the body being
-   *  sent, so the spinner lands on the button that was actually clicked with no extra state.
-   *  (Approve is only rendered when there is something to approve, so an empty body is
-   *  unambiguously "No compounds on this page".) */
-  const markingEmpty = correct.isPending && correct.variables?.compound_mentions.length === 0;
-
   // Still the `compounds` prop, verbatim: the server's unchanged-vs-edited identity tuple
   // includes both boxes, and re-deriving it from the draft would discard detector provenance.
   const approve = () =>
@@ -754,7 +764,11 @@ export function StructureAnnotationsSection({
           className="flex w-full items-center justify-between text-left"
         >
           <CardHeader
-            title={`Structure annotations · ${located.length} located · ${compounds.length} total`}
+            title={
+              missingCoordinates > 0
+                ? `Structure annotations · ${located.length} located · ${source.length} total`
+                : `Structure annotations · ${source.length} ${source.length === 1 ? "annotation" : "annotations"}`
+            }
             action={
               humanCorrection ? (
                 <span className="ml-3 inline-flex items-center gap-1 text-xs text-text-muted">
@@ -774,35 +788,46 @@ export function StructureAnnotationsSection({
             {editable && (
               <div className="flex flex-wrap items-center gap-2">
                 {!editing ? (
+                  /* One sign-off, one way in. The row follows the page's state instead of
+                     showing all three at once: a reviewed page has nothing left to approve,
+                     and an empty page's "approve" IS its "no compounds here" — same payload,
+                     same meaning, so it is one explicitly worded button rather than two. */
                   <>
-                    {compounds.length > 0 && (
+                    {humanCorrection ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-text-muted">
+                        <HumanCorrectedBadge info={humanCorrection} />
+                        Reviewed by {humanCorrection.corrected_by_name ??
+                          humanCorrection.corrected_by_id}{" "}
+                        · {timeAgo(humanCorrection.corrected_at)}
+                      </span>
+                    ) : compounds.length > 0 ? (
                       <Button
                         size="sm"
                         onClick={approve}
                         disabled={correct.isPending || blindReason !== null}
                       >
-                        {correct.isPending && !markingEmpty && (
-                          <Loader2 className="animate-spin" />
-                        )}
-                        {correct.isPending && !markingEmpty ? "Approving…" : "Approve as correct"}
+                        {correct.isPending && <Loader2 className="animate-spin" />}
+                        {correct.isPending ? "Approving…" : "Approve as correct"}
+                      </Button>
+                    ) : (
+                      /* A confirmed negative is training data in its own right, so the label
+                         says what is being asserted rather than what is absent. */
+                      <Button
+                        size="sm"
+                        onClick={markEmpty}
+                        disabled={correct.isPending || blindReason !== null}
+                      >
+                        {correct.isPending && <Loader2 className="animate-spin" />}
+                        {correct.isPending ? "Recording…" : "Confirm: no structures on this page"}
                       </Button>
                     )}
                     <Button
                       size="sm"
-                      variant="outline"
+                      variant={humanCorrection ? "default" : "outline"}
                       onClick={toggleEditing}
                       disabled={blindReason !== null}
                     >
                       Edit boxes
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={markEmpty}
-                      disabled={correct.isPending || blindReason !== null}
-                    >
-                      {markingEmpty && <Loader2 className="animate-spin" />}
-                      {markingEmpty ? "Recording…" : "No compounds on this page"}
                     </Button>
                     {blindReason && (
                       <span className="text-xs text-text-muted">{blindReason}</span>
