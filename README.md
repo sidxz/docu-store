@@ -306,3 +306,14 @@ docu-store/
 - `services/design_docs/TESTING_QUICK_REFERENCE.md` — local test setup
 - `services/design_docs/WORKER_SETUP.md` — worker configuration
 - `services/design_docs/SUMMARY_EMBEDDINGS_AND_SEARCH.md` — search architecture
+
+## License
+
+[GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only).
+
+Free to use, modify, self-host, and run internally — including commercially. The
+condition: if you offer DocuStore to others over a network, you must make the complete
+corresponding source of your modified version available to those users under the same
+license.
+
+For use without AGPL obligations, contact the copyright holder about a commercial license.

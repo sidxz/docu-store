@@ -8,6 +8,7 @@ import {
   Atom,
   MessageSquare,
   Settings,
+  Code2,
   Sun,
   Moon,
   PanelLeftClose,
@@ -107,6 +108,18 @@ export function Sidebar({ workspaceSlug }: { workspaceSlug: string }) {
           collapsed={collapsed}
           iconColor="text-slate-500"
         />
+
+        {/* Source code — required by AGPL-3.0 §13 for network-interactive use */}
+        <a
+          href="https://github.com/sidxz/docu-store"
+          target="_blank"
+          rel="noopener noreferrer"
+          title={collapsed ? "Source code (AGPL-3.0)" : undefined}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-text transition-all duration-200 hover:bg-sidebar-hover hover:text-sidebar-text-active"
+        >
+          <Code2 className="size-[1.125rem] shrink-0" />
+          {!collapsed && <span>Source code</span>}
+        </a>
 
         {/* Theme toggle */}
         <button
