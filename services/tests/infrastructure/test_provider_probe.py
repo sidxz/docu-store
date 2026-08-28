@@ -10,7 +10,7 @@ import pytest
 
 from application.ports.user_llm_config import UserLLMConfig
 from domain.exceptions import LLMAuthError, LLMBadRequestError, LLMRateLimitedError
-from infrastructure.llm import provider_probe
+from infrastructure.llm import openrouter_catalog, provider_probe
 
 
 class _FakeLLM:
@@ -59,8 +59,20 @@ def _patch_ner(monkeypatch: pytest.MonkeyPatch, fail: Exception | None, compound
 
 @pytest.fixture(autouse=True)
 def _no_live_ner(monkeypatch: pytest.MonkeyPatch):
-    """Nothing in this file may reach a provider; tests that care re-stub explicitly."""
+    """Nothing in this file may reach a provider or the catalog; tests re-stub as needed."""
     _patch_ner(monkeypatch, None)
+    _patch_catalog(monkeypatch, None)
+
+
+def _patch_catalog(monkeypatch: pytest.MonkeyPatch, verdict: bool | None) -> list[str]:
+    asked: list[str] = []
+
+    async def fake(model_id):
+        asked.append(model_id)
+        return verdict
+
+    monkeypatch.setattr(openrouter_catalog, "supports_structured_outputs", fake)
+    return asked
 
 
 async def test_same_model_for_both_lanes_is_probed_once(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -171,3 +183,65 @@ async def test_ner_probe_does_not_reach_a_cloud_provider_when_cloud_is_off() -> 
 
     assert not probe.ok
     assert not probe.refused
+
+
+# ── OpenRouter publishes the answer; no need to spend a call to learn it ──
+
+_OPENROUTER = "https://openrouter.ai/api/v1"
+
+
+async def test_a_model_openrouter_lists_as_incapable_is_refused_without_a_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The case the live probe cannot catch: OpenRouter drops the unsupported
+    parameter instead of erroring, so such a model answers in prose."""
+    built = _patch_ner(monkeypatch, None)
+    asked = _patch_catalog(monkeypatch, False)
+    cfg = UserLLMConfig(
+        provider="openai", api_key="key-x", base_url=_OPENROUTER, model="z-ai/glm-5.3",
+    )
+    probe = await provider_probe.probe_ner_support(cfg, allow_cloud=True)
+
+    assert not probe.ok
+    assert probe.refused
+    assert "structured_outputs" in (probe.detail or "")
+    assert asked == ["z-ai/glm-5.3"]
+    assert built == []  # nothing was spent
+
+
+async def test_a_listed_capability_is_still_proven_by_the_live_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """supported_parameters is a union across upstream routes, so yes is not proof."""
+    built = _patch_ner(monkeypatch, None)
+    _patch_catalog(monkeypatch, True)
+    cfg = UserLLMConfig(
+        provider="openai", api_key="key-x", base_url=_OPENROUTER, model="openai/gpt-5-mini",
+    )
+
+    assert (await provider_probe.probe_ner_support(cfg, allow_cloud=True)).ok
+    assert len(built) == 1
+
+
+async def test_an_unreachable_catalog_falls_through_to_the_live_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    built = _patch_ner(monkeypatch, None)
+    _patch_catalog(monkeypatch, None)
+    cfg = UserLLMConfig(
+        provider="openai", api_key="key-x", base_url=_OPENROUTER, model="openai/gpt-5-mini",
+    )
+
+    assert (await provider_probe.probe_ner_support(cfg, allow_cloud=True)).ok
+    assert len(built) == 1
+
+
+async def test_a_direct_openai_config_never_consults_the_catalog(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_ner(monkeypatch, None)
+    asked = _patch_catalog(monkeypatch, False)
+    cfg = UserLLMConfig(provider="openai", api_key="key-x", base_url=None, model="gpt-5-mini")
+
+    assert (await provider_probe.probe_ner_support(cfg, allow_cloud=True)).ok
+    assert asked == []
