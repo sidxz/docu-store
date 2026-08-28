@@ -252,6 +252,7 @@ export default function PageViewerPage() {
         compounds={(page.compound_mentions as CompoundMention[]) ?? []}
         pageId={pageId}
         editable={canEdit}
+        humanCorrection={page.human_corrections?.compound_mentions}
       />
 
       {/* Extracted Text — collapsed by default */}

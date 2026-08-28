@@ -17,7 +17,8 @@ import {
   type CorrectedCompoundInput,
 } from "@/hooks/use-pages";
 import { EditCompoundDialog } from "@/components/documents/EditCompoundDialog";
-import type { CompoundMention } from "@docu-store/types";
+import { HumanCorrectedBadge } from "@/components/documents/HumanCorrectedBadge";
+import type { CompoundMention, HumanCorrectionInfo } from "@docu-store/types";
 
 /** A mention plus draft-only bookkeeping. Both flags are client-side and never leave the
  *  browser — `toInput` names every field it sends, so they cannot leak into a correction. */
@@ -396,12 +397,15 @@ export function StructureAnnotationsSection({
   compounds,
   pageId,
   editable,
+  humanCorrection,
 }: {
   artifactId: string;
   pageIndex: number;
   compounds: CompoundMention[];
   pageId: string;
   editable: boolean;
+  /** Set once a human has signed these mentions off — same provenance CompoundGrid badges. */
+  humanCorrection?: HumanCorrectionInfo | null;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -477,9 +481,34 @@ export function StructureAnnotationsSection({
       ? "Waiting for the page render…"
       : null;
 
-  const approve = () => correct.mutateAsync({ compound_mentions: compounds.map(toInput) });
+  /** All three write paths go through here purely so the panel says something afterwards.
+   *  Approving is how machine output becomes ground truth and the only visible effect used to
+   *  be a badge in a different component further up the page — indistinguishable from a dead
+   *  button. Failures were just as silent, which is worse. Returns whether it stuck. */
+  const submit = async (mentions: CorrectedCompoundInput[], done: string) => {
+    try {
+      await correct.mutateAsync({ compound_mentions: mentions });
+      toast.success(done);
+      return true;
+    } catch (err) {
+      toast.error("Could not save your review", { description: getErrorMessage(err) });
+      return false;
+    }
+  };
 
-  const markEmpty = () => correct.mutateAsync({ compound_mentions: [] });
+  /** Which of the two out-of-edit-mode writes is in flight — readable from the body being
+   *  sent, so the spinner lands on the button that was actually clicked with no extra state.
+   *  (Approve is only rendered when there is something to approve, so an empty body is
+   *  unambiguously "No compounds on this page".) */
+  const markingEmpty = correct.isPending && correct.variables?.compound_mentions.length === 0;
+
+  // Still the `compounds` prop, verbatim: the server's unchanged-vs-edited identity tuple
+  // includes both boxes, and re-deriving it from the draft would discard detector provenance.
+  const approve = () =>
+    submit(compounds.map(toInput), "Approved — these annotations are now ground truth");
+
+  const markEmpty = () =>
+    submit([], "Recorded — this page is confirmed to have no compounds");
 
   const resetDraft = () => {
     setWorking(null);
@@ -532,7 +561,13 @@ export function StructureAnnotationsSection({
     // after the button was last rendered (a re-analyse that came back empty), and a blank
     // `smiles` would either be rejected by the server or stored as a compound that is not one.
     if (!working || blindReason || analyzingBox || working.some(isUnsaveable)) return;
-    await correct.mutateAsync({ compound_mentions: working.map(toInput) });
+    const n = working.length;
+    const saved = await submit(
+      working.map(toInput),
+      `Saved — ${n} ${n === 1 ? "annotation is" : "annotations are"} now ground truth`,
+    );
+    // Keep the draft on failure: it is the only copy of the human's boxes.
+    if (!saved) return;
     editSession.current += 1;
     setEditing(false);
     resetDraft();
@@ -720,6 +755,14 @@ export function StructureAnnotationsSection({
         >
           <CardHeader
             title={`Structure annotations · ${located.length} located · ${compounds.length} total`}
+            action={
+              humanCorrection ? (
+                <span className="ml-3 inline-flex items-center gap-1 text-xs text-text-muted">
+                  <HumanCorrectedBadge info={humanCorrection} />
+                  Reviewed
+                </span>
+              ) : undefined
+            }
           />
           <ChevronDown
             className={`h-4 w-4 shrink-0 text-text-muted transition-transform ${expanded ? "rotate-180" : ""}`}
@@ -738,7 +781,10 @@ export function StructureAnnotationsSection({
                         onClick={approve}
                         disabled={correct.isPending || blindReason !== null}
                       >
-                        Approve as correct
+                        {correct.isPending && !markingEmpty && (
+                          <Loader2 className="animate-spin" />
+                        )}
+                        {correct.isPending && !markingEmpty ? "Approving…" : "Approve as correct"}
                       </Button>
                     )}
                     <Button
@@ -755,7 +801,8 @@ export function StructureAnnotationsSection({
                       onClick={markEmpty}
                       disabled={correct.isPending || blindReason !== null}
                     >
-                      No compounds on this page
+                      {markingEmpty && <Loader2 className="animate-spin" />}
+                      {markingEmpty ? "Recording…" : "No compounds on this page"}
                     </Button>
                     {blindReason && (
                       <span className="text-xs text-text-muted">{blindReason}</span>
@@ -770,7 +817,8 @@ export function StructureAnnotationsSection({
                         correct.isPending || blindReason !== null || saveBlockedReason !== null
                       }
                     >
-                      Save changes
+                      {correct.isPending && <Loader2 className="animate-spin" />}
+                      {correct.isPending ? "Saving…" : "Save changes"}
                     </Button>
                     <Button
                       size="sm"
