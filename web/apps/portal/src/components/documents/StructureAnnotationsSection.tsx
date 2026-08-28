@@ -21,7 +21,7 @@ import { HumanCorrectedBadge } from "@/components/documents/HumanCorrectedBadge"
 import type { CompoundMention, HumanCorrectionInfo } from "@docu-store/types";
 
 /** A mention plus draft-only bookkeeping. Both flags are client-side and never leave the
- *  browser — `toInput` names every field it sends, so they cannot leak into a correction. */
+ *  browser. `toInput` names every field it sends, so they cannot leak into a correction. */
 type DraftMention = CompoundMention & {
   /** A human typed these values in the dialog. Analyse must not stomp them behind their back. */
   __human?: boolean;
@@ -39,7 +39,7 @@ function isLocated(m: DraftMention): m is WithBbox {
 }
 
 /** "3 days ago" from an ISO timestamp. `Intl.RelativeTimeFormat` does the wording and the
- *  pluralisation, so this is the whole of it — no date library. */
+ *  pluralisation, so this is the whole of it. No date library. */
 function timeAgo(iso: string): string {
   const seconds = (Date.parse(iso) - Date.now()) / 1000;
   const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
@@ -82,7 +82,7 @@ function blankMention(bbox: number[]): CompoundMention {
   };
 }
 
-/** Pointer position → SVG viewBox coordinates, i.e. render pixels — no scale factor needed. */
+/** Pointer position to SVG viewBox coordinates, i.e. render pixels. No scale factor needed. */
 function toRenderPixels(evt: React.PointerEvent, svg: SVGSVGElement) {
   const point = svg.createSVGPoint();
   point.x = evt.clientX;
@@ -94,8 +94,8 @@ function toRenderPixels(evt: React.PointerEvent, svg: SVGSVGElement) {
 }
 
 /** Normalise + round + clamp a [x1,y1,x2,y2] box to the image bounds. Normalising first
- *  means a resize dragged past its own opposite corner (x2 < x1 or y2 < y1 — every
- *  coordinate individually in bounds, but the box degenerate) still commits a valid
+ *  means a resize dragged past its own opposite corner (x2 < x1 or y2 < y1, i.e. every
+ *  coordinate individually in bounds but the box degenerate) still commits a valid
  *  box instead of writing an inverted one verbatim into exported training data. */
 function clampToImage(bbox: number[], w: number, h: number): number[] {
   const clamp = (v: number, max: number) => Math.max(0, Math.min(max, Math.round(v)));
@@ -108,7 +108,7 @@ function clampToImage(bbox: number[], w: number, h: number): number[] {
   ];
 }
 
-/** Which of a pair's two boxes a gesture is acting on — YOLO class 0 vs class 1. */
+/** Which of a pair's two boxes a gesture is acting on: YOLO class 0 vs class 1. */
 type BoxKind = "structure" | "label";
 /** null = not drawing; otherwise the class of box the next drag creates. */
 type DrawMode = BoxKind | null;
@@ -221,8 +221,8 @@ function BoxOverlay({
     }
   };
 
-  /** A press that never travelled more than the 2px slop is a click, not a drag — that is
-   *  the ONLY place either click fires. Label boxes deliberately carry no `onClick`: routing
+  /** A press that never travelled more than the 2px slop is a click, not a drag, and that
+   *  is the ONLY place either click fires. Label boxes deliberately carry no `onClick`: routing
    *  their click-to-re-pair through this same gate is what stops a label drag from arming or
    *  committing a re-pair on the way past. */
   const handleRectPointerUp = (e: React.PointerEvent<SVGRectElement>) => {
@@ -420,7 +420,7 @@ export function StructureAnnotationsSection({
   compounds: CompoundMention[];
   pageId: string;
   editable: boolean;
-  /** Set once a human has signed these mentions off — same provenance CompoundGrid badges. */
+  /** Set once a human has signed these mentions off. Same provenance CompoundGrid badges. */
   humanCorrection?: HumanCorrectionInfo | null;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -430,9 +430,9 @@ export function StructureAnnotationsSection({
   const [working, setWorking] = useState<DraftMention[] | null>(null);
   const [drawMode, setDrawMode] = useState<DrawMode>(null);
   const [pairSource, setPairSource] = useState<number | null>(null);
-  /** srcIndex open in the verify/correct dialog — SMILES and label text of one pair. */
+  /** srcIndex open in the verify/correct dialog: SMILES and label text of one pair. */
   const [editIndex, setEditIndex] = useState<number | null>(null);
-  /** The structure box currently being read by the models, as JSON — NOT an index. A cold
+  /** The structure box currently being read by the models, as JSON, NOT an index. A cold
    *  call runs ~95s, in which a delete can shift every later index and move the spinner onto
    *  someone else's card; the box identifies the pair no matter how the array moves. One at a
    *  time: the first call in a server process loads DECIMER, and queueing five behind it
@@ -441,7 +441,7 @@ export function StructureAnnotationsSection({
   /** srcIndex whose Analyse button is armed to overwrite hand-typed values (second click). */
   const [confirmIndex, setConfirmIndex] = useState<number | null>(null);
   /** Bumped on every entry to and exit from edit mode. An in-flight analyse is never
-   *  cancelled — leaving edit mode only nulls state — and `working` is rebuilt from the same
+   *  cancelled (leaving edit mode only nulls state) and `working` is rebuilt from the same
    *  `compounds` prop on re-entry, so the same index can hold the same box again with a
    *  hand-typed correction in it. Without a session identity that stale answer would pass the
    *  box check and overwrite the correction with no arm/confirm step. */
@@ -453,7 +453,7 @@ export function StructureAnnotationsSection({
   const rerun = useRerunPageWorkflow(pageId);
   const analyze = useAnalyzeBox(pageId);
 
-  // A page with no detections is the commonest — and most valuable — negative, so
+  // A page with no detections is the commonest and most valuable negative, so
   // a reviewer must still be able to open it and mark it reviewed-empty (or draw a
   // box the detector missed). Only the read-only view has nothing to show.
   if (compounds.length === 0 && !editable) return null;
@@ -469,7 +469,7 @@ export function StructureAnnotationsSection({
 
   // Byte-identical round-trip: the server's identity comparison keys on
   // (smiles, extracted_id, internal_id, cdd_id, chembl_id, pdb_id, structure_bbox,
-  // label_bbox) — build straight from the loaded mention, no re-derivation.
+  // label_bbox). Build straight from the loaded mention, no re-derivation.
   const toInput = (m: CompoundMention): CorrectedCompoundInput => ({
     smiles: m.smiles,
     extracted_id: m.extracted_id ?? null,
@@ -483,23 +483,23 @@ export function StructureAnnotationsSection({
 
   // Every correction here is a HUMAN assertion about what is printed on the page, and it
   // is only truthful about a page the human can actually see. With no render there is
-  // nothing to see, so all FOUR write paths — approve, markEmpty, save, and entering edit
-  // mode at all — are blind, and the empty one is a trap: "No compounds on this page" (or
+  // nothing to see, so all FOUR write paths (approve, markEmpty, save, and entering edit
+  // mode at all) are blind, and the empty one is a trap: "No compounds on this page" (or
   // a draft emptied card-by-card and saved, which is byte-identical) on a never-analysed
-  // page exports that page as a confirmed negative — a sheet full of molecules teaching
-  // the detector there is nothing there — and sets `human_corrections.compound_mentions`,
+  // page exports that page as a confirmed negative, a sheet full of molecules teaching
+  // the detector there is nothing there, and sets `human_corrections.compound_mentions`,
   // after which the extraction guard means a re-run can only re-render, never re-detect.
   // Blocked until the image is on screen; stated as text because browsers swallow `title`
   // on a disabled button.
   const blindReason = error
-    ? "No page render — run compound extraction first; you can't confirm what you can't see."
+    ? "No page render available. Run compound extraction first."
     : !blobUrl
       ? "Waiting for the page render…"
       : null;
 
   /** All three write paths go through here purely so the panel says something afterwards.
    *  Approving is how machine output becomes ground truth and the only visible effect used to
-   *  be a badge in a different component further up the page — indistinguishable from a dead
+   *  be a badge in a different component further up the page, indistinguishable from a dead
    *  button. Failures were just as silent, which is worse. Returns whether it stuck. */
   const submit = async (mentions: CorrectedCompoundInput[], done: string) => {
     try {
@@ -507,7 +507,7 @@ export function StructureAnnotationsSection({
       toast.success(done);
       return true;
     } catch (err) {
-      toast.error("Could not save your review", { description: getErrorMessage(err) });
+      toast.error("Failed to save annotations", { description: getErrorMessage(err) });
       return false;
     }
   };
@@ -515,10 +515,10 @@ export function StructureAnnotationsSection({
   // Still the `compounds` prop, verbatim: the server's unchanged-vs-edited identity tuple
   // includes both boxes, and re-deriving it from the draft would discard detector provenance.
   const approve = () =>
-    submit(compounds.map(toInput), "Approved — these annotations are now ground truth");
+    submit(compounds.map(toInput), "Annotations approved");
 
   const markEmpty = () =>
-    submit([], "Recorded — this page is confirmed to have no compounds");
+    submit([], "Marked as having no compounds");
 
   const resetDraft = () => {
     setWorking(null);
@@ -540,13 +540,13 @@ export function StructureAnnotationsSection({
       // Warm the model while the human draws. Both boxes null loads DECIMER and returns
       // nulls; the first call in a server process costs ~94s and every later one ~0.5s, so
       // paying it now is what stops the first real Analyse from looking hung. Same blind
-      // gate as every other server call here — no render, nothing to read, don't ask.
+      // gate as every other server call here. No render, nothing to read.
       if (!blindReason) analyze.mutate({ structure_bbox: null, label_bbox: null });
     }
   };
 
   /** Pairs the human drew (or re-analysed) that still have no SMILES. The user's rule is that
-   *  a structure whose SMILES cannot be read is not stored at all — but "not stored" must
+   *  a structure whose SMILES cannot be read is not stored at all, but "not stored" must
    *  never mean "quietly dropped on save", so these BLOCK the save instead of being filtered
    *  out of it. Blocking is the only option that cannot lose a drawn box without the human
    *  seeing it happen; the two ways out are both one click away on the card (type the SMILES,
@@ -555,9 +555,9 @@ export function StructureAnnotationsSection({
   // Saving mid-analyse ends the editing session while a ~95s answer is still coming, which is
   // half of what makes a stale write-back reachable at all. Cheaper to just wait for it.
   const saveBlockedReason = analyzingBox
-    ? "Reading a box with the models — Save unlocks when it finishes."
+    ? "Analysing. Save is unavailable until it finishes."
     : unsaveable
-      ? `${unsaveable} drawn ${unsaveable === 1 ? "box has" : "boxes have"} no SMILES yet. Analyse ${unsaveable === 1 ? "it" : "them"}, type the SMILES in by hand, or delete ${unsaveable === 1 ? "it" : "them"} — nothing is saved until then, so no box is dropped behind your back.`
+      ? `${unsaveable} drawn ${unsaveable === 1 ? "box has" : "boxes have"} no SMILES. Analyse ${unsaveable === 1 ? "it" : "them"}, enter a SMILES manually, or delete ${unsaveable === 1 ? "it" : "them"} before saving.`
       : null;
 
   const save = async () => {
@@ -565,7 +565,7 @@ export function StructureAnnotationsSection({
     // while a draft lives on. `editing`/`working` are plain state and nothing resets them:
     // collapsing the card sets the blob URL argument to "" and drops `blobUrl` to null,
     // re-expanding does not unmount, and the per-card delete X is driven by `working`
-    // alone — so a draft can be emptied and saved with no image on screen, which is the
+    // alone, so a draft can be emptied and saved with no image on screen, which is the
     // same permanent false negative `markEmpty` is blocked from writing.
     // The unsaveable re-check is the same kind of guard: a pair can become SMILES-less
     // after the button was last rendered (a re-analyse that came back empty), and a blank
@@ -574,7 +574,7 @@ export function StructureAnnotationsSection({
     const n = working.length;
     const saved = await submit(
       working.map(toInput),
-      `Saved — ${n} ${n === 1 ? "annotation is" : "annotations are"} now ground truth`,
+      `Saved ${n} ${n === 1 ? "annotation" : "annotations"}`,
     );
     // Keep the draft on failure: it is the only copy of the human's boxes.
     if (!saved) return;
@@ -601,10 +601,10 @@ export function StructureAnnotationsSection({
    *  first (`target`). This SWAPS the label box and its text between the two, never
    *  copies: one box on two mentions would export twice and claim two owners. The
    *  text travels with the box because `extracted_id` becomes the exported
-   *  `label_text` — the words physically inside that rectangle — so leaving it
+   *  `label_text`, the words physically inside that rectangle, so leaving it
    *  behind would ship a box captioned with someone else's label. Swapping (rather
-   *  than clearing the source) fixes the usual cause in one gesture — two structures
-   *  holding each other's labels — and destroys nothing: when the target is
+   *  than clearing the source) fixes the usual cause in one gesture, two structures
+   *  holding each other's labels, and destroys nothing: when the target is
    *  unlabelled it hands back null, which is exactly a move. */
   const handleLabelClick = (srcIndex: number) => {
     if (pairSource === null || pairSource === srcIndex) return;
@@ -642,7 +642,7 @@ export function StructureAnnotationsSection({
   /** Drop only the caption, keep the structure: `label_bbox: null` is a first-class
    *  annotation the training format allows, and a structure whose caption genuinely
    *  isn't printed on the page must be expressible without deleting the pair.
-   *  The text goes with the box for the same reason the re-pair swap carries it —
+   *  The text goes with the box for the same reason the re-pair swap carries it:
    *  `extracted_id` is exported as `label_text`, the words inside that rectangle, so
    *  keeping it would ship a caption that owns no box. */
   const handleDeleteLabel = (srcIndex: number) =>
@@ -652,7 +652,7 @@ export function StructureAnnotationsSection({
         prev.map((m, i) => (i === srcIndex ? { ...m, label_bbox: null, extracted_id: null } : m)),
     );
 
-  /** Drawing commits a box and nothing else — no dialog either way. The human's job is the
+  /** Drawing commits a box and nothing else, with no dialog either way. The human's job is the
    *  geometry and the pairing; the SMILES comes from DECIMER and the label text from OCR,
    *  via Analyse. (Demanding a hand-typed SMILES at draw time asked for something nobody can
    *  do by eye for a real scaffold, which is what made drawing a structure unusable.) */
@@ -672,7 +672,7 @@ export function StructureAnnotationsSection({
 
   /**
    * Read one pair's boxes with the models. Fills `smiles` (DECIMER) and `extracted_id`
-   * (OCR — exported as `label_text`), i.e. exactly the two things a human should verify
+   * (OCR, exported as `label_text`), i.e. exactly the two things a human should verify
    * rather than transcribe.
    *
    * Hand-typed values are never overwritten on the first click: a pair the human corrected
@@ -709,7 +709,7 @@ export function StructureAnnotationsSection({
         const current = prev[srcIndex];
         // A cold call runs ~95s; in that time the pair can be deleted (which shifts every
         // later index), re-drawn, or have either box dragged. Write back only if this slot
-        // still holds BOTH boxes we asked about — a machine SMILES on the wrong molecule, or
+        // still holds BOTH boxes we asked about. A machine SMILES on the wrong molecule, or
         // OCR from the label box's old position, is worse than no answer.
         if (
           !current ||
@@ -738,7 +738,7 @@ export function StructureAnnotationsSection({
       // Same session test: a failure the reviewer already walked away from is not news, and
       // clearing the spinner would clear it for whatever the NEXT session has in flight.
       if (session === editSession.current) {
-        toast.error("Could not analyse this box", { description: getErrorMessage(err) });
+        toast.error("Failed to analyse box", { description: getErrorMessage(err) });
       }
     } finally {
       if (session === editSession.current) setAnalyzingBox(null);
@@ -746,11 +746,11 @@ export function StructureAnnotationsSection({
   };
 
   // "Add label" attaches to a selection, so it has two ways of being unavailable. Both
-  // are rendered as text next to the button — a greyed-out button with no stated reason
+  // are rendered as text next to the button. A greyed-out button with no stated reason
   // reads as broken.
   const labelDrawBlocked =
     pairSource === null
-      ? "Click a structure box first — the new label attaches to it."
+      ? "Select a structure box first. The label attaches to it."
       : source[pairSource]?.label_bbox
         ? "That structure already has a label box. Remove it first, or drag the existing one."
         : null;
@@ -767,7 +767,7 @@ export function StructureAnnotationsSection({
             title={
               missingCoordinates > 0
                 ? `Structure annotations · ${located.length} located · ${source.length} total`
-                : `Structure annotations · ${source.length} ${source.length === 1 ? "annotation" : "annotations"}`
+                : `Structure annotations · ${source.length} ${source.length === 1 ? "structure" : "structures"}`
             }
             action={
               humanCorrection ? (
@@ -790,7 +790,7 @@ export function StructureAnnotationsSection({
                 {!editing ? (
                   /* One sign-off, one way in. The row follows the page's state instead of
                      showing all three at once: a reviewed page has nothing left to approve,
-                     and an empty page's "approve" IS its "no compounds here" — same payload,
+                     and an empty page's "approve" IS its "no compounds here": same payload,
                      same meaning, so it is one explicitly worded button rather than two. */
                   <>
                     {humanCorrection ? (
@@ -849,9 +849,9 @@ export function StructureAnnotationsSection({
                       size="sm"
                       variant={drawMode === "structure" ? "default" : "outline"}
                       onClick={() => setDrawMode((v) => (v === "structure" ? null : "structure"))}
-                      title="Drag a box around a structure — then click Analyse on its card to read the SMILES"
+                      title="Drag a box around a structure"
                     >
-                      {drawMode === "structure" ? "Drawing structure — drag on image" : "Add structure"}
+                      {drawMode === "structure" ? "Drawing structure. Drag on image" : "Add structure"}
                     </Button>
                     <Button
                       size="sm"
@@ -860,17 +860,17 @@ export function StructureAnnotationsSection({
                       disabled={labelDrawBlocked !== null}
                       title={
                         labelDrawBlocked ??
-                        "Drag the caption box for the selected structure — Analyse reads its text"
+                        "Drag the label box for the selected structure"
                       }
                     >
-                      {drawMode === "label" ? "Drawing label — drag on image" : "Add label"}
+                      {drawMode === "label" ? "Drawing label. Drag on image" : "Add label"}
                     </Button>
                     <Button size="sm" variant="ghost" onClick={toggleEditing} disabled={correct.isPending}>
                       Cancel editing
                     </Button>
                     {blindReason && (
                       <span className="text-xs text-text-muted">
-                        {blindReason} Your edits are still here — nothing is lost.
+                        {blindReason} Your edits are kept.
                       </span>
                     )}
                     {labelDrawBlocked && (
@@ -889,7 +889,7 @@ export function StructureAnnotationsSection({
             {missingCoordinates > 0 && (
               <p className="text-sm text-text-muted">
                 {missingCoordinates} compound{missingCoordinates === 1 ? "" : "s"} extracted before
-                annotations were recorded — re-run compound extraction to place them.
+                annotations were recorded. Re-run compound extraction to place them.
               </p>
             )}
 
@@ -897,11 +897,10 @@ export function StructureAnnotationsSection({
               /* The render is written by compound extraction (even when it finds nothing),
                  so "no render" means extraction never ran here. Telling the reviewer to
                  re-run it while the only control lives in a section they can't see from
-                 here is a dead end — same mutation, same workflow name, put in reach. */
+                 here is a dead end. Same mutation, same workflow name, put in reach. */
               <div className="space-y-2">
                 <p className="text-sm text-text-muted">
-                  No structure render stored for this page — compound extraction has not run
-                  here yet.
+                  No structure render stored for this page. Compound extraction has not run.
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
@@ -914,10 +913,10 @@ export function StructureAnnotationsSection({
                   </Button>
                   <span className="text-xs text-text-muted">
                     {rerun.isSuccess
-                      ? "Started. It runs in the background — reload this page in a minute to see the render."
+                      ? "Extraction started. Reload the page when it finishes."
                       : rerun.isError
-                        ? "Could not start it. Try again from the Workflows section below."
-                        : "Runs in the background; reload this page once it finishes."}
+                        ? "Failed to start extraction. Try again from the Workflows section below."
+                        : "Runs in the background. Reload the page when it finishes."}
                   </span>
                 </div>
               </div>
@@ -980,8 +979,8 @@ export function StructureAnnotationsSection({
                       {editing && (
                         <button
                           type="button"
-                          aria-label="Delete this whole pair — structure and label"
-                          title="Delete this whole pair — structure and label"
+                          aria-label="Delete pair"
+                          title="Delete pair"
                           onClick={() => handleDelete(m.__srcIndex)}
                           className="absolute right-2 top-2 rounded-sm p-0.5 text-text-muted opacity-0 transition-opacity hover:text-ds-error group-hover/ann:opacity-100"
                         >
@@ -995,7 +994,7 @@ export function StructureAnnotationsSection({
                         <button
                           type="button"
                           onClick={() => setEditIndex(m.__srcIndex)}
-                          title="Verify or correct the words printed inside the label box"
+                          title="Edit label text"
                           className="text-left text-sm font-medium text-text-primary underline decoration-dotted underline-offset-4 hover:text-primary"
                         >
                           {m.extracted_id ?? "unlabelled"}
@@ -1011,12 +1010,12 @@ export function StructureAnnotationsSection({
                         <button
                           type="button"
                           onClick={() => setEditIndex(m.__srcIndex)}
-                          title="Verify or correct the SMILES"
+                          title="Edit SMILES"
                           className={`mt-1 block break-all text-left font-mono text-xs underline decoration-dotted underline-offset-4 hover:text-primary ${
                             m.smiles ? "text-text-muted" : "text-ds-error"
                           }`}
                         >
-                          {m.smiles || "no SMILES yet"}
+                          {m.smiles || "No SMILES"}
                         </button>
                       ) : (
                         <div className="mt-1 break-all font-mono text-xs text-text-muted">
@@ -1043,24 +1042,24 @@ export function StructureAnnotationsSection({
                             title={
                               blindReason ??
                               (analyzingBox !== null && !analysing
-                                ? "Another box is being read — one at a time"
+                                ? "Another box is being analysed"
                                 : m.__human
-                                  ? "Re-read these boxes with the models, replacing what you typed"
-                                  : "Read the SMILES (DECIMER) and the label text (OCR) out of these boxes")
+                                  ? "Analyse again and replace the values you entered"
+                                  : "Read the SMILES and label text from these boxes")
                             }
                           >
                             {analysing && <Loader2 className="animate-spin" />}
                             {analysing
                               ? "Analysing…"
                               : confirmIndex === m.__srcIndex
-                                ? "Discard your edits?"
+                                ? "Confirm re-analyse"
                                 : m.smiles
                                   ? "Re-analyse"
                                   : "Analyse"}
                           </Button>
                           {analysing && (
                             <span className="text-xs text-text-muted">
-                              First one in a while can take ~90s — the model is loading.
+                              The first analysis can take up to 90 seconds.
                             </span>
                           )}
                           {!m.smiles && (
@@ -1069,9 +1068,9 @@ export function StructureAnnotationsSection({
                               variant="ghost"
                               className="-ml-1 text-text-muted"
                               onClick={() => setEditIndex(m.__srcIndex)}
-                              title="Type the SMILES yourself"
+                              title="Enter the SMILES manually"
                             >
-                              Enter SMILES by hand
+                              Enter SMILES
                             </Button>
                           )}
                         </div>
@@ -1080,25 +1079,24 @@ export function StructureAnnotationsSection({
                           moment they happen rather than as a surprise at save time. */}
                       {editing && m.__unreadable && (
                         <p className="mt-2 text-xs text-ds-error">
-                          No structure could be read here, so this pair cannot be saved — a
-                          compound with no SMILES is not stored at all. Adjust the box and
-                          re-analyse, type the SMILES by hand, or delete the pair (×, top right).
+                          No structure could be read from this box. Pairs without a SMILES are
+                          not saved. Adjust the box and analyse again, enter a SMILES, or delete
+                          the pair.
                         </p>
                       )}
                       {editing && !m.smiles && !m.__unreadable && (
                         <p className="mt-2 text-xs text-text-muted">
-                          Not analysed yet — click Analyse to read the SMILES and label text.
+                          Not analysed. Click Analyse to read the SMILES and label text.
                         </p>
                       )}
                       {editing && confirmIndex === m.__srcIndex && (
                         <p className="mt-2 text-xs text-ds-error">
-                          You typed these values in by hand. Click again to replace them with what
-                          the models read.
+                          These values were entered manually. Click again to replace them.
                         </p>
                       )}
                       {editing && m.label_bbox && !m.extracted_id && (
                         <p className="mt-2 text-xs text-ds-error">
-                          Label box has no text — the relation matcher needs the words.
+                          Label box has no text.
                         </p>
                       )}
                       {editing && m.label_bbox && (
@@ -1107,7 +1105,7 @@ export function StructureAnnotationsSection({
                           variant="ghost"
                           className="mt-2 -ml-2 text-text-muted hover:text-ds-error"
                           onClick={() => handleDeleteLabel(m.__srcIndex)}
-                          title="This structure has no printed caption — drop the label box, keep the structure"
+                          title="Remove the label box"
                         >
                           Remove label box
                         </Button>

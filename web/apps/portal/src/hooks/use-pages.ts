@@ -126,14 +126,14 @@ export function useCorrectPageCompounds(pageId: string) {
   });
 }
 
-/** Boxes in CSER-render pixels — the same space every stored bbox uses. Both null = warm-up. */
+/** Boxes in CSER-render pixels, the same space every stored bbox uses. Both null = warm-up. */
 export interface AnalyzeBoxInput {
   structure_bbox: number[] | null;
   label_bbox: number[] | null;
 }
 
 /** What the models read out of those boxes: DECIMER for the structure, OCR for the label.
- *  Either can be null — DECIMER returns nothing for a crop it can't resolve. */
+ *  Either can be null: DECIMER returns nothing for a crop it can't resolve. */
 export interface AnalyzeBoxResult {
   smiles: string | null;
   label_text: string | null;
@@ -147,7 +147,7 @@ export interface AnalyzeBoxResult {
  * so firing one when the reviewer enters edit mode is what makes the real Analyse feel
  * instant. 404 means the page has no stored CSER render.
  *
- * ponytail: `authFetchJson` rather than `apiClient` — this route is not in the generated
+ * ponytail: `authFetchJson` rather than `apiClient`, because this route is not in the generated
  * OpenAPI schema yet; move it to apiClient.POST after the backend ships and `pnpm generate`
  * runs. authFetchJson is the house wrapper for exactly that gap and refreshes + retries once
  * on 401, which matters most here: this is the longest-lived request in the app and the one
