@@ -1,14 +1,17 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, Loader2, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { useAuthBlobUrl } from "@/hooks/use-auth-blob-url";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { API_URL } from "@/lib/constants";
+import { getErrorMessage } from "@/lib/api-error";
 import {
+  useAnalyzeBox,
   useCorrectPageCompounds,
   useRerunPageWorkflow,
   type CorrectedCompoundInput,
@@ -16,14 +19,27 @@ import {
 import { EditCompoundDialog } from "@/components/documents/EditCompoundDialog";
 import type { CompoundMention } from "@docu-store/types";
 
+/** A mention plus draft-only bookkeeping. Both flags are client-side and never leave the
+ *  browser — `toInput` names every field it sends, so they cannot leak into a correction. */
+type DraftMention = CompoundMention & {
+  /** A human typed these values in the dialog. Analyse must not stomp them behind their back. */
+  __human?: boolean;
+  /** Analysed, and DECIMER read no structure. Unsaveable until a human fixes or deletes it. */
+  __unreadable?: boolean;
+};
+
 /** A mention we can actually draw: coordinates present. */
-type WithBbox = CompoundMention & { structure_bbox: number[] };
+type WithBbox = DraftMention & { structure_bbox: number[] };
 /** ...plus its index in the working/source array, so edits write back to the right slot. */
 type LocatedMention = WithBbox & { __srcIndex: number };
 
-function isLocated(m: CompoundMention): m is WithBbox {
+function isLocated(m: DraftMention): m is WithBbox {
   return Array.isArray(m.structure_bbox) && m.structure_bbox.length === 4;
 }
+
+/** A pair that would be silently dropped, or worse, saved blank: the human drew a box and
+ *  no SMILES was ever established for it. The one thing Save must never quietly discard. */
+const isUnsaveable = (m: CompoundMention) => !m.smiles?.trim();
 
 /** A freshly human-drawn mention, before its SMILES is known. */
 function blankMention(bbox: number[]): CompoundMention {
@@ -82,6 +98,13 @@ type DrawMode = BoxKind | null;
 
 const STRUCTURE_COLOR = "#22c55e";
 const LABEL_COLOR = "#3b82f6";
+/** Drawn but not analysed yet (amber) / analysed and unreadable (red). Same cue as the card,
+ *  so "which of these boxes still has no SMILES" is answerable from the image alone. */
+const PENDING_COLOR = "#f59e0b";
+const UNREADABLE_COLOR = "#ef4444";
+
+const structureColor = (m: DraftMention) =>
+  m.smiles?.trim() ? STRUCTURE_COLOR : m.__unreadable ? UNREADABLE_COLOR : PENDING_COLOR;
 
 type DragState =
   | {
@@ -261,6 +284,7 @@ function BoxOverlay({
         const stroke = Math.max(natural.w, natural.h) / 400;
         const handleSize = stroke * 4;
         const isPairSource = pairSource === m.__srcIndex;
+        const boxColor = structureColor(m);
         return (
           <g
             key={i}
@@ -276,7 +300,7 @@ function BoxOverlay({
               width={sx2 - sx1}
               height={sy2 - sy1}
               fill="none"
-              stroke={STRUCTURE_COLOR}
+              stroke={boxColor}
               strokeWidth={active ? stroke * 2 : stroke}
               strokeDasharray={isPairSource ? `${stroke * 2} ${stroke}` : undefined}
               style={{ cursor: editing ? "move" : "pointer" }}
@@ -290,7 +314,7 @@ function BoxOverlay({
                 y={sy2 - handleSize / 2}
                 width={handleSize}
                 height={handleSize}
-                fill={STRUCTURE_COLOR}
+                fill={boxColor}
                 style={{ cursor: "nwse-resize" }}
                 onPointerDown={(e) => startResizeDrag(e, m.__srcIndex, "structure", [sx1, sy1, sx2, sy2])}
                 onPointerMove={handleRectPointerMove}
@@ -383,17 +407,25 @@ export function StructureAnnotationsSection({
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [editing, setEditing] = useState(false);
-  const [working, setWorking] = useState<CompoundMention[] | null>(null);
+  const [working, setWorking] = useState<DraftMention[] | null>(null);
   const [drawMode, setDrawMode] = useState<DrawMode>(null);
   const [pairSource, setPairSource] = useState<number | null>(null);
-  const [pendingDrawBbox, setPendingDrawBbox] = useState<number[] | null>(null);
-  /** srcIndex whose label text is being edited — the words inside its label box. */
-  const [pendingLabelIndex, setPendingLabelIndex] = useState<number | null>(null);
+  /** srcIndex open in the verify/correct dialog — SMILES and label text of one pair. */
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+  /** The structure box currently being read by the models, as JSON — NOT an index. A cold
+   *  call runs ~95s, in which a delete can shift every later index and move the spinner onto
+   *  someone else's card; the box identifies the pair no matter how the array moves. One at a
+   *  time: the first call in a server process loads DECIMER, and queueing five behind it
+   *  helps nobody. */
+  const [analyzingBox, setAnalyzingBox] = useState<string | null>(null);
+  /** srcIndex whose Analyse button is armed to overwrite hand-typed values (second click). */
+  const [confirmIndex, setConfirmIndex] = useState<number | null>(null);
   const { blobUrl, error } = useAuthBlobUrl(
     expanded ? `${API_URL}/artifacts/${artifactId}/pages/${pageIndex}/image?size=cser` : "",
   );
   const correct = useCorrectPageCompounds(pageId);
   const rerun = useRerunPageWorkflow(pageId);
+  const analyze = useAnalyzeBox(pageId);
 
   // A page with no detections is the commonest — and most valuable — negative, so
   // a reviewer must still be able to open it and mark it reviewed-empty (or draw a
@@ -402,7 +434,7 @@ export function StructureAnnotationsSection({
 
   // While editing, the draft (`working`) is the source of truth for both the overlay
   // and the card grid below it; otherwise it's the loaded `compounds` as-is.
-  const source = editing && working ? working : compounds;
+  const source: DraftMention[] = editing && working ? working : compounds;
   const located: LocatedMention[] = [];
   source.forEach((m, i) => {
     if (isLocated(m)) located.push({ ...m, __srcIndex: i });
@@ -447,8 +479,9 @@ export function StructureAnnotationsSection({
     setWorking(null);
     setDrawMode(null);
     setPairSource(null);
-    setPendingDrawBbox(null);
-    setPendingLabelIndex(null);
+    setEditIndex(null);
+    setAnalyzingBox(null);
+    setConfirmIndex(null);
   };
 
   const toggleEditing = () => {
@@ -458,8 +491,24 @@ export function StructureAnnotationsSection({
     } else {
       setEditing(true);
       setWorking(compounds.map((m) => ({ ...m })));
+      // Warm the model while the human draws. Both boxes null loads DECIMER and returns
+      // nulls; the first call in a server process costs ~94s and every later one ~0.5s, so
+      // paying it now is what stops the first real Analyse from looking hung. Same blind
+      // gate as every other server call here — no render, nothing to read, don't ask.
+      if (!blindReason) analyze.mutate({ structure_bbox: null, label_bbox: null });
     }
   };
+
+  /** Pairs the human drew (or re-analysed) that still have no SMILES. The user's rule is that
+   *  a structure whose SMILES cannot be read is not stored at all — but "not stored" must
+   *  never mean "quietly dropped on save", so these BLOCK the save instead of being filtered
+   *  out of it. Blocking is the only option that cannot lose a drawn box without the human
+   *  seeing it happen; the two ways out are both one click away on the card (type the SMILES,
+   *  or delete the pair). */
+  const unsaveable = working ? working.filter(isUnsaveable).length : 0;
+  const saveBlockedReason = unsaveable
+    ? `${unsaveable} drawn ${unsaveable === 1 ? "box has" : "boxes have"} no SMILES yet. Analyse ${unsaveable === 1 ? "it" : "them"}, type the SMILES in by hand, or delete ${unsaveable === 1 ? "it" : "them"} — nothing is saved until then, so no box is dropped behind your back.`
+    : null;
 
   const save = async () => {
     // Guarded by the button's disabled state; re-checked because the render can disappear
@@ -468,7 +517,10 @@ export function StructureAnnotationsSection({
     // re-expanding does not unmount, and the per-card delete X is driven by `working`
     // alone — so a draft can be emptied and saved with no image on screen, which is the
     // same permanent false negative `markEmpty` is blocked from writing.
-    if (!working || blindReason) return;
+    // The unsaveable re-check is the same kind of guard: a pair can become SMILES-less
+    // after the button was last rendered (a re-analyse that came back empty), and a blank
+    // `smiles` would either be rejected by the server or stored as a compound that is not one.
+    if (!working || blindReason || working.some(isUnsaveable)) return;
     await correct.mutateAsync({ compound_mentions: working.map(toInput) });
     setEditing(false);
     resetDraft();
@@ -526,7 +578,8 @@ export function StructureAnnotationsSection({
   const handleDelete = (srcIndex: number) => {
     setWorking((prev) => prev && prev.filter((_, i) => i !== srcIndex));
     setPairSource(null);
-    setPendingLabelIndex(null);
+    setEditIndex(null);
+    setConfirmIndex(null);
   };
 
   /** Drop only the caption, keep the structure: `label_bbox: null` is a first-class
@@ -542,19 +595,83 @@ export function StructureAnnotationsSection({
         prev.map((m, i) => (i === srcIndex ? { ...m, label_bbox: null, extracted_id: null } : m)),
     );
 
+  /** Drawing commits a box and nothing else — no dialog either way. The human's job is the
+   *  geometry and the pairing; the SMILES comes from DECIMER and the label text from OCR,
+   *  via Analyse. (Demanding a hand-typed SMILES at draw time asked for something nobody can
+   *  do by eye for a real scaffold, which is what made drawing a structure unusable.) */
   const handleDraw = (bbox: number[]) => {
     if (drawMode === "label") {
       // Guarded by the button's disabled state; re-checked because state could have
       // moved between arming the mode and finishing the drag.
-      if (pairSource !== null) {
-        setBox(pairSource, "label_bbox", bbox);
-        // A box with no words teaches the relation matcher nothing — ask for the text now.
-        setPendingLabelIndex(pairSource);
-      }
+      if (pairSource !== null) setBox(pairSource, "label_bbox", bbox);
     } else {
-      setPendingDrawBbox(bbox);
+      // Select the new pair as well, so "Add label" attaches to the box just drawn.
+      const index = (working ?? []).length;
+      setWorking((prev) => [...(prev ?? []), blankMention(bbox)]);
+      setPairSource(index);
     }
     setDrawMode(null);
+  };
+
+  /**
+   * Read one pair's boxes with the models. Fills `smiles` (DECIMER) and `extracted_id`
+   * (OCR — exported as `label_text`), i.e. exactly the two things a human should verify
+   * rather than transcribe.
+   *
+   * Hand-typed values are never overwritten on the first click: a pair the human corrected
+   * arms the button instead, and only a second, explicit click re-runs. Silently replacing a
+   * human correction with a machine guess would quietly undo the whole point of this screen,
+   * and silently *keeping* it would strand a wrong hand-typed SMILES with no way back to the
+   * model's answer.
+   */
+  const runAnalyse = async (srcIndex: number) => {
+    const target = working?.[srcIndex];
+    // Same gate as every other server call on this screen: no render, nothing to read.
+    if (!target?.structure_bbox || blindReason || analyzingBox !== null) return;
+    if (target.__human && confirmIndex !== srcIndex) {
+      setConfirmIndex(srcIndex);
+      return;
+    }
+    setConfirmIndex(null);
+    const sent = target.structure_bbox;
+    setAnalyzingBox(JSON.stringify(sent));
+    try {
+      const result = await analyze.mutateAsync({
+        structure_bbox: sent,
+        label_bbox: target.label_bbox ?? null,
+      });
+      const smiles = result.smiles?.trim() ?? "";
+      const labelText = result.label_text?.trim() || null;
+      setWorking((prev) => {
+        if (!prev) return prev;
+        const current = prev[srcIndex];
+        // A cold call runs ~95s; in that time the pair can be deleted (which shifts every
+        // later index) or re-drawn. Write back only if this slot is still the box we asked
+        // about — a machine SMILES landing on the wrong molecule is worse than no answer.
+        if (!current || JSON.stringify(current.structure_bbox) !== JSON.stringify(sent)) {
+          return prev;
+        }
+        return prev.map((m, i) =>
+          i === srcIndex
+            ? {
+                ...m,
+                // Whatever was here described the box as it was; the answer for the box as
+                // it is now is this one, empty or not. An empty one marks the pair
+                // unsaveable rather than leaving a stale SMILES attached to moved corners.
+                smiles,
+                // Text belongs to the rectangle: no label box, no label text.
+                extracted_id: m.label_bbox ? labelText : m.extracted_id,
+                __human: false,
+                __unreadable: !smiles,
+              }
+            : m,
+        );
+      });
+    } catch (err) {
+      toast.error("Could not analyse this box", { description: getErrorMessage(err) });
+    } finally {
+      setAnalyzingBox(null);
+    }
   };
 
   // "Add label" attaches to a selection, so it has two ways of being unavailable. Both
@@ -623,7 +740,9 @@ export function StructureAnnotationsSection({
                     <Button
                       size="sm"
                       onClick={save}
-                      disabled={correct.isPending || blindReason !== null}
+                      disabled={
+                        correct.isPending || blindReason !== null || saveBlockedReason !== null
+                      }
                     >
                       Save changes
                     </Button>
@@ -631,7 +750,7 @@ export function StructureAnnotationsSection({
                       size="sm"
                       variant={drawMode === "structure" ? "default" : "outline"}
                       onClick={() => setDrawMode((v) => (v === "structure" ? null : "structure"))}
-                      title="Draw a new structure box and give it a SMILES"
+                      title="Drag a box around a structure — then click Analyse on its card to read the SMILES"
                     >
                       {drawMode === "structure" ? "Drawing structure — drag on image" : "Add structure"}
                     </Button>
@@ -642,7 +761,7 @@ export function StructureAnnotationsSection({
                       disabled={labelDrawBlocked !== null}
                       title={
                         labelDrawBlocked ??
-                        "Draw the caption box for the selected structure, then type its text"
+                        "Drag the caption box for the selected structure — Analyse reads its text"
                       }
                     >
                       {drawMode === "label" ? "Drawing label — drag on image" : "Add label"}
@@ -657,6 +776,9 @@ export function StructureAnnotationsSection({
                     )}
                     {labelDrawBlocked && (
                       <span className="text-xs text-text-muted">{labelDrawBlocked}</span>
+                    )}
+                    {saveBlockedReason && (
+                      <span className="text-xs text-ds-error">{saveBlockedReason}</span>
                     )}
                   </>
                 )}
@@ -738,112 +860,202 @@ export function StructureAnnotationsSection({
 
             {located.length > 0 && (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {located.map((m, i) => (
-                  <div
-                    key={i}
-                    onMouseEnter={() => setActiveIndex(i)}
-                    onMouseLeave={() => setActiveIndex(null)}
-                    className={`group/ann relative rounded-lg border p-3 transition-colors ${
-                      activeIndex === i
-                        ? "border-primary/50 bg-surface-elevated"
-                        : "border-border-subtle"
-                    }`}
-                  >
-                    {editing && (
-                      <button
-                        type="button"
-                        aria-label="Delete this whole pair — structure and label"
-                        title="Delete this whole pair — structure and label"
-                        onClick={() => handleDelete(m.__srcIndex)}
-                        className="absolute right-2 top-2 rounded-sm p-0.5 text-text-muted opacity-0 transition-opacity hover:text-ds-error group-hover/ann:opacity-100"
-                      >
-                        <X className="size-3.5" />
-                      </button>
-                    )}
-                    {/* Only a pair that HAS a label box can have label text: the words belong to
-                        the rectangle, so no rectangle means nothing to type. This is also the way
-                        back in if the dialog was dismissed right after drawing the box. */}
-                    {editing && m.label_bbox ? (
-                      <button
-                        type="button"
-                        onClick={() => setPendingLabelIndex(m.__srcIndex)}
-                        title="Edit the words printed inside the label box"
-                        className="text-left text-sm font-medium text-text-primary underline decoration-dotted underline-offset-4 hover:text-primary"
-                      >
-                        {m.extracted_id ?? "unlabelled"}
-                      </button>
-                    ) : (
-                      <div className="text-sm font-medium text-text-primary">
-                        {m.extracted_id ?? "unlabelled"}
+                {located.map((m, i) => {
+                  const analysing = analyzingBox === JSON.stringify(m.structure_bbox);
+                  const blocked = editing && isUnsaveable(m);
+                  return (
+                    <div
+                      key={i}
+                      onMouseEnter={() => setActiveIndex(i)}
+                      onMouseLeave={() => setActiveIndex(null)}
+                      className={`group/ann relative rounded-lg border p-3 transition-colors ${
+                        blocked
+                          ? "border-ds-error/60"
+                          : activeIndex === i
+                            ? "border-primary/50 bg-surface-elevated"
+                            : "border-border-subtle"
+                      }`}
+                    >
+                      {editing && (
+                        <button
+                          type="button"
+                          aria-label="Delete this whole pair — structure and label"
+                          title="Delete this whole pair — structure and label"
+                          onClick={() => handleDelete(m.__srcIndex)}
+                          className="absolute right-2 top-2 rounded-sm p-0.5 text-text-muted opacity-0 transition-opacity hover:text-ds-error group-hover/ann:opacity-100"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      )}
+                      {/* Only a pair that HAS a label box can have label text: the words belong to
+                          the rectangle, so no rectangle means nothing to type. This is also the way
+                          back in if the dialog was dismissed right after drawing the box. */}
+                      {editing && m.label_bbox ? (
+                        <button
+                          type="button"
+                          onClick={() => setEditIndex(m.__srcIndex)}
+                          title="Verify or correct the words printed inside the label box"
+                          className="text-left text-sm font-medium text-text-primary underline decoration-dotted underline-offset-4 hover:text-primary"
+                        >
+                          {m.extracted_id ?? "unlabelled"}
+                        </button>
+                      ) : (
+                        <div className="text-sm font-medium text-text-primary">
+                          {m.extracted_id ?? "unlabelled"}
+                        </div>
+                      )}
+                      {/* In edit mode the SMILES is a way back into the dialog: the models read
+                          it, the human verifies it, and correcting a misread is one click. */}
+                      {editing ? (
+                        <button
+                          type="button"
+                          onClick={() => setEditIndex(m.__srcIndex)}
+                          title="Verify or correct the SMILES"
+                          className={`mt-1 block break-all text-left font-mono text-xs underline decoration-dotted underline-offset-4 hover:text-primary ${
+                            m.smiles ? "text-text-muted" : "text-ds-error"
+                          }`}
+                        >
+                          {m.smiles || "no SMILES yet"}
+                        </button>
+                      ) : (
+                        <div className="mt-1 break-all font-mono text-xs text-text-muted">
+                          {m.smiles}
+                        </div>
+                      )}
+                      <div className="mt-2 flex gap-3 text-xs text-text-muted">
+                        {m.confidence != null && <span>match {(m.confidence * 100).toFixed(0)}%</span>}
+                        {m.structure_confidence != null && (
+                          <span>structure {(m.structure_confidence * 100).toFixed(0)}%</span>
+                        )}
+                        {m.label_confidence != null && (
+                          <span>label {(m.label_confidence * 100).toFixed(0)}%</span>
+                        )}
                       </div>
-                    )}
-                    <div className="mt-1 break-all font-mono text-xs text-text-muted">
-                      {m.smiles}
-                    </div>
-                    <div className="mt-2 flex gap-3 text-xs text-text-muted">
-                      {m.confidence != null && <span>match {(m.confidence * 100).toFixed(0)}%</span>}
-                      {m.structure_confidence != null && (
-                        <span>structure {(m.structure_confidence * 100).toFixed(0)}%</span>
+                      {editing && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <Button
+                            size="xs"
+                            variant={m.smiles ? "ghost" : "outline"}
+                            className={m.smiles ? "-ml-2 text-text-muted" : undefined}
+                            onClick={() => runAnalyse(m.__srcIndex)}
+                            disabled={analyzingBox !== null || blindReason !== null}
+                            title={
+                              blindReason ??
+                              (analyzingBox !== null && !analysing
+                                ? "Another box is being read — one at a time"
+                                : m.__human
+                                  ? "Re-read these boxes with the models, replacing what you typed"
+                                  : "Read the SMILES (DECIMER) and the label text (OCR) out of these boxes")
+                            }
+                          >
+                            {analysing && <Loader2 className="animate-spin" />}
+                            {analysing
+                              ? "Analysing…"
+                              : confirmIndex === m.__srcIndex
+                                ? "Discard your edits?"
+                                : m.smiles
+                                  ? "Re-analyse"
+                                  : "Analyse"}
+                          </Button>
+                          {analysing && (
+                            <span className="text-xs text-text-muted">
+                              First one in a while can take ~90s — the model is loading.
+                            </span>
+                          )}
+                          {!m.smiles && (
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              className="-ml-1 text-text-muted"
+                              onClick={() => setEditIndex(m.__srcIndex)}
+                              title="Type the SMILES yourself"
+                            >
+                              Enter SMILES by hand
+                            </Button>
+                          )}
+                        </div>
                       )}
-                      {m.label_confidence != null && (
-                        <span>label {(m.label_confidence * 100).toFixed(0)}%</span>
+                      {/* The two states a drawn box can be stuck in, both said out loud at the
+                          moment they happen rather than as a surprise at save time. */}
+                      {editing && m.__unreadable && (
+                        <p className="mt-2 text-xs text-ds-error">
+                          No structure could be read here, so this pair cannot be saved — a
+                          compound with no SMILES is not stored at all. Adjust the box and
+                          re-analyse, type the SMILES by hand, or delete the pair (×, top right).
+                        </p>
+                      )}
+                      {editing && !m.smiles && !m.__unreadable && (
+                        <p className="mt-2 text-xs text-text-muted">
+                          Not analysed yet — click Analyse to read the SMILES and label text.
+                        </p>
+                      )}
+                      {editing && confirmIndex === m.__srcIndex && (
+                        <p className="mt-2 text-xs text-ds-error">
+                          You typed these values in by hand. Click again to replace them with what
+                          the models read.
+                        </p>
+                      )}
+                      {editing && m.label_bbox && !m.extracted_id && (
+                        <p className="mt-2 text-xs text-ds-error">
+                          Label box has no text — the relation matcher needs the words.
+                        </p>
+                      )}
+                      {editing && m.label_bbox && (
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          className="mt-2 -ml-2 text-text-muted hover:text-ds-error"
+                          onClick={() => handleDeleteLabel(m.__srcIndex)}
+                          title="This structure has no printed caption — drop the label box, keep the structure"
+                        >
+                          Remove label box
+                        </Button>
                       )}
                     </div>
-                    {editing && m.label_bbox && !m.extracted_id && (
-                      <p className="mt-2 text-xs text-ds-error">
-                        Label box has no text — the relation matcher needs the words.
-                      </p>
-                    )}
-                    {editing && m.label_bbox && (
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        className="mt-2 -ml-2 text-text-muted hover:text-ds-error"
-                        onClick={() => handleDeleteLabel(m.__srcIndex)}
-                        title="This structure has no printed caption — drop the label box, keep the structure"
-                      >
-                        Remove label box
-                      </Button>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         )}
       </Card>
 
-      {/* One editor, two entry points: a freshly drawn structure needs its SMILES, and a
-          freshly drawn (or mis-transcribed) label needs its text. `extracted_id` is the
-          dialog's "Label" field and the exported `label_text`, so this is already the right
-          editor for both — a second one would be a second definition of the same field. */}
+      {/* Verification, not data entry: drawing never opens this. It is where a human fixes
+          what DECIMER or the OCR got wrong, and the only way to give a SMILES to a structure
+          the models cannot read. `extracted_id` is its "Label" field and the exported
+          `label_text`, so one editor covers both fields of a pair. */}
       {editable && (
         <EditCompoundDialog
-          open={pendingDrawBbox !== null || pendingLabelIndex !== null}
+          open={editIndex !== null}
           onOpenChange={(open) => {
-            if (open) return;
-            setPendingDrawBbox(null);
-            setPendingLabelIndex(null);
+            if (!open) setEditIndex(null);
           }}
-          compound={pendingLabelIndex !== null ? (working?.[pendingLabelIndex] ?? null) : null}
+          compound={editIndex !== null ? (working?.[editIndex] ?? null) : null}
           onSave={async (item) => {
-            const fields = {
-              smiles: item.smiles,
-              extracted_id: item.extracted_id ?? null,
-              internal_id: item.internal_id ?? null,
-              cdd_id: item.cdd_id ?? null,
-              chembl_id: item.chembl_id ?? null,
-              pdb_id: item.pdb_id ?? null,
-            };
-            if (pendingLabelIndex !== null) {
-              const srcIndex = pendingLabelIndex;
-              setWorking((prev) => prev && prev.map((m, i) => (i === srcIndex ? { ...m, ...fields } : m)));
-              setPendingLabelIndex(null);
-              return;
-            }
-            if (!pendingDrawBbox) return;
-            setWorking((prev) => [...(prev ?? []), { ...blankMention(pendingDrawBbox), ...fields }]);
-            setPendingDrawBbox(null);
+            if (editIndex === null) return;
+            const srcIndex = editIndex;
+            setWorking(
+              (prev) =>
+                prev &&
+                prev.map((m, i) =>
+                  i === srcIndex
+                    ? {
+                        ...m,
+                        smiles: item.smiles,
+                        extracted_id: item.extracted_id ?? null,
+                        internal_id: item.internal_id ?? null,
+                        cdd_id: item.cdd_id ?? null,
+                        chembl_id: item.chembl_id ?? null,
+                        pdb_id: item.pdb_id ?? null,
+                        // Typed by a human: Analyse now needs a second click to replace it,
+                        // and the dialog cannot save an empty SMILES, so this clears the block.
+                        __human: true,
+                        __unreadable: false,
+                      }
+                    : m,
+                ),
+            );
+            setEditIndex(null);
           }}
         />
       )}
