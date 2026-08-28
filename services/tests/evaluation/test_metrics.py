@@ -144,3 +144,35 @@ class TestAggregation:
 
     def test_aggregate_empty(self):
         assert aggregate_metrics([]) == {}
+
+
+from evaluation.eval_harness import QueryResult, _compute_query_metrics
+from evaluation.query_set import EvalQuery, GoldAnswer
+
+
+def _abstain_query() -> EvalQuery:
+    return EvalQuery(
+        query_id="DECK-X-q1",
+        query_text="Do we have anything on CHEMBL999999?",
+        query_type="factual_single",
+        gold_answer=GoldAnswer(kind="abstain"),
+    )
+
+
+def test_retrieval_metrics_omitted_when_no_gold_documents():
+    result = QueryResult()
+    result.answer = "That is not in the corpus."
+    result.retrieved_artifact_ids = [uuid4(), uuid4()]
+
+    metrics = _compute_query_metrics(_abstain_query(), result)
+
+    for key in (
+        "precision_at_5",
+        "precision_at_10",
+        "recall_at_10",
+        "recall_at_20",
+        "ndcg_at_10",
+        "context_pollution_rate",
+    ):
+        assert key not in metrics, f"{key} is undefined with no gold, must be omitted"
+    assert "abstained" in metrics, "answer scoring must still run"
