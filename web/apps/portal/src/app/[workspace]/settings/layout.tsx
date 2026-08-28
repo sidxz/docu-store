@@ -30,10 +30,14 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   const pathname = usePathname();
   const { workspace } = useParams<{ workspace: string }>();
   const isAdmin = useAuthzHasRole("admin");
+  // Training export is gated server side on `artifacts:hiledit`, held by editor and above.
+  const canExportTraining = useAuthzHasRole("editor");
   const provider = useLlmProvider();
-  const tabs = provider.data?.enabled
-    ? [...TABS, { label: "AI Provider", segment: "llm" }]
-    : TABS;
+  const tabs = [
+    ...TABS,
+    ...(canExportTraining ? [{ label: "Training Export", segment: "training-export" }] : []),
+    ...(provider.data?.enabled ? [{ label: "AI Provider", segment: "llm" }] : []),
+  ];
 
   const base = `/${workspace}/settings`;
 
