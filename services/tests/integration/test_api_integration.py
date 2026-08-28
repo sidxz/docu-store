@@ -135,7 +135,7 @@ def _build_use_cases() -> tuple[dict[type, object], MockArtifactRepository, Mock
     page_repo = MockPageRepository()
 
     use_cases: dict[type, object] = {
-        Settings: SimpleNamespace(user_llm_keys_enabled=False),
+        Settings: SimpleNamespace(user_llm_keys_enabled=False, self_serve_enabled=False),
         CreateArtifactUseCase: CreateArtifactUseCase(artifact_repo),
         CreatePageUseCase: CreatePageUseCase(page_repo, artifact_repo),
         AddCompoundMentionsUseCase: AddCompoundMentionsUseCase(page_repo),

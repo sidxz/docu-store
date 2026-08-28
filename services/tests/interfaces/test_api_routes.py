@@ -149,7 +149,7 @@ def make_client() -> Callable[[dict[type, object]], TestClient]:
         auth: FakeAuth | None = None,
     ) -> TestClient:
         container = FakeContainer(
-            {Settings: SimpleNamespace(user_llm_keys_enabled=False), **overrides},
+            {Settings: SimpleNamespace(user_llm_keys_enabled=False, self_serve_enabled=False), **overrides},
         )
         fake_auth = auth or FakeAuth(role="editor")
         app.dependency_overrides[get_container] = lambda: container

@@ -62,6 +62,7 @@ class FakeContainer:
 def _settings(*, enabled: bool = True, provider: str = "openai", key: str | None = None):
     return SimpleNamespace(
         user_llm_keys_enabled=enabled,
+        self_serve_enabled=False,
         llm_provider=provider,
         openai_api_key=key,
         anthropic_api_key=None,

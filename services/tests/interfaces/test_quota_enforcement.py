@@ -52,7 +52,7 @@ def _client(*, quota: FakeQuota, role: str = "editor") -> TestClient:
     strip_authz_middleware(app)
     app.dependency_overrides[get_container] = lambda: FakeContainer(
         {
-            Settings: SimpleNamespace(user_llm_keys_enabled=False),
+            Settings: SimpleNamespace(user_llm_keys_enabled=False, self_serve_enabled=False),
             CheckTokenQuotaUseCase: quota,
             SendMessageUseCase: FakeSendUseCase(),
             ChatRunRegistry: ChatRunRegistry(),
