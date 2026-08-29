@@ -72,7 +72,8 @@ export default function UsageSettingsPage() {
             </div>
             <p className="text-xs text-text-muted">
               Usage resets on the 1st of each month (UTC). Deep Research and document processing both
-              count toward your limit.
+              count toward your limit. These totals are our best estimate — for actual billed usage,
+              check your LLM provider&rsquo;s own dashboard.
             </p>
           </div>
         )}

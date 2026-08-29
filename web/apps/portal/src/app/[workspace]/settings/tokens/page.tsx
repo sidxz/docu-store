@@ -230,6 +230,10 @@ export default function TokenSettingsPage() {
           </p>
         )}
         <p className="mt-3 text-xs text-text-muted">
+          &ldquo;This month&rdquo; is our best estimate — for actual billed usage, check your LLM
+          provider&rsquo;s own dashboard.
+        </p>
+        <p className="mt-3 text-xs text-text-muted">
           Member list is capped at 50 (same as the stats member card); overrides for anyone
           not in it show as "Unknown member" so they can still be cleared. Setting a member's
           override to empty saves an explicit Unlimited that beats the workspace default.
