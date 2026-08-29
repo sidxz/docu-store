@@ -70,3 +70,51 @@ from evaluation.deckkit import degloss_caption
 )
 def test_degloss_caption(caption: str, expected: str):
     assert degloss_caption(caption) == expected
+
+
+# --- title normalisation -----------------------------------------------------
+# A gate protecting the answer key must not let two different titles look the
+# same. The first normaliser stripped all non-ASCII, so PPARalpha and PPARgamma
+# collapsed to one string and a wrong receptor subtype would have passed.
+
+from evaluation.deckkit import normalize_title as norm  # noqa: E402
+
+def test_greek_letters_stay_distinct():
+    assert norm("PPARα") != norm("PPARγ")
+
+
+def test_subscript_receptor_subtypes_stay_distinct():
+    assert norm("CB₁") != norm("CB₂")
+
+
+def test_greek_plus_subscript_subtype_stays_distinct():
+    assert norm("α₁A") != norm("α₂A")
+
+
+def test_greek_letter_does_not_fold_to_latin_or_vanish():
+    assert norm("α") != norm("a")
+    assert norm("α") != ""
+
+
+# --- must collide: same title, different typesetting ------------------------
+
+def test_subscript_digit_matches_plain_digit():
+    assert norm("CB₁") == norm("CB1")
+
+
+def test_letter_spaced_title_matches_gold():
+    assert norm("S E R I E S  1 1  —  1 - A Z A B I C Y C L O") == norm(
+        "Series 11 -- 1-azabicyclo"
+    )
+
+
+def test_case_insensitive():
+    assert norm("HTS First") == norm("hts first")
+
+
+def test_whitespace_and_linebreaks_ignored():
+    assert norm("HTS first\nand it did not work") == norm("HTS  first and it did not work")
+
+
+def test_trailing_punctuation_ignored():
+    assert norm("Did nature get there first?") == norm("Did nature get there first")
