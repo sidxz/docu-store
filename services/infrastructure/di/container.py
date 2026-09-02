@@ -916,6 +916,9 @@ def create_container() -> Container:
     from infrastructure.chat.nodes.inline_verification import (
         InlineVerificationNode,
     )
+    from infrastructure.chat.nodes.literature_context_assembly import (
+        LiteratureContextAssemblyNode,
+    )
     from infrastructure.chat.nodes.literature_retrieval import LiteratureRetrievalNode
     from infrastructure.chat.nodes.query_planning import QueryPlanningNode
     from infrastructure.chat.nodes.question_analysis import QuestionAnalysisNode
@@ -1091,7 +1094,7 @@ def create_container() -> Container:
     literature_agent = lambda c: ThinkingAgent(
         query_planning=c[QueryPlanningNode],
         agentic_retrieval=literature_retrieval(c),
-        context_assembly=c[ContextAssemblyNode],
+        context_assembly=LiteratureContextAssemblyNode(),
         adaptive_synthesis=c[AdaptiveSynthesisNode],
         inline_verification=c[InlineVerificationNode],
         answer_formatting=c[AnswerFormattingNode],
