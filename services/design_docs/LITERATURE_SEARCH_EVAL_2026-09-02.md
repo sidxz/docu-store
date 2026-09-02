@@ -180,3 +180,126 @@ running `gliner2` over abstracts locally.
 - Range citations such as `[1–10]` render as plain text, not clickable buttons.
 - Panel badge numbering is consistent; uncited assembled sources render unbadged
   between numbered ones by design.
+
+---
+
+# Post-fix results (2026-09-02, commits 020b3b0..6a44ca9)
+
+Five acceptance probes, plus one unplanned probe that a live Europe PMC outage
+handed us. Telemetry read from `literature.reranked` / `literature.assembly.done`
+and the agentic loop's `iteration=` counters.
+
+| Probe | Criterion | Result |
+|---|---|---|
+| P1 homograph | no goose / preeclampsia `INHA` paper cited | **PASS** — both present in the panel, neither carries a citation badge; every cited paper is genuine InhA/mycobacterial work |
+| P2 temporal | a post-2020 paper is cited and the "none exist" claim is gone | **PASS** (headline) |
+| P3 point fact | LLM verification runs, or the answer hedges | **FAIL** — see below, and the cause is not RC1 |
+| P4 retraction | model issues `PUB_TYPE:"Retracted Publication"`; retracted cards badged, no Add button | **PASS** |
+| P5 multi-turn | at least one `iteration=1` or higher | **PASS** |
+| P-outage | (unplanned) behaviour when Europe PMC is down | **PARTIAL** |
+
+## P2 — the failure the plan was built to fix, fixed
+
+Before: assembly kept 10 sources all dated 2015–2019 and the answer stated that
+the retrieved sources "contain no studies or resistance findings dated 2020 or
+later. Therefore, a source-grounded comparison cannot establish how mechanisms
+changed after 2020."
+
+After: citations [4] and [5] are both **2022** papers, and the answer delivers
+the comparison it previously called impossible —
+
+- 2010s: target-site resistance at DprE1 Cys387 (C387G/A/S/N/T), plus nitro-group
+  reduction in *M. smegmatis*
+- Since 2020: indirect, efflux-associated resistance via `rv0678`, the negative
+  regulator of the MmpS5/L5 pump, with low-level cross-resistance in clinical
+  isolates
+
+Coverage 87% (13/15), grounding 97%. The `rv0678` → MmpS5/MmpL5 efflux story is
+real, well-established TB biology and its extension to BTZ043/PBTZ169 is a
+genuine post-2020 finding — the answer is scientifically correct, not just
+better-shaped.
+
+## P5 — the loop iterates
+
+`at_capacity` fired **0 times** across the probe run, against 17 times in the
+original survey. Loop iterations observed: `iteration=0` ×15, `=1` ×5, `=2` ×3,
+`=3` ×1. The model now searches, reads what came back, and searches again — P4's
+run visibly refined from a broad `PUB_TYPE` sweep into target-specific follow-ups.
+
+## P4 — retraction, end to end
+
+Three searches used `PUB_TYPE:"Retracted Publication"`, the field the tool
+description previously did not teach. `TITLE_ABS:"Mycobacterium tuberculosis" AND
+PUB_TYPE:"Retracted Publication"` returned **37 hits** — against the pre-fix
+answer that "no Mycobacterium tuberculosis drug-target paper is explicitly
+reported as retracted." 55 cards rendered the RETRACTED badge and **none of them
+offered an Add to library button**.
+
+## NEW DEFECT — the reranker is scored against the raw user message
+
+Measured across two probes:
+
+| Probe | Input | top score | high-relevance | selected | avg |
+|---|---|---|---|---|---|
+| P1 | `TITLE_ABS:"InhA" AND PUB_YEAR:[2024 TO 2026]` | **0.025** | 0 | 60 | 0.003 |
+| P2 | natural-language question | **0.788** | 5 | 10 | 0.465 |
+
+`LiteratureRetrievalNode._rescore` scores each abstract against `question` — the
+user's raw message. `ms-marco-MiniLM` is trained on natural-language queries, so
+a fielded boolean expression scores near zero against everything. Nothing reaches
+the HIGH tier, and because the budget loop now uses `continue`, it backfills with
+**60 abstracts truncated to 200 characters** instead of ~10 full ones.
+
+Relative ordering still holds — P1 still demoted the wrong-gene papers correctly —
+but the absolute calibration collapses. This matters because the surface
+deliberately supports users typing Europe PMC syntax directly.
+
+Fix: prefer `plan.reformulated_query` (the planner already produces a
+natural-language restatement of intent) as the rerank query, falling back to
+`question`. `plan` is already in scope in `LiteratureRetrievalNode.run`.
+
+## P3 — still fails, and RC1 was not the cause
+
+The answer is unchanged: `The IC₅₀ of TAM16 against Pks13 is 0.19 μM. [2]` at 0%
+citation coverage, 10% grounding, "LLM verification skipped".
+
+The spec above (RC1) claimed that fixing the hardcoded `1.0` would re-arm the
+verification gate. That was half right, and the correction matters:
+
+`_needs_llm_verification` fires only when coverage < 0.7 AND the query is
+factual/comparative AND `avg_relevance_score` < 0.4. `avg_relevance_score` is now
+a real number — but on this query the sources genuinely *are* relevant (10 of 12
+high), so the gate correctly declines on relevance grounds. What is actually
+broken is the **coverage checker**: it scored 0/1 on a sentence that visibly
+carries a `[2]` marker.
+
+That checker lives in `infrastructure/chat/nodes/inline_verification.py`, a shared
+file this plan deliberately did not touch. Fixing it needs a decision about the
+Deep Research boundary.
+
+## P-outage — the dangerous half is fixed, the reporting half is weak
+
+Europe PMC went down mid-probe (a fifth outage window in one day). Observed:
+
+- `tool.literature.source_unavailable` logged, three retries per search
+- **No bare-query degradation** — the log shows zero `tool.literature.searched`
+  lines; the model did not loosen its fielded query
+- No panel rendered
+- The answer refused rather than inventing: "Because the source set is empty, I
+  cannot reliably summarize recent InhA research…"
+
+That is the failure mode that previously produced a one-word answer of "No",
+and it is gone. What remains: the answer says "no relevant source documents were
+retrieved" rather than "Europe PMC was unavailable", so the user still cannot
+tell an outage from an empty result. The tool's summary tells the model both
+things; the model relayed only one. Worth tightening the wording.
+
+Also unchanged: `Grounded: True (confidence: 100%)` and `100% citation coverage
+(0/0)` on zero sources. Vacuous truth in the shared verification path — same
+boundary decision as P3.
+
+## RC5 decision
+
+P1 passed its criterion: the cross-encoder demoted both wrong-gene `INHA` papers
+out of the citation set without any NER assistance. **RC5 (corpus NER query
+expansion) stays deferred**, as the plan's Task 8 Step 4 specified.
