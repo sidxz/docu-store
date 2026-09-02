@@ -15,10 +15,22 @@ def _corpus() -> DeckCorpus:
     return DeckCorpus(**json.loads(MERGED_GOLD.read_text()))
 
 
-def test_every_deck_has_an_anchor_of_usable_length():
+def test_every_anchor_is_printed_on_its_own_deck():
+    # The rule that replaced a 15-70 character bound. That bound is what pushed
+    # 24 decks onto hand-written names, and every one of them named the deck with
+    # a string printed nowhere -- unreachable by any reader or retriever.
+    from evaluation.deckkit import PDF_DIR, normalize_title
+    import fitz
+
     for deck in _corpus().decks:
         anchor = deck_anchor(deck)
-        assert 15 <= len(anchor) <= 70, f"{deck.deck_id}: {anchor!r} is {len(anchor)} chars"
+        assert anchor.strip(), f"{deck.deck_id}: has no anchor"
+        doc = fitz.open(PDF_DIR / f"{deck.deck_id}.pdf")
+        text = "".join(doc[i].get_text() for i in range(doc.page_count))
+        doc.close()
+        assert normalize_title(anchor) in normalize_title(text), (
+            f"{deck.deck_id}: anchor {anchor!r} is not printed on the deck"
+        )
 
 
 def test_anchors_are_unique_across_the_corpus():
