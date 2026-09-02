@@ -31,6 +31,7 @@ log = structlog.get_logger(__name__)
 # a "Correction to" notice -0.36 (0.411), a wrong-gene INHA paper -7.17 (0.0008).
 _HIGH = 0.50   # logit 0.0 — carries its full abstract
 _MEDIUM = 0.05  # logit -2.9 — carries a truncated abstract
+_HIGH_CHARS = 3000  # a whole abstract, but never the whole budget
 _MEDIUM_CHARS = 1000
 _LOW_CHARS = 200
 
@@ -66,14 +67,16 @@ class LiteratureContextAssemblyNode(ContextAssemblyNode):
         for r in ordered:
             score = self._score(r)
             if score >= _HIGH:
-                display = r.expanded_text
+                display = r.expanded_text[:_HIGH_CHARS]
             elif score >= _MEDIUM:
                 display = r.expanded_text[:_MEDIUM_CHARS]
             else:
                 display = r.expanded_text[:_LOW_CHARS]
 
             if chars_used + len(display) > budget:
-                break
+                # continue, not break: a long mid-ranked abstract must not shut
+                # out every shorter one below it.
+                continue
 
             idx = len(citations) + 1
             title = r.artifact_title or "Untitled"
@@ -101,7 +104,22 @@ class LiteratureContextAssemblyNode(ContextAssemblyNode):
                 ),
             )
 
-        scores = [self._score(r) for r in ordered[: len(citations)]]
+        if not citations:
+            return (
+                [],
+                "No relevant sources found.",
+                ContextMetadata(
+                    total_sources=0,
+                    high_relevance_count=0,
+                    avg_relevance_score=0.0,
+                    unique_artifacts=0,
+                    has_summaries=False,
+                ),
+            )
+
+        # Not ordered[: len(citations)] — continue (not break) above means
+        # selected citations are no longer a prefix of `ordered`.
+        scores = [c.similarity_score for c in citations]
         meta = ContextMetadata(
             total_sources=len(citations),
             high_relevance_count=high_count,
