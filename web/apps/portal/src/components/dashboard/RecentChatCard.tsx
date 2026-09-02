@@ -4,7 +4,7 @@ import Link from "next/link";
 import { FileText, Library, ShieldCheck, MoreHorizontal } from "lucide-react";
 import type { RecentConversation } from "@docu-store/types";
 import { entityChipClass } from "@/lib/entity-colors";
-import { SURFACE_ICON, SURFACE_ICON_COLOR } from "@/lib/surfaces";
+import { SURFACES, conversationHref } from "@/lib/surfaces";
 import { formatRelativeTime } from "@/lib/utils";
 import { MoveToFolderMenu } from "@/components/folders/MoveToFolderMenu";
 import { setChatDragData } from "@/components/folders/dnd";
@@ -17,18 +17,18 @@ export function RecentChatCard({ chat, workspace }: { chat: RecentConversation; 
   // from lib/surfaces so a recent card matches its sidebar entry exactly.
   const surface = chat.surface ?? "research";
   const isLiterature = surface === "literature";
-  const SurfaceIcon = SURFACE_ICON[surface];
+  const SurfaceIcon = SURFACES[surface].icon;
   return (
     <div className="group relative">
     <Link
-      href={`/${workspace}/${isLiterature ? "literature" : "chat"}/${chat.conversation_id}`}
+      href={conversationHref(workspace, surface, chat.conversation_id)}
       draggable
       onDragStart={(e) => setChatDragData(e, chat.conversation_id, chat.folder_id)}
       className="block rounded-xl border border-border-default bg-surface-elevated p-4 transition-all hover:border-primary/30 hover:shadow-ds-sm"
     >
       <div className="flex items-start gap-3">
         <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-light">
-          <SurfaceIcon className={`h-4 w-4 ${SURFACE_ICON_COLOR[surface]}`} />
+          <SurfaceIcon className={`h-4 w-4 ${SURFACES[surface].iconColor}`} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-3">

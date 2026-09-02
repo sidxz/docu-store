@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, Loader2 } from "lucide-react";
-import { SURFACE_ICON, SURFACE_ICON_COLOR, surfaceFromBasePath } from "@/lib/surfaces";
+import { SURFACES, surfaceFromBasePath, conversationHref } from "@/lib/surfaces";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useConversations, useCreateConversation, useDeleteConversation } from "@/hooks/use-chat";
@@ -23,14 +23,14 @@ export function ConversationSidebar({
   workspace,
   activeConversationId,
   onCollapse,
-  basePath = "chat",
+  basePath = SURFACES.research.segment,
 }: ConversationSidebarProps) {
   const router = useRouter();
   // Derived from basePath rather than passed separately: two props that must
   // agree are two props that can disagree.
   const surface: ChatSurface = surfaceFromBasePath(basePath);
   const sidebarSurface = surface;
-  const EmptySurfaceIcon = SURFACE_ICON[surface];
+  const EmptySurfaceIcon = SURFACES[surface].icon;
   const { data: conversations, isLoading } = useConversations(surface);
   const createConversation = useCreateConversation(surface);
   const deleteConversation = useDeleteConversation();
@@ -41,7 +41,7 @@ export function ConversationSidebar({
 
   const handleNew = async () => {
     const conv = await createConversation.mutateAsync(undefined);
-    router.push(`/${workspace}/${basePath}/${conv.conversation_id}`);
+    router.push(conversationHref(workspace, surface, conv.conversation_id));
   };
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
@@ -60,12 +60,12 @@ export function ConversationSidebar({
     useChatStore.getState().clearUnread(id);
     if (id === activeConversationId) {
       resetChat();
-      router.push(`/${workspace}/${basePath}`);
+      router.push(conversationHref(workspace, surface));
     }
   };
 
   const handleSelect = (id: string) => {
-    router.push(`/${workspace}/${basePath}/${id}`);
+    router.push(conversationHref(workspace, surface, id));
   };
 
   return (
@@ -100,8 +100,8 @@ export function ConversationSidebar({
           </div>
         ) : !conversations?.length ? (
           <div className="p-4 text-center text-text-muted text-sm">
-            <EmptySurfaceIcon className={cn("w-8 h-8 mx-auto mb-2 opacity-50", SURFACE_ICON_COLOR[sidebarSurface])} />
-            <p>{sidebarSurface === "literature" ? "No searches yet" : "No conversations yet"}</p>
+            <EmptySurfaceIcon className={cn("w-8 h-8 mx-auto mb-2 opacity-50", SURFACES[sidebarSurface].iconColor)} />
+            <p>{SURFACES[sidebarSurface].emptyListText}</p>
           </div>
         ) : (
           <div className="p-2 space-y-1">
@@ -139,7 +139,7 @@ function ConversationItem({
   // Read the surface off the conversation rather than the sidebar: it is fixed
   // at creation, and conversations written before surfaces existed have none.
   const surface = conversation.surface ?? "research";
-  const SurfaceIcon = SURFACE_ICON[surface];
+  const SurfaceIcon = SURFACES[surface].icon;
   const date = new Date(conversation.updated_at).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
@@ -155,7 +155,7 @@ function ConversationItem({
           : "text-text-primary hover:bg-surface-hover",
       )}
     >
-      <SurfaceIcon className={cn("size-4 shrink-0", SURFACE_ICON_COLOR[surface], isActive ? "" : "opacity-70")} />
+      <SurfaceIcon className={cn("size-4 shrink-0", SURFACES[surface].iconColor, isActive ? "" : "opacity-70")} />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{title}</p>
         <p className="text-xs text-text-muted">

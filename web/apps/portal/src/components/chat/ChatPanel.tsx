@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { PanelLeftOpen, FileText, Folder } from "lucide-react";
-import { SURFACE_ICON, SURFACE_ICON_COLOR } from "@/lib/surfaces";
+import { SURFACES, surfaceFromBasePath, conversationHref } from "@/lib/surfaces";
 import { Button } from "@/components/ui/button";
 import { MoveToFolderMenu } from "@/components/folders/MoveToFolderMenu";
 import { useFolders } from "@/hooks/use-folders";
@@ -48,13 +48,13 @@ export function ChatPanel({
   sourcesOpen,
   onToggleSources,
   forceMode,
-  basePath = "chat",
+  basePath = SURFACES.research.segment,
   placeholder,
 }: ChatPanelProps) {
   const router = useRouter();
   const { data, isLoading } = useConversation(conversationId);
   const { data: folders } = useFolders();
-  const surface: ChatSurface = basePath === "literature" ? "literature" : "research";
+  const surface: ChatSurface = surfaceFromBasePath(basePath);
   const createConversation = useCreateConversation(surface);
   const sendMessage = useSendMessage(conversationId, { forceMode });
 
@@ -168,7 +168,7 @@ export function ChatPanel({
       // Queue the message, create conversation, then navigate — message auto-sends on mount
       setQueuedMessage(message);
       const conv = await createConversation.mutateAsync(undefined);
-      router.push(`/${workspace}/${basePath}/${conv.conversation_id}`);
+      router.push(conversationHref(workspace, surface, conv.conversation_id));
       return;
     }
     sendMessage.mutate(message);
@@ -206,14 +206,10 @@ export function ChatPanel({
           {/* The two surfaces search different corpora — the empty state has to
               say which, and wear the same icon and colour as its sidebar entry. */}
           <EmptyState
-            icon={SURFACE_ICON[surface]}
-            iconColor={SURFACE_ICON_COLOR[surface]}
-            title={surface === "literature" ? "Find relevant papers" : "Start a conversation"}
-            description={
-              surface === "literature"
-                ? "Select an existing search or start a new one to explore published literature."
-                : "Select an existing conversation or start a new one to chat with your documents."
-            }
+            icon={SURFACES[surface].icon}
+            iconColor={SURFACES[surface].iconColor}
+            title={SURFACES[surface].emptyTitle}
+            description={SURFACES[surface].emptyDescription}
           />
         </div>
         <ChatInput onSend={handleSend} disabled={createConversation.isPending} onAbort={sendMessage.stop} modeLocked={!!forceMode} placeholder={placeholder} />
@@ -294,6 +290,7 @@ export function ChatPanel({
             workspace={workspace}
             conversationId={conversationId}
             onFeedback={handleFeedback}
+            surface={surface}
           />
         </ConversationContent>
         <ConversationScrollButton />

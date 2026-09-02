@@ -4,6 +4,9 @@ import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useChatStore } from "@/lib/stores/chat-store";
+import { SURFACES, SURFACE_SEGMENTS } from "@/lib/surfaces";
+
+const CONVERSATION_ROUTE = new RegExp(`/(?:${SURFACE_SEGMENTS.join("|")})/([0-9a-f-]{36})`);
 
 const DISMISS_KEY = "chat-notify-dismissed";
 const PROMPT_AFTER_MS = 12_000;
@@ -29,7 +32,7 @@ export function ChatNotifications() {
   // Consume "answer ready" signals for the conversation being viewed,
   // however the user got there (toast View button, sidebar, reload).
   useEffect(() => {
-    const convId = pathname?.match(/\/(?:chat|literature)\/([0-9a-f-]{36})/)?.[1];
+    const convId = pathname?.match(CONVERSATION_ROUTE)?.[1];
     if (convId) {
       toast.dismiss(`chat-ready-${convId}`);
       useChatStore.getState().clearUnread(convId);
@@ -44,11 +47,11 @@ export function ChatNotifications() {
     // arbitrarily later, and pathnameRef tracks wherever the user has since
     // navigated — possibly a different workspace. A conversation belongs to
     // the surface it was started on, and the two surfaces are separate
-    // routes, so freeze that too (defaulting to "chat" if the segment isn't
-    // a known surface, matching prior behavior).
+    // routes, so freeze that too (defaulting to research's segment if the
+    // segment isn't a known surface, matching prior behavior).
     const segments = (pathnameRef.current ?? "").split("/");
     const workspace = segments[1] ?? "";
-    const surface = segments[2] === "literature" ? "literature" : "chat";
+    const surface = SURFACE_SEGMENTS.includes(segments[2]) ? segments[2] : SURFACES.research.segment;
 
     // Rising edge: one-time permission offer if the answer is slow.
     const timer = setTimeout(() => {

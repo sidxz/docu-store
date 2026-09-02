@@ -28,6 +28,7 @@ import { useSession } from "@/lib/auth";
 import { ARTIFACT_TYPE_LABELS } from "@/lib/constants";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { severityToVariant } from "@/lib/severity";
+import { SURFACES, conversationHref } from "@/lib/surfaces";
 
 export default function DashboardPage() {
   const { workspace } = useParams<{ workspace: string }>();
@@ -172,7 +173,7 @@ export default function DashboardPage() {
             </h2>
             <div className="space-y-3">
               <Link
-                href={`/${workspace}/chat`}
+                href={conversationHref(workspace, "research")}
                 onClick={() => trackEvent("dashboard_action", { action: "chat" })}
                 className="group flex items-center gap-4 rounded-xl border border-border-default bg-surface-elevated p-4 transition-all hover:shadow-ds-sm hover:border-primary/30"
               >
@@ -181,7 +182,7 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-text-primary">
-                    Docu Research
+                    {SURFACES.research.label}
                   </p>
                   <p className="text-xs text-text-muted">
                     Ask questions about your documents

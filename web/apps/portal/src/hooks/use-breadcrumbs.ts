@@ -6,6 +6,7 @@ import { apiClient } from "@docu-store/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { authFetchJson } from "@/lib/auth-fetch";
 import { throwApiError } from "@/lib/api-error";
+import { SURFACES, SURFACE_SEGMENTS } from "@/lib/surfaces";
 
 interface Breadcrumb {
   label: string;
@@ -17,8 +18,8 @@ const LABEL_MAP: Record<string, string> = {
   documents: "Documents",
   search: "Search",
   compounds: "Compounds",
-  chat: "Docu Research",
-  literature: "Literature",
+  chat: SURFACES.research.label,
+  literature: SURFACES.literature.label,
   settings: "Settings",
   upload: "Upload",
 };
@@ -56,7 +57,7 @@ export function useBreadcrumbs(): Breadcrumb[] {
   // /[workspace]/chat/[conversationId] and /[workspace]/literature/[conversationId].
   // Both surfaces hold conversations, so both resolve to a title — otherwise one
   // of them shows a raw id where the other shows a name.
-  const CONVERSATION_SEGMENTS = ["chat", "literature"];
+  const CONVERSATION_SEGMENTS = SURFACE_SEGMENTS;
   const chatIdx = segments.findIndex((s) => CONVERSATION_SEGMENTS.includes(s));
   const conversationId =
     chatIdx >= 0 &&

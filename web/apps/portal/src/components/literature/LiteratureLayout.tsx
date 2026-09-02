@@ -6,6 +6,7 @@ import { useChatStore } from "@/lib/stores/chat-store";
 import { useConversation } from "@/hooks/use-chat";
 import { ConversationSidebar } from "@/components/chat/ConversationSidebar";
 import { ChatPanel } from "@/components/chat/ChatPanel";
+import { SURFACES } from "@/lib/surfaces";
 import { LiteraturePanel } from "./LiteraturePanel";
 
 /**
@@ -72,7 +73,7 @@ export function LiteratureLayout({
             workspace={workspace}
             activeConversationId={conversationId}
             onCollapse={() => setSidebarCollapsed(true)}
-            basePath="literature"
+            basePath={SURFACES.literature.segment}
           />
         </div>
       </div>
@@ -87,8 +88,8 @@ export function LiteratureLayout({
           sourcesOpen={showPanel}
           onToggleSources={() => setPanelOpen(!panelOpen)}
           forceMode="literature"
-          basePath="literature"
-          placeholder="Search published literature — e.g. inhibitors of Pks13"
+          basePath={SURFACES.literature.segment}
+          placeholder={SURFACES.literature.composerPlaceholder}
         />
       </div>
 

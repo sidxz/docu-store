@@ -8,6 +8,7 @@ import { useAuthzHasRole } from "@duar-auth/react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useLlmProvider } from "@/hooks/use-llm-provider";
 import { useAppConfig } from "@/lib/app-config";
+import { SURFACES } from "@/lib/surfaces";
 
 interface SettingsTab {
   label: string;
@@ -16,7 +17,7 @@ interface SettingsTab {
 
 const TABS: SettingsTab[] = [
   { label: "General", segment: "general" },
-  { label: "Docu Research", segment: "chat" },
+  { label: SURFACES.research.label, segment: SURFACES.research.segment },
   { label: "Usage", segment: "usage" },
   { label: "Workspace", segment: "workspace" },
 ];

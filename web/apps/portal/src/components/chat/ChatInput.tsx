@@ -13,6 +13,7 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useChatStore, isReasoningOn, type ChatMode } from "@/lib/stores/chat-store";
+import { SURFACES } from "@/lib/surfaces";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -28,7 +29,7 @@ interface ChatInputProps {
 export function ChatInput({
   onSend,
   disabled = false,
-  placeholder = "Ask a question about your documents...",
+  placeholder = SURFACES.research.composerPlaceholder,
   onAbort,
   modeLocked = false,
 }: ChatInputProps) {
