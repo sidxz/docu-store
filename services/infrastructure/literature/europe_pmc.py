@@ -35,6 +35,7 @@ is. Restrict to ``TITLE_ABS:`` to compare like with like.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 import structlog
@@ -53,6 +54,12 @@ _PDF_TIMEOUT_SECONDS = 120.0  # a rendered paper runs to a few MB
 INGESTABLE_LICENCES = frozenset(
     {"cc by", "cc by-sa", "cc0", "cc by-nc", "cc by-nc-sa"},
 )
+
+# Both halves of a record's identity go into a query string, so both are checked
+# before they get there. Sources are three uppercase letters (MED, PMC, PPR,
+# PAT...); ids are bare alphanumerics (41591406, PMC12910649, PPR1298287).
+_SOURCE_RE = re.compile(r"^[A-Z]{3}$")
+_EXTERNAL_ID_RE = re.compile(r"^[A-Za-z0-9]{1,32}$")
 
 
 @dataclass(frozen=True)
@@ -158,6 +165,22 @@ class EuropePmcClient:
             logger.warning("europe_pmc_search_failed", query=query, exc_info=True)
             return []
         return [parse_hit(r) for r in results]
+
+    async def fetch_one(self, source: str, external_id: str) -> LiteratureHit | None:
+        """One record by its Europe PMC identity, or None if there is no such record.
+
+        Ingest re-fetches through here rather than trusting the hit the browser
+        sends back: a licence gate the caller supplies the input to is not a gate.
+        """
+        if not _SOURCE_RE.match(source) or not _EXTERNAL_ID_RE.match(external_id):
+            logger.warning(
+                "europe_pmc_bad_identity",
+                source=source[:16],
+                external_id=external_id[:32],
+            )
+            return None
+        hits = await self.search(f"EXT_ID:{external_id} AND SRC:{source}", limit=1)
+        return hits[0] if hits else None
 
     async def fetch_pdf(self, hit: LiteratureHit) -> bytes | None:
         """The rendered PDF, or None when it cannot be had.

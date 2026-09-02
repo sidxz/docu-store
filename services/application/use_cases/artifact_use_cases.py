@@ -60,6 +60,8 @@ class CreateArtifactUseCase:
             storage_location=request.storage_location,
             workspace_id=auth.workspace_id if auth else None,
             owner_id=auth.user_id if auth else None,
+            source_class=request.source_class,
+            licence=request.licence,
         )
 
         self.artifact_repository.save(artifact)

@@ -14,6 +14,19 @@ class ArtifactReadModel(ABC):
         pass
 
     @abstractmethod
+    async def find_artifact_id_by_source_uri(
+        self,
+        source_uri: str,
+        workspace_id: UUID | None = None,
+    ) -> UUID | None:
+        """The artifact already holding this source, if any.
+
+        Returns the id alone rather than the artifact: the only caller asks in
+        order to decide whether to fetch and ingest, and hydrating pages to
+        answer a yes/no question is work nobody wants done.
+        """
+
+    @abstractmethod
     async def list_artifacts(
         self,
         workspace_id: UUID | None = None,

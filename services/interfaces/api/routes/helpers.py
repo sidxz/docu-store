@@ -37,6 +37,13 @@ def _map_app_error_to_http_exception(error: AppError) -> HTTPException:  # noqa:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=error.message,
         )
+    if error.category == "conflict":
+        # Distinct from "concurrency": nothing raced, the thing simply already
+        # exists. Same status, but the two should not be read as one another.
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=error.message,
+        )
     if error.category == "concurrency":
         return HTTPException(
             status_code=status.HTTP_409_CONFLICT,

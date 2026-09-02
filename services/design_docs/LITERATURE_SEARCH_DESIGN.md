@@ -88,15 +88,21 @@ artifact allowlist it cannot fail open.
 
 ## Provenance in Qdrant
 
-One new payload field, `source_class` ∈ `internal | literature_oa`, plus
-`license` alongside it. KEYWORD-indexed.
+One new payload field, `source_class` ∈ `internal | literature_oa`,
+KEYWORD-indexed.
 
-Visibility deliberately does **not** go in the payload. ACL is already enforced
-via `allowed_artifact_ids`, and duplicating it would create a second source of
-truth that drifts.
+`licence` is kept beside it **on the artifact, not in the payload**: nothing
+queries it, and duplicating a per-document fact onto every chunk earns nothing.
+It is there so a later audit is answerable.
 
-`source_class` is set once at ingest and never changes, so it lives on the
-artifact read model — no new domain event, no aggregate change.
+Visibility deliberately does **not** go in the payload either. ACL is already
+enforced via `allowed_artifact_ids`, and duplicating it would create a second
+source of truth that drifts.
+
+Both fields sit on the **aggregate**, defaulted on `Created` so events written
+before provenance existed replay as `INTERNAL` — which is what they are. The
+read model was the first plan; the aggregate won because the embedding path
+already reaches it, so nothing new had to be injected to read the value.
 
 ## Seams
 
@@ -114,14 +120,23 @@ artifact read model — no new domain event, no aggregate change.
 
 ## Slices
 
-1. **Provenance** — `source_class` + `license` on the artifact read model, into
-   `upsert_metadata`, indexed in Qdrant. Independent of everything else.
-2. **Flag** — `LITERATURE_ENABLED` through config and `/api/config`.
+1. ~~**Provenance** — `source_class` + `licence`, into `upsert_metadata`,
+   indexed in Qdrant.~~ **Done.** On the aggregate rather than the read model:
+   the embedding path already reaches the aggregate, and defaulting the field on
+   `Created` replays old events as INTERNAL. Payload indexes are now ensured on
+   every startup — `ensure_collection_exists` returned before the index list on
+   every path except a genuine first creation, which would have made this a
+   no-op everywhere it mattered.
+2. ~~**Flag** — `LITERATURE_ENABLED` through config and `/api/config`.~~
+   **Done.** Routes 404 rather than 403 when off.
 3. ~~**Client** — `infrastructure/literature/europe_pmc.py`: `search()` and
    `fetch_pdf()`, returning `LiteratureHit`.~~ **Done.** No rate limiter: one
    request per user action. Add one if bulk ingest ever lands.
-4. **Ingest** — `IngestLiteratureUseCase`: dedup on `source_uri`, refuse non-OA,
-   hand the stream to the upload saga.
+4. ~~**Ingest** — `IngestLiteratureUseCase`: dedup on `source_uri`, refuse
+   non-OA, hand the stream to the upload saga.~~ **Done.** Ingest takes an
+   identity only and re-fetches the record: every fact the decision turns on,
+   the licence above all, is read server-side. A gate the caller supplies the
+   input to is not a gate. Refusal and dedup both land before the PDF fetch.
 5. **Tool + mode** — `SearchLiteratureTool`; `ToolRegistry` exposes only it when
    mode is `literature`.
 6. **Frontend** — `/[workspace]/literature`, `LiteratureResultCard` with the

@@ -19,6 +19,7 @@ from interfaces.api.routes.compound_routes import router as compound_router
 from interfaces.api.routes.dashboard_routes import router as dashboard_router
 from interfaces.api.routes.folder_routes import router as folder_router
 from interfaces.api.routes.health_routes import router as health_router
+from interfaces.api.routes.literature_routes import router as literature_router
 from interfaces.api.routes.page_routes import router as page_router
 from interfaces.api.routes.search_routes import router as search_router
 from interfaces.api.routes.stats_routes import router as stats_router
@@ -268,6 +269,7 @@ def create_app() -> FastAPI:
     app.include_router(dashboard_router)
     app.include_router(folder_router)
     app.include_router(health_router)
+    app.include_router(literature_router)
     app.include_router(page_router)
     app.include_router(search_router)
     app.include_router(stats_router)

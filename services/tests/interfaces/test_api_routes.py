@@ -32,6 +32,7 @@ from domain.value_objects.compound_mention import CompoundMention
 from domain.value_objects.mime_type import MimeType
 from domain.value_objects.title_mention import TitleMention
 from infrastructure.config import Settings
+from infrastructure.config import settings as literature_settings
 from interfaces.api.main import app
 from interfaces.dependencies import get_auth, get_container
 from tests.conftest import strip_authz_middleware
@@ -56,6 +57,16 @@ class FakeArtifactReadModel(ArtifactReadModel):
         workspace_id: UUID | None = None,
     ) -> ArtifactResponse | None:
         return self._artifacts.get(artifact_id)
+
+    async def find_artifact_id_by_source_uri(
+        self,
+        source_uri: str,
+        workspace_id: UUID | None = None,
+    ) -> UUID | None:
+        return next(
+            (a.artifact_id for a in self._artifacts.values() if a.source_uri == source_uri),
+            None,
+        )
 
     async def list_artifacts(
         self,
@@ -620,3 +631,38 @@ class TestUserPreferencesRoutes:
         response = client.get("/user/preferences")
         assert response.status_code == 200
         assert response.json()["font_family"] == "inter"
+
+
+class TestLiteratureRoutes:
+    """The flag closes the routes, and it closes them as absence rather than denial."""
+
+    def test_search_is_absent_when_the_feature_is_off(self, make_client, monkeypatch) -> None:
+        monkeypatch.setattr(literature_settings, "literature_enabled", False)
+        client = make_client({})
+        response = client.get("/literature/search", params={"q": "InhA inhibitor"})
+        # 404, not 403: a deployment that never turned this on should look like
+        # one that never had it, so the flag reads as a deployment decision and
+        # not as a permission the UI could ask the user to obtain.
+        assert response.status_code == 404
+
+    def test_ingest_is_absent_when_the_feature_is_off(self, make_client, monkeypatch) -> None:
+        monkeypatch.setattr(literature_settings, "literature_enabled", False)
+        client = make_client({})
+        response = client.post(
+            "/literature/ingest",
+            json={"source": "MED", "external_id": "41591406", "visibility": "private"},
+        )
+        assert response.status_code == 404
+
+    def test_ingest_rejects_a_visibility_it_does_not_offer(
+        self,
+        make_client,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.setattr(literature_settings, "literature_enabled", True)
+        client = make_client({})
+        response = client.post(
+            "/literature/ingest",
+            json={"source": "MED", "external_id": "41591406", "visibility": "public"},
+        )
+        assert response.status_code == 422

@@ -76,6 +76,10 @@ from application.use_cases.embedding_use_cases import (
 )
 from application.use_cases.extract_document_metadata_use_case import ExtractDocumentMetadataUseCase
 from application.use_cases.extract_page_entities_use_case import ExtractPageEntitiesUseCase
+from application.use_cases.literature_use_cases import (
+    IngestLiteratureUseCase,
+    SearchLiteratureUseCase,
+)
 from application.use_cases.page_use_cases import (
     AddCompoundMentionsUseCase,
     CreatePageUseCase,
@@ -172,6 +176,7 @@ from infrastructure.file_services.libreoffice_converter import LibreOfficeConver
 from infrastructure.file_services.subprocess_parse import SubprocessParser
 from infrastructure.kafka.kafka_external_event_streamer import KafkaExternalEventPublisher
 from infrastructure.kafka.kafka_publisher import KafkaPublisher
+from infrastructure.literature.europe_pmc import EuropePmcClient
 from infrastructure.llm.factory import (
     _resolve_api_key,
     create_chat_llm_client,
@@ -582,6 +587,19 @@ def create_container() -> Container:
         upload_blob_use_case=c[UploadBlobUseCase],
         create_artifact_use_case=c[CreateArtifactUseCase],
         permission_registrar=c[PermissionRegistrar],
+    )
+
+    # Literature. Registered whether or not LITERATURE_ENABLED is set -- the
+    # routes are what the flag closes, and a container that varies by flag is a
+    # container whose wiring is only exercised in one configuration.
+    container[EuropePmcClient] = lambda c: EuropePmcClient()  # noqa: ARG005
+    container[SearchLiteratureUseCase] = lambda c: SearchLiteratureUseCase(
+        client=c[EuropePmcClient],
+    )
+    container[IngestLiteratureUseCase] = lambda c: IngestLiteratureUseCase(
+        client=c[EuropePmcClient],
+        upload_saga=c[ArtifactUploadSaga],
+        artifact_read_model=c[ArtifactReadModel],
     )
 
     # NER Extraction Use Cases
