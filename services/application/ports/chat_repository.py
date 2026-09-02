@@ -46,7 +46,10 @@ class ChatRepository(Protocol):
         limit: int = 20,
         is_archived: bool = False,
         folder_id: UUID | None = None,
-        surface: ChatSurface = ChatSurface.RESEARCH,
+        # None means every surface. A folder view wants that — things are filed
+        # into a folder deliberately, so it must show what was put there — while
+        # the sidebar passes a surface explicitly to keep the histories apart.
+        surface: ChatSurface | None = None,
     ) -> list[ConversationDTO]: ...
 
     async def list_recent_conversations(
