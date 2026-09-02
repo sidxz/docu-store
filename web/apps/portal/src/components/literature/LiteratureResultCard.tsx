@@ -1,0 +1,134 @@
+"use client";
+
+import { useState } from "react";
+import { BookOpen, Check, ExternalLink, Loader2, Lock, Plus } from "lucide-react";
+import type { LiteratureHit } from "@docu-store/types";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useIngestLiterature } from "@/hooks/use-chat";
+
+/**
+ * One paper. Two states that look deliberately different, because they are:
+ * a paper whose licence lets this workspace keep a copy, and one that can only
+ * ever be read at the publisher.
+ *
+ * Cards render in the order Europe PMC returned them. Sorting or filtering by
+ * whether a paper can be added would push the paywalled med-chem literature to
+ * the bottom, and on the queries this corpus exists for that is most of what is
+ * worth reading.
+ */
+export function LiteratureResultCard({ hit }: { hit: LiteratureHit }) {
+  const ingest = useIngestLiterature();
+  const [expanded, setExpanded] = useState(false);
+
+  const where = [hit.journal, hit.year].filter(Boolean).join(" · ");
+  const added = ingest.isSuccess;
+
+  const add = (visibility: "private" | "workspace") =>
+    ingest.mutate({ source: hit.source, external_id: hit.external_id, visibility });
+
+  return (
+    <article className="rounded-lg border border-border-default bg-surface-elevated p-3 text-xs">
+      <a
+        href={hit.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group block font-medium text-text-primary hover:text-accent-text"
+      >
+        {hit.title}
+        <ExternalLink className="ml-1 inline h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
+      </a>
+
+      {where && <p className="mt-1 text-text-muted">{where}</p>}
+      {hit.authors && (
+        <p className="truncate text-text-muted" title={hit.authors}>
+          {hit.authors}
+        </p>
+      )}
+
+      {hit.abstract && (
+        <>
+          <p className={`mt-2 text-text-secondary ${expanded ? "" : "line-clamp-3"}`}>
+            {hit.abstract}
+          </p>
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="mt-1 text-text-muted hover:text-text-primary"
+          >
+            {expanded ? "Show less" : "Show more"}
+          </button>
+        </>
+      )}
+
+      <div className="mt-3 flex items-center justify-between gap-2">
+        {hit.is_ingestable ? (
+          <Badge variant="outline" className="gap-1 text-[10px] uppercase">
+            <BookOpen className="h-3 w-3" />
+            {hit.licence}
+          </Badge>
+        ) : (
+          // The reason, not just the fact: "no open licence" and "no full text
+          // to fetch" are entirely different situations for a reader.
+          <Badge
+            variant="outline"
+            className="gap-1 text-[10px] text-text-muted"
+            title={hit.ingest_blocker ?? undefined}
+          >
+            <Lock className="h-3 w-3" />
+            {hit.licence ?? "no open licence"}
+          </Badge>
+        )}
+
+        {added ? (
+          <span className="flex items-center gap-1 text-emerald-600">
+            <Check className="h-3 w-3" />
+            Added — parsing
+          </span>
+        ) : hit.is_ingestable ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" disabled={ingest.isPending}>
+                {ingest.isPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Plus className="h-3 w-3" />
+                )}
+                Add to library
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => add("private")}>
+                Private — only you
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => add("workspace")}>
+                Workspace — everyone here
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <a
+            href={hit.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-text-muted hover:text-text-primary"
+          >
+            View at publisher
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
+      </div>
+
+      {ingest.isError && (
+        <p className="mt-2 text-[11px] text-destructive">{ingest.error.message}</p>
+      )}
+    </article>
+  );
+}

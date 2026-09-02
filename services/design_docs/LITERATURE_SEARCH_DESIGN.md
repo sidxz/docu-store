@@ -143,9 +143,11 @@ already reaches it, so nothing new had to be injected to read the value.
    `ThinkingAgent` over a literature-only registry, the same trick
    `deep_thinking` uses. Citations are synthetic — `uuid5` of the DOI, carrying
    `source_type: "literature"` and `external_url`.
-6. **Frontend** — `/[workspace]/literature`, `LiteratureResultCard` with the
-   OA badge and the Private/Workspace ingest split button, flag-gated sidebar
-   entry. `ChatPanel` / `MessageList` / `ChatInput` reused unchanged.
+6. ~~**Frontend** — `/[workspace]/literature`, `LiteratureResultCard`,
+   flag-gated sidebar entry.~~ **Done.** `ChatPanel`, `MessageList`,
+   `ConversationSidebar` and `ChatInput` are reused; they gained `forceMode`,
+   `basePath` and `modeLocked` so a second surface can borrow them without
+   either surface reaching into the other's state.
 
 ## The query trap
 

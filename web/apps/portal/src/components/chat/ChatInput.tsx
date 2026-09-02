@@ -19,6 +19,10 @@ interface ChatInputProps {
   disabled?: boolean;
   placeholder?: string;
   onAbort?: () => void;
+  /** Hide the pipeline-mode toggle where the surface pins the mode. Showing it
+   *  there would let a click change the mode chosen for Deep Research while
+   *  changing nothing about the surface the user is looking at. */
+  modeLocked?: boolean;
 }
 
 export function ChatInput({
@@ -26,6 +30,7 @@ export function ChatInput({
   disabled = false,
   placeholder = "Ask a question about your documents...",
   onAbort,
+  modeLocked = false,
 }: ChatInputProps) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -76,7 +81,9 @@ export function ChatInput({
           />
           <PromptInputFooter>
             <PromptInputTools>
-              <ModeToggle mode={chatMode} onToggle={toggleMode} disabled={disabled} />
+              {!modeLocked && (
+                <ModeToggle mode={chatMode} onToggle={toggleMode} disabled={disabled} />
+              )}
               {chatMode !== "quick" && (
                 <ReasoningToggle
                   on={reasoningOn}

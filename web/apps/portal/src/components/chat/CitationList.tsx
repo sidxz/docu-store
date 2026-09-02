@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, ExternalLink } from "lucide-react";
+import { BookOpen, FileText, ExternalLink } from "lucide-react";
 import type { SourceCitation } from "@docu-store/types";
 import { useDevModeStore } from "@/lib/stores/dev-mode-store";
 
@@ -38,25 +38,44 @@ function SourceCard({
 }) {
   const title = source.artifact_title || "Unknown Document";
   const page = source.page_index != null ? `Page ${source.page_index + 1}` : null;
-  const href = source.page_id
-    ? `/${workspace}/documents/${source.artifact_id}/pages/${source.page_id}`
-    : `/${workspace}/documents/${source.artifact_id}`;
+
+  // A literature citation names a paper this workspace does not hold: its
+  // artifact_id is derived from the DOI and nothing is stored under it, so the
+  // link has to leave the app. Marked as well as routed differently — a claim
+  // taken from an abstract should not read as one taken off a page.
+  const isLiterature = source.source_type === "literature";
+  const href = isLiterature
+    ? (source.external_url ?? "#")
+    : source.page_id
+      ? `/${workspace}/documents/${source.artifact_id}/pages/${source.page_id}`
+      : `/${workspace}/documents/${source.artifact_id}`;
 
   return (
     <div className="inline-flex flex-col">
       <a
         href={href}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border-default bg-surface-elevated hover:bg-surface-hover transition-colors text-xs group"
+        {...(isLiterature ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors text-xs group ${
+          isLiterature
+            ? "border-dashed border-border-default bg-transparent hover:bg-surface-hover"
+            : "border-border-default bg-surface-elevated hover:bg-surface-hover"
+        }`}
       >
         <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-accent-light text-accent-text font-semibold text-[10px]">
           {source.citation_index}
         </span>
-        <FileText className="w-3 h-3 text-text-muted" />
+        {isLiterature ? (
+          <BookOpen className="w-3 h-3 text-text-muted" />
+        ) : (
+          <FileText className="w-3 h-3 text-text-muted" />
+        )}
         <span className="text-text-primary truncate max-w-[140px]">
           {title}
         </span>
-        {page && (
-          <span className="text-text-muted">{"\u00B7"} {page}</span>
+        {isLiterature ? (
+          <span className="text-text-muted italic">{"\u00B7"} abstract</span>
+        ) : (
+          page && <span className="text-text-muted">{"\u00B7"} {page}</span>
         )}
         <ExternalLink className="w-3 h-3 text-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
       </a>

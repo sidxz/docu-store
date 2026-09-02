@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { AgentEvent, AgentStep, ContentBlock, GroundingStatus, NerFilterTag, SourceCitation, ThinkingBlock } from "@docu-store/types";
+import type { AgentEvent, AgentStep, ContentBlock, GroundingStatus, LiteratureHit, NerFilterTag, SourceCitation, ThinkingBlock } from "@docu-store/types";
 import { trackEvent } from "@/lib/analytics";
 
 interface StepTiming {
@@ -65,6 +65,11 @@ interface ChatState {
   // Entity filters the planner ran retrieval with this turn (running list)
   queryFilters: NerFilterTag[];
 
+  // Papers the last literature search returned, in Europe PMC's relevance order.
+  // Never re-sorted: ranking these by whether they can be ingested would bury
+  // the paywalled med-chem papers, which are usually the relevant ones.
+  literatureResults: LiteratureHit[];
+
   // Message queued for send after navigation (new conversation flow)
   queuedMessage: string | null;
 
@@ -109,6 +114,7 @@ interface ChatState {
   setFinalSources: (sources: SourceCitation[]) => void;
   setGroundingResult: (result: GroundingStatus) => void;
   setQueryFilters: (filters: NerFilterTag[]) => void;
+  setLiteratureResults: (results: LiteratureHit[]) => void;
   recordEvent: (event: AgentEvent) => void;
   setDoneEvent: (event: AgentEvent) => void;
   finishStreaming: () => void;
@@ -135,6 +141,7 @@ export const useChatStore = create<ChatState>()(
   streamingStructuredBlocks: [],
   groundingResult: null,
   queryFilters: [],
+  literatureResults: [],
   highlightedCitation: null,
   activeSourcesMessageId: null,
   stepTimings: [],
@@ -210,6 +217,7 @@ export const useChatStore = create<ChatState>()(
       streamingStructuredBlocks: [],
       groundingResult: null,
       queryFilters: [],
+  literatureResults: [],
       stepTimings: [],
       rawEvents: [],
       doneEvent: null,
@@ -229,6 +237,7 @@ export const useChatStore = create<ChatState>()(
       streamingStructuredBlocks: [],
       groundingResult: null,
       queryFilters: [],
+  literatureResults: [],
       stepTimings: [],
       rawEvents: [],
       doneEvent: null,
@@ -297,6 +306,8 @@ export const useChatStore = create<ChatState>()(
 
   setQueryFilters: (filters) => set({ queryFilters: filters }),
 
+  setLiteratureResults: (results) => set({ literatureResults: results }),
+
   setDoneEvent: (event) => set({ doneEvent: event }),
 
   finishStreaming: () =>
@@ -331,6 +342,7 @@ export const useChatStore = create<ChatState>()(
       streamingStructuredBlocks: [],
       groundingResult: null,
       queryFilters: [],
+  literatureResults: [],
       highlightedCitation: null,
       activeSourcesMessageId: null,
       stepTimings: [],

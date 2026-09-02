@@ -13,12 +13,16 @@ interface ConversationSidebarProps {
   workspace: string;
   activeConversationId?: string;
   onCollapse: () => void;
+  /** Route segment to navigate within, so selecting a conversation keeps you on
+   *  the surface you are already on. */
+  basePath?: string;
 }
 
 export function ConversationSidebar({
   workspace,
   activeConversationId,
   onCollapse,
+  basePath = "chat",
 }: ConversationSidebarProps) {
   const router = useRouter();
   const { data: conversations, isLoading } = useConversations();
@@ -31,7 +35,7 @@ export function ConversationSidebar({
 
   const handleNew = async () => {
     const conv = await createConversation.mutateAsync(undefined);
-    router.push(`/${workspace}/chat/${conv.conversation_id}`);
+    router.push(`/${workspace}/${basePath}/${conv.conversation_id}`);
   };
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
@@ -50,12 +54,12 @@ export function ConversationSidebar({
     useChatStore.getState().clearUnread(id);
     if (id === activeConversationId) {
       resetChat();
-      router.push(`/${workspace}/chat`);
+      router.push(`/${workspace}/${basePath}`);
     }
   };
 
   const handleSelect = (id: string) => {
-    router.push(`/${workspace}/chat/${id}`);
+    router.push(`/${workspace}/${basePath}/${id}`);
   };
 
   return (
