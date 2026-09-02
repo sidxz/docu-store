@@ -56,7 +56,12 @@ class ArtifactUploadSaga:
             storage_location=blob_response.storage_key,
         )
 
-        artifact_result = await self.create_artifact.execute(create_artifact_request, auth=auth)
+        artifact_result = await self.create_artifact.execute(
+            create_artifact_request,
+            auth=auth,
+            source_class=upload_req.source_class,
+            licence=upload_req.licence,
+        )
         if isinstance(artifact_result, Failure):
             return artifact_result
 

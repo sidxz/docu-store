@@ -32,12 +32,14 @@ from application.use_cases.chat_use_cases import (
     RecordFeedbackUseCase,
     SendMessageUseCase,
 )
+from domain.value_objects.chat_surface import ChatSurface
 from infrastructure.chat.run_registry import ChatRunRegistry, RunAlreadyActiveError
 from interfaces.api.middleware import handle_use_case_errors
 from interfaces.api.routes.helpers import (
     _map_app_error_to_http_exception,
     ensure_llm_configured,
     ensure_within_quota,
+    require_literature_enabled,
 )
 from interfaces.api.routes.helpers import get_allowed_artifact_ids as _get_allowed_artifact_ids
 from interfaces.dependencies import get_auth, get_container, llm_user_scope
@@ -57,15 +59,16 @@ class CreateConversationRequest(BaseModel):
     """Request to create a new conversation."""
 
     title: str | None = None
+    surface: ChatSurface = ChatSurface.RESEARCH
 
 
 class SendMessageRequest(BaseModel):
     """Request to send a message in a conversation."""
 
     message: str = Field(..., min_length=1, max_length=10000)
-    mode: Literal["quick", "thinking", "deep_thinking"] | None = Field(
+    mode: Literal["quick", "thinking", "deep_thinking", "literature"] | None = Field(
         default=None,
-        description="Pipeline mode. 'quick' = 4-step, 'thinking' = 5-stage, 'deep_thinking' = thinking + page images. None = server default.",
+        description="Pipeline mode. 'quick' = 4-step, 'thinking' = 5-stage, 'deep_thinking' = thinking + page images, 'literature' = published papers rather than this corpus. None = server default.",
     )
     reasoning: (
         dict[Literal["synthesis", "retrieval", "base"], Literal["off", "low", "medium", "high"]]
@@ -101,11 +104,14 @@ async def create_conversation(
     auth: Annotated[RequestAuth, Depends(get_auth)],
 ) -> ConversationDTO:
     """Create a new chat conversation."""
+    if request.surface == ChatSurface.LITERATURE:
+        require_literature_enabled()
     use_case = container[CreateConversationUseCase]
     return await use_case.execute(
         workspace_id=auth.workspace_id,
         owner_id=auth.user_id,
         title=request.title,
+        surface=request.surface,
     )
 
 
@@ -118,12 +124,22 @@ async def list_conversations(
     limit: int = 20,
     is_archived: bool = False,
     folder_id: UUID | None = None,
+    surface: ChatSurface | None = None,
 ) -> list[ConversationDTO]:
-    """List conversations for the current user. Pass ``folder_id`` for a folder view."""
+    """List conversations for the current user. Pass ``folder_id`` for a folder view.
+
+    ``surface`` keeps the two chat surfaces apart: Deep Research and Literature
+    share a store but not a history, since a question asked of the corpus and one
+    asked of the literature are not the same kind of thing to come back to.
+    Omitting ``surface`` returns every surface -- that is what a folder view
+    wants, since a folder is an explicit bucket the user dragged things into
+    and must show everything filed there, not just one surface's slice of it.
+    """
     use_case = container[ListConversationsUseCase]
     return await use_case.execute(
         workspace_id=auth.workspace_id,
         owner_id=auth.user_id,
+        surface=surface,
         skip=skip,
         limit=limit,
         is_archived=is_archived,
@@ -260,6 +276,8 @@ async def send_message(
 
     Raises 409 if a response is already being generated for this conversation.
     """
+    if request.mode == "literature":
+        require_literature_enabled()
     await ensure_llm_configured(auth, container)
     await ensure_within_quota(auth, container)
     allowed_artifact_ids = await _get_allowed_artifact_ids(auth)

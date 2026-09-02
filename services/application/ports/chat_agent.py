@@ -15,6 +15,8 @@ class ChatAgentPort(Protocol):
     Supports two modes:
     - quick: 4-step linear pipeline (Question Analysis → Retrieval → Synthesis → Grounding)
     - thinking: 5-stage advanced pipeline (Planning → Intelligent Retrieval → Assembly → Adaptive Synthesis → Inline Verification)
+    - literature: the thinking pipeline over published papers instead of this
+      corpus. Same stages, one tool, and abstracts rather than full text.
     """
 
     async def run(
@@ -23,6 +25,6 @@ class ChatAgentPort(Protocol):
         conversation_history: list[ChatMessageDTO],
         workspace_id: UUID,
         allowed_artifact_ids: list[UUID] | None = None,
-        mode: Literal["quick", "thinking", "deep_thinking"] | None = None,
+        mode: Literal["quick", "thinking", "deep_thinking", "literature"] | None = None,
         previous_citations: list[SourceCitationDTO] | None = None,
     ) -> AsyncGenerator[AgentEvent, None]: ...

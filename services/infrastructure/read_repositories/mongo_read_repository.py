@@ -152,6 +152,19 @@ class MongoReadRepository(
             doc["pages"] = []
         return ArtifactResponse(**doc)
 
+    async def find_artifact_id_by_source_uri(
+        self,
+        source_uri: str,
+        workspace_id: UUID | None = None,
+    ) -> UUID | None:
+        query: dict = {"source_uri": source_uri}
+        if workspace_id is not None:
+            query["workspace_id"] = str(workspace_id)
+        doc = await self.artifacts.find_one(query, {"artifact_id": 1})
+        if not doc:
+            return None
+        return UUID(doc.get("artifact_id") or str(doc["_id"]))
+
     async def list_artifacts(
         self,
         workspace_id: UUID | None = None,

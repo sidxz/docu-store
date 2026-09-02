@@ -13,7 +13,9 @@ import type {
   AgentEvent,
   AgentStep,
   ContentBlock,
+  ChatSurface,
   GroundingStatus,
+  LiteratureHit,
   NerFilterTag,
   SourceCitation,
   ThinkingBlock,
@@ -21,10 +23,12 @@ import type {
 
 // ── Conversation CRUD ──────────────────────────────────────────────────────
 
-export function useConversations() {
+/** Conversations for one surface. The key varies by surface too — otherwise the
+ *  two sidebars share a cache entry and show each other's history. */
+export function useConversations(surface: ChatSurface = "research") {
   return useQuery({
-    queryKey: queryKeys.chat.list(),
-    queryFn: () => authFetchJson<Conversation[]>("/chat"),
+    queryKey: queryKeys.chat.list(surface),
+    queryFn: () => authFetchJson<Conversation[]>(`/chat?surface=${surface}`),
     staleTime: 30_000,
   });
 }
@@ -49,20 +53,51 @@ export function useConversation(conversationId: string | undefined) {
   });
 }
 
-export function useCreateConversation() {
+export function useCreateConversation(surface: ChatSurface = "research") {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (title?: string) => {
       const res = await authFetch("/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title ?? null }),
+        body: JSON.stringify({ title: title ?? null, surface }),
       });
       if (!res.ok) throw new Error("Failed to create conversation");
       return res.json() as Promise<Conversation>;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.chat.all });
+    },
+  });
+}
+
+/** Take a copy of one open-licensed paper. The server re-reads the record and
+ *  decides on the licence, so the only thing sent is which paper. */
+export function useIngestLiterature() {
+  const queryClient = useQueryClient();
+  const { trackEvent } = useAnalytics();
+  return useMutation({
+    mutationFn: async (vars: {
+      source: string;
+      external_id: string;
+      visibility: "private" | "workspace";
+    }) => {
+      const res = await authFetch("/literature/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(vars),
+      });
+      if (!res.ok) {
+        // 409 means the paper is already here, which is not a failure the user
+        // needs to fix -- the message carries where it already is.
+        const detail = await readErrorDetail(res);
+        throw new Error(detail ?? `Could not add paper: ${res.statusText}`);
+      }
+      return res.json() as Promise<{ artifact_id: string }>;
+    },
+    onSuccess: (_data, vars) => {
+      trackEvent("literature_ingested", { source: vars.source, visibility: vars.visibility });
+      queryClient.invalidateQueries({ queryKey: queryKeys.artifacts.all });
     },
   });
 }
@@ -122,7 +157,13 @@ export function useChatFeedback(conversationId: string | undefined) {
 // conversation has claimed.
 const streamAbortRef: { current: AbortController | null } = { current: null };
 
-export function useSendMessage(conversationId: string | undefined) {
+/** `forceMode` pins the pipeline for a whole surface. Literature chat sets it so
+ *  asking a question there cannot quietly change the mode the user picked for
+ *  Docu Research — the two surfaces share a store but not a preference. */
+export function useSendMessage(
+  conversationId: string | undefined,
+  opts?: { forceMode?: string },
+) {
   const queryClient = useQueryClient();
   const store = useChatStore();
   const { trackEvent } = useAnalytics();
@@ -175,7 +216,7 @@ export function useSendMessage(conversationId: string | undefined) {
       const controller = new AbortController();
       abortRef.current = controller;
 
-      const mode = store.chatMode;
+      const mode = opts?.forceMode ?? store.chatMode;
       trackEvent("chat_message_sent", { mode, message_length: message.length });
 
       // Track follow-up depth: check if conversation already has messages
@@ -288,6 +329,7 @@ interface ChatStoreActions {
   setFinalSources: (sources: SourceCitation[]) => void;
   setGroundingResult: (result: GroundingStatus) => void;
   setQueryFilters: (filters: NerFilterTag[]) => void;
+  setLiteratureResults: (results: LiteratureHit[]) => void;
   recordEvent: (event: AgentEvent) => void;
   setDoneEvent: (event: AgentEvent) => void;
 }
@@ -412,6 +454,10 @@ function handleAgentEvent(
 
     case "query_context":
       store.setQueryFilters(event.query_context_entities ?? []);
+      break;
+
+    case "literature_results":
+      store.setLiteratureResults(event.literature_results ?? []);
       break;
 
     case "done":

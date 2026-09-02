@@ -60,7 +60,7 @@ export default function UsageSettingsPage() {
             )}
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="rounded-lg border border-border-default px-3 py-2.5">
-                <div className="text-xs text-text-muted">Deep Research</div>
+                <div className="text-xs text-text-muted">Conversations</div>
                 <div className="font-mono text-text-primary">{formatTokens(month.chat)}</div>
               </div>
               <div className="rounded-lg border border-border-default px-3 py-2.5">
@@ -71,7 +71,7 @@ export default function UsageSettingsPage() {
               </div>
             </div>
             <p className="text-xs text-text-muted">
-              Usage resets on the 1st of each month (UTC). Deep Research and document processing both
+              Usage resets on the 1st of each month (UTC). Conversations and document processing both
               count toward your limit. These totals are our best estimate — for actual billed usage,
               check your LLM provider&rsquo;s own dashboard.
             </p>

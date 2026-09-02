@@ -7,6 +7,7 @@ from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.author_mention import AuthorMention
 from domain.value_objects.mime_type import MimeType
 from domain.value_objects.presentation_date import PresentationDate
+from domain.value_objects.source_class import SourceClass
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.title_mention import TitleMention
@@ -31,6 +32,8 @@ class Artifact(Aggregate):
         artifact_id: UUID | None = None,
         workspace_id: UUID | None = None,
         owner_id: UUID | None = None,
+        source_class: SourceClass = SourceClass.INTERNAL,
+        licence: str | None = None,
     ) -> "Artifact":
         """Create a new Artifact aggregate (Factory Method)."""
         kwargs = {
@@ -41,6 +44,8 @@ class Artifact(Aggregate):
             "storage_location": storage_location,
             "workspace_id": workspace_id,
             "owner_id": owner_id,
+            "source_class": source_class,
+            "licence": licence,
         }
         if artifact_id is not None:
             kwargs["originator_id"] = artifact_id
@@ -56,6 +61,10 @@ class Artifact(Aggregate):
         storage_location: str
         workspace_id: UUID | None = None
         owner_id: UUID | None = None
+        # Defaulted so events written before provenance existed replay as what
+        # they in fact are: documents someone uploaded here.
+        source_class: SourceClass = SourceClass.INTERNAL
+        licence: str | None = None
 
     @event(Created)  # Links this handler to the Created event class above
     def __init__(
@@ -67,6 +76,8 @@ class Artifact(Aggregate):
         storage_location: str,
         workspace_id: UUID | None = None,
         owner_id: UUID | None = None,
+        source_class: SourceClass = SourceClass.INTERNAL,
+        licence: str | None = None,
     ) -> None:
         # Strip whitespace BEFORE validation to catch whitespace-only strings
         if source_uri is not None:
@@ -92,6 +103,8 @@ class Artifact(Aggregate):
         self.storage_location = storage_location
         self.workspace_id = workspace_id
         self.owner_id = owner_id
+        self.source_class = source_class
+        self.licence = licence
         self._pages: list[UUID] = []
         self.title_mention: TitleMention | None = None
         self.summary_candidate: SummaryCandidate | None = None

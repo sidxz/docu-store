@@ -52,10 +52,14 @@ class AgenticRetrievalNode:
         tool_llm: ToolCallingLLMPort,
         tool_registry: ToolRegistry,
         prompt_repository: PromptRepositoryPort,
+        accumulator_budget_chars: int | None = None,
     ) -> None:
         self._tool_llm = tool_llm
         self._tools = tool_registry
         self._prompts = prompt_repository
+        # None keeps RetrievalAccumulator's own default, which is
+        # settings.chat_context_budget_chars. Only Literature mode overrides it.
+        self._accumulator_budget = accumulator_budget_chars
 
     async def run(
         self,
@@ -87,7 +91,7 @@ class AgenticRetrievalNode:
         max_iterations = settings.chat_agent_max_iterations
         iteration_timeout = settings.chat_agent_iteration_timeout_s
         total_timeout = settings.chat_agent_total_timeout_s
-        accumulator = RetrievalAccumulator()
+        accumulator = RetrievalAccumulator(self._accumulator_budget)
         loop_start = time.monotonic()
 
         # ── 0. Seed carried-forward citations from previous grounded turn ──
@@ -105,7 +109,8 @@ class AgenticRetrievalNode:
         import re
 
         explicit_refs = {int(m) for m in re.findall(r"\[(\d{1,2})\]", question)}
-        if explicit_refs and previous_citations:
+        can_read_pages = "get_page_content" in self._tools._tools
+        if explicit_refs and previous_citations and can_read_pages:
             log.info(
                 "chat.agentic_retrieval.explicit_refs_detected",
                 refs=sorted(explicit_refs),
@@ -127,6 +132,12 @@ class AgenticRetrievalNode:
                         )
 
         # ── 1. Auto-seed first search using the query plan ──
+        # Gated on the tool being registered, as the bioactivity and structure
+        # pre-fetches below already are. A literature-only registry holds
+        # search_literature and nothing else, and executing a name it does not
+        # know returns the string "Unknown tool: search_documents" -- which then
+        # gets handed to the model as its initial search results.
+        can_search_documents = "search_documents" in self._tools._tools
         entity_types = list({f.entity_type for f in plan.ner_entity_filters})
         # target and gene_name are interchangeable — if either is present, include both
         if {"target", "gene_name"} & set(entity_types):
@@ -145,13 +156,16 @@ class AgenticRetrievalNode:
         if tags:
             seed_args_filtered["tags"] = tags
 
-        filtered_results, filtered_summary, _ = await self._tools.execute(
-            "search_documents",
-            seed_args_filtered,
-            workspace_id,
-            allowed_artifact_ids,
-        )
-        accumulator.add_results(filtered_results, plan.reformulated_query)
+        filtered_results: list = []
+        filtered_summary = ""
+        if can_search_documents:
+            filtered_results, filtered_summary, _ = await self._tools.execute(
+                "search_documents",
+                seed_args_filtered,
+                workspace_id,
+                allowed_artifact_ids,
+            )
+            accumulator.add_results(filtered_results, plan.reformulated_query)
 
         # Second search: same query, NO filters — catches pages missed by NER
         # In factual mode (skip_unfiltered_seed=True), always skip the unfiltered
@@ -159,7 +173,7 @@ class AgenticRetrievalNode:
         seed_summary = filtered_summary
         new_from_unfiltered = 0
         did_skip_unfiltered = False
-        if has_filters:
+        if has_filters and can_search_documents:
             if skip_unfiltered_seed:
                 did_skip_unfiltered = True
                 log.info(
@@ -252,7 +266,7 @@ class AgenticRetrievalNode:
 
         # ── 1c. SMILES-resolved page pre-fetch ──
         smiles_page_count = 0
-        if plan.smiles_context and plan.smiles_context.resolved:
+        if plan.smiles_context and plan.smiles_context.resolved and can_read_pages:
             for compound in plan.smiles_context.resolved:
                 for page_id in compound.page_ids[:3]:  # cap per compound
                     page_results, _, _ = await self._tools.execute(
@@ -341,15 +355,18 @@ class AgenticRetrievalNode:
         if structure_count > 0:
             output_parts.append(f" + {structure_count} structures")
         output_parts.append(f" = {total_seed} results")
-        yield (
-            "event",
-            AgentEvent(
-                type="step_completed",
-                step="retrieval",
-                status="completed",
-                output="".join(output_parts),
-            ),
-        )
+        # A surface with no corpus tools pre-fetches nothing, and would otherwise
+        # announce "Initial search: 0 filtered = 0 results" as a completed step.
+        if can_search_documents or total_seed:
+            yield (
+                "event",
+                AgentEvent(
+                    type="step_completed",
+                    step="retrieval",
+                    status="completed",
+                    output="".join(output_parts),
+                ),
+            )
 
         if _debug:
             log.info(
@@ -433,7 +450,8 @@ class AgenticRetrievalNode:
                 "role": "user",
                 "content": (
                     f"I need to answer: {question}\n\n"
-                    f"Here are the initial search results:\n{seed_summary}\n\n"
+                    f"Here are the initial search results:\n"
+                    f"{seed_summary or '(none — no search has run yet; call a search tool)'}\n\n"
                     f"{accumulator.summary_for_model()}{carried_note}{smiles_note}\n\n"
                     "Evaluate these results. If they are sufficient, call finish_retrieval. "
                     "Otherwise, search for additional information."

@@ -20,6 +20,7 @@ from application.dtos.chat_dtos import (
     SourceCitationDTO,
     TokenUsageDTO,
 )
+from domain.value_objects.chat_surface import ChatSurface
 
 log = structlog.get_logger(__name__)
 
@@ -89,12 +90,15 @@ class MongoChatRepository:
         limit: int = 20,
         is_archived: bool = False,
         folder_id: UUID | None = None,
+        surface: ChatSurface | None = None,
     ) -> list[ConversationDTO]:
-        query = {
+        query: dict = {
             "workspace_id": str(workspace_id),
             "owner_id": str(owner_id),
             "is_archived": is_archived,
         }
+        if surface is not None:
+            query.update(_surface_query(surface))
         if folder_id is not None:
             query["folder_id"] = str(folder_id)
         cursor = self._conversations.find(query).sort("updated_at", -1).skip(skip).limit(limit)
@@ -111,6 +115,8 @@ class MongoChatRepository:
             "owner_id": str(owner_id),
             "is_archived": False,
             "message_count": {"$gt": 0},
+            # Recents now span both surfaces, interleaved by recency; each
+            # card routes to the surface its own conversation belongs to.
         }
         cursor = self._conversations.find(query).sort("updated_at", -1).limit(limit)
         return [_doc_to_conversation(doc) async for doc in cursor]
@@ -217,7 +223,10 @@ class MongoChatRepository:
                     "workspace_id": str(workspace_id),
                     "owner_id": str(owner_id),
                     "folder_id": {"$ne": None},
-                    "is_archived": {"$ne": True},  # match the folder-view list filter
+                    # Intentionally no surface filter: a folder is an explicit
+                    # bucket the user dragged things into, spanning both
+                    # surfaces on purpose — same as the folder-view list below.
+                    "is_archived": {"$ne": True},
                 },
             },
             {"$group": {"_id": "$folder_id", "n": {"$sum": 1}}},
@@ -496,6 +505,18 @@ def _utc(dt: datetime) -> datetime:
     return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
 
 
+def _surface_query(surface: ChatSurface) -> dict:
+    """Mongo clause selecting one surface.
+
+    RESEARCH matches documents with no ``surface`` at all: every conversation
+    written before surfaces existed was created there, so absence is not
+    unknown -- it is research, and treating it that way avoids a backfill.
+    """
+    if surface == ChatSurface.RESEARCH:
+        return {"surface": {"$ne": str(ChatSurface.LITERATURE)}}
+    return {"surface": str(surface)}
+
+
 def _conversation_to_doc(conv: ConversationDTO) -> dict:
     return {
         "conversation_id": str(conv.conversation_id),
@@ -508,6 +529,7 @@ def _conversation_to_doc(conv: ConversationDTO) -> dict:
         "message_count": conv.message_count,
         "model_used": conv.model_used,
         "is_archived": conv.is_archived,
+        "surface": str(conv.surface),
     }
 
 
@@ -523,6 +545,7 @@ def _doc_to_conversation(doc: dict) -> ConversationDTO:
         message_count=doc.get("message_count", 0),
         model_used=doc.get("model_used"),
         is_archived=doc.get("is_archived", False),
+        surface=ChatSurface(doc.get("surface") or ChatSurface.RESEARCH),
     )
 
 
@@ -566,6 +589,8 @@ def _message_to_doc(msg: ChatMessageDTO) -> dict:
         doc["token_usage"] = msg.token_usage.model_dump(mode="json")
     if msg.query_context:
         doc["query_context"] = msg.query_context.model_dump(mode="json")
+    if msg.literature_results:
+        doc["literature_results"] = msg.literature_results
     return doc
 
 
@@ -594,5 +619,6 @@ def _doc_to_message(doc: dict) -> ChatMessageDTO:
         agent_trace=agent_trace,
         token_usage=token_usage,
         query_context=query_context,
+        literature_results=doc.get("literature_results"),
         created_at=_utc(doc["created_at"]),
     )

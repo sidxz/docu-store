@@ -13,6 +13,7 @@ export function GET() {
     appUrl: process.env.APP_URL ?? "http://localhost:15000",
     duarUrl: process.env.APP_DUAR_URL ?? "http://localhost:9003",
     selfServeEnabled: process.env.APP_SELF_SERVE_ENABLED === "true",
+    literatureEnabled: process.env.APP_LITERATURE_ENABLED === "true",
     googleClientId: process.env.APP_GOOGLE_CLIENT_ID ?? "",
     githubClientId: process.env.APP_GITHUB_CLIENT_ID ?? "",
     entraIdClientId: process.env.APP_ENTRA_ID_CLIENT_ID ?? "",

@@ -101,8 +101,12 @@ class QueryPlan(BaseModel):
 class RetrievalResult(BaseModel):
     """A single retrieved source with expanded context (Thinking Mode)."""
 
-    source_type: Literal["chunk", "summary"]
+    source_type: Literal["chunk", "summary", "literature"]
+    # "literature" is a paper that is not in this corpus: artifact_id is a uuid5
+    # of its DOI so the id is stable and reconciles if it is ever ingested, but
+    # nothing is stored under it. external_url is where a reader must be sent.
     artifact_id: UUID
+    external_url: str | None = None
     artifact_title: str | None = None
     authors: list[str] = Field(default_factory=list)
     presentation_date: str | None = None

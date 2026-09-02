@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { MessageSquare, PanelLeftOpen, FileText, Folder } from "lucide-react";
+import { PanelLeftOpen, FileText, Folder } from "lucide-react";
+import { SURFACES, surfaceFromBasePath, conversationHref } from "@/lib/surfaces";
 import { Button } from "@/components/ui/button";
 import { MoveToFolderMenu } from "@/components/folders/MoveToFolderMenu";
 import { useFolders } from "@/hooks/use-folders";
@@ -18,7 +19,7 @@ import { MessageList } from "./MessageList";
 import { ChatInput } from "./ChatInput";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatTokens } from "@/lib/utils";
-import type { SourceCitation } from "@docu-store/types";
+import type { ChatSurface, SourceCitation } from "@docu-store/types";
 
 interface ChatPanelProps {
   workspace: string;
@@ -28,6 +29,14 @@ interface ChatPanelProps {
   onSourcesChange: (sources: SourceCitation[]) => void;
   sourcesOpen: boolean;
   onToggleSources: () => void;
+  /** Pins the pipeline for this surface, so Literature cannot change the mode
+   *  the user chose for Deep Research. Omitted = follow the store. */
+  forceMode?: string;
+  /** Composer prompt, since the two surfaces search different things. */
+  placeholder?: string;
+  /** Route segment this panel lives under, so a new conversation stays on the
+   *  surface it was started from. */
+  basePath?: string;
 }
 
 export function ChatPanel({
@@ -38,12 +47,16 @@ export function ChatPanel({
   onSourcesChange,
   sourcesOpen,
   onToggleSources,
+  forceMode,
+  basePath = SURFACES.research.segment,
+  placeholder,
 }: ChatPanelProps) {
   const router = useRouter();
   const { data, isLoading } = useConversation(conversationId);
   const { data: folders } = useFolders();
-  const createConversation = useCreateConversation();
-  const sendMessage = useSendMessage(conversationId);
+  const surface: ChatSurface = surfaceFromBasePath(basePath);
+  const createConversation = useCreateConversation(surface);
+  const sendMessage = useSendMessage(conversationId, { forceMode });
 
   const feedbackMutation = useChatFeedback(conversationId);
   const { isStreaming, streamingContent, streamingSteps, streamingSources, chatMode } =
@@ -155,7 +168,7 @@ export function ChatPanel({
       // Queue the message, create conversation, then navigate — message auto-sends on mount
       setQueuedMessage(message);
       const conv = await createConversation.mutateAsync(undefined);
-      router.push(`/${workspace}/chat/${conv.conversation_id}`);
+      router.push(conversationHref(workspace, surface, conv.conversation_id));
       return;
     }
     sendMessage.mutate(message);
@@ -190,13 +203,16 @@ export function ChatPanel({
           </div>
         )}
         <div className="flex-1 flex items-center justify-center">
+          {/* The two surfaces search different corpora — the empty state has to
+              say which, and wear the same icon and colour as its sidebar entry. */}
           <EmptyState
-            icon={MessageSquare}
-            title="Start a conversation"
-            description="Select an existing conversation or start a new one to chat with your documents."
+            icon={SURFACES[surface].icon}
+            iconColor={SURFACES[surface].iconColor}
+            title={SURFACES[surface].emptyTitle}
+            description={SURFACES[surface].emptyDescription}
           />
         </div>
-        <ChatInput onSend={handleSend} disabled={createConversation.isPending} onAbort={sendMessage.stop} />
+        <ChatInput onSend={handleSend} disabled={createConversation.isPending} onAbort={sendMessage.stop} modeLocked={!!forceMode} placeholder={placeholder} />
       </div>
     );
   }
@@ -274,13 +290,14 @@ export function ChatPanel({
             workspace={workspace}
             conversationId={conversationId}
             onFeedback={handleFeedback}
+            surface={surface}
           />
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
 
       {/* Input */}
-      <ChatInput onSend={handleSend} disabled={streamingHere} onAbort={sendMessage.stop} />
+      <ChatInput onSend={handleSend} disabled={streamingHere} onAbort={sendMessage.stop} modeLocked={!!forceMode} placeholder={placeholder} />
     </div>
   );
 }

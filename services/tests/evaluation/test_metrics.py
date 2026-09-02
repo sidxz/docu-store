@@ -125,6 +125,34 @@ class TestCitationCoverage:
         assert cov["factual_sentences"] == 0
         assert cov["ratio"] == 1.0  # trivially complete
 
+    def test_a_trailing_citation_is_counted(self):
+        """The benchmark metric must agree with production on this shape.
+
+        A citation after the sentence-ending period splits off as its own
+        fragment; before consolidation this metric dropped it and scored the
+        claim uncited, disagreeing with what the live pipeline reported.
+        """
+        answer = "The IC50 of TAM16 against Pks13 is 0.19 uM. [2]"
+
+        assert citation_coverage(answer)["ratio"] == 1.0
+
+    def test_an_abbreviation_does_not_manufacture_coverage(self):
+        answer = "The IC50 was 0.19 uM, i.e. [1] Compound 44 outperformed the reference."
+
+        assert citation_coverage(answer)["ratio"] == 0.0
+
+    def test_the_metric_and_the_live_verifier_cannot_drift(self):
+        from infrastructure.chat.nodes.inline_verification import InlineVerificationNode
+
+        node = InlineVerificationNode.__new__(InlineVerificationNode)
+        for answer in (
+            "The IC50 of TAM16 against Pks13 is 0.19 uM. [2]",
+            "The assay was validated in triplicate [4]. A second run was measured at 79% [8].",
+            "The IC50 was 0.19 uM, i.e. [1] Compound 44 outperformed the reference.",
+            "Page 3 reports a yield of 82%. [7]  A second run reported 79%. [8]",
+        ):
+            assert citation_coverage(answer) == node._compute_citation_coverage(answer)
+
 
 class TestAggregation:
     def test_mean_empty(self):

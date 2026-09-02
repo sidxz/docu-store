@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { MessageSquare, FileText, ShieldCheck, MoreHorizontal } from "lucide-react";
+import { FileText, Library, ShieldCheck, MoreHorizontal } from "lucide-react";
 import type { RecentConversation } from "@docu-store/types";
 import { entityChipClass } from "@/lib/entity-colors";
+import { SURFACES, conversationHref } from "@/lib/surfaces";
 import { formatRelativeTime } from "@/lib/utils";
 import { MoveToFolderMenu } from "@/components/folders/MoveToFolderMenu";
 import { setChatDragData } from "@/components/folders/dnd";
@@ -11,17 +12,23 @@ import { setChatDragData } from "@/components/folders/dnd";
 export function RecentChatCard({ chat, workspace }: { chat: RecentConversation; workspace: string }) {
   const hasChips = chat.entities.length > 0;
   const hasDocs = !hasChips && chat.cited_documents.length > 0;
+  // A conversation's surface is fixed at creation, so the card must route to
+  // the surface it actually belongs to, not always /chat. Icon and colour come
+  // from lib/surfaces so a recent card matches its sidebar entry exactly.
+  const surface = chat.surface ?? "research";
+  const isLiterature = surface === "literature";
+  const SurfaceIcon = SURFACES[surface].icon;
   return (
     <div className="group relative">
     <Link
-      href={`/${workspace}/chat/${chat.conversation_id}`}
+      href={conversationHref(workspace, surface, chat.conversation_id)}
       draggable
       onDragStart={(e) => setChatDragData(e, chat.conversation_id, chat.folder_id)}
       className="block rounded-xl border border-border-default bg-surface-elevated p-4 transition-all hover:border-primary/30 hover:shadow-ds-sm"
     >
       <div className="flex items-start gap-3">
         <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-light">
-          <MessageSquare className="h-4 w-4 text-accent-text" />
+          <SurfaceIcon className={`h-4 w-4 ${SURFACES[surface].iconColor}`} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-3">
@@ -49,7 +56,11 @@ export function RecentChatCard({ chat, workspace }: { chat: RecentConversation; 
                   key={d.artifact_id}
                   className="inline-flex max-w-[12rem] items-center gap-1 truncate rounded-md border border-border-default bg-surface-elevated px-1.5 py-0.5 text-[11px] text-text-secondary"
                 >
-                  <FileText className="h-3 w-3 shrink-0 text-text-muted" />
+                  {isLiterature ? (
+                    <Library className="h-3 w-3 shrink-0 text-text-muted" />
+                  ) : (
+                    <FileText className="h-3 w-3 shrink-0 text-text-muted" />
+                  )}
                   <span className="truncate">{d.title ?? "Document"}</span>
                 </span>
               ))}

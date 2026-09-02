@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Callable
 from datetime import datetime
 from types import SimpleNamespace
@@ -20,7 +21,9 @@ from application.ports.repositories.artifact_read_models import ArtifactReadMode
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.user_preferences_store import UserPreferencesStore
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
+from application.services.llm_scope import UserLLMScope
 from application.use_cases.artifact_use_cases import CreateArtifactUseCase
+from application.use_cases.literature_use_cases import SearchLiteratureUseCase
 from application.use_cases.correct_metadata_use_cases import (
     CorrectArtifactMetadataUseCase,
     CorrectPageCompoundMentionsUseCase,
@@ -32,10 +35,20 @@ from domain.value_objects.compound_mention import CompoundMention
 from domain.value_objects.mime_type import MimeType
 from domain.value_objects.title_mention import TitleMention
 from infrastructure.config import Settings
+from infrastructure.literature.europe_pmc import LiteratureHit, LiteratureQueryError
+from infrastructure.config import settings as literature_settings
 from interfaces.api.main import app
 from interfaces.dependencies import get_auth, get_container
 from tests.conftest import strip_authz_middleware
 from tests.fakes.fake_auth import FakeAuth
+
+
+class _NullLLMScope:
+    """Enough of UserLLMScope for a route that never reaches its body."""
+
+    @contextlib.asynccontextmanager
+    async def for_user(self, workspace_id, user_id):  # noqa: ANN001, ANN201, ARG002
+        yield
 
 
 class FakeContainer:
@@ -56,6 +69,16 @@ class FakeArtifactReadModel(ArtifactReadModel):
         workspace_id: UUID | None = None,
     ) -> ArtifactResponse | None:
         return self._artifacts.get(artifact_id)
+
+    async def find_artifact_id_by_source_uri(
+        self,
+        source_uri: str,
+        workspace_id: UUID | None = None,
+    ) -> UUID | None:
+        return next(
+            (a.artifact_id for a in self._artifacts.values() if a.source_uri == source_uri),
+            None,
+        )
 
     async def list_artifacts(
         self,
@@ -620,3 +643,100 @@ class TestUserPreferencesRoutes:
         response = client.get("/user/preferences")
         assert response.status_code == 200
         assert response.json()["font_family"] == "inter"
+
+
+class TestLiteratureRoutes:
+    """The flag closes the routes, and it closes them as absence rather than denial."""
+
+    def test_search_is_absent_when_the_feature_is_off(self, make_client, monkeypatch) -> None:
+        monkeypatch.setattr(literature_settings, "literature_enabled", False)
+        client = make_client({})
+        response = client.get("/literature/search", params={"q": "InhA inhibitor"})
+        # 404, not 403: a deployment that never turned this on should look like
+        # one that never had it, so the flag reads as a deployment decision and
+        # not as a permission the UI could ask the user to obtain.
+        assert response.status_code == 404
+
+    def test_ingest_is_absent_when_the_feature_is_off(self, make_client, monkeypatch) -> None:
+        monkeypatch.setattr(literature_settings, "literature_enabled", False)
+        client = make_client({})
+        response = client.post(
+            "/literature/ingest",
+            json={"source": "MED", "external_id": "41591406", "visibility": "private"},
+        )
+        assert response.status_code == 404
+
+    def test_search_returns_the_hits_rather_than_a_500(self, make_client, monkeypatch) -> None:
+        """The route returns a plain list, so it must not wear the Result decorator.
+
+        @handle_use_case_errors unwraps a returns.Result; anything else falls
+        through it into "Unexpected result type" and a 500 on every single call.
+        """
+        monkeypatch.setattr(literature_settings, "literature_enabled", True)
+        hit = LiteratureHit(
+            external_id="41591406",
+            source="MED",
+            title="An InhA inhibitor",
+            licence="cc by",
+            in_epmc=True,
+            has_pdf=True,
+            pmcid="PMC12910649",
+            cited_by_count=7,
+        )
+
+        class _Search:
+            async def execute(self, q, *, limit=25):  # noqa: ANN001, ANN003, ANN201, ARG002
+                return [hit]
+
+        client = make_client({SearchLiteratureUseCase: _Search()})
+        response = client.get("/literature/search", params={"q": "InhA inhibitor"})
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body[0]["title"] == "An InhA inhibitor"
+        # The three fields the SSE event sent and this response used to omit.
+        assert body[0]["is_retracted"] is False
+        assert body[0]["retraction_notice"] is None
+        assert body[0]["cited_by_count"] == 7
+
+    def test_a_query_europe_pmc_rejects_is_a_400(self, make_client, monkeypatch) -> None:
+        monkeypatch.setattr(literature_settings, "literature_enabled", True)
+
+        class _Search:
+            async def execute(self, q, *, limit=25):  # noqa: ANN001, ANN003, ANN201, ARG002
+                raise LiteratureQueryError("Europe PMC rejected the query (400)")
+
+        client = make_client({SearchLiteratureUseCase: _Search()})
+        response = client.get("/literature/search", params={"q": 'TITLE_ABS:"InhA" AND ('})
+
+        assert response.status_code == 400
+
+    def test_the_flag_also_closes_the_chat_surface(self, make_client, monkeypatch) -> None:
+        """Gating only /literature left mode="literature" wide open on /chat."""
+        monkeypatch.setattr(literature_settings, "literature_enabled", False)
+        client = make_client({})
+
+        created = client.post("/chat", json={"surface": "literature"})
+        assert created.status_code == 404
+
+        # send_message runs llm_user_scope as a route dependency before its body,
+        # so the container has to answer for it even on the path that 404s.
+        client = make_client({UserLLMScope: _NullLLMScope()})
+        sent = client.post(
+            f"/chat/{uuid4()}/messages",
+            json={"message": "inhibitors of Pks13", "mode": "literature"},
+        )
+        assert sent.status_code == 404
+
+    def test_ingest_rejects_a_visibility_it_does_not_offer(
+        self,
+        make_client,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.setattr(literature_settings, "literature_enabled", True)
+        client = make_client({})
+        response = client.post(
+            "/literature/ingest",
+            json={"source": "MED", "external_id": "41591406", "visibility": "public"},
+        )
+        assert response.status_code == 422

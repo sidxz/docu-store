@@ -12,6 +12,23 @@ from domain.value_objects.text_embedding import TextEmbedding
 
 logger = structlog.get_logger()
 
+# Payload fields we filter on, and so must index. Ensured on every startup rather
+# than only at collection creation: an index added here would otherwise never
+# reach a deployment whose collection already exists, which is all of them.
+_PAYLOAD_INDEXES: tuple[tuple[str, models.PayloadSchemaType], ...] = (
+    ("artifact_id", models.PayloadSchemaType.KEYWORD),
+    ("page_id", models.PayloadSchemaType.KEYWORD),
+    ("workspace_id", models.PayloadSchemaType.KEYWORD),
+    ("tag_normalized", models.PayloadSchemaType.KEYWORD),
+    ("artifact_tag_normalized", models.PayloadSchemaType.KEYWORD),
+    ("entity_types", models.PayloadSchemaType.KEYWORD),
+    ("block_type", models.PayloadSchemaType.KEYWORD),
+    ("section_path_normalized", models.PayloadSchemaType.KEYWORD),
+    ("source_class", models.PayloadSchemaType.KEYWORD),
+    ("is_table", models.PayloadSchemaType.BOOL),
+    ("is_figure", models.PayloadSchemaType.BOOL),
+)
+
 
 class QdrantStore(VectorStore):
     """Adapter for Qdrant vector database.
@@ -77,6 +94,7 @@ class QdrantStore(VectorStore):
 
             if exists:
                 logger.info("collection_already_exists", collection=self.collection_name)
+                await self._ensure_payload_indexes()
                 return
 
             # Create collection with named dense vector + sparse vector + quantization
@@ -109,27 +127,11 @@ class QdrantStore(VectorStore):
                         "collection_created_by_another_process",
                         collection=self.collection_name,
                     )
+                    await self._ensure_payload_indexes()
                     return
                 raise
 
-            # Create payload indexes for filtering
-            for field, schema in [
-                ("artifact_id", models.PayloadSchemaType.KEYWORD),
-                ("page_id", models.PayloadSchemaType.KEYWORD),
-                ("workspace_id", models.PayloadSchemaType.KEYWORD),
-                ("tag_normalized", models.PayloadSchemaType.KEYWORD),
-                ("artifact_tag_normalized", models.PayloadSchemaType.KEYWORD),
-                ("entity_types", models.PayloadSchemaType.KEYWORD),
-                ("block_type", models.PayloadSchemaType.KEYWORD),
-                ("section_path_normalized", models.PayloadSchemaType.KEYWORD),
-                ("is_table", models.PayloadSchemaType.BOOL),
-                ("is_figure", models.PayloadSchemaType.BOOL),
-            ]:
-                await client.create_payload_index(
-                    collection_name=self.collection_name,
-                    field_name=field,
-                    field_schema=schema,
-                )
+            await self._ensure_payload_indexes()
 
             logger.info(
                 "collection_created",
@@ -144,6 +146,28 @@ class QdrantStore(VectorStore):
                 error=str(e),
             )
             raise
+
+    async def _ensure_payload_indexes(self) -> None:
+        """Create any missing payload index. Idempotent, and safe to call on startup.
+
+        One index failing is logged and stepped over rather than raised: a missing
+        index costs filter performance, while refusing to start costs everything.
+        """
+        client = await self._get_client()
+        for field, schema in _PAYLOAD_INDEXES:
+            try:
+                await client.create_payload_index(
+                    collection_name=self.collection_name,
+                    field_name=field,
+                    field_schema=schema,
+                )
+            except Exception:
+                logger.warning(
+                    "payload_index_not_ensured",
+                    collection=self.collection_name,
+                    field=field,
+                    exc_info=True,
+                )
 
     async def upsert_page_embedding(
         self,

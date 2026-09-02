@@ -89,7 +89,7 @@ export const queryKeys = {
   },
   chat: {
     all: ["chat"] as const,
-    list: () => [...queryKeys.chat.all, "list"] as const,
+    list: (surface = "research") => [...queryKeys.chat.all, "list", surface] as const,
     detail: (conversationId: string) =>
       [...queryKeys.chat.all, conversationId] as const,
     messages: (conversationId: string) =>

@@ -4,7 +4,38 @@
 
 import type { Bioactivity } from "./extraction";
 
+/** Which chat surface a conversation belongs to. Fixed at creation: it decides
+ *  which sidebar shows it and which corpus answers it, and a follow-up should
+ *  not be able to switch either. */
+export type ChatSurface = "research" | "literature";
+
 // --- Source citations ---
+
+/** A paper Europe PMC knows about, which this workspace may or may not hold. */
+export interface LiteratureHit {
+  external_id: string;
+  source: string;
+  title: string;
+  doi: string | null;
+  pmid: string | null;
+  pmcid: string | null;
+  abstract: string | null;
+  journal: string | null;
+  year: number | null;
+  authors: string | null;
+  licence: string | null;
+  is_open_access: boolean;
+  url: string;
+  /** Whether this workspace may keep a copy. Decided from the licence, not the access flag. */
+  is_ingestable: boolean;
+  /** Why not, in words meant for a reader. Null when ingestable. */
+  ingest_blocker: string | null;
+  /** Europe PMC pubTypeList carries "Retracted Publication". */
+  is_retracted: boolean;
+  /** The retraction notice's own citation, when there is one. */
+  retraction_notice: string | null;
+  cited_by_count: number;
+}
 
 export interface SourceCitation {
   artifact_id: string;
@@ -17,6 +48,13 @@ export interface SourceCitation {
   text_excerpt: string | null;
   similarity_score: number | null;
   citation_index: number;
+  /** "document" cites a page in this corpus; "literature" cites a paper the
+   *  agent has only seen the abstract of. Render the two differently — an
+   *  abstract-derived claim should not look as grounded as one read off a page,
+   *  and its artifact_id points at nothing storable. */
+  source_type?: "document" | "literature";
+  /** Where to send a reader for a literature citation. Never a document route. */
+  external_url?: string | null;
 }
 
 // --- Retrieval filters ---
@@ -116,6 +154,10 @@ export interface ChatMessage {
   agent_trace: AgentTrace | null;
   token_usage: TokenUsage | null;
   query_context?: QueryContext | null;
+  /** Papers the literature searches returned for this message. Persisted so a
+   *  reopened conversation can rebuild its panel — a citation whose panel is
+   *  empty leads nowhere. */
+  literature_results?: LiteratureHit[] | null;
   created_at: string;
 }
 
@@ -128,6 +170,7 @@ export interface Conversation {
   created_at: string;
   updated_at: string;
   message_count: number;
+  surface?: ChatSurface;
   model_used: string | null;
   is_archived: boolean;
   /** True while an answer is being generated server-side (detail endpoint only). */
@@ -179,6 +222,7 @@ export interface AgentEvent {
     | "structured_block"
     | "grounding_result"
     | "query_context"
+    | "literature_results"
     | "done"
     | "error";
   step?: string;
@@ -198,6 +242,7 @@ export interface AgentEvent {
   grounding_is_grounded?: boolean;
   grounding_confidence?: number;
   query_context_entities?: NerFilterTag[];
+  literature_results?: LiteratureHit[];
 }
 
 export interface GroundingStatus {

@@ -37,6 +37,13 @@ def _map_app_error_to_http_exception(error: AppError) -> HTTPException:  # noqa:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=error.message,
         )
+    if error.category == "conflict":
+        # Distinct from "concurrency": nothing raced, the thing simply already
+        # exists. Same status, but the two should not be read as one another.
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=error.message,
+        )
     if error.category == "concurrency":
         return HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -52,6 +59,23 @@ def _map_app_error_to_http_exception(error: AppError) -> HTTPException:  # noqa:
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Internal server error",
     )
+
+
+def require_literature_enabled() -> None:
+    """404 when LITERATURE_ENABLED is off, on every route that reaches the feature.
+
+    404 rather than 403: a deployment that has not turned this on should look
+    like one that never had it, so the flag is a deployment decision and not a
+    permission the UI can ask about. Lives here because the chat surface reaches
+    literature too -- gating only /literature left `mode="literature"` open.
+    """
+    from infrastructure.config import settings
+
+    if not settings.literature_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Literature search is not enabled on this deployment",
+        )
 
 
 async def get_allowed_artifact_ids(auth: RequestAuth) -> list[UUID] | None:

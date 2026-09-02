@@ -7,6 +7,7 @@ from domain.aggregates.artifact import Artifact
 from domain.aggregates.page import Page
 from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.mime_type import MimeType
+from domain.value_objects.source_class import SourceClass
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.text_mention import TextMention
 from tests.mocks import (
@@ -95,3 +96,44 @@ async def test_batch_reembed_scopes_table_tags():
     table_meta = next(m for m in cm if m.get("is_table"))
     assert table_meta["tag_normalized"] == ["pptt"]
     assert "rho" not in table_meta["tag_normalized"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "source_class",
+    [SourceClass.INTERNAL, SourceClass.LITERATURE_OA],
+)
+async def test_batch_reembed_writes_provenance(source_class):
+    """The path the ingestion pipeline actually runs must carry source_class.
+
+    This is the regression: provenance went into the single-page embedding use
+    case, the pipeline runs the batch one, and every point was written without
+    it. Both build the payload through build_page_payload now, and this pins the
+    half that ships.
+    """
+    artifact_repo, page_repo = MockArtifactRepository(), MockPageRepository()
+    artifact = Artifact.create(
+        source_uri="https://doi.org/10.1021/acsinfecdis.4c00808",
+        source_filename="PMC11915372.pdf",
+        artifact_type=ArtifactType.RESEARCH_ARTICLE,
+        mime_type=MimeType.PDF,
+        storage_location="artifacts/x/source.pdf",
+        source_class=source_class,
+        licence="cc by",
+    )
+    page = Page.create(name="P1", artifact_id=artifact.id, index=0)
+    page.update_text_mention(TextMention(text="Pks13 inhibitors of the benzofuran series"))
+    artifact.add_pages([page.id])
+    artifact_repo.artifacts[artifact.id] = artifact
+    page_repo.pages[page.id] = page
+
+    vs = MockVectorStore()
+    uc = BatchReEmbedArtifactPagesUseCase(
+        artifact_repository=artifact_repo, page_repository=page_repo,
+        embedding_generator=MockEmbeddingGenerator(), vector_store=vs,
+        text_chunker=MockTextChunker(),
+    )
+    out = await uc.execute(artifact.id)
+
+    assert out["status"] == "success"
+    assert vs.upsert_chunk_calls[-1]["metadata"]["source_class"] == source_class

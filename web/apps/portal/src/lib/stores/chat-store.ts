@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { AgentEvent, AgentStep, ContentBlock, GroundingStatus, NerFilterTag, SourceCitation, ThinkingBlock } from "@docu-store/types";
+import type { AgentEvent, AgentStep, ContentBlock, GroundingStatus, LiteratureHit, NerFilterTag, SourceCitation, ThinkingBlock } from "@docu-store/types";
 import { trackEvent } from "@/lib/analytics";
 
 interface StepTiming {
@@ -19,16 +19,17 @@ export type ReasoningDefault = "inherit" | ReasoningLevel;
 // Synthesis reasoning is mode-driven (composer toggle); retrieval/base are advanced knobs.
 export type ReasoningDefaults = { retrieval: ReasoningDefault; base: ReasoningDefault };
 
-// Default model-reasoning state per mode. Quick never reasons; Deep Research does.
+// Reasoning is on by default in every mode. It used to be a per-mode default
+// with quick opted out entirely; the split mostly meant the cheaper modes
+// answered worse for no reason the user had chosen.
 export const MODE_REASONING_DEFAULT: Record<ChatMode, boolean> = {
-  quick: false,
-  thinking: false,
+  quick: true,
+  thinking: true,
   deep_thinking: true,
 };
 
 /** Effective reasoning on/off — mode default unless the user explicitly overrode it. */
 export function isReasoningOn(mode: ChatMode, override: "on" | "off" | null): boolean {
-  if (mode === "quick") return false;
   if (override !== null) return override === "on";
   return MODE_REASONING_DEFAULT[mode];
 }
@@ -64,6 +65,11 @@ interface ChatState {
 
   // Entity filters the planner ran retrieval with this turn (running list)
   queryFilters: NerFilterTag[];
+
+  // Papers the last literature search returned, in Europe PMC's relevance order.
+  // Never re-sorted: ranking these by whether they can be ingested would bury
+  // the paywalled med-chem papers, which are usually the relevant ones.
+  literatureResults: LiteratureHit[];
 
   // Message queued for send after navigation (new conversation flow)
   queuedMessage: string | null;
@@ -109,6 +115,7 @@ interface ChatState {
   setFinalSources: (sources: SourceCitation[]) => void;
   setGroundingResult: (result: GroundingStatus) => void;
   setQueryFilters: (filters: NerFilterTag[]) => void;
+  setLiteratureResults: (results: LiteratureHit[]) => void;
   recordEvent: (event: AgentEvent) => void;
   setDoneEvent: (event: AgentEvent) => void;
   finishStreaming: () => void;
@@ -135,6 +142,7 @@ export const useChatStore = create<ChatState>()(
   streamingStructuredBlocks: [],
   groundingResult: null,
   queryFilters: [],
+  literatureResults: [],
   highlightedCitation: null,
   activeSourcesMessageId: null,
   stepTimings: [],
@@ -210,6 +218,7 @@ export const useChatStore = create<ChatState>()(
       streamingStructuredBlocks: [],
       groundingResult: null,
       queryFilters: [],
+      literatureResults: [],
       stepTimings: [],
       rawEvents: [],
       doneEvent: null,
@@ -229,6 +238,7 @@ export const useChatStore = create<ChatState>()(
       streamingStructuredBlocks: [],
       groundingResult: null,
       queryFilters: [],
+      literatureResults: [],
       stepTimings: [],
       rawEvents: [],
       doneEvent: null,
@@ -297,6 +307,18 @@ export const useChatStore = create<ChatState>()(
 
   setQueryFilters: (filters) => set({ queryFilters: filters }),
 
+  // Accumulate across the turn rather than replace. The agent searches several
+  // times per question, and citations span all of those searches -- keeping only
+  // the last one leaves most of the papers the answer used missing from the
+  // panel, which is exactly where the reader goes to act on them. Deduped on
+  // identity, first sighting wins, so relevance order is preserved.
+  setLiteratureResults: (results) =>
+    set((state) => {
+      const seen = new Set(state.literatureResults.map((r) => `${r.source}-${r.external_id}`));
+      const fresh = results.filter((r) => !seen.has(`${r.source}-${r.external_id}`));
+      return fresh.length ? { literatureResults: [...state.literatureResults, ...fresh] } : {};
+    }),
+
   setDoneEvent: (event) => set({ doneEvent: event }),
 
   finishStreaming: () =>
@@ -331,6 +353,7 @@ export const useChatStore = create<ChatState>()(
       streamingStructuredBlocks: [],
       groundingResult: null,
       queryFilters: [],
+      literatureResults: [],
       highlightedCitation: null,
       activeSourcesMessageId: null,
       stepTimings: [],

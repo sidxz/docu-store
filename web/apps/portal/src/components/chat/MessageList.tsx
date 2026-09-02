@@ -1,9 +1,10 @@
 "use client";
 
-import type { ChatMessage as ChatMessageType, AgentStep, SourceCitation } from "@docu-store/types";
+import type { ChatMessage as ChatMessageType, AgentStep, ChatSurface, SourceCitation } from "@docu-store/types";
 import { ConversationEmptyState } from "@/components/ai-elements/conversation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useChatStore } from "@/lib/stores/chat-store";
+import { SURFACES } from "@/lib/surfaces";
 import { ChatMessage } from "./ChatMessage";
 
 interface MessageListProps {
@@ -16,6 +17,10 @@ interface MessageListProps {
   workspace: string;
   conversationId?: string;
   onFeedback?: (messageId: string, feedback: "positive" | "negative") => void;
+  /** Which surface this conversation belongs to — picks the in-conversation
+   *  empty-state prompt, since Literature and Docu Research search different
+   *  things. Defaults to research so existing callers keep today's copy. */
+  surface?: ChatSurface;
 }
 
 export function MessageList({
@@ -28,6 +33,7 @@ export function MessageList({
   workspace,
   conversationId,
   onFeedback,
+  surface = "research",
 }: MessageListProps) {
   const pendingUserMessage = useChatStore((s) => s.pendingUserMessage);
   const finalSources = useChatStore((s) => s.finalSources);
@@ -118,7 +124,7 @@ export function MessageList({
 
       {messages.length === 0 && !showOptimistic && (
         <ConversationEmptyState
-          title="Ask a question about your documents"
+          title={SURFACES[surface].askPrompt}
           description="Your answers will be grounded in uploaded sources with citations."
           className="py-12"
         />

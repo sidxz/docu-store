@@ -39,6 +39,7 @@ from application.use_cases.token_limit_use_cases import (
     month_total,
     month_usage_by_kind,
 )
+from domain.value_objects.chat_surface import ChatSurface
 from infrastructure.llm.token_counter import TokenCounter
 
 if TYPE_CHECKING:
@@ -79,6 +80,7 @@ class CreateConversationUseCase:
         workspace_id: UUID,
         owner_id: UUID,
         title: str | None = None,
+        surface: ChatSurface = ChatSurface.RESEARCH,
     ) -> Result[ConversationDTO, AppError]:
         try:
             now = datetime.now(UTC)
@@ -89,6 +91,7 @@ class CreateConversationUseCase:
                 title=title,
                 created_at=now,
                 updated_at=now,
+                surface=surface,
             )
             created = await self._repo.create_conversation(conversation)
             log.info("chat.conversation.created", id=str(created.conversation_id))
@@ -112,11 +115,13 @@ class ListConversationsUseCase:
         limit: int = 20,
         is_archived: bool = False,
         folder_id: UUID | None = None,
+        surface: ChatSurface | None = None,
     ) -> Result[list[ConversationDTO], AppError]:
         try:
             conversations = await self._repo.list_conversations(
                 workspace_id=workspace_id,
                 owner_id=owner_id,
+                surface=surface,
                 skip=skip,
                 limit=limit,
                 is_archived=is_archived,
@@ -361,7 +366,7 @@ class SendMessageUseCase:
         owner_id: UUID,
         message: str,
         allowed_artifact_ids: list[UUID] | None = None,
-        mode: Literal["quick", "thinking", "deep_thinking"] | None = None,
+        mode: Literal["quick", "thinking", "deep_thinking", "literature"] | None = None,
         reasoning: dict[str, str] | None = None,
     ) -> AsyncGenerator[AgentEvent, None]:
         from infrastructure.llm import reasoning_context
@@ -423,6 +428,8 @@ class SendMessageUseCase:
             grounding_is_grounded: bool | None = None
             grounding_confidence: float | None = None
             query_context: QueryContextDTO | None = None
+            literature_results: list[dict] = []
+            literature_seen: set[tuple] = set()
             structured_blocks: list[ContentBlockDTO] = []
             reasoning_parts: list[str] = []
 
@@ -485,6 +492,15 @@ class SendMessageUseCase:
                                 smiles_detected=event.query_context_smiles or [],
                                 smiles_resolved=event.query_context_smiles_resolved or [],
                             )
+                        elif event.type == "literature_results":
+                            # The agent searches several times a turn; keep them
+                            # all, in the order first seen, so the reopened panel
+                            # holds every paper the answer could have cited.
+                            for hit in event.literature_results or []:
+                                key = (hit.get("source"), hit.get("external_id"))
+                                if key not in literature_seen:
+                                    literature_seen.add(key)
+                                    literature_results.append(hit)
                         elif event.type == "structured_block" and event.block:
                             structured_blocks.append(event.block)
                         elif event.type == "grounding_result":
@@ -547,6 +563,7 @@ class SendMessageUseCase:
                         structured_content=structured_blocks or None,
                         token_usage=token_usage,
                         query_context=query_context,
+                        literature_results=literature_results or None,
                         created_at=datetime.now(UTC),
                     )
                     await self._repo.append_message(assistant_msg)

@@ -1,0 +1,532 @@
+{
+  "hitCount": 135,
+  "resultList": {
+    "result": [
+      {
+        "id": "PPR1298287",
+        "source": "PPR",
+        "doi": "10.21203/rs.3.rs-10317124/v1",
+        "title": "Synthesis and discovery of direct Enoyl-ACP Reductase (InhA) inhibitors via in-silico studies and ADMET prediction for potent anti-tubercular activity",
+        "abstractText": "<title>Abstract</title>  <p>  The increase in multidrug-resistant tuberculosis (MDR-TB) is mainly due to a mutation in the katG gene, which prevents activation of standard pro-drugs like Isoniazid, and is a critical challenge for global health. To overcome this issue, direct inhibition of Enoyl-ACP reductase (InhA) is an excellent option for therapeutic target. Here in, a series of ten novel triazolopyrimidines (VP101-VP110) were synthesized for evaluation of  <italic>in-silico</italic>  analysis as InhA inhibitor, in which compounds VP107 and VP109 demonstrated extraordinary binding energies of −13.93 kcal/mol, and closely followed at −13.14 kcal/mol respectively, with picomolar inhibition constant outperforming the standards Triclosan (−8.67 kcal/mol) and Ethambutol (−7.15 kcal/mol). Mechanistically, these compounds act as Direct InhA Inhibitors (DIIs) in their native state, avoiding the necessity of KatG activation. The ADMET profiling advocated favourable drug-likeness, compliance with Lipinski’s Rule of Five, excellent intestinal absorption, high plasma protein binding (>94%), and minimal blood-brain barrier penetration. However, hepatotoxicity and genotoxicity across the series were a matter of concern. Ultimately, the synthesised compounds show exceptionally potent direct-acting therapeutic drugs, especially VP107, which can act as a lead for evading traditional katG-mediated resistance vectors in tuberculosis treatment.  </p>",
+        "authorString": "Gol R, Pandey AK, Jani R, Khatri T, Shah V.",
+        "pubYear": "2026",
+        "isOpenAccess": "N",
+        "inEPMC": "N",
+        "inPMC": "N",
+        "license": "cc by",
+        "hasPDF": "N",
+        "fullTextUrlList": {
+          "fullTextUrl": [
+            {
+              "availability": "Free",
+              "availabilityCode": "F",
+              "documentStyle": "doi",
+              "site": "DOI",
+              "url": "https://doi.org/10.21203/rs.3.rs-10317124/v1"
+            }
+          ]
+        }
+      },
+      {
+        "id": "40687024",
+        "source": "MED",
+        "pmid": "40687024",
+        "pmcid": "PMC12268426",
+        "doi": "10.1021/acsomega.5c02912",
+        "title": "Designing Novel InhA Inhibitors for Antituberculosis Agents Using ab Initio Fragment Molecular Orbital Calculations.",
+        "abstractText": "Tuberculosis is an ancient chronic disease caused by <i>Mycobacterium tuberculosis</i> (<i>M. tuberculosis</i>) and remains one of the leading causes of death worldwide. InhA, an enoyl-ACP reductase in <i>M. tuberculosis</i>, plays a crucial role in the biosynthesis of mycolic acids, essential constituents of the mycobacterial cell wall. Therefore, InhA enzyme has been considered as a promising target for the development of novel antitubercular drugs. In our previous molecular simulations, we investigated the interactions between InhA and a series of benzimidazole derivatives for the crystal structure of InhA (PDB ID: 6R9W) using <i>ab initio</i> fragment molecular orbital (FMO) calculations. To design highly effective benzimidazole derivatives as InhA inhibitors, we here extended our molecular simulations to other derivatives and highlighted key electronic-level interactions between InhA and these compounds. Indeed, we strategically modified substituents at three sites of the 2,3-dihydro-1<i>H</i>-indene ring of the most potent benzimidazole derivative, with the aim of facilitating hydrogen bond formation to InhA residues. A total of 24 compounds were rationally designed and virtually screened based on Lipinski's rule of five and toxicity predictions, ultimately obtaining nine promising candidate compounds. Using FMO calculations, specific interactions were elucidated between InhA and the compounds to highlight key interactions for achieving high binding affinity to InhA. Notably, the highest-affinity inhibitor exhibited strong hydrogen bond interactions with the backbones of Gln100, Ala157, and Ile215, as well as nicotinamide adenine dinucleotide of InhA. These findings provide valuable structural insights for designing novel benzimidazole derivatives with improved binding efficiency to InhA. Overall, our <i>ab initio</i> molecular simulations provide crucial insights for the rational design of more effective InhA inhibitors, potentially advancing tuberculosis chemotherapy.",
+        "authorString": "Pornprom T, Pakamwong B, Sukchit D, Yuguchi M, Nagura Y, Sabishiro H, Chimura N, Punkvang A, Thongdee P, Suttisintong K, Kittakoop P, Kurita N, Pungpo P.",
+        "pubYear": "2025",
+        "isOpenAccess": "Y",
+        "inEPMC": "Y",
+        "inPMC": "Y",
+        "license": "cc by-nc-nd",
+        "hasPDF": "Y",
+        "journalInfo": {
+          "issue": "27",
+          "volume": "10",
+          "journalIssueId": 3979830,
+          "dateOfPublication": "2025 Jul",
+          "monthOfPublication": 7,
+          "yearOfPublication": 2025,
+          "printPublicationDate": "2025-07-01",
+          "journal": {
+            "title": "ACS omega",
+            "medlineAbbreviation": "ACS Omega",
+            "isoabbreviation": "ACS Omega",
+            "nlmid": "101691658",
+            "essn": "2470-1343",
+            "issn": "2470-1343"
+          }
+        },
+        "fullTextUrlList": {
+          "fullTextUrl": [
+            {
+              "availability": "Open access",
+              "availabilityCode": "OA",
+              "documentStyle": "doi",
+              "site": "Unpaywall",
+              "url": "https://doi.org/10.1021/acsomega.5c02912"
+            },
+            {
+              "availability": "Subscription required",
+              "availabilityCode": "S",
+              "documentStyle": "doi",
+              "site": "DOI",
+              "url": "https://doi.org/10.1021/acsomega.5c02912"
+            },
+            {
+              "availability": "Open access",
+              "availabilityCode": "OA",
+              "documentStyle": "html",
+              "site": "Europe_PMC",
+              "url": "https://europepmc.org/articles/PMC12268426"
+            },
+            {
+              "availability": "Open access",
+              "availabilityCode": "OA",
+              "documentStyle": "pdf",
+              "site": "Europe_PMC",
+              "url": "https://europepmc.org/articles/PMC12268426?pdf=render"
+            }
+          ]
+        }
+      },
+      {
+        "id": "41591406",
+        "source": "MED",
+        "pmid": "41591406",
+        "pmcid": "PMC12910649",
+        "doi": "10.1021/acs.jmedchem.5c02409",
+        "title": "Optimizing the Antibiotic Potency and Metabolic Stability of Pyridomycin Using a Semisynthetic Approach.",
+        "abstractText": "Pyridomycin is a natural product with potent activity against <i>Mycobacterium tuberculosis</i> (<i>Mtb</i>), acting through direct inhibition of the fatty acid synthesis enzyme InhA. As a direct inhibitor, pyridomycin maintains activity on <i>Mtb</i> strains resistant to the InhA targeting prodrugs isoniazid and ethionamide. Evaluation of the drug-like properties of pyridomycin, however, found it to have poor <i>in vitro</i> metabolic stability, thus limiting its drug development potential. To address this limitation, semisynthetic derivatives were generated by replacing the metabolically labile hydroxypicolinic acid group with alternative (hetero)aromatic moieties, identifying several derivatives with improved <i>in vitro</i> metabolic stability and with comparable or even enhanced antibacterial activity. Pharmacokinetic studies in mice, however, revealed that these gains did not reduce systemic clearance <i>in vivo</i>, and neither pyridomycin nor its derivatives were effective in a murine pulmonary tuberculosis model. Overall, semisynthesis yielded more potent, P450-stable analogs, but the improvements were insufficient to provide measurable <i>in vivo</i> efficacy.",
+        "authorString": "Valderrama K, Horlacher O, Publicola G, Eisenring P, Kienle M, Boarbi S, Kiass M, Korduláková J, Chatagnon J, Piveteau C, Leroux F, Savková K, Záhorszká M, Cantrelle FX, Lherbet C, Mourey L, Mikušová K, Mathys V, Aichholz R, Maveyraud L, Altmann KH, Hartkoorn RC.",
+        "pubYear": "2026",
+        "isOpenAccess": "Y",
+        "inEPMC": "Y",
+        "inPMC": "Y",
+        "license": "cc by",
+        "hasPDF": "Y",
+        "journalInfo": {
+          "issue": "3",
+          "volume": "69",
+          "journalIssueId": 4120545,
+          "dateOfPublication": "2026 Feb",
+          "monthOfPublication": 2,
+          "yearOfPublication": 2026,
+          "printPublicationDate": "2026-02-01",
+          "journal": {
+            "title": "Journal of medicinal chemistry",
+            "medlineAbbreviation": "J Med Chem",
+            "isoabbreviation": "J Med Chem",
+            "nlmid": "9716531",
+            "essn": "1520-4804",
+            "issn": "0022-2623"
+          }
+        },
+        "fullTextUrlList": {
+          "fullTextUrl": [
+            {
+              "availability": "Subscription required",
+              "availabilityCode": "S",
+              "documentStyle": "doi",
+              "site": "DOI",
+              "url": "https://doi.org/10.1021/acs.jmedchem.5c02409"
+            },
+            {
+              "availability": "Open access",
+              "availabilityCode": "OA",
+              "documentStyle": "html",
+              "site": "Europe_PMC",
+              "url": "https://europepmc.org/articles/PMC12910649"
+            },
+            {
+              "availability": "Open access",
+              "availabilityCode": "OA",
+              "documentStyle": "pdf",
+              "site": "Europe_PMC",
+              "url": "https://europepmc.org/articles/PMC12910649?pdf=render"
+            }
+          ]
+        }
+      },
+      {
+        "id": "40901448",
+        "source": "MED",
+        "pmid": "40901448",
+        "pmcid": "PMC12400508",
+        "doi": "10.1039/d5ra03641k",
+        "title": "Isoniazid-rhodanine molecular hybrids: design, synthesis, antimycobacterial activity and computational validation.",
+        "abstractText": "A novel series of isoniazid-rhodanine (INH-Rh) molecular hybrids (9a-t) was prepared and structurally characterized using different spectroscopic techniques, including FTIR, NMR (<sup>1</sup>H, <sup>13</sup>C, HMBC, and HSQC), and HRMS. All the hybrids (9a-t), including their precursors (3a-t and 8a-t), were assessed for their <i>in vitro</i> anti-tubercular activity, alongside the standard anti-tubercular drug, INH. Among them, 9d (MIC = 1.56 μg ml<sup>-1</sup>), 9j (MIC = 12.50 μg ml<sup>-1</sup>), and 9n (MIC = 12.50 μg ml<sup>-1</sup>) displayed the most potent activity against <i>M. tuberculosis (Mtb)</i>, with 9d emerging as the most active. However, limited efficacy was observed for seven selected compounds (3h, 3i, 9d, 9j, 9l, 9n, and 9p) against INH-resistant <i>Mtb</i> strains harboring mutations in <i>KatG</i>. Moreover, the <i>Mtb</i> strain overexpressing the enoyl acyl carrier protein reductase (InhA) exhibited significant resistance to 9d, 9j, and 9n, suggesting InhA as their likely target. Molecular docking studies revealed that the binding modes and key intermolecular interactions of the selected compounds closely resembled those of INH, a known inhibitor of InhA. ADME/T analysis indicated favorable pharmacokinetic and safety profiles for the synthesized compounds, while DFT calculations provided further insights into their global reactivity characteristics.",
+        "authorString": "Kumar G, Mishra S, Seboletswe P, Manhas N, Ghumran S, Roquet-Banères F, Kremer L, Bhargava G, Singh P.",
+        "pubYear": "2025",
+        "isOpenAccess": "Y",
+        "inEPMC": "Y",
+        "inPMC": "Y",
+        "license": "cc by-nc",
+        "hasPDF": "Y",
+        "journalInfo": {
+          "issue": "38",
+          "volume": "15",
+          "journalIssueId": 4004976,
+          "dateOfPublication": "2025 Aug",
+          "monthOfPublication": 8,
+          "yearOfPublication": 2025,
+          "printPublicationDate": "2025-08-01",
+          "journal": {
+            "title": "RSC advances",
+            "medlineAbbreviation": "RSC Adv",
+            "isoabbreviation": "RSC Adv",
+            "nlmid": "101581657",
+            "essn": "2046-2069",
+            "issn": "2046-2069"
+          }
+        },
+        "fullTextUrlList": {
+          "fullTextUrl": [
+            {
+              "availability": "Subscription required",
+              "availabilityCode": "S",
+              "documentStyle": "doi",
+              "site": "DOI",
+              "url": "https://doi.org/10.1039/d5ra03641k"
+            },
+            {
+              "availability": "Open access",
+              "availabilityCode": "OA",
+              "documentStyle": "html",
+              "site": "Europe_PMC",
+              "url": "https://europepmc.org/articles/PMC12400508"
+            },
+            {
+              "availability": "Open access",
+              "availabilityCode": "OA",
+              "documentStyle": "pdf",
+              "site": "Europe_PMC",
+              "url": "https://europepmc.org/articles/PMC12400508?pdf=render"
+            }
+          ]
+        }
+      },
+      {
+        "id": "38984262",
+        "source": "MED",
+        "pmid": "38984262",
+        "pmcid": "PMC11232110",
+        "doi": "10.1039/d4ra02746a",
+        "title": "Design, synthesis and computational studies of new azaheterocyclic coumarin derivatives as anti-<i>Mycobacterium tuberculosis</i> agents targeting enoyl acyl carrier protein reductase (InhA).",
+        "abstractText": "In this study, we designed and synthesized a series of coumarin derivatives as antitubercular agents targeting the enoyl acyl carrier protein reductase (InhA) enzyme. Among the synthesized compounds, the tetrazole derivative 4c showed the most potent antitubercular effect with a minimum inhibitory concentration value (MIC) of 15 μg mL<sup>-1</sup> against <i>Mtb</i> H37Rv and could also inhibit the growth of the mutant strain (Δ<i>katG</i>). Compound 4c was able to penetrate <i>Mtb</i>-infected human macrophages and suppress the intracellular growth of tubercle bacilli. Moreover, the target derivative 4c showed a potent inhibitory effect against InhA enzyme with an IC<sub>50</sub> value of 0.565 μM, which was superior to the reference InhA inhibitor triclosan. Molecular docking of compound 4c within the InhA active site revealed the importance of the 4-phenylcoumarin ring system and tetrazole moiety for activity. Finally, the physicochemical properties and pharmacokinetic parameters of 4c were investigated.",
+        "authorString": "Batran RZ, Sabt A, Dziadek J, Kassem AF.",
+        "pubYear": "2024",
+        "isOpenAccess": "Y",
+        "inEPMC": "Y",
+        "inPMC": "Y",
+        "license": "cc by-nc",
+        "hasPDF": "Y",
+        "journalInfo": {
+          "issue": "30",
+          "volume": "14",
+          "journalIssueId": 3796377,
+          "dateOfPublication": "2024 Jul",
+          "monthOfPublication": 7,
+          "yearOfPublication": 2024,
+          "printPublicationDate": "2024-07-01",
+          "journal": {
+            "title": "RSC advances",
+            "medlineAbbreviation": "RSC Adv",
+            "isoabbreviation": "RSC Adv",
+            "nlmid": "101581657",
+            "essn": "2046-2069",
+            "issn": "2046-2069"
+          }
+        },
+        "fullTextUrlList": {
+          "fullTextUrl": [
+            {
+              "availability": "Subscription required",
+              "availabilityCode": "S",
+              "documentStyle": "doi",
+              "site": "DOI",
+              "url": "https://doi.org/10.1039/d4ra02746a"
+            },
+            {
+              "availability": "Open access",
+              "availabilityCode": "OA",
+              "documentStyle": "html",
+              "site": "Europe_PMC",
+              "url": "https://europepmc.org/articles/PMC11232110"
+            },
+            {
+              "availability": "Open access",
+              "availabilityCode": "OA",
+              "documentStyle": "pdf",
+              "site": "Europe_PMC",
+              "url": "https://europepmc.org/articles/PMC11232110?pdf=render"
+            }
+          ]
+        }
+      },
+      {
+        "id": "39484752",
+        "source": "MED",
+        "pmid": "39484752",
+        "doi": "10.2174/0115734099353857241022102426",
+        "title": "Synthesis, Biological Evaluation, Molecular Docking Studies and ADMET Prediction of Oxindole-based Hybrids for the Treatment of Tuberculosis.",
+        "abstractText": "<h4>Introduction</h4>With a projected mortality toll of 1.4 million in 2019, tuberculosis (TB) continues to be a significant public health concern around the world. Studies of novel treatments are required due to decreased bioavailability, increased toxicity, increased side effects, and resistance of several first- and second-line TB therapies, including isoniazid and ethionamide.<h4>Methods</h4>This study reports the synthesis of oxindole-based hybrids as potent InhA inhibitors targeting <i>Mycobacterium tuberculosis</i>. The synthesized compounds (5a-5e and 8a-8c) were evaluated for their anti-mycobacterial activity against <i>Mycobacterium tuberculosis</i> and nontuberculous mycobacteria (NTMs), viz. <i>M. abscessus</i> (ATCC 19977), <i>M. fortuitum</i> (ATCC 6841), and <i>M. chelonae</i> (ATCC 35752) using the Microplate Alamar Blue Assay (MABA). Molecular docking studies were performed using AutoDock Vina to explore the binding interactions of these compounds with the InhA enzyme (PDB: 2NSD). Additionally, biochemical and histopathological studies were conducted to assess the hepatotoxicity of the lead compounds. <i>Insilico</i> molecular properties and ADMET properties of the synthesized compounds were predicted using SwissADME and Deep-PK online tools to assess their drug-likeness.<h4>Results</h4>Among the tested compounds, 8b exhibited significant anti-mycobacterial activity with a minimum inhibitory concentration (MIC = 1 μg/mL) comparable to the reference drug ethambutol. Further, the compound demonstrated a binding affinity and orientation similar to the reference inhibitor 4PI, indicating its potential as a potent InhA inhibitor, and was found to be stabilized within the binding pocket of InhA through H-bonding, hydrophobic and van der Waal's interactions. Besides, the compounds hepatotoxicity assessment studies depicted that 8b showed no significant liver dysfunction or damage to liver tissues. Additionally, 8b adhered to Lipinski's rule of five and Veber's rule, displaying favourable pharmacokinetic and drug-like properties, including high human intestinal absorption, distribution, and acceptable metabolic stability and excretion.<h4>Conclusion</h4>Compound 8b emerged as a promising candidate for further optimization and development as a therapeutic agent for tuberculosis, offering a new avenue for tackling tuberculosis.",
+        "authorString": "Patel VP, Tripathi RKP, Mandal SD.",
+        "pubYear": "2025",
+        "isOpenAccess": "N",
+        "inEPMC": "N",
+        "inPMC": "N",
+        "hasPDF": "N",
+        "journalInfo": {
+          "issue": "4",
+          "volume": "21",
+          "journalIssueId": 3947783,
+          "dateOfPublication": "2025 ",
+          "monthOfPublication": 0,
+          "yearOfPublication": 2025,
+          "printPublicationDate": "2025-01-01",
+          "journal": {
+            "title": "Current computer-aided drug design",
+            "medlineAbbreviation": "Curr Comput Aided Drug Des",
+            "isoabbreviation": "Curr Comput Aided Drug Des",
+            "nlmid": "101265750",
+            "essn": "1875-6697",
+            "issn": "1573-4099"
+          }
+        },
+        "fullTextUrlList": {
+          "fullTextUrl": [
+            {
+              "availability": "Subscription required",
+              "availabilityCode": "S",
+              "documentStyle": "doi",
+              "site": "DOI",
+              "url": "https://doi.org/10.2174/0115734099353857241022102426"
+            }
+          ]
+        }
+      },
+      {
+        "id": "37270808",
+        "source": "MED",
+        "pmid": "37270808",
+        "pmcid": "PMC10329767",
+        "doi": "10.1021/acs.biochem.2c00606",
+        "title": "Evaluating the Impact of the Tyr158 p<i>K</i><sub>a</sub> on the Mechanism and Inhibition of InhA, the Enoyl-ACP Reductase from <i>Mycobacterium tuberculosis</i>.",
+        "abstractText": "InhA, the <i>Mycobacterium tuberculosis</i> enoyl-ACP reductase, is a target for the tuberculosis (TB) drug isoniazid (INH). InhA inhibitors that do not require KatG activation avoid the most common mechanism of INH resistance, and there are continuing efforts to fully elucidate the enzyme mechanism to drive inhibitor discovery. InhA is a member of the short-chain dehydrogenase/reductase superfamily characterized by a conserved active site Tyr, Y158 in InhA. To explore the role of Y158 in the InhA mechanism, this residue has been replaced by fluoroTyr residues that increase the acidity of Y158 up to ∼3200-fold. Replacement of Y158 with 3-fluoroTyr (3-FY) and 3,5-difluoroTyr (3,5-F<sub>2</sub>Y) has no effect on <i>k</i><sub>cat</sub><sup>app</sup>/<i>K</i><sub>M</sub><sup>app</sup> nor on the binding of inhibitors to the open form of the enzyme (<i>K</i><sub>i</sub><sup>app</sup>), whereas both <i>k</i><sub>cat</sub><sup>app</sup>/<i>K</i><sub>M</sub><sup>app</sup> and <i>K</i><sub>i</sub><sup>app</sup> are altered by seven-fold for the 2,3,5-trifluoroTyr variant (2,3,5-F<sub>3</sub>Y158 InhA). <sup>19</sup>F NMR spectroscopy suggests that 2,3,5-F<sub>3</sub>Y158 is ionized at neutral pH indicating that neither the acidity nor ionization state of residue 158 has a major impact on catalysis or on the binding of substrate-like inhibitors. In contrast, <i>K</i><sub>i</sub>*<sup>app</sup> is decreased 6- and 35-fold for the binding of the slow-onset inhibitor <b>PT504</b> to 3,5-F<sub>2</sub>Y158 and 2,3,5-F<sub>3</sub>Y158 InhA, respectively, indicating that Y158 stabilizes the closed form of the enzyme adopted by EI*. The residence time of <b>PT504</b> is reduced ∼four-fold for 2,3,5-F<sub>3</sub>Y158 InhA compared to wild-type, and thus, the hydrogen bonding interaction of the inhibitor with Y158 is an important factor in the design of InhA inhibitors with increased residence times on the enzyme.",
+        "authorString": "Davoodi S, Daryaee F, Iuliano JN, Tolentino Collado J, He Y, Pollard AC, Gil AA, Aramini JM, Tonge PJ.",
+        "pubYear": "2023",
+        "isOpenAccess": "N",
+        "inEPMC": "Y",
+        "inPMC": "Y",
+        "hasPDF": "Y",
+        "journalInfo": {
+          "issue": "12",
+          "volume": "62",
+          "journalIssueId": 3591838,
+          "dateOfPublication": "2023 Jun",
+          "monthOfPublication": 6,
+          "yearOfPublication": 2023,
+          "printPublicationDate": "2023-06-01",
+          "journal": {
+            "title": "Biochemistry",
+            "medlineAbbreviation": "Biochemistry",
+            "isoabbreviation": "Biochemistry",
+            "nlmid": "0370623",
+            "essn": "1520-4995",
+            "issn": "0006-2960"
+          }
+        },
+        "fullTextUrlList": {
+          "fullTextUrl": [
+            {
+              "availability": "Subscription required",
+              "availabilityCode": "S",
+              "documentStyle": "doi",
+              "site": "DOI",
+              "url": "https://doi.org/10.1021/acs.biochem.2c00606"
+            },
+            {
+              "availability": "Free",
+              "availabilityCode": "F",
+              "documentStyle": "html",
+              "site": "Europe_PMC",
+              "url": "https://europepmc.org/articles/PMC10329767"
+            },
+            {
+              "availability": "Free",
+              "availabilityCode": "F",
+              "documentStyle": "pdf",
+              "site": "Europe_PMC",
+              "url": "https://europepmc.org/articles/PMC10329767?pdf=render"
+            },
+            {
+              "availability": "Free",
+              "availabilityCode": "F",
+              "documentStyle": "doi",
+              "site": "DOI",
+              "url": "https://doi.org/10.1021/acs.biochem.2c00606"
+            }
+          ]
+        }
+      },
+      {
+        "id": "41264724",
+        "source": "MED",
+        "pmid": "41264724",
+        "doi": "10.1021/acsabm.5c00927",
+        "title": "&lt;i&gt;N&lt;/i&gt;-(Arylcarbamothioyl)benzamide Derivatives as Selective Antimycobacterial Agents and Their Supramolecular Structural Features.",
+        "abstractText": "<i>Mycobacterium tuberculosis</i> (Mtb) remains a major global health threat, intensified by multidrug-resistant (MDR) and extensively drug-resistant (XDR) strains. We synthesized a series of <i>N</i>-benzoyl-arylthiourea derivatives (IITKDA1-20) as hybrids of isoniazid/pyrazinamide and ethionamide to explore their antimycobacterial potential. Our evaluation of synthesized library members for antimycobacterial activity has identified IITKDA10 (<i>N</i>-benzoyl-arylthiourea possessing <i>p</i>-(<i>N</i>-Boc)-thionamide) as the maximally effective inhibitor of Mtb (1 μg/mL MIC). Further, the physicochemical properties indicated a trend of high topological polar surface area (tPSA) and partition coefficient (ClogP) in the range of 3-4 was optimal for the compounds to be active against Mtb. Molecular docking of IITKDA10 into the InhA (enoyl-[acyl-carrier-protein] reductase) active site revealed strong binding (-9.63 kcal/mol), stabilized by hydrogen bonds and π-alkyl interactions. Further, crystal packing analysis indicated that hydrogen bonding networks guided supramolecular architecture, and structural planarity (e.g., IITKDA4, IITKDA8) correlated with higher activity. In contrast, twisted or L-shaped conformations (IITKDA2, IITKDA5) showed reduced potency. This study presents a structurally and functionally diverse set of <i>N</i>-benzoyl-arylthioureas with promising anti-TB activity, supported by structure-activity relationships, docking, and crystallographic insights.",
+        "authorString": "Mahapatra AD, Kambhale P, Malik P, Ali J, Kumar P, Dasgupta A, Sista S, Rahman MI, Chopra S, Allimuthu D.",
+        "pubYear": "2025",
+        "isOpenAccess": "N",
+        "inEPMC": "N",
+        "inPMC": "N",
+        "hasPDF": "N",
+        "journalInfo": {
+          "issue": "12",
+          "volume": "8",
+          "journalIssueId": 4072962,
+          "dateOfPublication": "2025 Dec",
+          "monthOfPublication": 12,
+          "yearOfPublication": 2025,
+          "printPublicationDate": "2025-12-01",
+          "journal": {
+            "title": "ACS applied bio materials",
+            "medlineAbbreviation": "ACS Appl Bio Mater",
+            "isoabbreviation": "ACS Appl Bio Mater",
+            "nlmid": "101729147",
+            "essn": "2576-6422",
+            "issn": "2576-6422"
+          }
+        },
+        "fullTextUrlList": {
+          "fullTextUrl": [
+            {
+              "availability": "Subscription required",
+              "availabilityCode": "S",
+              "documentStyle": "doi",
+              "site": "DOI",
+              "url": "https://doi.org/10.1021/acsabm.5c00927"
+            }
+          ]
+        }
+      },
+      {
+        "id": "37482022",
+        "source": "MED",
+        "pmid": "37482022",
+        "doi": "10.1016/j.ejmech.2023.115646",
+        "title": "Discovery of new diaryl ether inhibitors against Mycobacterium tuberculosis targeting the minor portal of InhA.",
+        "abstractText": "Tuberculosis (TB) caused by Mycobacterium tuberculosis (Mtb) affects 10 million people each year and the emergence of resistant TB augurs for a growing incidence. In the last 60 years, only three new drugs were approved for TB treatment, for which resistances are already emerging. Therefore, there is a crucial need for new chemotherapeutic agents capable of eradicating TB. Enzymes belonging to the type II fatty acid synthase system (FAS-II) are involved in the biosynthesis of mycolic acids, cell envelope components essential for mycobacterial survival. Among them, InhA is the primary target of isoniazid (INH), one of the most effective compounds to treat TB. INH acts as a prodrug requiring activation by the catalase-peroxidase KatG, whose mutations are the major cause for INH resistance. Herein, a new series of direct InhA inhibitors were designed based on a molecular hybridization approach. They exhibit potent inhibitory activities of InhA and, for some of them, good antitubercular activities. Moreover, they display a low toxicity on human cells. A study of the mechanism of action of the most effective molecules shows that they inhibit the biosynthesis of mycolic acids. The X-ray structures of two InhA/NAD<sup>+</sup>/inhibitor complexes have been obtained showing a binding mode of a part of the molecule in the minor portal, rarely seen in the InhA structures reported so far.",
+        "authorString": "Chebaiki M, Delfourne E, Tamhaev R, Danoun S, Rodriguez F, Hoffmann P, Grosjean E, Goncalves F, Azéma-Despeyroux J, Pál A, Korduláková J, Preuilh N, Britton S, Constant P, Marrakchi H, Maveyraud L, Mourey L, Lherbet C.",
+        "pubYear": "2023",
+        "isOpenAccess": "N",
+        "inEPMC": "N",
+        "inPMC": "N",
+        "hasPDF": "N",
+        "journalInfo": {
+          "volume": "259",
+          "journalIssueId": 3617592,
+          "dateOfPublication": "2023 Nov",
+          "monthOfPublication": 11,
+          "yearOfPublication": 2023,
+          "printPublicationDate": "2023-11-01",
+          "journal": {
+            "title": "European journal of medicinal chemistry",
+            "medlineAbbreviation": "Eur J Med Chem",
+            "isoabbreviation": "Eur J Med Chem",
+            "nlmid": "0420510",
+            "essn": "1768-3254",
+            "issn": "0223-5234"
+          }
+        },
+        "fullTextUrlList": {
+          "fullTextUrl": [
+            {
+              "availability": "Open access",
+              "availabilityCode": "OA",
+              "documentStyle": "html",
+              "site": "Unpaywall",
+              "url": "https://hal.science/hal-04244940"
+            },
+            {
+              "availability": "Subscription required",
+              "availabilityCode": "S",
+              "documentStyle": "doi",
+              "site": "DOI",
+              "url": "https://doi.org/10.1016/j.ejmech.2023.115646"
+            }
+          ]
+        }
+      },
+      {
+        "id": "38294237",
+        "source": "MED",
+        "pmid": "38294237",
+        "pmcid": "PMC10936210",
+        "doi": "10.1128/mbio.02968-23",
+        "title": "Inducing vulnerability to InhA inhibition restores isoniazid susceptibility in drug-resistant &lt;i&gt;Mycobacterium tuberculosis&lt;/i&gt;.",
+        "abstractText": "Of the approximately 10 million cases of <i>Mycobacterium tuberculosis</i> (<i>Mtb</i>) infections each year, over 10% are resistant to the frontline antibiotic isoniazid (INH). INH resistance is predominantly caused by mutations that decrease the activity of the bacterial enzyme KatG, which mediates the conversion of the pro-drug INH to its active form INH-NAD. We previously discovered an inhibitor of <i>Mtb</i> respiration, C10, that enhances the bactericidal activity of INH, prevents the emergence of INH-resistant mutants, and re-sensitizes a collection of INH-resistant mutants to INH through an unknown mechanism. To investigate the mechanism of action of C10, we exploited the toxicity of high concentrations of C10 to select for resistant mutants. We discovered two mutations that confer resistance to the disruption of energy metabolism and allow for the growth of <i>Mtb</i> in high C10 concentrations, indicating that growth inhibition by C10 is associated with inhibition of respiration. Using these mutants as well as direct inhibitors of the <i>Mtb</i> electron transport chain, we provide evidence that inhibition of energy metabolism by C10 is neither sufficient nor necessary to potentiate killing by INH. Instead, we find that C10 acts downstream of INH-NAD synthesis, causing <i>Mtb</i> to become particularly sensitive to inhibition of the INH-NAD target, InhA, without changing the concentration of INH-NAD or the activity of InhA, the two predominant mechanisms of potentiating INH. Our studies revealed that there exists a vulnerability in <i>Mtb</i> that can be exploited to render <i>Mtb</i> sensitive to otherwise subinhibitory concentrations of InhA inhibitor.IMPORTANCEIsoniazid (INH) is a critical frontline antibiotic to treat <i>Mycobacterium tuberculosis</i> (<i>Mtb</i>) infections. INH efficacy is limited by its suboptimal penetration of the <i>Mtb</i>-containing lesion and by the prevalence of clinical INH resistance. We previously discovered a compound, C10, that enhances the bactericidal activity of INH, prevents the emergence of INH-resistant mutants, and re-sensitizes a set of INH-resistant mutants to INH. Resistance is typically mediated by <i>katG</i> mutations that decrease the activation of INH, which is required for INH to inhibit the essential enzyme InhA. Our current work demonstrates that C10 re-sensitizes INH-resistant <i>katG</i>-hypomorphs without enhancing the activation of INH. We furthermore show that C10 causes <i>Mtb</i> to become particularly vulnerable to InhA inhibition without compromising InhA activity on its own. Therefore, C10 represents a novel strategy to curtail the development of INH resistance and to sensitize <i>Mtb</i> to sub-lethal doses of INH, such as those achieved at the infection site.",
+        "authorString": "Harrison GA, Wang ER, Cho K, Mreyoud Y, Sarkar S, Almqvist F, Patti GJ, Stallings CL.",
+        "pubYear": "2024",
+        "isOpenAccess": "Y",
+        "inEPMC": "Y",
+        "inPMC": "Y",
+        "license": "cc by",
+        "hasPDF": "Y",
+        "journalInfo": {
+          "issue": "3",
+          "volume": "15",
+          "journalIssueId": 3739459,
+          "dateOfPublication": "2024 Mar",
+          "monthOfPublication": 3,
+          "yearOfPublication": 2024,
+          "printPublicationDate": "2024-03-01",
+          "journal": {
+            "title": "mBio",
+            "medlineAbbreviation": "mBio",
+            "isoabbreviation": "mBio",
+            "nlmid": "101519231",
+            "essn": "2150-7511",
+            "issn": "2150-7511"
+          }
+        },
+        "fullTextUrlList": {
+          "fullTextUrl": [
+            {
+              "availability": "Open access",
+              "availabilityCode": "OA",
+              "documentStyle": "doi",
+              "site": "Unpaywall",
+              "url": "https://doi.org/10.1128/mbio.02968-23"
+            },
+            {
+              "availability": "Subscription required",
+              "availabilityCode": "S",
+              "documentStyle": "doi",
+              "site": "DOI",
+              "url": "https://doi.org/10.1128/mbio.02968-23"
+            },
+            {
+              "availability": "Open access",
+              "availabilityCode": "OA",
+              "documentStyle": "html",
+              "site": "Europe_PMC",
+              "url": "https://europepmc.org/articles/PMC10936210"
+            },
+            {
+              "availability": "Open access",
+              "availabilityCode": "OA",
+              "documentStyle": "pdf",
+              "site": "Europe_PMC",
+              "url": "https://europepmc.org/articles/PMC10936210?pdf=render"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

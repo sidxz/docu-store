@@ -11,6 +11,7 @@ from application.dtos.chat_dtos import (
     ChatMessageDTO,
     ConversationDTO,
 )
+from domain.value_objects.chat_surface import ChatSurface
 
 
 class ChatRepository(Protocol):
@@ -45,6 +46,10 @@ class ChatRepository(Protocol):
         limit: int = 20,
         is_archived: bool = False,
         folder_id: UUID | None = None,
+        # None means every surface. A folder view wants that — things are filed
+        # into a folder deliberately, so it must show what was put there — while
+        # the sidebar passes a surface explicitly to keep the histories apart.
+        surface: ChatSurface | None = None,
     ) -> list[ConversationDTO]: ...
 
     async def list_recent_conversations(

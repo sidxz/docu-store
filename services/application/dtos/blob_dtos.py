@@ -3,6 +3,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from domain.value_objects.artifact_type import ArtifactType
+from domain.value_objects.source_class import SourceClass
 
 
 class UploadBlobRequest(BaseModel):
@@ -11,6 +12,11 @@ class UploadBlobRequest(BaseModel):
     filename: str | None = Field(None, description="Original filename of the artifact")
     mime_type: str | None
     visibility: str = Field("workspace", description="Initial visibility: 'workspace' or 'private'")
+    source_class: SourceClass = Field(
+        SourceClass.INTERNAL,
+        description="Where the document came from, and so what may be done with it",
+    )
+    licence: str | None = Field(None, description="Licence the document was ingested under")
 
 
 class UploadBlobResponse(BaseModel):

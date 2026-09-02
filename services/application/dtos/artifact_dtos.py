@@ -25,6 +25,10 @@ class CreateArtifactRequest(BaseModel):
     artifact_type: ArtifactType = Field(..., description="Classification type of the artifact")
     mime_type: MimeType = Field(..., description="MIME type of the artifact")
     storage_location: str = Field(..., description="Location where the artifact is stored")
+    # source_class and licence are deliberately absent: they say what may be done
+    # with the document, and a caller that can declare its own provenance can label
+    # anything as open literature. They are passed to CreateArtifactUseCase.execute
+    # by the ingest path that established them, never carried on the request body.
 
 
 class ArtifactResponse(BaseModel):

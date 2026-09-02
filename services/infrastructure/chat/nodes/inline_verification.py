@@ -7,13 +7,12 @@ when coverage is low and query is factual.
 from __future__ import annotations
 
 import json
-import re
 from typing import TYPE_CHECKING
 
 import structlog
 
 from infrastructure.chat.models import GroundingResult
-from infrastructure.chat.utils import CITATION_RE, strip_markdown_fences
+from infrastructure.chat.utils import compute_citation_coverage, strip_markdown_fences
 from infrastructure.config import settings
 
 if TYPE_CHECKING:
@@ -22,13 +21,6 @@ if TYPE_CHECKING:
     from infrastructure.chat.models import ContextMetadata, QueryPlan
 
 log = structlog.get_logger(__name__)
-
-# Heuristic: sentences that are likely factual claims (contain numbers, units, names)
-_FACTUAL_INDICATORS = re.compile(
-    r"(\d+\.?\d*\s*(uM|nM|mM|mg|kg|%|IC50|EC50|Ki|Kd|μM|μg|mol))"
-    r"|(\b(was|is|are|were|found|showed|demonstrated|reported|measured|determined)\b)",
-    re.IGNORECASE,
-)
 
 
 class InlineVerificationNode:
@@ -101,36 +93,7 @@ class InlineVerificationNode:
 
     def _compute_citation_coverage(self, answer: str) -> dict:
         """Parse answer, classify sentences, compute coverage ratio."""
-        # Split into sentences (rough but effective)
-        sentences = re.split(r"(?<=[.!?])\s+", answer.strip())
-        sentences = [s.strip() for s in sentences if len(s.strip()) > 10]
-
-        factual_sentences = 0
-        cited_sentences = 0
-
-        for sentence in sentences:
-            # Skip headers, list markers, introductory phrases
-            if sentence.startswith("#") or sentence.startswith("-") or sentence.startswith("*"):
-                continue
-            if sentence.endswith(":"):
-                continue
-
-            is_factual = bool(_FACTUAL_INDICATORS.search(sentence))
-            has_citation = bool(CITATION_RE.search(sentence))
-
-            if is_factual:
-                factual_sentences += 1
-                if has_citation:
-                    cited_sentences += 1
-
-        ratio = cited_sentences / factual_sentences if factual_sentences > 0 else 1.0
-
-        return {
-            "total_sentences": len(sentences),
-            "factual_sentences": factual_sentences,
-            "cited_sentences": cited_sentences,
-            "ratio": ratio,
-        }
+        return compute_citation_coverage(answer)
 
     def _needs_llm_verification(
         self,

@@ -190,6 +190,7 @@ class MockVectorStore:
                 "page_id": page_id,
                 "embeddings": embeddings,
                 "chunk_count": chunk_count,
+                "metadata": metadata,
                 "chunk_metadata": chunk_metadata,
             },
         )

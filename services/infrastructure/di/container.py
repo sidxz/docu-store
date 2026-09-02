@@ -76,6 +76,10 @@ from application.use_cases.embedding_use_cases import (
 )
 from application.use_cases.extract_document_metadata_use_case import ExtractDocumentMetadataUseCase
 from application.use_cases.extract_page_entities_use_case import ExtractPageEntitiesUseCase
+from application.use_cases.literature_use_cases import (
+    IngestLiteratureUseCase,
+    SearchLiteratureUseCase,
+)
 from application.use_cases.page_use_cases import (
     AddCompoundMentionsUseCase,
     CreatePageUseCase,
@@ -172,6 +176,7 @@ from infrastructure.file_services.libreoffice_converter import LibreOfficeConver
 from infrastructure.file_services.subprocess_parse import SubprocessParser
 from infrastructure.kafka.kafka_external_event_streamer import KafkaExternalEventPublisher
 from infrastructure.kafka.kafka_publisher import KafkaPublisher
+from infrastructure.literature.europe_pmc import EuropePmcClient
 from infrastructure.llm.factory import (
     _resolve_api_key,
     create_chat_llm_client,
@@ -584,6 +589,19 @@ def create_container() -> Container:
         permission_registrar=c[PermissionRegistrar],
     )
 
+    # Literature. Registered whether or not LITERATURE_ENABLED is set -- the
+    # routes are what the flag closes, and a container that varies by flag is a
+    # container whose wiring is only exercised in one configuration.
+    container[EuropePmcClient] = lambda c: EuropePmcClient()  # noqa: ARG005
+    container[SearchLiteratureUseCase] = lambda c: SearchLiteratureUseCase(
+        client=c[EuropePmcClient],
+    )
+    container[IngestLiteratureUseCase] = lambda c: IngestLiteratureUseCase(
+        client=c[EuropePmcClient],
+        upload_saga=c[ArtifactUploadSaga],
+        artifact_read_model=c[ArtifactReadModel],
+    )
+
     # NER Extraction Use Cases
     container[ExtractPageEntitiesUseCase] = lambda c: ExtractPageEntitiesUseCase(
         page_repository=c[PageRepository],
@@ -898,6 +916,10 @@ def create_container() -> Container:
     from infrastructure.chat.nodes.inline_verification import (
         InlineVerificationNode,
     )
+    from infrastructure.chat.nodes.literature_context_assembly import (
+        LiteratureContextAssemblyNode,
+    )
+    from infrastructure.chat.nodes.literature_retrieval import LiteratureRetrievalNode
     from infrastructure.chat.nodes.query_planning import QueryPlanningNode
     from infrastructure.chat.nodes.question_analysis import QuestionAnalysisNode
     from infrastructure.chat.nodes.retrieval import RetrievalNode
@@ -1053,11 +1075,43 @@ def create_container() -> Container:
         include_images=True,
     )
 
-    # --- Agent Router (dispatches to quick, thinking, or deep thinking) ---
+    # --- Literature Mode (the thinking pipeline, one tool, no corpus) ---
+    # Its own registry and retrieval node rather than a mode threaded through
+    # four layers: the router already picks agents by mode, and deep_thinking is
+    # the same trick. Only reached when LITERATURE_ENABLED is on -- see the router
+    # wiring below.
+    literature_retrieval = lambda c: LiteratureRetrievalNode(
+        tool_llm=tool_calling_llm,
+        tool_registry=ToolRegistry(
+            hierarchical_search=c[HierarchicalSearchUseCase],
+            summary_search=c[SearchSummariesUseCase],
+            page_read_model=c[PageReadModel],
+            literature_client=c[EuropePmcClient],
+            literature_only=True,
+        ),
+        prompt_repository=c[PromptRepositoryPort],
+        reranker=c[Reranker],
+        accumulator_budget_chars=settings.literature_accumulator_budget_chars,
+    )
+    literature_agent = lambda c: ThinkingAgent(
+        query_planning=c[QueryPlanningNode],
+        agentic_retrieval=literature_retrieval(c),
+        context_assembly=LiteratureContextAssemblyNode(),
+        adaptive_synthesis=c[AdaptiveSynthesisNode],
+        inline_verification=c[InlineVerificationNode],
+        answer_formatting=c[AnswerFormattingNode],
+        tag_dictionary=c[TagDictionaryReadModel],
+        max_retries=settings.chat_max_retries,
+    )
+
+    # --- Agent Router (quick, thinking, deep thinking, literature) ---
     container[ChatAgentPort] = lambda c: ChatAgentRouter(
         quick_agent=quick_agent(c),
         thinking_agent=thinking_agent(c),
         deep_thinking_agent=deep_thinking_agent(c),
+        # None when the flag is off: the router then refuses the mode rather
+        # than answering a literature question from the corpus.
+        literature_agent=literature_agent(c) if settings.literature_enabled else None,
         default_mode=settings.chat_default_mode,
     )
 

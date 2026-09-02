@@ -9,6 +9,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from application.dtos.compound_dtos import BioactivityDTO
+from domain.value_objects.chat_surface import ChatSurface
 
 # --- Agent Events (streaming) ---
 
@@ -20,6 +21,7 @@ class AgentEvent(BaseModel):
         "step_started",
         "step_completed",
         "retrieval_results",
+        "literature_results",
         "token",
         "reasoning_token",
         "structured_block",
@@ -47,6 +49,10 @@ class AgentEvent(BaseModel):
     # Grounding verification result (emitted as grounding_result event)
     grounding_is_grounded: bool | None = None
     grounding_confidence: float | None = None
+    # Papers found by search_literature (emitted as literature_results event).
+    # Carried whole rather than as citations: the cards need the licence and the
+    # ingest verdict, which a citation has no business holding.
+    literature_results: list[dict] | None = None
     # Query context (emitted as query_context event)
     query_context_entities: list[dict] | None = None
     query_context_authors: list[str] | None = None
@@ -75,6 +81,12 @@ class SourceCitationDTO(BaseModel):
     text_excerpt: str | None = None
     similarity_score: float | None = None
     citation_index: int
+    # "document" cites a page in this corpus; "literature" cites a paper the
+    # agent has only ever seen the abstract of. The client renders the two
+    # differently on purpose -- an abstract-derived claim should not look as
+    # grounded as one read off a page.
+    source_type: str = "document"
+    external_url: str | None = None
 
 
 # --- Content Blocks ---
@@ -175,6 +187,10 @@ class ChatMessageDTO(BaseModel):
     agent_trace: AgentTraceDTO | None = None
     token_usage: TokenUsageDTO | None = None
     query_context: QueryContextDTO | None = None
+    # Papers the literature searches returned this turn. Persisted with the
+    # message because the panel is rebuilt from it when a conversation is
+    # reopened -- a citation whose panel is empty leads nowhere.
+    literature_results: list[dict] | None = None
     created_at: datetime
 
 
@@ -194,6 +210,9 @@ class ConversationDTO(BaseModel):
     message_count: int = 0
     model_used: str | None = None
     is_archived: bool = False
+    # Conversations created before surfaces existed have no value stored and
+    # read back as RESEARCH, which is where they were in fact created.
+    surface: ChatSurface = ChatSurface.RESEARCH
 
 
 class ConversationDetailDTO(ConversationDTO):
