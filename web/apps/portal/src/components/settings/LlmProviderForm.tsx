@@ -1,12 +1,24 @@
 "use client";
 
 import { useId, useState } from "react";
-import { CheckCircle2, KeyRound, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronDown, KeyRound, XCircle } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import {
   type LlmProviderEntry,
@@ -145,11 +157,77 @@ function TestResult({ result }: { result: LlmProviderTestResult }) {
 }
 
 /**
- * Both model fields. A `datalist` keeps them free text — type any slug the
- * provider accepts — while sparing anyone who does not have the current names
- * memorised. The list is a hint the backend reads off OpenRouter's live catalog,
- * so it is empty for OpenRouter itself and empty when that catalog is down.
+ * One free-text model field, listed three ways: the `datalist` completes what you
+ * type, the chevron opens the whole list for anyone who does not know the names,
+ * and anything else you type is still accepted. Chrome's own datalist arrow is
+ * hidden — the chevron is that button, and two of them is one too many. The names
+ * come from the backend reading OpenRouter's live catalog, so both lists are
+ * absent for OpenRouter itself and whenever that catalog is down.
  */
+function ModelField({
+  label,
+  value,
+  placeholder,
+  suggestions,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  suggestions: string[];
+  onChange: (v: string) => void;
+}) {
+  const id = useId();
+  const listId = `${id}-models`;
+  const hasList = suggestions.length > 0;
+  return (
+    <div>
+      <label htmlFor={id} className="text-xs text-text-muted">
+        {label}
+      </label>
+      <InputGroup className="mt-1">
+        <InputGroupInput
+          id={id}
+          className="font-mono text-xs [&::-webkit-calendar-picker-indicator]:hidden!"
+          list={hasList ? listId : undefined}
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        {hasList && (
+          <InputGroupAddon align="inline-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <InputGroupButton size="icon-xs" aria-label={`Choose a ${label.toLowerCase()}`}>
+                  <ChevronDown />
+                </InputGroupButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="max-h-72 overflow-y-auto">
+                {suggestions.map((m) => (
+                  <DropdownMenuItem
+                    key={m}
+                    className="font-mono text-xs"
+                    onSelect={() => onChange(m)}
+                  >
+                    {m}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </InputGroupAddon>
+        )}
+      </InputGroup>
+      {hasList && (
+        <datalist id={listId}>
+          {suggestions.map((m) => (
+            <option key={m} value={m} />
+          ))}
+        </datalist>
+      )}
+    </div>
+  );
+}
+
 function ModelInputs({
   model,
   chatModel,
@@ -165,37 +243,22 @@ function ModelInputs({
   onModel: (v: string) => void;
   onChatModel: (v: string) => void;
 }) {
-  const listId = useId();
-  const list = suggestions.length ? listId : undefined;
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <label className="text-xs text-text-muted">
-        Ingestion model
-        <Input
-          className="mt-1 font-mono text-xs"
-          list={list}
-          value={model}
-          placeholder={placeholder.model}
-          onChange={(e) => onModel(e.target.value)}
-        />
-      </label>
-      <label className="text-xs text-text-muted">
-        Chat model (needs tools + vision)
-        <Input
-          className="mt-1 font-mono text-xs"
-          list={list}
-          value={chatModel}
-          placeholder={placeholder.chat_model}
-          onChange={(e) => onChatModel(e.target.value)}
-        />
-      </label>
-      {list && (
-        <datalist id={list}>
-          {suggestions.map((m) => (
-            <option key={m} value={m} />
-          ))}
-        </datalist>
-      )}
+      <ModelField
+        label="Ingestion model"
+        value={model}
+        placeholder={placeholder.model}
+        suggestions={suggestions}
+        onChange={onModel}
+      />
+      <ModelField
+        label="Chat model (needs tools + vision)"
+        value={chatModel}
+        placeholder={placeholder.chat_model}
+        suggestions={suggestions}
+        onChange={onChatModel}
+      />
     </div>
   );
 }
@@ -243,7 +306,7 @@ function ProviderRow({
         <span className="font-medium text-text-primary">{providerLabel(entry.provider)}</span>
         <span className="font-mono text-xs text-text-muted">key ••••{entry.key_last4}</span>
         {entry.active ? (
-          <Badge variant="default">Active</Badge>
+          <Badge variant="success">Active</Badge>
         ) : (
           <Badge variant="outline" className="text-text-muted">
             Inactive
