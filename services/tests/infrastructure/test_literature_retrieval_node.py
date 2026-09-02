@@ -96,3 +96,24 @@ async def test_the_user_question_is_what_gets_scored_not_the_models_query():
     await node._rescore("what are known inhibitors of Pks13", [_result("a", "x")])
 
     assert fake.calls == ["what are known inhibitors of Pks13"]
+
+
+async def test_results_beyond_the_rerank_cap_are_kept_and_sort_last():
+    """The tail must survive: dropping it would silently shrink the evidence set.
+
+    It must also never outrank a scored hit — leaving rerank_score None would
+    let assembly fall back to similarity_score (a hardcoded 1.0 for literature).
+    """
+    from infrastructure.chat.nodes.literature_retrieval import _MAX_RERANK_CANDIDATES
+
+    node = LiteratureRetrievalNode.__new__(LiteratureRetrievalNode)
+    node._reranker = _FakeReranker({"body": -3.0})
+
+    results = [_result(f"p{i}", "body") for i in range(_MAX_RERANK_CANDIDATES + 5)]
+    ranked = await node._rescore("some question", results)
+
+    assert len(ranked) == len(results), "no result may be discarded"
+    assert all(r.rerank_score is not None for r in ranked), "None would fall back to 1.0"
+    tail = ranked[-5:]
+    assert all(r.rerank_score == 0.0 for r in tail)
+    assert ranked[0].rerank_score > 0.0

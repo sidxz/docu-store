@@ -33,7 +33,8 @@ log = structlog.get_logger(__name__)
 # path, and ms-marco truncates at 512 tokens anyway.
 _RERANK_TEXT_CHARS = 2000
 # Above this many candidates the CPU cross-encoder costs more than the precision
-# it buys. Europe PMC order is a reasonable prior for the tail.
+# it buys. The tail beyond this cap is kept, in Europe PMC order, below every
+# scored result rather than dropped.
 _MAX_RERANK_CANDIDATES = 200
 
 
@@ -96,12 +97,22 @@ class LiteratureRetrievalNode(AgenticRetrievalNode):
             for i, r in enumerate(candidates)
             if i in by_index
         ]
+
+        # The tail beyond the cap is preserved but never outranks a scored hit.
+        # 0.0 is strictly below every sigmoid output (clamped minimum ~9.4e-14),
+        # and an explicit sentinel is required: leaving rerank_score None would
+        # make ContextAssemblyNode._score fall back to similarity_score, which is
+        # a hardcoded 1.0 for literature and would rank the tail first.
+        ranked.extend(
+            r.model_copy(update={"rerank_score": 0.0})
+            for r in results[_MAX_RERANK_CANDIDATES:]
+        )
         ranked.sort(key=lambda r: r.rerank_score or 0.0, reverse=True)
 
         log.info(
             "literature.reranked",
             candidates=len(candidates),
-            dropped_tail=len(results) - len(candidates),
+            unscored_tail=len(results) - len(candidates),
             top_score=f"{ranked[0].rerank_score:.3f}" if ranked else None,
             bottom_score=f"{ranked[-1].rerank_score:.3f}" if ranked else None,
         )
