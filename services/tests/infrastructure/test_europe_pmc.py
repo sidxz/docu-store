@@ -241,3 +241,39 @@ class TestMarkupStripping:
                 assert "&lt;" not in value and "&gt;" not in value, (
                     f"{hit.external_id} {field} still has entities: {value[:80]}"
                 )
+
+
+RETRACTED_FIXTURE = FIXTURE.parent / "europe_pmc_retracted.json"
+
+
+def _retracted_hit():
+    record = json.loads(RETRACTED_FIXTURE.read_text())["resultList"]["result"][0]
+    return parse_hit(record)
+
+
+def test_retraction_is_parsed_from_a_core_record():
+    hit = _retracted_hit()
+
+    assert hit.is_retracted is True
+    assert "Retracted Publication" in hit.pub_types
+    assert hit.retraction_notice is not None
+    assert "10.7759/cureus.r217" in hit.retraction_notice
+    assert hit.cited_by_count == 3
+
+
+def test_a_retracted_paper_is_never_ingestable_even_under_an_open_licence():
+    """cc by, in EPMC, has a PDF — every existing gate says yes."""
+    hit = _retracted_hit()
+
+    assert hit.licence == "cc by"
+    assert hit.in_epmc and hit.has_pdf
+    assert hit.ingest_blocker() == "retracted publication"
+    assert hit.is_ingestable is False
+
+
+def test_an_ordinary_record_is_unaffected():
+    records = json.loads(FIXTURE.read_text())["resultList"]["result"]
+    hits = [parse_hit(r) for r in records]
+
+    assert all(h.is_retracted is False for h in hits)
+    assert any(h.is_ingestable for h in hits), "the open-licence fixture must still ingest"

@@ -1,0 +1,36 @@
+{
+  "resultList": {
+    "result": [
+      {
+        "id": "40045825",
+        "source": "MED",
+        "pmid": "40045825",
+        "doi": "10.7759/cureus.79000",
+        "title": "Role of T1 Ratio of Marrow in Spinal Tuberculosis.",
+        "abstractText": "A retrospective imaging study of spinal tuberculosis.",
+        "authorString": "Example A, Example B.",
+        "journalInfo": {"journal": {"title": "Cureus"}},
+        "pubYear": "2025",
+        "license": "cc by",
+        "isOpenAccess": "Y",
+        "inEPMC": "Y",
+        "hasPDF": "Y",
+        "citedByCount": 3,
+        "pubTypeList": {
+          "pubType": ["Retracted Publication", "research-article", "Journal Article"]
+        },
+        "commentCorrectionList": {
+          "commentCorrection": [
+            {
+              "id": "41585624",
+              "source": "MED",
+              "reference": "Cureus. 2026 Jan 22;18(1):r217. doi: 10.7759/cureus.r217.",
+              "type": "Retraction in",
+              "orderIn": 1
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

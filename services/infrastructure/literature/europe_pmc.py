@@ -97,6 +97,9 @@ class LiteratureHit:
     is_open_access: bool = False  # for display only -- never the ingest gate
     in_epmc: bool = False
     has_pdf: bool = False
+    pub_types: tuple[str, ...] = ()
+    retraction_notice: str | None = None  # the notice's own citation, when retracted
+    cited_by_count: int = 0
 
     @property
     def url(self) -> str:
@@ -112,6 +115,8 @@ class LiteratureHit:
         different reasons applies: we are not allowed to keep it, or there is
         nothing to fetch.
         """
+        if self.is_retracted:
+            return "retracted publication"
         if self.licence not in INGESTABLE_LICENCES:
             if self.licence:
                 return f"licence {self.licence} does not permit derivative works"
@@ -119,6 +124,10 @@ class LiteratureHit:
         if not (self.in_epmc and self.has_pdf):
             return "no full text available to fetch"
         return None
+
+    @property
+    def is_retracted(self) -> bool:
+        return "retracted publication" in {p.lower() for p in self.pub_types}
 
     @property
     def is_ingestable(self) -> bool:
@@ -167,6 +176,17 @@ def parse_hit(record: dict) -> LiteratureHit:
     journal = (record.get("journalInfo") or {}).get("journal") or {}
     licence = record.get("license")
     year = record.get("pubYear")
+    pub_types = tuple((record.get("pubTypeList") or {}).get("pubType") or ())
+    corrections = (record.get("commentCorrectionList") or {}).get("commentCorrection") or []
+    retraction_notice = next(
+        (
+            c.get("reference")
+            for c in corrections
+            if str(c.get("type", "")).lower().startswith("retraction")
+        ),
+        None,
+    )
+    cited_by = record.get("citedByCount")
     return LiteratureHit(
         external_id=str(record["id"]),
         source=str(record.get("source") or ""),
@@ -182,6 +202,9 @@ def parse_hit(record: dict) -> LiteratureHit:
         is_open_access=_flag(record.get("isOpenAccess")),
         in_epmc=_flag(record.get("inEPMC")),
         has_pdf=_flag(record.get("hasPDF")),
+        pub_types=pub_types,
+        retraction_notice=retraction_notice,
+        cited_by_count=int(cited_by) if isinstance(cited_by, int) else 0,
     )
 
 
