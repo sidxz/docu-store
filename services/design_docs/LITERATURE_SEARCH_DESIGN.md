@@ -20,7 +20,7 @@ components.
 | Coverage | Tier A + B — OA full text where it exists, abstract + DOI link where it does not |
 | Ingest target | User picks per ingest: **Private** (default) or **Workspace** |
 | Retrieval scope | Literature only, plus a DOI dedup check against the existing corpus |
-| Ingest boundary | OA only, enforced server-side |
+| Ingest boundary | Licence-gated, enforced server-side. ND refused |
 
 ## Legal model
 
@@ -48,8 +48,28 @@ polish: without it the tool looks empty on exactly the queries this corpus
 cares about.
 
 Licence split of the OA corpus: CC BY 6.38M, CC BY-NC-ND 1.58M, CC BY-NC 1.12M,
-CC0 69k, CC BY-SA 6.6k, **CC BY-ND 22.6k**. The ND bucket is the one to exclude
-— chunking and embedding are plausibly derivative works.
+CC0 69k, CC BY-SA 6.6k, **CC BY-ND 22.6k**. ND is excluded — chunking and
+embedding are hard to argue are not derivative works, and ~20% of the open
+corpus is not worth the argument.
+
+### `isOpenAccess` is not the gate
+
+Three records from one real query, each breaking the obvious rule:
+
+| Record | `isOpenAccess` | `licence` | Verdict |
+|---|---|---|---|
+| Research Square preprint | N | `cc by` | licence permits; no full text to fetch |
+| Biochemistry 2022 | N (`inEPMC=Y`) | none | free to read, not to mine |
+| ACS Omega 2025 | **Y** | `cc by-nc-nd` | open access, still no derivatives |
+
+So the flag both under- and over-approximates. `licence` decides. Ingestable:
+`cc by`, `cc by-sa`, `cc0`, `cc by-nc`, `cc by-nc-sa`. Everything else is
+link-only, and the refusal lives in the client — a caller that skipped the check
+still cannot pull bytes we may not keep.
+
+Full text is fetched as **PDF, not JATS XML**, though the XML is cleaner and
+eight times smaller: CSER reads structures off rendered page images, which exist
+only in the PDF. Ingesting XML would silently drop compound extraction.
 
 ## The fail-open finding
 
@@ -97,8 +117,9 @@ artifact read model — no new domain event, no aggregate change.
 1. **Provenance** — `source_class` + `license` on the artifact read model, into
    `upsert_metadata`, indexed in Qdrant. Independent of everything else.
 2. **Flag** — `LITERATURE_ENABLED` through config and `/api/config`.
-3. **Client** — `infrastructure/literature/europe_pmc.py`: `search()` and
-   `fetch_oa_fulltext()`, rate-limited, returning `LiteratureHit`.
+3. ~~**Client** — `infrastructure/literature/europe_pmc.py`: `search()` and
+   `fetch_pdf()`, returning `LiteratureHit`.~~ **Done.** No rate limiter: one
+   request per user action. Add one if bulk ingest ever lands.
 4. **Ingest** — `IngestLiteratureUseCase`: dedup on `source_uri`, refuse non-OA,
    hand the stream to the upload saga.
 5. **Tool + mode** — `SearchLiteratureTool`; `ToolRegistry` exposes only it when
