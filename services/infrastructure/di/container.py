@@ -1078,7 +1078,8 @@ def create_container() -> Container:
     # --- Literature Mode (the thinking pipeline, one tool, no corpus) ---
     # Its own registry and retrieval node rather than a mode threaded through
     # four layers: the router already picks agents by mode, and deep_thinking is
-    # the same trick. Built unconditionally; LITERATURE_ENABLED closes the routes.
+    # the same trick. Only reached when LITERATURE_ENABLED is on -- see the router
+    # wiring below.
     literature_retrieval = lambda c: LiteratureRetrievalNode(
         tool_llm=tool_calling_llm,
         tool_registry=ToolRegistry(
@@ -1108,7 +1109,9 @@ def create_container() -> Container:
         quick_agent=quick_agent(c),
         thinking_agent=thinking_agent(c),
         deep_thinking_agent=deep_thinking_agent(c),
-        literature_agent=literature_agent(c),
+        # None when the flag is off: the router then refuses the mode rather
+        # than answering a literature question from the corpus.
+        literature_agent=literature_agent(c) if settings.literature_enabled else None,
         default_mode=settings.chat_default_mode,
     )
 

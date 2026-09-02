@@ -8,7 +8,6 @@ from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.author_mention import AuthorMention
 from domain.value_objects.mime_type import MimeType
 from domain.value_objects.presentation_date import PresentationDate
-from domain.value_objects.source_class import SourceClass
 from domain.value_objects.summary_candidate import SummaryCandidate
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.title_mention import TitleMention
@@ -26,14 +25,10 @@ class CreateArtifactRequest(BaseModel):
     artifact_type: ArtifactType = Field(..., description="Classification type of the artifact")
     mime_type: MimeType = Field(..., description="MIME type of the artifact")
     storage_location: str = Field(..., description="Location where the artifact is stored")
-    source_class: SourceClass = Field(
-        SourceClass.INTERNAL,
-        description="Where the document came from, and so what may be done with it",
-    )
-    licence: str | None = Field(
-        None,
-        description="Licence the document was ingested under, e.g. 'cc by'. Audit trail.",
-    )
+    # source_class and licence are deliberately absent: they say what may be done
+    # with the document, and a caller that can declare its own provenance can label
+    # anything as open literature. They are passed to CreateArtifactUseCase.execute
+    # by the ingest path that established them, never carried on the request body.
 
 
 class ArtifactResponse(BaseModel):

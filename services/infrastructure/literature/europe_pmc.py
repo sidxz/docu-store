@@ -70,6 +70,14 @@ _SOURCE_RE = re.compile(r"^[A-Z]{3}$")
 _EXTERNAL_ID_RE = re.compile(r"^[A-Za-z0-9]{1,32}$")
 
 
+class LiteratureQueryError(Exception):
+    """Europe PMC rejected the query itself.
+
+    Kept apart from an outage because the advice is opposite: an outage should be
+    retried unchanged, a rejected query must be rewritten before it is sent again.
+    """
+
+
 class LiteratureSourceUnavailableError(Exception):
     """Europe PMC could not be reached.
 
@@ -121,7 +129,9 @@ class LiteratureHit:
             if self.licence:
                 return f"licence {self.licence} does not permit derivative works"
             return "no open licence — abstract and link only"
-        if not (self.in_epmc and self.has_pdf):
+        # pmcid included: fetch_pdf formats it into the URL, and without it the
+        # UI offers an Add button that resolves to .../articles/None.
+        if not (self.in_epmc and self.has_pdf and self.pmcid):
             return "no full text available to fetch"
         return None
 
@@ -139,7 +149,15 @@ class LiteratureHit:
 # (`&lt;i&gt;N&lt;/i&gt;`). Both reach the reader as literal angle brackets, and
 # both reach the model as tokens it has to ignore.
 _BLOCK_CLOSE_RE = re.compile(r"(?:</|&lt;/)(?:p|div|sec|title|h[1-6]|li)\s*(?:>|&gt;)", re.IGNORECASE)
-_TAG_RE = re.compile(r"<[a-zA-Z/][^>]*>")
+# A tag is a name followed immediately by `>`, or by attributes containing `=`.
+# Without that second half `MIC <LOD in the resistant strain and IC50 > 5 uM`
+# reads as one tag and everything between the brackets is deleted -- the same
+# failure _ESCAPED_TAG_RE is bounded against, on the raw path.
+_TAG_RE = re.compile(
+    r"</?[a-zA-Z][a-zA-Z0-9-]{0,19}"
+    r"(?:\s+[a-zA-Z-]+=(?:\"[^\"]*\"|'[^']*'))*"
+    r"\s*/?>",
+)
 # Escaped tags only: a tag name must follow the bracket. `&lt; 0.5` and
 # `&lt;10 uM` are comparisons, not markup, and must survive to be unescaped
 # into the operators they are.
@@ -208,6 +226,34 @@ def parse_hit(record: dict) -> LiteratureHit:
     )
 
 
+def hit_payload(hit: LiteratureHit) -> dict:
+    """The wire form of a hit — the REST search and the chat SSE event send this.
+
+    One function rather than two hand-written dicts: they had already drifted,
+    and the REST copy was three fields short of the type the client declares.
+    """
+    return {
+        "external_id": hit.external_id,
+        "source": hit.source,
+        "title": hit.title,
+        "doi": hit.doi,
+        "pmid": hit.pmid,
+        "pmcid": hit.pmcid,
+        "abstract": hit.abstract,
+        "journal": hit.journal,
+        "year": hit.year,
+        "authors": hit.authors,
+        "licence": hit.licence,
+        "is_open_access": hit.is_open_access,
+        "url": hit.url,
+        "is_ingestable": hit.is_ingestable,
+        "ingest_blocker": hit.ingest_blocker(),
+        "is_retracted": hit.is_retracted,
+        "retraction_notice": hit.retraction_notice,
+        "cited_by_count": hit.cited_by_count,
+    }
+
+
 class EuropePmcClient:
     """Read-only client for Europe PMC's public REST API. No key required."""
 
@@ -233,7 +279,8 @@ class EuropePmcClient:
 
         Transient 5xx is retried: EBI drops requests in short bursts, and a
         single-shot client turns that into a silently thin answer. A 4xx is the
-        query's fault and is not retried.
+        query's fault, so it is not retried and raises LiteratureQueryError --
+        reporting it as an outage tells the caller to send it again unchanged.
         """
         params = {
             "query": query,
@@ -247,15 +294,19 @@ class EuropePmcClient:
                 async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as client:
                     response = await client.get(self._search_url, params=params)
                     response.raise_for_status()
-                    results = response.json()["resultList"]["result"]
+                    # Parsed inside the try: a record missing `id` is a malformed
+                    # response, and raising KeyError from the else clause takes it
+                    # past every caller's handler and out as a bare 500.
+                    hits = [parse_hit(r) for r in response.json()["resultList"]["result"]]
             except httpx.HTTPStatusError as exc:
-                last_exc = exc
                 if exc.response.status_code not in _RETRYABLE_STATUS:
-                    break
+                    msg = f"Europe PMC rejected the query ({exc.response.status_code}): {query}"
+                    raise LiteratureQueryError(msg) from exc
+                last_exc = exc
             except Exception as exc:  # timeouts, DNS, malformed JSON
                 last_exc = exc
             else:
-                return [parse_hit(r) for r in results]
+                return hits
 
             if attempt < _MAX_ATTEMPTS - 1:
                 await asyncio.sleep(_RETRY_BACKOFF_SECONDS * (attempt + 1))
@@ -294,8 +345,6 @@ class EuropePmcClient:
                 reason=blocker,
             )
             return None
-
-        import httpx
 
         url = PDF_URL.format(pmcid=hit.pmcid)
         try:

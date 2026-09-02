@@ -36,6 +36,14 @@ _RERANK_TEXT_CHARS = 2000
 # it buys. The tail beyond this cap is kept, in Europe PMC order, below every
 # scored result rather than dropped.
 _MAX_RERANK_CANDIDATES = 200
+# What a hit scores when there is no relevance signal at all — RERANKER_ENABLED
+# off, or no query to score against. It must not be the tool's placeholder 1.0:
+# that puts every abstract in the HIGH tier and pushes avg_relevance_score above
+# chat_verification_relevance_threshold (0.4), which switches the grounding check
+# off silently, on a surface whose answers then look maximally grounded. Below
+# that threshold so verification runs, above _MEDIUM (0.05) so abstracts are not
+# cut to 200 characters.
+_UNSCORED = 0.3
 
 
 def _sigmoid(x: float) -> float:
@@ -88,8 +96,15 @@ class LiteratureRetrievalNode(AgenticRetrievalNode):
         results: list[RetrievalResult],
     ) -> list[RetrievalResult]:
         """Score every hit against the user's question, best first."""
-        if not self._reranker or not results or not question:
+        if not results:
             return results
+        if not self._reranker or not question:
+            log.warning(
+                "literature.rerank.unavailable",
+                reranker=bool(self._reranker),
+                results=len(results),
+            )
+            return [r.model_copy(update={"rerank_score": _UNSCORED}) for r in results]
 
         candidates = results[:_MAX_RERANK_CANDIDATES]
         docs = [

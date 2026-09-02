@@ -39,6 +39,7 @@ from interfaces.api.routes.helpers import (
     _map_app_error_to_http_exception,
     ensure_llm_configured,
     ensure_within_quota,
+    require_literature_enabled,
 )
 from interfaces.api.routes.helpers import get_allowed_artifact_ids as _get_allowed_artifact_ids
 from interfaces.dependencies import get_auth, get_container, llm_user_scope
@@ -103,6 +104,8 @@ async def create_conversation(
     auth: Annotated[RequestAuth, Depends(get_auth)],
 ) -> ConversationDTO:
     """Create a new chat conversation."""
+    if request.surface == ChatSurface.LITERATURE:
+        require_literature_enabled()
     use_case = container[CreateConversationUseCase]
     return await use_case.execute(
         workspace_id=auth.workspace_id,
@@ -273,6 +276,8 @@ async def send_message(
 
     Raises 409 if a response is already being generated for this conversation.
     """
+    if request.mode == "literature":
+        require_literature_enabled()
     await ensure_llm_configured(auth, container)
     await ensure_within_quota(auth, container)
     allowed_artifact_ids = await _get_allowed_artifact_ids(auth)

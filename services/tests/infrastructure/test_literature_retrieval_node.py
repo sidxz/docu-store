@@ -11,10 +11,12 @@ from uuid import uuid4
 
 from application.ports.reranker import RerankResult
 from infrastructure.chat.models import RetrievalResult
+from infrastructure.chat.nodes import literature_retrieval
 from infrastructure.chat.nodes.literature_retrieval import (
     LiteratureRetrievalNode,
     _sigmoid,
 )
+from infrastructure.config import settings
 
 
 def _result(title: str, text: str) -> RetrievalResult:
@@ -77,15 +79,23 @@ async def test_wrong_gene_papers_sort_below_relevant_ones():
     assert all(0.0 < r.rerank_score < 1.0 for r in ranked)
 
 
-async def test_rescore_is_a_no_op_without_a_reranker():
+async def test_without_a_reranker_hits_are_marked_unscored_not_perfect():
+    """RERANKER_ENABLED=false must not read as "every abstract is a 1.0 match".
+
+    The tool stamps a placeholder similarity_score of 1.0, and ContextAssembly
+    falls back to it when rerank_score is None -- putting every result in the
+    HIGH tier and lifting avg_relevance_score above the threshold that decides
+    whether the grounding check runs at all. Order is still Europe PMC's.
+    """
     node = LiteratureRetrievalNode.__new__(LiteratureRetrievalNode)
     node._reranker = None
 
     results = [_result("a", "one"), _result("b", "two")]
     ranked = await node._rescore("q", results)
 
-    assert ranked == results
-    assert all(r.rerank_score is None for r in ranked)
+    assert [r.artifact_title for r in ranked] == [r.artifact_title for r in results]
+    assert all(r.rerank_score == literature_retrieval._UNSCORED for r in ranked)
+    assert literature_retrieval._UNSCORED < settings.chat_verification_relevance_threshold
 
 
 async def test_run_prefers_the_plans_reformulated_query_over_the_raw_question(monkeypatch):
@@ -199,3 +209,60 @@ def test_literature_gets_a_budget_large_enough_to_iterate():
     # clear that with room, or the loop still ends at iteration 0.
     assert node._accumulator_budget >= 500_000
     assert node._accumulator_budget > settings.chat_context_budget_chars * 10
+
+
+class _RecordingLLM:
+    """Stops the loop immediately and keeps the messages it was handed."""
+
+    supports_native_tools = True
+
+    def __init__(self) -> None:
+        self.messages: list[dict] = []
+
+    async def invoke_with_tools(self, messages, tools, system_prompt=None, temperature=None):  # noqa: ANN001, ANN201, ARG002
+        from application.ports.tool_calling_llm import ToolCallResult
+
+        self.messages = messages
+        return ToolCallResult(content="done")
+
+
+class _StubPrompts:
+    async def render_prompt(self, name, **kwargs):  # noqa: ANN001, ANN003, ANN201, ARG002
+        return "system"
+
+
+async def test_the_seed_does_not_call_a_tool_the_literature_registry_lacks():
+    """The inherited auto-seed searches the corpus; literature has no such tool.
+
+    Executing an unregistered name returns the string "Unknown tool:
+    search_documents", which was then interpolated into the model's opening
+    message as its initial search results — a dead seed and an internal error
+    in the prompt, on every literature turn.
+    """
+    from infrastructure.chat.models import QueryPlan
+    from infrastructure.chat.tools.retrieval_tools import ToolRegistry
+
+    llm = _RecordingLLM()
+    node = LiteratureRetrievalNode(
+        tool_llm=llm,
+        tool_registry=ToolRegistry(
+            hierarchical_search=object(),
+            summary_search=object(),
+            page_read_model=object(),
+            literature_client=object(),
+            literature_only=True,
+        ),
+        prompt_repository=_StubPrompts(),
+    )
+    plan = QueryPlan(
+        query_type="factual",
+        reformulated_query="known InhA inhibitors",
+        search_strategy="hybrid",
+        summary="",
+    )
+
+    async for _ in node.run(plan, uuid4(), None, question="known InhA inhibitors"):
+        pass
+
+    assert llm.messages, "the loop must have reached the model"
+    assert "Unknown tool" not in llm.messages[0]["content"]

@@ -18,6 +18,7 @@ from infrastructure.literature import europe_pmc as epmc
 from infrastructure.literature.europe_pmc import (
     EuropePmcClient,
     LiteratureHit,
+    LiteratureQueryError,
     LiteratureSourceUnavailableError,
     parse_hit,
     strip_markup,
@@ -135,8 +136,9 @@ class _FakeResponse:
 class _FakeAsyncClient:
     """Replaces httpx.AsyncClient; yields one queued response per GET."""
 
-    def __init__(self, statuses: list[int]) -> None:
+    def __init__(self, statuses: list[int], payload: dict | None = None) -> None:
         self._statuses = list(statuses)
+        self._payload = payload
         self.calls = 0
 
     def __call__(self, *args, **kwargs):  # noqa: ANN002, ANN003, ANN204
@@ -150,7 +152,7 @@ class _FakeAsyncClient:
 
     async def get(self, *args, **kwargs):  # noqa: ANN002, ANN003, ANN204
         self.calls += 1
-        return _FakeResponse(self._statuses.pop(0))
+        return _FakeResponse(self._statuses.pop(0), self._payload)
 
 
 async def test_transient_5xx_is_retried_then_succeeds(monkeypatch):
@@ -176,15 +178,29 @@ async def test_persistent_5xx_still_raises(monkeypatch):
 
 
 async def test_client_error_is_not_retried(monkeypatch):
-    """A malformed query is 400 — retrying it is pure latency."""
+    """A malformed query is 400 — retrying it is pure latency.
+
+    And it is reported as a query error, not an outage: the outage wording tells
+    the caller to send the same query again, which for a 400 never succeeds.
+    """
     fake = _FakeAsyncClient([400, 200])
+    monkeypatch.setattr(epmc.httpx, "AsyncClient", fake, raising=False)
+    monkeypatch.setattr(epmc, "_RETRY_BACKOFF_SECONDS", 0.0)
+
+    with pytest.raises(LiteratureQueryError):
+        await EuropePmcClient().search_or_raise("TITLE_ABS:test")
+
+    assert fake.calls == 1, "4xx must not be retried"
+
+
+async def test_a_malformed_record_does_not_escape_as_a_bare_key_error(monkeypatch):
+    """A 200 carrying a record without `id` is a bad response, not a crash."""
+    fake = _FakeAsyncClient([200], {"resultList": {"result": [{"source": "MED"}]}})
     monkeypatch.setattr(epmc.httpx, "AsyncClient", fake, raising=False)
     monkeypatch.setattr(epmc, "_RETRY_BACKOFF_SECONDS", 0.0)
 
     with pytest.raises(LiteratureSourceUnavailableError):
         await EuropePmcClient().search_or_raise("TITLE_ABS:test")
-
-    assert fake.calls == 1, "4xx must not be retried"
 
 
 class TestMarkupStripping:

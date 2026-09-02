@@ -14,6 +14,7 @@ from application.use_cases._guards import (
 )
 from domain.aggregates.artifact import Artifact
 from domain.services.artifact_deletion_service import ArtifactDeletionService
+from domain.value_objects.source_class import SourceClass
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -49,7 +50,16 @@ class CreateArtifactUseCase:
         self,
         request: CreateArtifactRequest,
         auth: AuthContext | None = None,
+        *,
+        source_class: SourceClass = SourceClass.INTERNAL,
+        licence: str | None = None,
     ) -> Result[ArtifactResponse, AppError]:
+        """``source_class``/``licence`` are set by the ingest path, not the caller.
+
+        They come from the saga, which got them from the fetch that established
+        them. Defaulting to INTERNAL means an artifact created any other way is
+        labelled as this workspace's own, which is the safe reading.
+        """
         require_editor(auth)
 
         artifact = Artifact.create(
@@ -60,8 +70,8 @@ class CreateArtifactUseCase:
             storage_location=request.storage_location,
             workspace_id=auth.workspace_id if auth else None,
             owner_id=auth.user_id if auth else None,
-            source_class=request.source_class,
-            licence=request.licence,
+            source_class=source_class,
+            licence=licence,
         )
 
         self.artifact_repository.save(artifact)

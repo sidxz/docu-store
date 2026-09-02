@@ -17,6 +17,7 @@ export interface LiteratureHit {
   source: string;
   title: string;
   doi: string | null;
+  pmid: string | null;
   pmcid: string | null;
   abstract: string | null;
   journal: string | null;

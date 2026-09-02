@@ -80,7 +80,7 @@ class LiteratureContextAssemblyNode(ContextAssemblyNode):
 
             idx = len(citations) + 1
             title = r.artifact_title or "Untitled"
-            where = " · ".join(p for p in (r.presentation_date,) if p)
+            where = r.presentation_date or ""
             head = f"[{idx}] (ABSTRACT ONLY — {title}{f', {where}' if where else ''})"
             sections.append(f"{head}\n{display}")
             chars_used += len(display)

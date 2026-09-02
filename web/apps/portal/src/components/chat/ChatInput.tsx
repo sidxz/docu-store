@@ -85,13 +85,13 @@ export function ChatInput({
               {!modeLocked && (
                 <ModeToggle mode={chatMode} onToggle={toggleMode} disabled={disabled} />
               )}
-              {chatMode !== "quick" && (
-                <ReasoningToggle
-                  on={reasoningOn}
-                  onToggle={() => setSynthesisOverride(reasoningOn ? "off" : "on")}
-                  disabled={disabled}
-                />
-              )}
+              {/* Shown in every mode, quick included: reasoning now defaults on
+                  there too, and hiding the toggle left no way to turn it off. */}
+              <ReasoningToggle
+                on={reasoningOn}
+                onToggle={() => setSynthesisOverride(reasoningOn ? "off" : "on")}
+                disabled={disabled}
+              />
             </PromptInputTools>
             {disabled ? (
               <PromptInputSubmit

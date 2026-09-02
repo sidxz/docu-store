@@ -98,10 +98,6 @@ class BatchReEmbedArtifactPagesUseCase:
                 by_page.setdefault(b.source_page_index, []).append(b)
         return by_page
 
-    def _build_page_metadata(self, page: Page, source_class: SourceClass) -> dict:
-        """Build Qdrant payload metadata for a page. See build_page_payload."""
-        return build_page_payload(page, source_class)
-
     async def execute(self, artifact_id: UUID) -> dict:
         """Re-embed all pages of an artifact with full contextual prefixes.
 
@@ -188,7 +184,7 @@ class BatchReEmbedArtifactPagesUseCase:
                     chunk_metadata = [chunk_payload(bc) for bc in bchunks]
                     # Phase D: scope each TABLE chunk's tags to the entities in the
                     # table's own text/caption/section, overriding the page-wide
-                    # union (_build_page_metadata) so a table isn't matched by an
+                    # union (build_page_payload) so a table isn't matched by an
                     # unrelated target mentioned elsewhere on the page.
                     if page.tag_mentions:
                         candidates = [(tm.tag, tm.entity_type) for tm in page.tag_mentions]
@@ -228,7 +224,7 @@ class BatchReEmbedArtifactPagesUseCase:
             page_embeddings = embeddings[embedding_offset : embedding_offset + page_embedding_count]
             embedding_offset += page_embedding_count
 
-            metadata = self._build_page_metadata(page, source_class)
+            metadata = build_page_payload(page, source_class)
 
             # Upsert per-page (sparse_embeddings=None — we skip sparse on re-embed)
             await self.vector_store.upsert_page_chunk_embeddings(

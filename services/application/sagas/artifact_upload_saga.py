@@ -54,11 +54,14 @@ class ArtifactUploadSaga:
             artifact_type=upload_req.artifact_type,
             mime_type=MimeType(blob_response.mime_type),
             storage_location=blob_response.storage_key,
+        )
+
+        artifact_result = await self.create_artifact.execute(
+            create_artifact_request,
+            auth=auth,
             source_class=upload_req.source_class,
             licence=upload_req.licence,
         )
-
-        artifact_result = await self.create_artifact.execute(create_artifact_request, auth=auth)
         if isinstance(artifact_result, Failure):
             return artifact_result
 

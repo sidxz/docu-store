@@ -67,11 +67,6 @@ export function surfaceFromBasePath(basePath: string | undefined): ChatSurface {
   return basePath === "literature" ? "literature" : "research";
 }
 
-/** Same lookup, named for call sites parsing a pathname segment rather than
- *  receiving a `basePath` prop — behaviour is identical. */
-export function surfaceFromSegment(segment: string | undefined): ChatSurface {
-  return surfaceFromBasePath(segment);
-}
 
 /** Builds `/{workspace}/{segment}` or `/{workspace}/{segment}/{conversationId}`. */
 export function conversationHref(

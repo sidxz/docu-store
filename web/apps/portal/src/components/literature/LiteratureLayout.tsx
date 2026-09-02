@@ -51,12 +51,10 @@ export function LiteratureLayout({
         break;
       }
     }
-    // A turn that has just finished streaming is in the store but not yet
-    // refetched; prefer the live pair over an empty fallback.
-    if (results.length === 0) {
-      results = live;
-      sources = liveFinal ?? liveStreaming;
-    }
+    // No live fallback here. streamingConversationId outlives the stream, so a
+    // turn that has just finished still takes the branch above; reaching this
+    // point means the store belongs to a *different* conversation, and reading
+    // it would open the panel on another search's papers and citations.
   }
 
   const showPanel = results.length > 0 && panelOpen;

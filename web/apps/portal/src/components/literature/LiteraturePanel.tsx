@@ -52,7 +52,7 @@ export function LiteraturePanel({
       <header className="flex items-center justify-between border-b border-border-default px-4 py-3">
         <div className="flex items-center gap-2">
           <Library className="h-4 w-4 text-rose-500" />
-          <h2 className="text-sm font-medium text-text-primary">Papers</h2>
+          <h2 className="text-sm font-medium text-text-primary">In the literature</h2>
         </div>
         <button
           type="button"

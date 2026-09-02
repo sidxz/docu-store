@@ -18,7 +18,10 @@ from application.dtos.blob_dtos import UploadBlobRequest
 from application.dtos.errors import AppError
 from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.source_class import SourceClass
-from infrastructure.literature.europe_pmc import LiteratureSourceUnavailableError
+from infrastructure.literature.europe_pmc import (
+    LiteratureQueryError,
+    LiteratureSourceUnavailableError,
+)
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -71,7 +74,7 @@ class IngestLiteratureUseCase:
     ) -> Result[ArtifactResponse, AppError]:
         try:
             hit = await self._client.fetch_one(source, external_id)
-        except LiteratureSourceUnavailableError:
+        except (LiteratureSourceUnavailableError, LiteratureQueryError):
             # Not "no such paper" -- saying that would be a lie the user cannot
             # check, and Europe PMC 503s often enough for it to matter.
             log.warning("literature.source_unavailable", external_id=external_id, exc_info=True)

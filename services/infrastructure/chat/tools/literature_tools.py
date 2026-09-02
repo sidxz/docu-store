@@ -26,7 +26,11 @@ import structlog
 from application.dtos.chat_dtos import AgentEvent
 from application.ports.tool_calling_llm import ToolDefinition
 from infrastructure.chat.models import RetrievalResult
-from infrastructure.literature.europe_pmc import LiteratureSourceUnavailableError
+from infrastructure.literature.europe_pmc import (
+    LiteratureQueryError,
+    LiteratureSourceUnavailableError,
+    hit_payload,
+)
 
 if TYPE_CHECKING:
     from infrastructure.literature.europe_pmc import EuropePmcClient, LiteratureHit
@@ -118,6 +122,9 @@ class SearchLiteratureTool:
 
         try:
             hits = await self._client.search_or_raise(query, limit=limit)
+        except LiteratureQueryError as exc:
+            log.warning("tool.literature.query_rejected", query=query, error=str(exc))
+            return [], _rejected_summary(query, exc), []
         except LiteratureSourceUnavailableError as exc:
             log.warning("tool.literature.source_unavailable", query=query, error=str(exc))
             return [], _outage_summary(query, exc), []
@@ -181,6 +188,21 @@ def _outage_summary(query: str, exc: Exception) -> str:
     )
 
 
+def _rejected_summary(query: str, exc: Exception) -> str:
+    """The opposite advice to _outage_summary, and it has to be said separately.
+
+    A 400 from Europe PMC means the syntax is wrong. Telling the model to send
+    the same query again -- which is what the outage wording does -- burns every
+    remaining iteration on a query that cannot succeed.
+    """
+    return (
+        f"QUERY REJECTED — Europe PMC could not parse `{query}` ({exc}). "
+        "The syntax is wrong, most likely an unbalanced quote or bracket. "
+        "Rewrite the fielded query and search again; do not send this one "
+        "unchanged, and do not fall back to the bare question."
+    )
+
+
 _DETAILED_HITS = 10  # beyond this, titles only: the agentic loop resends this
                      # whole summary every iteration, so the cost is quadratic.
 
@@ -219,26 +241,5 @@ def _hits_event(hits: list[LiteratureHit]) -> AgentEvent:
     """The result cards. Relevance order, untouched — see the module docstring."""
     return AgentEvent(
         type="literature_results",
-        literature_results=[
-            {
-                "external_id": h.external_id,
-                "source": h.source,
-                "title": h.title,
-                "doi": h.doi,
-                "pmcid": h.pmcid,
-                "abstract": h.abstract,
-                "journal": h.journal,
-                "year": h.year,
-                "authors": h.authors,
-                "licence": h.licence,
-                "is_open_access": h.is_open_access,
-                "url": h.url,
-                "is_ingestable": h.is_ingestable,
-                "ingest_blocker": h.ingest_blocker(),
-                "is_retracted": h.is_retracted,
-                "retraction_notice": h.retraction_notice,
-                "cited_by_count": h.cited_by_count,
-            }
-            for h in hits
-        ],
+        literature_results=[hit_payload(h) for h in hits],
     )

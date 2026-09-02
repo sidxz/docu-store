@@ -17,13 +17,14 @@ from application.use_cases.literature_use_cases import (
     IngestLiteratureUseCase,
     SearchLiteratureUseCase,
 )
-from infrastructure.config import settings
+from infrastructure.literature.europe_pmc import LiteratureQueryError, hit_payload
 from interfaces.api.middleware import handle_use_case_errors
 from interfaces.api.routes.helpers import (
     ensure_llm_configured,
     ensure_terms_accepted,
     ensure_within_quota,
     require_action,
+    require_literature_enabled,
 )
 from interfaces.dependencies import get_auth, get_container
 
@@ -54,6 +55,9 @@ class LiteratureHitResponse(BaseModel):
         None,
         description="Why not, in words meant for a reader. None when ingestable.",
     )
+    is_retracted: bool = False
+    retraction_notice: str | None = None
+    cited_by_count: int = 0
 
 
 class IngestLiteratureRequest(BaseModel):
@@ -68,16 +72,9 @@ class IngestLiteratureRequest(BaseModel):
     )
 
 
-def _require_enabled() -> None:
-    if not settings.literature_enabled:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Literature search is not enabled on this deployment",
-        )
-
-
+# No @handle_use_case_errors: that decorator unwraps a returns.Result, and a
+# plain list falls through it into a 500 on every call.
 @router.get("/search", status_code=status.HTTP_200_OK)
-@handle_use_case_errors
 async def search_literature(
     container: Annotated[Container, Depends(get_container)],
     auth: Annotated[RequestAuth, Depends(get_auth)],  # noqa: ARG001 — authenticates the caller; search reads nothing owned by them
@@ -85,29 +82,16 @@ async def search_literature(
     limit: Annotated[int, Query(ge=1, le=100)] = 25,
 ) -> list[LiteratureHitResponse]:
     """Search Europe PMC. Reads nothing from this workspace and writes nothing."""
-    _require_enabled()
+    require_literature_enabled()
     use_case = container[SearchLiteratureUseCase]
-    hits = await use_case.execute(q, limit=limit)
-    return [
-        LiteratureHitResponse(
-            external_id=h.external_id,
-            source=h.source,
-            title=h.title,
-            doi=h.doi,
-            pmid=h.pmid,
-            pmcid=h.pmcid,
-            abstract=h.abstract,
-            journal=h.journal,
-            year=h.year,
-            authors=h.authors,
-            licence=h.licence,
-            is_open_access=h.is_open_access,
-            url=h.url,
-            is_ingestable=h.is_ingestable,
-            ingest_blocker=h.ingest_blocker(),
-        )
-        for h in hits
-    ]
+    try:
+        hits = await use_case.execute(q, limit=limit)
+    except LiteratureQueryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    return [LiteratureHitResponse(**hit_payload(h)) for h in hits]
 
 
 @router.post("/ingest", status_code=status.HTTP_201_CREATED)
@@ -129,7 +113,7 @@ async def ingest_literature(
         409 Conflict: already in this workspace
 
     """
-    _require_enabled()
+    require_literature_enabled()
     await require_action(auth, "artifacts:create")
     await ensure_terms_accepted(auth, container)
     await ensure_llm_configured(auth, container)
