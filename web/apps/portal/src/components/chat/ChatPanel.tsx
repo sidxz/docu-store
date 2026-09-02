@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { MessageSquare, PanelLeftOpen, FileText, Folder } from "lucide-react";
+import { MessageSquare, PanelLeftOpen, FileText, Folder, Library } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MoveToFolderMenu } from "@/components/folders/MoveToFolderMenu";
 import { useFolders } from "@/hooks/use-folders";
@@ -202,10 +202,16 @@ export function ChatPanel({
           </div>
         )}
         <div className="flex-1 flex items-center justify-center">
+          {/* The two surfaces search different corpora — the empty state has to
+              say which, and carry the same icon as its sidebar entry. */}
           <EmptyState
-            icon={MessageSquare}
-            title="Start a conversation"
-            description="Select an existing conversation or start a new one to chat with your documents."
+            icon={surface === "literature" ? Library : MessageSquare}
+            title={surface === "literature" ? "Find relevant papers" : "Start a conversation"}
+            description={
+              surface === "literature"
+                ? "Select an existing search or start a new one to explore published literature."
+                : "Select an existing conversation or start a new one to chat with your documents."
+            }
           />
         </div>
         <ChatInput onSend={handleSend} disabled={createConversation.isPending} onAbort={sendMessage.stop} modeLocked={!!forceMode} placeholder={placeholder} />
