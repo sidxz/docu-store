@@ -35,7 +35,16 @@ _FACTUAL_INDICATORS = re.compile(
 # survive the length filter, leaving the claim counted as uncited. Move such
 # markers back inside the sentence before counting. This normalisation is local
 # to the count: the answer shown to the reader is never altered.
-_TRAILING_CITATION = re.compile(r"([.!?])(\s*(?:\[\d{1,2}(?:\s*,\s*\d{1,2})*\]\s*)+)")
+#
+# Only reattach when the citation genuinely ends a sentence: what follows must be
+# the end of the answer or the start of the next one. Without that guard the
+# pattern also fires on an abbreviation's period ("…, e.g. [1] in DMSO buffer."),
+# dragging the citation backward onto a claim it does not support and
+# manufacturing coverage. A sentence opening with a digit or a lowercase word
+# keeps the old under-count — a conservative failure, and the safe direction.
+_TRAILING_CITATION = re.compile(
+    r"([.!?])\s*((?:\[\d{1,2}(?:\s*,\s*\d{1,2})*\]\s*)+)(?=[A-Z]|$)",
+)
 
 
 def _attach_trailing_citations(answer: str) -> str:

@@ -92,3 +92,28 @@ def test_no_citations_at_all_still_scores_zero():
     assert coverage["ratio"] == 0.0
     assert coverage["cited_sentences"] == 0
     assert coverage["factual_sentences"] == 2
+
+
+def test_a_citation_after_an_abbreviation_does_not_manufacture_coverage():
+    """The period in "e.g." is not a sentence boundary.
+
+    Reattaching across it would bind the citation to a claim it does not
+    support and report the sentence as cited when it is not.
+    """
+    node = _node()
+    answer = "The IC50 was 0.19 uM, e.g. [1] in DMSO buffer."
+
+    assert node._compute_citation_coverage(answer)["ratio"] == 0.0
+
+
+def test_an_abbreviation_before_a_real_sentence_end_is_left_alone():
+    node = _node()
+    answer = "See Fig. 3. [2] for the dose curve; the compound showed activity."
+
+    assert node._compute_citation_coverage(answer)["ratio"] == 1.0
+
+
+def test_a_markdown_header_after_a_citation_is_not_pulled_in():
+    answer = "The yield was measured at 82%. [3]\n\n## Next section"
+
+    assert "## Next section" in _attach_trailing_citations(answer)
