@@ -1,3 +1,4 @@
+import contextlib
 from uuid import UUID
 
 import structlog
@@ -25,6 +26,7 @@ from application.ports.text_chunker import TextChunker
 from application.ports.vector_store import VectorStore
 from domain.exceptions import AggregateNotFoundError
 from domain.value_objects.embedding_metadata import EmbeddingMetadata, EmbeddingType
+from domain.value_objects.source_class import SourceClass
 from infrastructure.text_chunkers.block_aware_chunker import (
     chunk_blocks,
     chunk_payload,
@@ -212,16 +214,23 @@ class GeneratePageEmbeddingUseCase:
             #    Raw chunk text is used for sparse (exact-term) and display.
             #    Contextual text (with doc title, tags, summary prefix) is used for dense embedding.
 
+            # Loaded once for two consumers: the context prefix below, and the
+            # provenance that goes into the Qdrant payload. Hoisted out of the
+            # enrichment branch because the payload needs it either way -- which
+            # costs one aggregate read per page only when enrichment is off.
+            artifact = None
+            if self.artifact_repository:
+                with contextlib.suppress(AggregateNotFoundError):
+                    artifact = self.artifact_repository.get_by_id(page.artifact_id)
+
             context_prefix = ""
 
             if self.artifact_repository and _settings.embedding_enable_context_enrichment:
-                artifact_title = None
-                try:
-                    artifact = self.artifact_repository.get_by_id(page.artifact_id)
-                    if artifact.title_mention:
-                        artifact_title = artifact.title_mention.title
-                except AggregateNotFoundError:
-                    pass
+                artifact_title = (
+                    artifact.title_mention.title
+                    if artifact is not None and artifact.title_mention
+                    else None
+                )
 
                 tags = [tm.tag for tm in page.tag_mentions] if page.tag_mentions else None
                 summary = page.summary_candidate.summary if page.summary_candidate else None
@@ -264,6 +273,13 @@ class GeneratePageEmbeddingUseCase:
             upsert_metadata: dict = {}
             if page.workspace_id:
                 upsert_metadata["workspace_id"] = str(page.workspace_id)
+
+            # Provenance, always written so the field is filterable rather than
+            # merely usually present. A page whose artifact will not load is one
+            # of ours: literature ingest writes the class at creation time.
+            upsert_metadata["source_class"] = str(
+                artifact.source_class if artifact is not None else SourceClass.INTERNAL,
+            )
 
             # Include tag metadata for filtered search
             if page.tag_mentions:

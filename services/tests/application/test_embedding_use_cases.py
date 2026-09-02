@@ -14,12 +14,17 @@ from application.use_cases.embedding_use_cases import (
     GeneratePageEmbeddingUseCase,
     SearchSimilarPagesUseCase,
 )
+from domain.aggregates.artifact import Artifact
 from domain.aggregates.page import Page
+from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.embedding_metadata import EmbeddingMetadata
+from domain.value_objects.mime_type import MimeType
+from domain.value_objects.source_class import SourceClass
 from domain.value_objects.tag_mention import TagMention
 from domain.value_objects.text_mention import TextMention
 from tests.mocks import (
     MockArtifactReadModel,
+    MockArtifactRepository,
     MockEmbeddingGenerator,
     MockPageReadModel,
     MockPageRepository,
@@ -432,3 +437,76 @@ class TestRerankDocText:
         from application.use_cases.embedding_use_cases import _rerank_doc_text
         assert _rerank_doc_text("body", None) == "body"
         assert _rerank_doc_text("body", {}) == "body"
+
+
+class TestProvenanceInThePayload:
+    """`source_class` is what survives a permission-service outage.
+
+    Entity ACLs run through an artifact allowlist that degrades to workspace-wide
+    when Duar is unreachable. A payload field is evaluated inside Qdrant, so it is
+    the one control on retrieved content that cannot fail open the same way --
+    which only holds if it is written on every point, not merely on most of them.
+    """
+
+    async def _payload_for(self, source_class: SourceClass | None) -> dict:
+        """Embed one page and return the payload metadata Qdrant was handed.
+
+        ``None`` stands for the artifact having gone missing between page write
+        and embedding.
+        """
+        artifact_repo = MockArtifactRepository()
+        artifact_id = uuid4()
+        if source_class is not None:
+            artifact = Artifact.create(
+                source_uri="https://doi.org/10.1021/acs.jmedchem.5c02409",
+                source_filename="paper.pdf",
+                artifact_type=ArtifactType.RESEARCH_ARTICLE,
+                mime_type=MimeType.PDF,
+                storage_location="/storage/paper.pdf",
+                source_class=source_class,
+            )
+            artifact_id = artifact.id
+            artifact_repo.artifacts[artifact.id] = artifact
+
+        page = Page.create(name="Test Page", artifact_id=artifact_id, index=0)
+        page.update_text_mention(TextMention(text="A" * 200))
+        page_repo = MockPageRepository()
+        page_repo.pages[page.id] = page
+
+        vector_store = MockVectorStore()
+        use_case = GeneratePageEmbeddingUseCase(
+            page_repo,
+            MockEmbeddingGenerator(),
+            vector_store,
+            MockTextChunker(num_chunks=2),
+            artifact_repository=artifact_repo,
+        )
+        result = await use_case.execute(page.id)
+        assert isinstance(result, Success)
+        return vector_store.upsert_chunk_calls[0]["metadata"]
+
+    async def test_ingested_literature_is_marked_as_such(self) -> None:
+        payload = await self._payload_for(SourceClass.LITERATURE_OA)
+        assert payload["source_class"] == SourceClass.LITERATURE_OA
+
+    async def test_uploads_are_marked_internal(self) -> None:
+        payload = await self._payload_for(SourceClass.INTERNAL)
+        assert payload["source_class"] == SourceClass.INTERNAL
+
+    async def test_an_unloadable_artifact_still_writes_a_class(self) -> None:
+        # Never leave the field absent: a point carrying no source_class matches
+        # no provenance filter, so it drops silently out of every filtered search
+        # rather than failing loudly.
+        payload = await self._payload_for(None)
+        assert payload["source_class"] == SourceClass.INTERNAL
+
+    def test_artifacts_default_to_internal_without_being_told(self) -> None:
+        artifact = Artifact.create(
+            source_uri=None,
+            source_filename="upload.pdf",
+            artifact_type=ArtifactType.RESEARCH_ARTICLE,
+            mime_type=MimeType.PDF,
+            storage_location="/storage/upload.pdf",
+        )
+        assert artifact.source_class == SourceClass.INTERNAL
+        assert artifact.licence is None
