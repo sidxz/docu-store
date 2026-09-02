@@ -11,11 +11,14 @@ import json
 import re
 from pathlib import Path
 
+import httpx
 import pytest
 
+from infrastructure.literature import europe_pmc as epmc
 from infrastructure.literature.europe_pmc import (
     EuropePmcClient,
     LiteratureHit,
+    LiteratureSourceUnavailableError,
     parse_hit,
     strip_markup,
 )
@@ -107,6 +110,80 @@ async def test_search_returns_empty_when_europe_pmc_is_unreachable():
     # leave the chat able to say so, not error the turn.
     client = EuropePmcClient(search_url="http://127.0.0.1:9/search")
     assert await client.search("InhA") == []
+
+
+class _FakeResponse:
+    """Enough of httpx.Response for search_or_raise."""
+
+    def __init__(self, status_code: int, payload: dict | None = None) -> None:
+        self.status_code = status_code
+        self._payload = payload or {"resultList": {"result": []}}
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise httpx.HTTPStatusError(
+                f"Server error '{self.status_code}'",
+                request=httpx.Request("GET", "http://test"),
+                response=httpx.Response(self.status_code),
+            )
+
+    def json(self) -> dict:
+        return self._payload
+
+
+class _FakeAsyncClient:
+    """Replaces httpx.AsyncClient; yields one queued response per GET."""
+
+    def __init__(self, statuses: list[int]) -> None:
+        self._statuses = list(statuses)
+        self.calls = 0
+
+    def __call__(self, *args, **kwargs):  # noqa: ANN002, ANN003, ANN204
+        return self
+
+    async def __aenter__(self):  # noqa: ANN204
+        return self
+
+    async def __aexit__(self, *exc):  # noqa: ANN002, ANN204
+        return False
+
+    async def get(self, *args, **kwargs):  # noqa: ANN002, ANN003, ANN204
+        self.calls += 1
+        return _FakeResponse(self._statuses.pop(0))
+
+
+async def test_transient_5xx_is_retried_then_succeeds(monkeypatch):
+    fake = _FakeAsyncClient([503, 502, 200])
+    monkeypatch.setattr(epmc.httpx, "AsyncClient", fake, raising=False)
+    monkeypatch.setattr(epmc, "_RETRY_BACKOFF_SECONDS", 0.0)
+
+    hits = await EuropePmcClient().search_or_raise("TITLE_ABS:test")
+
+    assert hits == []
+    assert fake.calls == 3, "should have retried twice before succeeding"
+
+
+async def test_persistent_5xx_still_raises(monkeypatch):
+    fake = _FakeAsyncClient([503, 503, 503])
+    monkeypatch.setattr(epmc.httpx, "AsyncClient", fake, raising=False)
+    monkeypatch.setattr(epmc, "_RETRY_BACKOFF_SECONDS", 0.0)
+
+    with pytest.raises(LiteratureSourceUnavailableError):
+        await EuropePmcClient().search_or_raise("TITLE_ABS:test")
+
+    assert fake.calls == 3, "should stop after _MAX_ATTEMPTS"
+
+
+async def test_client_error_is_not_retried(monkeypatch):
+    """A malformed query is 400 — retrying it is pure latency."""
+    fake = _FakeAsyncClient([400, 200])
+    monkeypatch.setattr(epmc.httpx, "AsyncClient", fake, raising=False)
+    monkeypatch.setattr(epmc, "_RETRY_BACKOFF_SECONDS", 0.0)
+
+    with pytest.raises(LiteratureSourceUnavailableError):
+        await EuropePmcClient().search_or_raise("TITLE_ABS:test")
+
+    assert fake.calls == 1, "4xx must not be retried"
 
 
 class TestMarkupStripping:

@@ -35,10 +35,12 @@ is. Restrict to ``TITLE_ABS:`` to compare like with like.
 
 from __future__ import annotations
 
+import asyncio
 import re
 from dataclasses import dataclass
 from html import unescape
 
+import httpx
 import structlog
 
 logger = structlog.get_logger()
@@ -49,6 +51,11 @@ ARTICLE_URL = "https://europepmc.org/article/{source}/{external_id}"
 
 _TIMEOUT_SECONDS = 30.0
 _PDF_TIMEOUT_SECONDS = 120.0  # a rendered paper runs to a few MB
+_MAX_ATTEMPTS = 3
+_RETRY_BACKOFF_SECONDS = 1.0
+# EBI returns 502/503/504 in short bursts several times an hour. Measured
+# 2026-09-02: a plain curl needed four attempts over ~6s to get a 200.
+_RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
 
 # Licences under which we may keep and chunk the full text. Everything else --
 # ND variants, and the far larger set carrying no licence at all -- is link-only.
@@ -199,24 +206,39 @@ class EuropePmcClient:
             return []
 
     async def search_or_raise(self, query: str, *, limit: int = 25) -> list[LiteratureHit]:
-        """As :meth:`search`, but an unreachable source raises."""
-        import httpx
+        """As :meth:`search`, but an unreachable source raises.
 
+        Transient 5xx is retried: EBI drops requests in short bursts, and a
+        single-shot client turns that into a silently thin answer. A 4xx is the
+        query's fault and is not retried.
+        """
         params = {
             "query": query,
             "format": "json",
             "resultType": "core",  # the only resultType carrying licence + abstract
             "pageSize": str(min(limit, 100)),
         }
-        try:
-            async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as client:
-                response = await client.get(self._search_url, params=params)
-                response.raise_for_status()
-                results = response.json()["resultList"]["result"]
-        except Exception as exc:
-            msg = f"Europe PMC is unreachable: {exc}"
-            raise LiteratureSourceUnavailableError(msg) from exc
-        return [parse_hit(r) for r in results]
+        last_exc: Exception | None = None
+        for attempt in range(_MAX_ATTEMPTS):
+            try:
+                async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as client:
+                    response = await client.get(self._search_url, params=params)
+                    response.raise_for_status()
+                    results = response.json()["resultList"]["result"]
+            except httpx.HTTPStatusError as exc:
+                last_exc = exc
+                if exc.response.status_code not in _RETRYABLE_STATUS:
+                    break
+            except Exception as exc:  # noqa: BLE001 — timeouts, DNS, malformed JSON
+                last_exc = exc
+            else:
+                return [parse_hit(r) for r in results]
+
+            if attempt < _MAX_ATTEMPTS - 1:
+                await asyncio.sleep(_RETRY_BACKOFF_SECONDS * (attempt + 1))
+
+        msg = f"Europe PMC is unreachable: {last_exc}"
+        raise LiteratureSourceUnavailableError(msg) from last_exc
 
     async def fetch_one(self, source: str, external_id: str) -> LiteratureHit | None:
         """One record by its Europe PMC identity, or None if there is no such record.
