@@ -15,7 +15,7 @@ import pytest
 
 from infrastructure.chat.tools.literature_tools import SearchLiteratureTool
 from infrastructure.chat.tools.retrieval_tools import ToolRegistry
-from infrastructure.literature.europe_pmc import LiteratureHit, parse_hit
+from infrastructure.literature.europe_pmc import LiteratureHit, LiteratureSourceUnavailableError, parse_hit
 
 FIXTURE = Path(__file__).parent.parent / "fixtures" / "europe_pmc_search_core.json"
 
@@ -27,12 +27,15 @@ def hits() -> list[LiteratureHit]:
 
 
 class FakeClient:
-    def __init__(self, hits: list[LiteratureHit]) -> None:
+    def __init__(self, hits: list[LiteratureHit], raises: Exception | None = None) -> None:
         self._hits = hits
+        self._raises = raises
         self.queries: list[str] = []
 
-    async def search(self, query: str, *, limit: int = 25) -> list[LiteratureHit]:
+    async def search_or_raise(self, query: str, *, limit: int = 25) -> list[LiteratureHit]:
         self.queries.append(query)
+        if self._raises is not None:
+            raise self._raises
         return self._hits[:limit]
 
 
@@ -94,6 +97,35 @@ async def test_the_tool_description_teaches_the_syntax_that_matters():
     description = SearchLiteratureTool(FakeClient([])).definition.description
     assert "TITLE_ABS" in description
     assert "ABSTRACTS only" in description
+
+
+async def test_outage_is_not_reported_as_an_empty_result(hits):
+    client = FakeClient(hits, raises=LiteratureSourceUnavailableError("502 Bad Gateway"))
+
+    results, summary, events = await _run(client, query='TITLE_ABS:"Pks13"')
+
+    assert results == []
+    assert events == [], "a failed search must not render a results panel"
+    low = summary.lower()
+    assert "unreachable" in low or "unavailable" in low
+    assert "do not broaden" in low, "the model must be told not to loosen the query"
+    assert "no europe pmc results" not in low, "must not read as an empty result"
+
+
+async def test_genuinely_empty_result_still_reads_as_empty(hits):
+    results, summary, events = await _run(FakeClient([]), query='TITLE_ABS:"Zzyzx"')
+
+    assert results == []
+    assert "No Europe PMC results" in summary
+    assert "unreachable" not in summary.lower()
+
+
+def test_tool_description_teaches_pub_type_and_scopes_the_bare_retry():
+    from infrastructure.chat.tools.literature_tools import SEARCH_LITERATURE_DEF
+
+    desc = SEARCH_LITERATURE_DEF.description
+    assert "PUB_TYPE" in desc
+    assert "unreachable" in desc, "the bare-terms retry must be scoped to real empties"
 
 
 class TestLiteratureRegistryIsExclusive:

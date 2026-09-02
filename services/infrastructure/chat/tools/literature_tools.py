@@ -26,6 +26,7 @@ import structlog
 from application.dtos.chat_dtos import AgentEvent
 from application.ports.tool_calling_llm import ToolDefinition
 from infrastructure.chat.models import RetrievalResult
+from infrastructure.literature.europe_pmc import LiteratureSourceUnavailableError
 
 if TYPE_CHECKING:
     from infrastructure.literature.europe_pmc import EuropePmcClient, LiteratureHit
@@ -44,13 +45,17 @@ SEARCH_LITERATURE_DEF = ToolDefinition(
         '  TITLE_ABS:"term"     match title or abstract — prefer this for entities\n'
         "  AND / OR / NOT       combine\n"
         "  PUB_YEAR:[2020 TO 2026]\n"
-        '  AUTH:"Surname I"\n\n'
+        '  AUTH:"Surname I"\n'
+        '  PUB_TYPE:"Retracted Publication"   also "Review", "Clinical Trial"\n\n'
         "Examples:\n"
         '  known inhibitors of Pks13  ->  TITLE_ABS:"Pks13" AND TITLE_ABS:"inhibitor"\n'
         '  recent InhA SAR work       ->  TITLE_ABS:"InhA" AND PUB_YEAR:[2022 TO 2026]\n'
         '  benzothiazinones for TB    ->  TITLE_ABS:"benzothiazinone" AND '
         'TITLE_ABS:"tuberculosis"\n\n'
-        "If a fielded query returns nothing, retry once with the bare terms.\n\n"
+        "If a fielded query genuinely returns 0 results, retry once with the bare "
+        "terms. If it returns SEARCH FAILED — Europe PMC unreachable — that is an "
+        "outage, not an empty result: retry the same fielded query, never a "
+        "broader one.\n\n"
         "You see titles and ABSTRACTS only, never full text. Say what the abstracts "
         "support and no more. Many results will be paywalled; report them anyway — "
         "they are usually the most relevant, and the user can still read them at the "
@@ -111,7 +116,11 @@ class SearchLiteratureTool:
         if not query:
             return [], "search_literature needs a query.", []
 
-        hits = await self._client.search(query, limit=limit)
+        try:
+            hits = await self._client.search_or_raise(query, limit=limit)
+        except LiteratureSourceUnavailableError as exc:
+            log.warning("tool.literature.source_unavailable", query=query, error=str(exc))
+            return [], _outage_summary(query, exc), []
         if not hits:
             return [], f"No Europe PMC results for: {query}", []
 
@@ -139,6 +148,24 @@ class SearchLiteratureTool:
             ingestable=ingestable,
         )
         return results, _summarise(hits, query, ingestable), [_hits_event(hits)]
+
+
+def _outage_summary(query: str, exc: Exception) -> str:
+    """What the model reads when the source is down, not empty.
+
+    The two cases are indistinguishable if both say "nothing came back", and the
+    tool description tells the model to broaden on nothing. Broadening drops the
+    fielded query for a bare one, which matches full text and so returns whatever
+    is open rather than whatever is relevant.
+    """
+    return (
+        f"SEARCH FAILED — Europe PMC is unreachable ({exc}). "
+        f"The query `{query}` was NOT evaluated. This is a source outage, not an "
+        "empty result. Do not broaden the query and do not drop the fielded "
+        "syntax; the same query may work on a later attempt. If every search in "
+        "this turn fails, tell the user that the literature source is currently "
+        "unavailable and do not answer from your own knowledge."
+    )
 
 
 def _summarise(hits: list[LiteratureHit], query: str, ingestable: int) -> str:
