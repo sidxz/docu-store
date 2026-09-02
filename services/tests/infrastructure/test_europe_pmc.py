@@ -8,6 +8,7 @@ is not the ingest gate; the licence is.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,7 @@ from infrastructure.literature.europe_pmc import (
     EuropePmcClient,
     LiteratureHit,
     parse_hit,
+    strip_markup,
 )
 
 FIXTURE = Path(__file__).parent.parent / "fixtures" / "europe_pmc_search_core.json"
@@ -105,3 +107,60 @@ async def test_search_returns_empty_when_europe_pmc_is_unreachable():
     # leave the chat able to say so, not error the turn.
     client = EuropePmcClient(search_url="http://127.0.0.1:9/search")
     assert await client.search("InhA") == []
+
+
+class TestMarkupStripping:
+    """Europe PMC returns JATS markup inside titles and abstracts.
+
+    It arrives in both forms -- raw `<i>` and escaped `&lt;i&gt;` -- and both
+    reach the reader as literal angle brackets and the model as tokens to
+    ignore.
+    """
+
+    def test_both_forms_of_markup_are_removed(self):
+        assert strip_markup("<i>Mycobacterium tuberculosis</i> Pks13") == (
+            "Mycobacterium tuberculosis Pks13"
+        )
+        assert strip_markup("&lt;i&gt;N&lt;/i&gt;-(Arylcarbamothioyl)benzamides") == (
+            "N-(Arylcarbamothioyl)benzamides"
+        )
+
+    def test_block_boundaries_do_not_close_up(self):
+        # Without a separator this reads "BackgroundTuberculosis", which is
+        # worse than the tag was.
+        assert strip_markup("<h4>Background</h4>Tuberculosis remains") == (
+            "Background Tuberculosis remains"
+        )
+
+    def test_comparisons_survive_being_mistaken_for_tags(self):
+        """The reason entities are unescaped last rather than first.
+
+        Unescape first and `IC50 &gt; 100` becomes `IC50 > 100`, after which the
+        tag pattern happily eats from a later `<` all the way to that `>` --
+        deleting real text, silently, in exactly the potency figures this corpus
+        exists to read.
+        """
+        assert strip_markup("MIC &gt; 100 uM and IC50 &lt; 0.5 uM") == (
+            "MIC > 100 uM and IC50 < 0.5 uM"
+        )
+        assert strip_markup("hERG IC50 &lt;10 uM") == "hERG IC50 <10 uM"
+
+    def test_subscripts_close_up_because_they_are_one_token(self):
+        assert strip_markup("IC&lt;sub&gt;50&lt;/sub&gt; of 0.32") == "IC50 of 0.32"
+
+    def test_empty_and_missing_stay_none(self):
+        assert strip_markup(None) is None
+        assert strip_markup("   ") is None
+        assert strip_markup("<p></p>") is None
+
+    def test_no_markup_survives_the_real_fixture(self, hits):
+        for hit in hits.values():
+            for field, value in (("title", hit.title), ("abstract", hit.abstract)):
+                if not value:
+                    continue
+                assert "<" not in value or not re.search(r"<[a-zA-Z/]", value), (
+                    f"{hit.external_id} {field} still has a tag: {value[:80]}"
+                )
+                assert "&lt;" not in value and "&gt;" not in value, (
+                    f"{hit.external_id} {field} still has entities: {value[:80]}"
+                )

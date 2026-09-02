@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from html import unescape
 
 import structlog
 
@@ -117,6 +118,38 @@ class LiteratureHit:
         return self.ingest_blocker() is None
 
 
+# Europe PMC returns JATS markup inside titles and abstracts, in both forms:
+# raw (`<i>Mycobacterium tuberculosis</i>`, `<h4>Background</h4>`) and escaped
+# (`&lt;i&gt;N&lt;/i&gt;`). Both reach the reader as literal angle brackets, and
+# both reach the model as tokens it has to ignore.
+_BLOCK_CLOSE_RE = re.compile(r"(?:</|&lt;/)(?:p|div|sec|title|h[1-6]|li)\s*(?:>|&gt;)", re.IGNORECASE)
+_TAG_RE = re.compile(r"<[a-zA-Z/][^>]*>")
+# Escaped tags only: a tag name must follow the bracket. `&lt; 0.5` and
+# `&lt;10 uM` are comparisons, not markup, and must survive to be unescaped
+# into the operators they are.
+_ESCAPED_TAG_RE = re.compile(r"&lt;/?[a-zA-Z][^&]{0,40}?&gt;")
+_WHITESPACE_RE = re.compile(r"\s+")
+
+
+def strip_markup(value: str | None) -> str | None:
+    """Plain text from a JATS-marked field.
+
+    Order matters. Tags are removed while they are still recognisable as tags,
+    and entities are unescaped only afterwards -- unescaping first would turn
+    `IC50 &gt; 100` into `IC50 > 100` and then let the tag pattern eat from the
+    `<` of a later comparison to that `>`, silently deleting real text.
+    """
+    if not value:
+        return None
+    # Block boundaries carry meaning: without this, "<h4>Background</h4>Tuberculosis"
+    # closes up into "BackgroundTuberculosis".
+    text = _BLOCK_CLOSE_RE.sub(" ", value)
+    text = _TAG_RE.sub("", text)
+    text = _ESCAPED_TAG_RE.sub("", text)
+    text = unescape(text)
+    return _WHITESPACE_RE.sub(" ", text).strip() or None
+
+
 def _flag(value: object) -> bool:
     """Europe PMC spells its booleans ``"Y"``/``"N"``."""
     return str(value).strip().upper() == "Y"
@@ -130,12 +163,12 @@ def parse_hit(record: dict) -> LiteratureHit:
     return LiteratureHit(
         external_id=str(record["id"]),
         source=str(record.get("source") or ""),
-        title=str(record.get("title") or "").strip(),
+        title=strip_markup(record.get("title")) or "",
         doi=record.get("doi"),
         pmid=record.get("pmid"),
         pmcid=record.get("pmcid"),
-        abstract=record.get("abstractText"),
-        journal=journal.get("title"),
+        abstract=strip_markup(record.get("abstractText")),
+        journal=strip_markup(journal.get("title")),
         year=int(year) if year and str(year).isdigit() else None,
         authors=record.get("authorString"),
         licence=licence.strip().lower() if licence else None,
