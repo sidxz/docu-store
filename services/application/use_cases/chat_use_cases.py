@@ -48,6 +48,26 @@ if TYPE_CHECKING:
 log = structlog.get_logger(__name__)
 
 
+def carried_forward_citations(
+    history: list[ChatMessageDTO],
+) -> list[SourceCitationDTO] | None:
+    """Citations the agent should carry into the next turn: the sources of the
+    most recent *grounded* assistant message, or None.
+
+    Shared with the evaluation harness so a benchmark run cannot silently
+    differ from production on which citations get seeded into retrieval.
+    """
+    for msg in reversed(history):
+        if (
+            msg.role == "assistant"
+            and msg.sources
+            and msg.query_context is not None
+            and msg.query_context.grounded
+        ):
+            return msg.sources
+    return None
+
+
 class CreateConversationUseCase:
     """Create a new chat conversation."""
 
@@ -383,16 +403,7 @@ class SendMessageUseCase:
             history = await self._repo.get_recent_messages(conversation_id, limit=10)
 
             # Extract previous citations from last grounded assistant message
-            previous_citations: list[SourceCitationDTO] | None = None
-            for msg in reversed(history):
-                if (
-                    msg.role == "assistant"
-                    and msg.sources
-                    and msg.query_context is not None
-                    and msg.query_context.grounded
-                ):
-                    previous_citations = msg.sources
-                    break
+            previous_citations = carried_forward_citations(history)
 
             log.info(
                 "chat.send_message.context",

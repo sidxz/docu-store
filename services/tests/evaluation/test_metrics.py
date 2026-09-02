@@ -144,3 +144,54 @@ class TestAggregation:
 
     def test_aggregate_empty(self):
         assert aggregate_metrics([]) == {}
+
+
+from evaluation.eval_harness import QueryResult, _compute_query_metrics
+from evaluation.query_set import EvalQuery, GoldAnswer
+
+
+def _abstain_query() -> EvalQuery:
+    return EvalQuery(
+        query_id="DECK-X-q1",
+        query_text="Do we have anything on CHEMBL999999?",
+        query_type="factual_single",
+        gold_answer=GoldAnswer(kind="abstain"),
+    )
+
+
+def test_retrieval_metrics_omitted_when_no_gold_documents():
+    result = QueryResult()
+    result.answer = "That is not in the corpus."
+    result.retrieved_artifact_ids = [uuid4(), uuid4()]
+
+    metrics = _compute_query_metrics(_abstain_query(), result)
+
+    for key in (
+        "precision_at_5",
+        "precision_at_10",
+        "recall_at_10",
+        "recall_at_20",
+        "ndcg_at_10",
+        "context_pollution_rate",
+    ):
+        assert key not in metrics, f"{key} is undefined with no gold, must be omitted"
+    assert "abstained" in metrics, "answer scoring must still run"
+
+
+def test_aggregate_metrics_averages_only_present_values():
+    rows = [
+        {"success": 1.0, "value_match": 1.0},
+        {"success": 0.0},
+        {"success": 1.0},
+        {"success": 1.0},
+    ]
+    agg = aggregate_metrics(rows)
+
+    assert agg["success"] == 0.75
+    # value_match is defined for one query and it passed. Averaging it over
+    # four would report 0.25 for a metric that was never 0.25 for anything.
+    assert agg["value_match"] == 1.0
+
+
+def test_aggregate_metrics_drops_a_key_no_row_defines():
+    assert "value_match" not in aggregate_metrics([{"success": 1.0}])
