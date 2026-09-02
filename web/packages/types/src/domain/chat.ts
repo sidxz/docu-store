@@ -19,6 +19,25 @@ export interface SourceCitation {
   citation_index: number;
 }
 
+// --- Retrieval filters ---
+
+/** One NER tag the planner ended up filtering retrieval by. */
+export interface NerFilterTag {
+  entity_text: string;
+  entity_type: string;
+}
+
+/** Planning output kept on the assistant message. `ner_entities` is the running
+ *  filter list after accumulation and drops — what retrieval actually ran with,
+ *  not everything NER found. */
+export interface QueryContext {
+  ner_entities: NerFilterTag[];
+  authors: string[];
+  query_type: string;
+  reformulated_query: string;
+  grounded: boolean;
+}
+
 // --- Structured content blocks ---
 
 export interface ContentBlock {
@@ -96,6 +115,7 @@ export interface ChatMessage {
   sources: SourceCitation[];
   agent_trace: AgentTrace | null;
   token_usage: TokenUsage | null;
+  query_context?: QueryContext | null;
   created_at: string;
 }
 
@@ -158,6 +178,7 @@ export interface AgentEvent {
     | "reasoning_token"
     | "structured_block"
     | "grounding_result"
+    | "query_context"
     | "done"
     | "error";
   step?: string;
@@ -176,6 +197,7 @@ export interface AgentEvent {
   error_message?: string;
   grounding_is_grounded?: boolean;
   grounding_confidence?: number;
+  query_context_entities?: NerFilterTag[];
 }
 
 export interface GroundingStatus {

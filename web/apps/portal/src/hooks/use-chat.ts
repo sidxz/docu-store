@@ -14,6 +14,7 @@ import type {
   AgentStep,
   ContentBlock,
   GroundingStatus,
+  NerFilterTag,
   SourceCitation,
   ThinkingBlock,
 } from "@docu-store/types";
@@ -286,6 +287,7 @@ interface ChatStoreActions {
   setSources: (sources: SourceCitation[]) => void;
   setFinalSources: (sources: SourceCitation[]) => void;
   setGroundingResult: (result: GroundingStatus) => void;
+  setQueryFilters: (filters: NerFilterTag[]) => void;
   recordEvent: (event: AgentEvent) => void;
   setDoneEvent: (event: AgentEvent) => void;
 }
@@ -406,6 +408,10 @@ function handleAgentEvent(
           confidence: event.grounding_confidence,
         });
       }
+      break;
+
+    case "query_context":
+      store.setQueryFilters(event.query_context_entities ?? []);
       break;
 
     case "done":

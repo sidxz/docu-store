@@ -60,6 +60,7 @@ export function ChatLayout({ workspace, conversationId }: ChatLayoutProps) {
             <SourcesPanel
               sources={activeSources}
               workspace={workspace}
+              conversationId={conversationId}
               onClose={() => setSourcesOpen(false)}
             />
           )}

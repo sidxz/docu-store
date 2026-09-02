@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { AgentEvent, AgentStep, ContentBlock, GroundingStatus, SourceCitation, ThinkingBlock } from "@docu-store/types";
+import type { AgentEvent, AgentStep, ContentBlock, GroundingStatus, NerFilterTag, SourceCitation, ThinkingBlock } from "@docu-store/types";
 import { trackEvent } from "@/lib/analytics";
 
 interface StepTiming {
@@ -62,6 +62,9 @@ interface ChatState {
   // Grounding verification state
   groundingResult: GroundingStatus | null;
 
+  // Entity filters the planner ran retrieval with this turn (running list)
+  queryFilters: NerFilterTag[];
+
   // Message queued for send after navigation (new conversation flow)
   queuedMessage: string | null;
 
@@ -105,6 +108,7 @@ interface ChatState {
   setSources: (sources: SourceCitation[]) => void;
   setFinalSources: (sources: SourceCitation[]) => void;
   setGroundingResult: (result: GroundingStatus) => void;
+  setQueryFilters: (filters: NerFilterTag[]) => void;
   recordEvent: (event: AgentEvent) => void;
   setDoneEvent: (event: AgentEvent) => void;
   finishStreaming: () => void;
@@ -130,6 +134,7 @@ export const useChatStore = create<ChatState>()(
   streamingReasoning: "",
   streamingStructuredBlocks: [],
   groundingResult: null,
+  queryFilters: [],
   highlightedCitation: null,
   activeSourcesMessageId: null,
   stepTimings: [],
@@ -204,6 +209,7 @@ export const useChatStore = create<ChatState>()(
       streamingReasoning: "",
       streamingStructuredBlocks: [],
       groundingResult: null,
+      queryFilters: [],
       stepTimings: [],
       rawEvents: [],
       doneEvent: null,
@@ -222,6 +228,7 @@ export const useChatStore = create<ChatState>()(
       streamingReasoning: "",
       streamingStructuredBlocks: [],
       groundingResult: null,
+      queryFilters: [],
       stepTimings: [],
       rawEvents: [],
       doneEvent: null,
@@ -288,6 +295,8 @@ export const useChatStore = create<ChatState>()(
       rawEvents: [...state.rawEvents, event],
     })),
 
+  setQueryFilters: (filters) => set({ queryFilters: filters }),
+
   setDoneEvent: (event) => set({ doneEvent: event }),
 
   finishStreaming: () =>
@@ -321,6 +330,7 @@ export const useChatStore = create<ChatState>()(
       streamingReasoning: "",
       streamingStructuredBlocks: [],
       groundingResult: null,
+      queryFilters: [],
       highlightedCitation: null,
       activeSourcesMessageId: null,
       stepTimings: [],

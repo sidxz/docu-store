@@ -2,26 +2,28 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { FileText, X, ChevronDown, ChevronRight, Users, Calendar, Eye } from "lucide-react";
+import { FileText, X, ChevronDown, ChevronRight, Users, Calendar, Eye, Tags } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { SourceCitation } from "@docu-store/types";
+import type { NerFilterTag, SourceCitation } from "@docu-store/types";
 import { AuthThumbnail } from "@/components/ui/TableThumbnail";
 import { useAuthBlobUrl } from "@/hooks/use-auth-blob-url";
 import { usePointerDrag } from "@/hooks/use-pointer-drag";
 import { useDevModeStore } from "@/lib/stores/dev-mode-store";
 import { useChatStore } from "@/lib/stores/chat-store";
+import { useConversation } from "@/hooks/use-chat";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { API_URL } from "@/lib/constants";
 
 interface SourcesPanelProps {
   sources: SourceCitation[];
   workspace: string;
+  conversationId?: string;
   onClose: () => void;
 }
 
-export function SourcesPanel({ sources, workspace, onClose }: SourcesPanelProps) {
+export function SourcesPanel({ sources, workspace, conversationId, onClose }: SourcesPanelProps) {
   const devMode = useDevModeStore((s) => s.enabled);
 
   if (!sources.length) return null;
@@ -66,7 +68,60 @@ export function SourcesPanel({ sources, workspace, onClose }: SourcesPanelProps)
           />
         ))}
       </div>
+
+      <RetrievalFilters conversationId={conversationId} />
     </div>
+  );
+}
+
+/**
+ * The entity filters retrieval actually ran with — the planner's running list,
+ * carried across follow-ups and already stripped of whatever it dropped. Native
+ * `<details>`, shut by default: it is a footnote, not part of reading the answer.
+ */
+function RetrievalFilters({ conversationId }: { conversationId?: string }) {
+  const live = useChatStore((s) => s.queryFilters);
+  const streamingConversationId = useChatStore((s) => s.streamingConversationId);
+  const { data } = useConversation(conversationId);
+
+  // The live list only speaks for the conversation being streamed; otherwise the
+  // latest answer carries the list it was retrieved with. Latest *answered*, not
+  // latest non-empty: a turn that switched topic and ran unfiltered says nothing,
+  // and showing the turn-before's tags would credit it with filters it never used.
+  const streamingHere = !!conversationId && streamingConversationId === conversationId;
+  let tags: NerFilterTag[] = streamingHere ? live : [];
+  if (!streamingHere) {
+    const messages = data?.messages ?? [];
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const context = messages[i].query_context;
+      if (messages[i].role === "assistant" && context) {
+        tags = context.ner_entities;
+        break;
+      }
+    }
+  }
+
+  if (!tags.length) return null;
+
+  return (
+    <details className="group border-t border-border-default">
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3 py-2 text-xs text-text-muted hover:bg-surface-hover [&::-webkit-details-marker]:hidden">
+        <ChevronRight className="w-3 h-3 transition-transform group-open:rotate-90" />
+        <Tags className="w-3 h-3" />
+        <span>Retrieval context ({tags.length})</span>
+      </summary>
+      <div className="max-h-40 overflow-y-auto px-3 pb-3 flex flex-wrap gap-1">
+        {tags.map((t) => (
+          <span
+            key={`${t.entity_type}:${t.entity_text}`}
+            title={t.entity_type.replace(/_name$/, "").replace(/_/g, " ")}
+            className="rounded-full border border-border-subtle bg-surface-sunken px-2 py-0.5 text-[11px] text-text-secondary"
+          >
+            {t.entity_text}
+          </span>
+        ))}
+      </div>
+    </details>
   );
 }
 
