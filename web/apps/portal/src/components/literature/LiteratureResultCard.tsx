@@ -116,6 +116,15 @@ export function LiteratureResultCard({
             <BookOpen className="h-3 w-3" />
             {hit.licence}
           </Badge>
+        ) : hit.is_retracted ? (
+          <Badge
+            variant="outline"
+            className="gap-1 text-[0.6875rem] uppercase text-red-600 dark:text-red-400"
+            title={hit.retraction_notice ?? "retracted publication"}
+          >
+            <Lock className="h-3 w-3" />
+            Retracted
+          </Badge>
         ) : (
           // The reason, not just the fact: "no open licence" and "no full text
           // to fetch" are entirely different situations for a reader.

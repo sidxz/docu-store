@@ -128,6 +128,22 @@ def test_tool_description_teaches_pub_type_and_scopes_the_bare_retry():
     assert "unreachable" in desc, "the bare-terms retry must be scoped to real empties"
 
 
+async def test_a_retracted_hit_is_flagged_to_the_model_and_to_the_card():
+    # json, Path, parse_hit and FIXTURE are already imported at the top of this file.
+    record = json.loads(
+        (FIXTURE.parent / "europe_pmc_retracted.json").read_text()
+    )["resultList"]["result"][0]
+    hit = parse_hit(record)
+
+    _results, summary, events = await _run(FakeClient([hit]), query='TITLE_ABS:"test"')
+
+    assert "RETRACTED" in summary, "the model must see it in the tool output"
+    card = events[0].literature_results[0]
+    assert card["is_retracted"] is True
+    assert "10.7759/cureus.r217" in card["retraction_notice"]
+    assert card["cited_by_count"] == 3
+
+
 class TestLiteratureRegistryIsExclusive:
     def _registry(self, **kwargs) -> ToolRegistry:  # noqa: ANN003
         return ToolRegistry(

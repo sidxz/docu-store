@@ -29,6 +29,11 @@ export interface LiteratureHit {
   is_ingestable: boolean;
   /** Why not, in words meant for a reader. Null when ingestable. */
   ingest_blocker: string | null;
+  /** Europe PMC pubTypeList carries "Retracted Publication". */
+  is_retracted: boolean;
+  /** The retraction notice's own citation, when there is one. */
+  retraction_notice: string | null;
+  cited_by_count: number;
 }
 
 export interface SourceCitation {

@@ -179,6 +179,11 @@ def _summarise(hits: list[LiteratureHit], query: str, ingestable: int) -> str:
     for i, h in enumerate(hits, start=1):
         where = " · ".join(p for p in (h.journal, str(h.year) if h.year else None) if p)
         lines.append(f"[{i}] {h.title}")
+        if h.is_retracted:
+            lines.append(
+                f"    ** RETRACTED PUBLICATION — {h.retraction_notice or 'retraction notice on record'}. "
+                "Do not present its findings as current."
+            )
         if where:
             lines.append(f"    {where}")
         if h.abstract:
@@ -207,6 +212,9 @@ def _hits_event(hits: list[LiteratureHit]) -> AgentEvent:
                 "url": h.url,
                 "is_ingestable": h.is_ingestable,
                 "ingest_blocker": h.ingest_blocker(),
+                "is_retracted": h.is_retracted,
+                "retraction_notice": h.retraction_notice,
+                "cited_by_count": h.cited_by_count,
             }
             for h in hits
         ],
