@@ -88,12 +88,60 @@ async def test_rescore_is_a_no_op_without_a_reranker():
     assert all(r.rerank_score is None for r in ranked)
 
 
-async def test_the_user_question_is_what_gets_scored_not_the_models_query():
+async def test_run_prefers_the_plans_reformulated_query_over_the_raw_question(monkeypatch):
+    """ms-marco is trained on natural-language queries. This surface also takes
+    raw Europe PMC field syntax straight from the user (measured: 0.025 top
+    score, 0 HIGH-tier), which the planner's natural-language reformulation
+    beats regardless of what the user actually typed (measured: 0.788 top
+    score, 5 HIGH-tier) -- so the reformulation must win.
+    """
+    from infrastructure.chat.models import QueryPlan
+    from infrastructure.chat.nodes.agentic_retrieval import AgenticRetrievalNode
+
+    async def fake_super_run(self, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003, ANN202
+        yield "results", [_result("a", "x")]
+
+    monkeypatch.setattr(AgenticRetrievalNode, "run", fake_super_run)
+
     fake = _FakeReranker({"x": 1.0})
     node = LiteratureRetrievalNode.__new__(LiteratureRetrievalNode)
     node._reranker = fake
+    plan = QueryPlan(
+        query_type="factual",
+        reformulated_query="known InhA inhibitors",
+        search_strategy="hybrid",
+        summary="",
+    )
 
-    await node._rescore("what are known inhibitors of Pks13", [_result("a", "x")])
+    async for _ in node.run(plan, uuid4(), None, question='TITLE_ABS:"InhA"'):
+        pass
+
+    assert fake.calls == ["known InhA inhibitors"]
+
+
+async def test_run_falls_back_to_the_question_when_the_plan_has_no_reformulated_query(
+    monkeypatch,
+):
+    from infrastructure.chat.models import QueryPlan
+    from infrastructure.chat.nodes.agentic_retrieval import AgenticRetrievalNode
+
+    async def fake_super_run(self, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003, ANN202
+        yield "results", [_result("a", "x")]
+
+    monkeypatch.setattr(AgenticRetrievalNode, "run", fake_super_run)
+
+    fake = _FakeReranker({"x": 1.0})
+    node = LiteratureRetrievalNode.__new__(LiteratureRetrievalNode)
+    node._reranker = fake
+    plan = QueryPlan(
+        query_type="factual",
+        reformulated_query="",  # e.g. planning skipped, or produced nothing
+        search_strategy="hybrid",
+        summary="",
+    )
+
+    async for _ in node.run(plan, uuid4(), None, question="what are known inhibitors of Pks13"):
+        pass
 
     assert fake.calls == ["what are known inhibitors of Pks13"]
 

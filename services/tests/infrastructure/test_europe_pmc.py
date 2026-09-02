@@ -105,9 +105,10 @@ async def test_fetch_pdf_refuses_before_touching_the_network(hits):
     assert await EuropePmcClient().fetch_pdf(hits["40687024"]) is None
 
 
-async def test_search_returns_empty_when_europe_pmc_is_unreachable():
+async def test_search_returns_empty_when_europe_pmc_is_unreachable(monkeypatch):
     # Their API 503'd twice while this was being written. A dead source should
     # leave the chat able to say so, not error the turn.
+    monkeypatch.setattr(epmc, "_RETRY_BACKOFF_SECONDS", 0.0)
     client = EuropePmcClient(search_url="http://127.0.0.1:9/search")
     assert await client.search("InhA") == []
 

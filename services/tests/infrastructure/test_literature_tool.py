@@ -78,6 +78,34 @@ async def test_the_summary_says_how_much_is_out_of_reach(hits):
     assert f"{len(hits) - ingestable} are abstract-and-link only" in summary
 
 
+async def test_hits_beyond_the_detail_cap_lose_their_abstract_but_keep_their_title():
+    """The agentic loop resends this whole summary every iteration, so capping
+    the number of full abstracts keeps the cost from growing quadratically.
+    """
+    from infrastructure.chat.tools.literature_tools import _DETAILED_HITS
+
+    extra = 5
+    synthetic_hits = [
+        LiteratureHit(
+            external_id=str(i),
+            source="MED",
+            title=f"Paper number {i}",
+            abstract=f"Distinctive abstract body for paper {i}",
+        )
+        for i in range(_DETAILED_HITS + extra)
+    ]
+
+    _, summary, _ = await _run(FakeClient(synthetic_hits), query="x")
+
+    # last hit within the cap: abstract present
+    assert f"Distinctive abstract body for paper {_DETAILED_HITS - 1}" in summary
+    # first hit beyond the cap: title survives, abstract does not
+    assert f"Paper number {_DETAILED_HITS}" in summary
+    assert f"Distinctive abstract body for paper {_DETAILED_HITS}" not in summary
+    assert f"{extra} further results" in summary
+    assert "search_literature" in summary.split(f"{extra} further results")[1]
+
+
 async def test_an_empty_query_does_not_reach_europe_pmc():
     client = FakeClient([])
     results, summary, events = await _run(client, query="   ")
@@ -142,6 +170,33 @@ async def test_a_retracted_hit_is_flagged_to_the_model_and_to_the_card():
     assert card["is_retracted"] is True
     assert "10.7759/cureus.r217" in card["retraction_notice"]
     assert card["cited_by_count"] == 3
+
+
+async def test_the_retraction_marker_reaches_expanded_text_for_synthesis():
+    """_summarise's warning only reaches the retrieval LLM, whose message
+    history is discarded at the end of the agentic loop. The synthesis LLM
+    reads only expanded_text/matched_text, so the marker has to live there too,
+    or a retracted paper reaches the answer indistinguishable from sound work.
+    """
+    record = json.loads(
+        (FIXTURE.parent / "europe_pmc_retracted.json").read_text()
+    )["resultList"]["result"][0]
+    hit = parse_hit(record)
+
+    results, _summary, _events = await _run(FakeClient([hit]), query='TITLE_ABS:"test"')
+
+    assert results[0].expanded_text.startswith(
+        "[RETRACTED PUBLICATION — do not present its findings as current] "
+    )
+    assert results[0].matched_text == results[0].expanded_text
+
+
+async def test_a_non_retracted_hits_expanded_text_is_unprefixed(hits):
+    assert not hits[0].is_retracted  # sanity: fixture hit is sound work
+    results, _summary, _events = await _run(FakeClient(hits), query="x")
+
+    assert not results[0].expanded_text.startswith("[RETRACTED")
+    assert results[0].expanded_text == hits[0].abstract
 
 
 class TestLiteratureRegistryIsExclusive:

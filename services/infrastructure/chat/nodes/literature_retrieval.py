@@ -53,22 +53,33 @@ class LiteratureRetrievalNode(AgenticRetrievalNode):
 
     def __init__(
         self,
-        *args: Any,  # noqa: ANN401
+        *args: Any,
         reranker: Reranker | None = None,
-        **kwargs: Any,  # noqa: ANN401
+        **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         self._reranker = reranker
 
     async def run(
         self,
-        *args: Any,  # noqa: ANN401
-        **kwargs: Any,  # noqa: ANN401
+        *args: Any,
+        **kwargs: Any,
     ) -> AsyncGenerator[tuple[str, Any], None]:
         question = kwargs.get("question") or (args[3] if len(args) > 3 else "")
+        plan = kwargs.get("plan") or (args[0] if args else None)
+        # ms-marco-MiniLM is trained on natural-language queries. This surface
+        # also takes raw Europe PMC field syntax straight from the user (e.g.
+        # `TITLE_ABS:"InhA" AND PUB_YEAR:[2024 TO 2026]`), and that scores near
+        # zero against every abstract -- measured live: top score 0.025, 0
+        # results reach the HIGH tier, vs. 0.788 / 5 HIGH for a natural-language
+        # question. The planner's reformulation is natural language regardless
+        # of what the user typed, so prefer it and fall back to the raw
+        # question only when it is missing.
+        reformulated = (getattr(plan, "reformulated_query", "") or "").strip()
+        rerank_query = reformulated or question
         async for kind, payload in super().run(*args, **kwargs):
             if kind == "results" and payload:
-                payload = await self._rescore(question, payload)
+                payload = await self._rescore(rerank_query, payload)
             yield kind, payload
 
     async def _rescore(

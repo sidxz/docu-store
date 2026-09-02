@@ -252,7 +252,7 @@ class EuropePmcClient:
                 last_exc = exc
                 if exc.response.status_code not in _RETRYABLE_STATUS:
                     break
-            except Exception as exc:  # noqa: BLE001 — timeouts, DNS, malformed JSON
+            except Exception as exc:  # timeouts, DNS, malformed JSON
                 last_exc = exc
             else:
                 return [parse_hit(r) for r in results]

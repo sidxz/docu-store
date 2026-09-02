@@ -124,21 +124,34 @@ class SearchLiteratureTool:
         if not hits:
             return [], f"No Europe PMC results for: {query}", []
 
-        results = [
-            RetrievalResult(
-                source_type="literature",
-                artifact_id=_synthetic_artifact_id(h),
-                artifact_title=h.title,
-                authors=[a.strip() for a in (h.authors or "").split(",") if a.strip()],
-                presentation_date=str(h.year) if h.year else None,
-                expanded_text=h.abstract or h.title,
-                matched_text=h.abstract or h.title,
-                similarity_score=1.0,  # Europe PMC ranks; it does not score
-                query_source="tool_literature",
-                external_url=h.url,
+        results = []
+        for h in hits:
+            # The retraction warning added in _summarise() only reaches the
+            # retrieval LLM's message history, which the agentic loop discards.
+            # The synthesis LLM sees only expanded_text/matched_text, so the
+            # warning has to be baked in here too, or a retracted paper -- which
+            # ranks HIGH, since it was retracted for fraud or error, not for
+            # being off-topic -- reaches the answer looking like sound work.
+            prefix = (
+                "[RETRACTED PUBLICATION — do not present its findings as current] "
+                if h.is_retracted
+                else ""
             )
-            for h in hits
-        ]
+            text = prefix + (h.abstract or h.title)
+            results.append(
+                RetrievalResult(
+                    source_type="literature",
+                    artifact_id=_synthetic_artifact_id(h),
+                    artifact_title=h.title,
+                    authors=[a.strip() for a in (h.authors or "").split(",") if a.strip()],
+                    presentation_date=str(h.year) if h.year else None,
+                    expanded_text=text,
+                    matched_text=text,
+                    similarity_score=1.0,  # Europe PMC ranks; it does not score
+                    query_source="tool_literature",
+                    external_url=h.url,
+                )
+            )
 
         ingestable = sum(1 for h in hits if h.is_ingestable)
         log.info(
@@ -168,6 +181,10 @@ def _outage_summary(query: str, exc: Exception) -> str:
     )
 
 
+_DETAILED_HITS = 10  # beyond this, titles only: the agentic loop resends this
+                     # whole summary every iteration, so the cost is quadratic.
+
+
 def _summarise(hits: list[LiteratureHit], query: str, ingestable: int) -> str:
     """What the model reads. Abstracts, and an honest note about the rest."""
     lines = [
@@ -186,9 +203,15 @@ def _summarise(hits: list[LiteratureHit], query: str, ingestable: int) -> str:
             )
         if where:
             lines.append(f"    {where}")
-        if h.abstract:
+        if h.abstract and i <= _DETAILED_HITS:
             lines.append(f"    {h.abstract[:900]}")
         lines.append("")
+    if len(hits) > _DETAILED_HITS:
+        lines.append(
+            f"({len(hits) - _DETAILED_HITS} further results above are listed by title "
+            "only. Call search_literature again with a narrower query to see their "
+            "abstracts.)"
+        )
     return "\n".join(lines)
 
 
