@@ -25,12 +25,25 @@ export function LiteraturePanel({
   // is the thing they genuinely share and needs no hashing in the browser.
   const finalSources = useChatStore((s) => s.finalSources);
   const streamingSources = useChatStore((s) => s.streamingSources);
+  const sources = finalSources ?? streamingSources;
   const citedUrls = new Set(
-    (finalSources ?? streamingSources)
-      .map((s) => s.external_url)
-      .filter((u): u is string => !!u),
+    sources.map((s) => s.external_url).filter((u): u is string => !!u),
   );
   const citedCount = results.filter((r) => citedUrls.has(r.url)).length;
+
+  // The [n] in the answer has to lead somewhere. Deep Research scrolls its
+  // sources panel to the cited row; this is the same idea against papers,
+  // resolved through the URL the citation and the hit share.
+  const highlightedCitation = useChatStore((s) => s.highlightedCitation);
+  const indexByUrl = new Map<string, number>();
+  for (const s of sources) {
+    if (s.external_url && !indexByUrl.has(s.external_url)) {
+      indexByUrl.set(s.external_url, s.citation_index);
+    }
+  }
+  const highlightedUrl = sources.find(
+    (s) => s.citation_index === highlightedCitation,
+  )?.external_url;
 
   return (
     <div className="flex h-full flex-col">
@@ -68,6 +81,8 @@ export function LiteraturePanel({
             key={`${hit.source}-${hit.external_id}`}
             hit={hit}
             cited={citedUrls.has(hit.url)}
+            citationIndex={indexByUrl.get(hit.url)}
+            highlighted={!!highlightedUrl && hit.url === highlightedUrl}
           />
         ))}
       </div>

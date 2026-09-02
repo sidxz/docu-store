@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BookOpen, Check, ExternalLink, Loader2, Lock, Plus, Quote } from "lucide-react";
 import type { LiteratureHit } from "@docu-store/types";
 
@@ -27,12 +27,27 @@ import { useIngestLiterature } from "@/hooks/use-chat";
 export function LiteratureResultCard({
   hit,
   cited = false,
+  citationIndex,
+  highlighted = false,
 }: {
   hit: LiteratureHit;
   cited?: boolean;
+  /** The [n] this paper carries in the answer, when it was cited. */
+  citationIndex?: number;
+  /** The reader just clicked that [n]. */
+  highlighted?: boolean;
 }) {
   const ingest = useIngestLiterature();
   const [expanded, setExpanded] = useState(false);
+  const ref = useRef<HTMLElement>(null);
+
+  // Bring the card to the reader rather than making them find it: the panel
+  // routinely holds fifty-odd papers by the time an answer lands.
+  useEffect(() => {
+    if (highlighted && ref.current) {
+      ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [highlighted]);
 
   const where = [hit.journal, hit.year].filter(Boolean).join(" · ");
   const added = ingest.isSuccess;
@@ -42,17 +57,24 @@ export function LiteratureResultCard({
 
   return (
     <article
+      ref={ref}
       className={`rounded-lg border p-3 text-xs transition-colors ${
         cited
           // The answer leaned on this one. Worth marking, because the panel
           // shows every result and only a handful end up mattering.
           ? "border-emerald-500/40 bg-emerald-500/[0.07]"
           : "border-border-default bg-surface-elevated"
-      }`}
+      } ${highlighted ? "ring-2 ring-emerald-500/60" : ""}`}
     >
       {cited && (
-        <p className="mb-1.5 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
-          <Quote className="h-3 w-3" />
+        <p className="mb-1.5 flex items-center gap-1 text-2xs font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+          {citationIndex != null ? (
+            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded bg-emerald-600 px-1 font-semibold text-white">
+              {citationIndex}
+            </span>
+          ) : (
+            <Quote className="h-3 w-3" />
+          )}
           Cited in the answer
         </p>
       )}
@@ -90,7 +112,7 @@ export function LiteratureResultCard({
 
       <div className="mt-3 flex items-center justify-between gap-2">
         {hit.is_ingestable ? (
-          <Badge variant="outline" className="gap-1 text-[10px] uppercase">
+          <Badge variant="outline" className="gap-1 text-2xs uppercase">
             <BookOpen className="h-3 w-3" />
             {hit.licence}
           </Badge>
@@ -99,7 +121,7 @@ export function LiteratureResultCard({
           // to fetch" are entirely different situations for a reader.
           <Badge
             variant="outline"
-            className="gap-1 text-[10px] text-text-muted"
+            className="gap-1 text-2xs text-text-muted"
             title={hit.ingest_blocker ?? undefined}
           >
             <Lock className="h-3 w-3" />
@@ -147,7 +169,7 @@ export function LiteratureResultCard({
       </div>
 
       {ingest.isError && (
-        <p className="mt-2 text-[11px] text-destructive">{ingest.error.message}</p>
+        <p className="mt-2 text-2xs text-destructive">{ingest.error.message}</p>
       )}
     </article>
   );

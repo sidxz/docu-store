@@ -17,6 +17,15 @@
 @import "tw-animate-css";
 @import "@structflo/daikon-design-tokens/tokens.css";
 
+/* One step below text-xs, for badges and captions. Defined in rem because
+   FontScaleProvider scales the app by setting the root font-size: a px size
+   ignores the text-size slider entirely, which is what `text-[10px]` was
+   quietly doing everywhere it appeared. */
+@theme {
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: calc(1 / 0.6875);
+}
+
 /* Streamdown ships its own Tailwind classes (markdown typography, tables,
    code blocks) — they only compile if Tailwind scans its dist. */
 @source "../../node_modules/streamdown/dist/*.js";
