@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BookOpen, Check, ExternalLink, Loader2, Lock, Plus } from "lucide-react";
+import { BookOpen, Check, ExternalLink, Loader2, Lock, Plus, Quote } from "lucide-react";
 import type { LiteratureHit } from "@docu-store/types";
 
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +24,13 @@ import { useIngestLiterature } from "@/hooks/use-chat";
  * the bottom, and on the queries this corpus exists for that is most of what is
  * worth reading.
  */
-export function LiteratureResultCard({ hit }: { hit: LiteratureHit }) {
+export function LiteratureResultCard({
+  hit,
+  cited = false,
+}: {
+  hit: LiteratureHit;
+  cited?: boolean;
+}) {
   const ingest = useIngestLiterature();
   const [expanded, setExpanded] = useState(false);
 
@@ -35,7 +41,21 @@ export function LiteratureResultCard({ hit }: { hit: LiteratureHit }) {
     ingest.mutate({ source: hit.source, external_id: hit.external_id, visibility });
 
   return (
-    <article className="rounded-lg border border-border-default bg-surface-elevated p-3 text-xs">
+    <article
+      className={`rounded-lg border p-3 text-xs transition-colors ${
+        cited
+          // The answer leaned on this one. Worth marking, because the panel
+          // shows every result and only a handful end up mattering.
+          ? "border-emerald-500/40 bg-emerald-500/[0.07]"
+          : "border-border-default bg-surface-elevated"
+      }`}
+    >
+      {cited && (
+        <p className="mb-1.5 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+          <Quote className="h-3 w-3" />
+          Cited in the answer
+        </p>
+      )}
       <a
         href={hit.url}
         target="_blank"

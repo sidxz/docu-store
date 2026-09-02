@@ -18,6 +18,7 @@ const LABEL_MAP: Record<string, string> = {
   search: "Search",
   compounds: "Compounds",
   chat: "Deep Research",
+  literature: "Literature",
   settings: "Settings",
   upload: "Upload",
 };
@@ -52,8 +53,11 @@ export function useBreadcrumbs(): Breadcrumb[] {
       ? segments[pagesIdx + 1]
       : null;
 
-  // /[workspace]/chat/[conversationId]
-  const chatIdx = segments.indexOf("chat");
+  // /[workspace]/chat/[conversationId] and /[workspace]/literature/[conversationId].
+  // Both surfaces hold conversations, so both resolve to a title — otherwise one
+  // of them shows a raw id where the other shows a name.
+  const CONVERSATION_SEGMENTS = ["chat", "literature"];
+  const chatIdx = segments.findIndex((s) => CONVERSATION_SEGMENTS.includes(s));
   const conversationId =
     chatIdx >= 0 &&
     chatIdx + 1 < segments.length &&
@@ -142,7 +146,7 @@ export function useBreadcrumbs(): Breadcrumb[] {
       return "\u2026";
     }
 
-    if (prevSegment === "chat" && segment === conversationId) {
+    if (CONVERSATION_SEGMENTS.includes(prevSegment ?? "") && segment === conversationId) {
       if (!conversation) return "\u2026";
       return conversation.title || "New Research";
     }
