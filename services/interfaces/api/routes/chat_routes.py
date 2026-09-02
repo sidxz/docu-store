@@ -121,13 +121,16 @@ async def list_conversations(
     limit: int = 20,
     is_archived: bool = False,
     folder_id: UUID | None = None,
-    surface: ChatSurface = ChatSurface.RESEARCH,
+    surface: ChatSurface | None = None,
 ) -> list[ConversationDTO]:
     """List conversations for the current user. Pass ``folder_id`` for a folder view.
 
     ``surface`` keeps the two chat surfaces apart: Deep Research and Literature
     share a store but not a history, since a question asked of the corpus and one
     asked of the literature are not the same kind of thing to come back to.
+    Omitting ``surface`` returns every surface -- that is what a folder view
+    wants, since a folder is an explicit bucket the user dragged things into
+    and must show everything filed there, not just one surface's slice of it.
     """
     use_case = container[ListConversationsUseCase]
     return await use_case.execute(

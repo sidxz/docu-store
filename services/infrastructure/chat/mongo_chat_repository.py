@@ -90,14 +90,15 @@ class MongoChatRepository:
         limit: int = 20,
         is_archived: bool = False,
         folder_id: UUID | None = None,
-        surface: ChatSurface = ChatSurface.RESEARCH,
+        surface: ChatSurface | None = None,
     ) -> list[ConversationDTO]:
         query: dict = {
             "workspace_id": str(workspace_id),
             "owner_id": str(owner_id),
             "is_archived": is_archived,
-            **_surface_query(surface),
         }
+        if surface is not None:
+            query.update(_surface_query(surface))
         if folder_id is not None:
             query["folder_id"] = str(folder_id)
         cursor = self._conversations.find(query).sort("updated_at", -1).skip(skip).limit(limit)
@@ -222,7 +223,10 @@ class MongoChatRepository:
                     "workspace_id": str(workspace_id),
                     "owner_id": str(owner_id),
                     "folder_id": {"$ne": None},
-                    "is_archived": {"$ne": True},  # match the folder-view list filter
+                    # Intentionally no surface filter: a folder is an explicit
+                    # bucket the user dragged things into, spanning both
+                    # surfaces on purpose — same as the folder-view list below.
+                    "is_archived": {"$ne": True},
                 },
             },
             {"$group": {"_id": "$folder_id", "n": {"$sum": 1}}},

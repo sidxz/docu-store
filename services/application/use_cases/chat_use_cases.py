@@ -115,7 +115,7 @@ class ListConversationsUseCase:
         limit: int = 20,
         is_archived: bool = False,
         folder_id: UUID | None = None,
-        surface: ChatSurface = ChatSurface.RESEARCH,
+        surface: ChatSurface | None = None,
     ) -> Result[list[ConversationDTO], AppError]:
         try:
             conversations = await self._repo.list_conversations(

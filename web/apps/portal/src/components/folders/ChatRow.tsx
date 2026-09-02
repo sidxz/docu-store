@@ -3,23 +3,30 @@
 import Link from "next/link";
 import { MoreHorizontal } from "lucide-react";
 import type { Conversation } from "@docu-store/types";
+import { SURFACE_ICON, SURFACE_ICON_COLOR } from "@/lib/surfaces";
 import { formatRelativeTime } from "@/lib/utils";
 import { MoveToFolderMenu } from "./MoveToFolderMenu";
 import { setChatDragData } from "./dnd";
 
 /** Compact chat row used in folder views (plain conversation, no enrichment). */
 export function ChatRow({ chat, workspace }: { chat: Conversation; workspace: string }) {
+  // A conversation's surface is fixed at creation, so the row must route to
+  // the surface it actually belongs to, not always /chat. Folders hold both
+  // surfaces at once, so the icon is how a dense row tells them apart.
+  const surface = chat.surface ?? "research";
+  const SurfaceIcon = SURFACE_ICON[surface];
   return (
     <div className="group relative">
       <Link
-        href={`/${workspace}/chat/${chat.conversation_id}`}
+        href={`/${workspace}/${surface === "literature" ? "literature" : "chat"}/${chat.conversation_id}`}
         draggable
         onDragStart={(e) => setChatDragData(e, chat.conversation_id, chat.folder_id)}
         className="block rounded-lg border border-border-default bg-surface-elevated px-4 py-3 pr-9 transition-all hover:border-primary/30 hover:shadow-ds-sm"
       >
         <div className="flex items-baseline justify-between gap-3">
-          <p className="truncate text-sm font-medium text-text-primary">
-            {chat.title || "New Research"}
+          <p className="flex min-w-0 items-center gap-1.5 truncate text-sm font-medium text-text-primary">
+            <SurfaceIcon className={`size-3.5 shrink-0 ${SURFACE_ICON_COLOR[surface]}`} />
+            <span className="truncate">{chat.title || "New Research"}</span>
           </p>
           <span className="shrink-0 text-xs text-text-muted">
             {formatRelativeTime(chat.updated_at)}
