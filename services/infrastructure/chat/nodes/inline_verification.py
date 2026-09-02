@@ -7,13 +7,12 @@ when coverage is low and query is factual.
 from __future__ import annotations
 
 import json
-import re
 from typing import TYPE_CHECKING
 
 import structlog
 
 from infrastructure.chat.models import GroundingResult
-from infrastructure.chat.utils import CITATION_RE, strip_markdown_fences
+from infrastructure.chat.utils import compute_citation_coverage, strip_markdown_fences
 from infrastructure.config import settings
 
 if TYPE_CHECKING:
@@ -22,32 +21,6 @@ if TYPE_CHECKING:
     from infrastructure.chat.models import ContextMetadata, QueryPlan
 
 log = structlog.get_logger(__name__)
-
-# Heuristic: sentences that are likely factual claims (contain numbers, units, names)
-_FACTUAL_INDICATORS = re.compile(
-    r"(\d+\.?\d*\s*(uM|nM|mM|mg|kg|%|IC50|EC50|Ki|Kd|μM|μg|mol))"
-    r"|(\b(was|is|are|were|found|showed|demonstrated|reported|measured|determined)\b)",
-    re.IGNORECASE,
-)
-
-# A citation trailing its sentence — "…0.19 µM. [2]" — splits off as a fragment
-# of its own, which the length filter below would then discard, leaving the claim
-# it supports counted as uncited. Merge such fragments back into the sentence
-# they belong to. Done after the split rather than by rewriting the answer: the
-# boundaries are already decided here, so this cannot create or destroy one, and
-# cannot drag a citation backward across an abbreviation's period the way a
-# text-level substitution does.
-#
-# Only a citation isolated as its OWN fragment gets rescued this way. A citation
-# trailing the middle of a multi-sentence answer stays glued to the sentence that
-# follows it instead — an accepted undercount, pinned by
-# test_a_mid_answer_trailing_citation_is_not_attributed_backwards. Pulling a
-# leading citation run back onto the previous fragment would rescue that shape
-# too, but it also reintroduces the abbreviation regression ("…, i.e. [1]
-# Compound 44 …"), since a fragment boundary made by an abbreviation's period is
-# indistinguishable from a real one at this layer. The undercount is the safe
-# direction: it can only trigger more verification than needed, never less.
-_CITATION_ONLY = re.compile(r"(?:\[\d{1,2}(?:\s*,\s*\d{1,2})*\]\s*)+")
 
 
 class InlineVerificationNode:
@@ -120,45 +93,7 @@ class InlineVerificationNode:
 
     def _compute_citation_coverage(self, answer: str) -> dict:
         """Parse answer, classify sentences, compute coverage ratio."""
-        # Split into sentences (rough but effective)
-        split = re.split(r"(?<=[.!?])\s+", answer.strip())
-
-        merged: list[str] = []
-        for fragment in split:
-            stripped = fragment.strip()
-            if merged and _CITATION_ONLY.fullmatch(stripped):
-                merged[-1] = f"{merged[-1]} {stripped}"
-            else:
-                merged.append(fragment)
-
-        sentences = [s.strip() for s in merged if len(s.strip()) > 10]
-
-        factual_sentences = 0
-        cited_sentences = 0
-
-        for sentence in sentences:
-            # Skip headers, list markers, introductory phrases
-            if sentence.startswith("#") or sentence.startswith("-") or sentence.startswith("*"):
-                continue
-            if sentence.endswith(":"):
-                continue
-
-            is_factual = bool(_FACTUAL_INDICATORS.search(sentence))
-            has_citation = bool(CITATION_RE.search(sentence))
-
-            if is_factual:
-                factual_sentences += 1
-                if has_citation:
-                    cited_sentences += 1
-
-        ratio = cited_sentences / factual_sentences if factual_sentences > 0 else 1.0
-
-        return {
-            "total_sentences": len(sentences),
-            "factual_sentences": factual_sentences,
-            "cited_sentences": cited_sentences,
-            "ratio": ratio,
-        }
+        return compute_citation_coverage(answer)
 
     def _needs_llm_verification(
         self,
