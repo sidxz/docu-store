@@ -1,0 +1,108 @@
+"""The retrieval loop for Literature mode.
+
+Europe PMC ranks a result set against the fielded query the model wrote. Nothing
+in that ordering knows what the user actually asked, and context assembly cuts on
+whatever order it is handed — so without this step the answer is built from
+whichever papers happened to arrive first.
+
+A subclass rather than a branch inside AgenticRetrievalNode: the internal-docs
+pipeline already scores its own results during retrieval, and it must not acquire
+a literature-shaped code path it never executes.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import math
+from typing import TYPE_CHECKING, Any
+
+import structlog
+
+from application.ports.reranker import RerankDocument
+from infrastructure.chat.nodes.agentic_retrieval import AgenticRetrievalNode
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
+    from application.ports.reranker import Reranker
+    from infrastructure.chat.models import RetrievalResult
+
+log = structlog.get_logger(__name__)
+
+# Abstract characters handed to the cross-encoder. Matches the internal search
+# path, and ms-marco truncates at 512 tokens anyway.
+_RERANK_TEXT_CHARS = 2000
+# Above this many candidates the CPU cross-encoder costs more than the precision
+# it buys. Europe PMC order is a reasonable prior for the tail.
+_MAX_RERANK_CANDIDATES = 200
+
+
+def _sigmoid(x: float) -> float:
+    """Squash a cross-encoder logit into (0, 1).
+
+    ms-marco-MiniLM returns raw logits — measured range on real abstracts is about
+    -7.2 to +1.3 — while every threshold downstream is expressed as a probability.
+    Clamped because math.exp overflows around 710.
+    """
+    return 1.0 / (1.0 + math.exp(-max(-30.0, min(30.0, x))))
+
+
+class LiteratureRetrievalNode(AgenticRetrievalNode):
+    """Agentic retrieval, plus a relevance score the assembly stage can rank on."""
+
+    def __init__(
+        self,
+        *args: Any,  # noqa: ANN401
+        reranker: Reranker | None = None,
+        **kwargs: Any,  # noqa: ANN401
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self._reranker = reranker
+
+    async def run(
+        self,
+        *args: Any,  # noqa: ANN401
+        **kwargs: Any,  # noqa: ANN401
+    ) -> AsyncGenerator[tuple[str, Any], None]:
+        question = kwargs.get("question") or (args[3] if len(args) > 3 else "")
+        async for kind, payload in super().run(*args, **kwargs):
+            if kind == "results" and payload:
+                payload = await self._rescore(question, payload)
+            yield kind, payload
+
+    async def _rescore(
+        self,
+        question: str,
+        results: list[RetrievalResult],
+    ) -> list[RetrievalResult]:
+        """Score every hit against the user's question, best first."""
+        if not self._reranker or not results or not question:
+            return results
+
+        candidates = results[:_MAX_RERANK_CANDIDATES]
+        docs = [
+            RerankDocument(
+                id=str(i),
+                text=(r.artifact_title or "") + "\n" + r.expanded_text[:_RERANK_TEXT_CHARS],
+            )
+            for i, r in enumerate(candidates)
+        ]
+
+        scored = await asyncio.to_thread(self._reranker.rerank, question, docs)
+        by_index = {int(s.id): _sigmoid(s.score) for s in scored}
+
+        ranked = [
+            r.model_copy(update={"rerank_score": by_index[i]})
+            for i, r in enumerate(candidates)
+            if i in by_index
+        ]
+        ranked.sort(key=lambda r: r.rerank_score or 0.0, reverse=True)
+
+        log.info(
+            "literature.reranked",
+            candidates=len(candidates),
+            dropped_tail=len(results) - len(candidates),
+            top_score=f"{ranked[0].rerank_score:.3f}" if ranked else None,
+            bottom_score=f"{ranked[-1].rerank_score:.3f}" if ranked else None,
+        )
+        return ranked

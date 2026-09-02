@@ -916,6 +916,7 @@ def create_container() -> Container:
     from infrastructure.chat.nodes.inline_verification import (
         InlineVerificationNode,
     )
+    from infrastructure.chat.nodes.literature_retrieval import LiteratureRetrievalNode
     from infrastructure.chat.nodes.query_planning import QueryPlanningNode
     from infrastructure.chat.nodes.question_analysis import QuestionAnalysisNode
     from infrastructure.chat.nodes.retrieval import RetrievalNode
@@ -1075,7 +1076,7 @@ def create_container() -> Container:
     # Its own registry and retrieval node rather than a mode threaded through
     # four layers: the router already picks agents by mode, and deep_thinking is
     # the same trick. Built unconditionally; LITERATURE_ENABLED closes the routes.
-    literature_retrieval = lambda c: AgenticRetrievalNode(
+    literature_retrieval = lambda c: LiteratureRetrievalNode(
         tool_llm=tool_calling_llm,
         tool_registry=ToolRegistry(
             hierarchical_search=c[HierarchicalSearchUseCase],
@@ -1085,6 +1086,7 @@ def create_container() -> Container:
             literature_only=True,
         ),
         prompt_repository=c[PromptRepositoryPort],
+        reranker=c[Reranker],
     )
     literature_agent = lambda c: ThinkingAgent(
         query_planning=c[QueryPlanningNode],
