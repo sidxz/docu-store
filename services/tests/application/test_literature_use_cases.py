@@ -15,7 +15,11 @@ from returns.result import Failure, Success
 
 from application.use_cases.literature_use_cases import IngestLiteratureUseCase
 from domain.value_objects.source_class import SourceClass
-from infrastructure.literature.europe_pmc import LiteratureHit, parse_hit
+from infrastructure.literature.europe_pmc import (
+    LiteratureHit,
+    LiteratureSourceUnavailableError,
+    parse_hit,
+)
 
 FIXTURE = Path(__file__).parent.parent / "fixtures" / "europe_pmc_search_core.json"
 
@@ -146,4 +150,26 @@ async def test_a_missing_pdf_does_not_create_an_empty_artifact(hits):
         external_id=CC_BY,
     )
     assert isinstance(result, Failure)
+    assert saga.calls == []
+
+
+async def test_an_unreachable_source_is_not_reported_as_a_missing_paper(hits):
+    """Europe PMC 503s often enough that this distinction is not academic.
+
+    Collapsing the two tells someone their paper does not exist when it does,
+    and it is a claim they cannot check from the UI.
+    """
+
+    class DeadClient(FakeClient):
+        async def fetch_one(self, source, external_id):
+            raise LiteratureSourceUnavailableError("503")
+
+    saga = FakeSaga()
+    result = await _use_case(DeadClient(hits[CC_BY]), saga, FakeReadModel()).execute(
+        source="MED",
+        external_id=CC_BY,
+    )
+    assert isinstance(result, Failure)
+    assert result.failure().category == "infrastructure"
+    assert "unavailable" in result.failure().message
     assert saga.calls == []

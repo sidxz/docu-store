@@ -24,6 +24,7 @@ from application.ports.reranker import RerankDocument, Reranker
 from application.ports.sparse_embedding_generator import SparseEmbeddingGenerator
 from application.ports.text_chunker import TextChunker
 from application.ports.vector_store import VectorStore
+from application.use_cases.page_payload import build_page_payload
 from domain.exceptions import AggregateNotFoundError
 from domain.value_objects.embedding_metadata import EmbeddingMetadata, EmbeddingType
 from domain.value_objects.source_class import SourceClass
@@ -269,32 +270,12 @@ class GeneratePageEmbeddingUseCase:
                 page_id=str(page_id),
                 chunk_count=len(embeddings),
             )
-            # Pass workspace_id and tag metadata through metadata for Qdrant payload
-            upsert_metadata: dict = {}
-            if page.workspace_id:
-                upsert_metadata["workspace_id"] = str(page.workspace_id)
-
-            # Provenance, always written so the field is filterable rather than
-            # merely usually present. A page whose artifact will not load is one
-            # of ours: literature ingest writes the class at creation time.
-            upsert_metadata["source_class"] = str(
+            # A page whose artifact will not load is one of ours: literature
+            # ingest writes the class at creation time.
+            upsert_metadata = build_page_payload(
+                page,
                 artifact.source_class if artifact is not None else SourceClass.INTERNAL,
             )
-
-            # Include tag metadata for filtered search
-            if page.tag_mentions:
-                upsert_metadata["tags"] = [tm.tag for tm in page.tag_mentions]
-                upsert_metadata["tag_normalized"] = [tm.tag.lower() for tm in page.tag_mentions]
-                ner_types = {tm.entity_type for tm in page.tag_mentions if tm.entity_type}
-                upsert_metadata["entity_types"] = sorted(ner_types)
-
-            # Include compound SMILES for cross-reference
-            if page.compound_mentions:
-                upsert_metadata["compound_smiles"] = [
-                    cm.canonical_smiles
-                    for cm in page.compound_mentions
-                    if cm.canonical_smiles and cm.is_smiles_valid
-                ]
 
             await self.vector_store.upsert_page_chunk_embeddings(
                 page_id=page_id,

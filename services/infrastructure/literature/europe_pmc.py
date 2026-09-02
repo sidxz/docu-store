@@ -62,6 +62,15 @@ _SOURCE_RE = re.compile(r"^[A-Z]{3}$")
 _EXTERNAL_ID_RE = re.compile(r"^[A-Za-z0-9]{1,32}$")
 
 
+class LiteratureSourceUnavailableError(Exception):
+    """Europe PMC could not be reached.
+
+    Distinct from "no such record", and the distinction is not academic: their
+    API returns 503 often enough that collapsing the two tells a user their
+    paper does not exist when it does.
+    """
+
+
 @dataclass(frozen=True)
 class LiteratureHit:
     """One Europe PMC record, in the terms this codebase cares about."""
@@ -147,7 +156,17 @@ class EuropePmcClient:
 
         Failure is empty rather than raised: a literature search that cannot
         reach its source should leave the chat saying so, not error the turn.
+        Callers that must tell "nothing found" from "nothing reachable" -- ingest
+        -- use :meth:`search_or_raise` instead.
         """
+        try:
+            return await self.search_or_raise(query, limit=limit)
+        except LiteratureSourceUnavailableError:
+            logger.warning("europe_pmc_search_failed", query=query, exc_info=True)
+            return []
+
+    async def search_or_raise(self, query: str, *, limit: int = 25) -> list[LiteratureHit]:
+        """As :meth:`search`, but an unreachable source raises."""
         import httpx
 
         params = {
@@ -161,9 +180,9 @@ class EuropePmcClient:
                 response = await client.get(self._search_url, params=params)
                 response.raise_for_status()
                 results = response.json()["resultList"]["result"]
-        except Exception:
-            logger.warning("europe_pmc_search_failed", query=query, exc_info=True)
-            return []
+        except Exception as exc:
+            msg = f"Europe PMC is unreachable: {exc}"
+            raise LiteratureSourceUnavailableError(msg) from exc
         return [parse_hit(r) for r in results]
 
     async def fetch_one(self, source: str, external_id: str) -> LiteratureHit | None:
@@ -179,7 +198,7 @@ class EuropePmcClient:
                 external_id=external_id[:32],
             )
             return None
-        hits = await self.search(f"EXT_ID:{external_id} AND SRC:{source}", limit=1)
+        hits = await self.search_or_raise(f"EXT_ID:{external_id} AND SRC:{source}", limit=1)
         return hits[0] if hits else None
 
     async def fetch_pdf(self, hit: LiteratureHit) -> bytes | None:

@@ -14,6 +14,8 @@ from uuid import UUID
 import structlog
 
 from application.dtos.parsed_document import Block, ParsedDocument
+from application.use_cases.page_payload import build_page_payload
+from domain.value_objects.source_class import SourceClass
 from infrastructure.text_chunkers.block_aware_chunker import (
     chunk_blocks,
     chunk_payload,
@@ -96,23 +98,9 @@ class BatchReEmbedArtifactPagesUseCase:
                 by_page.setdefault(b.source_page_index, []).append(b)
         return by_page
 
-    def _build_page_metadata(self, page: Page) -> dict:
-        """Build Qdrant payload metadata for a page."""
-        metadata: dict = {}
-        if page.workspace_id:
-            metadata["workspace_id"] = str(page.workspace_id)
-        if page.tag_mentions:
-            metadata["tags"] = [tm.tag for tm in page.tag_mentions]
-            metadata["tag_normalized"] = [tm.tag.lower() for tm in page.tag_mentions]
-            ner_types = {tm.entity_type for tm in page.tag_mentions if tm.entity_type}
-            metadata["entity_types"] = sorted(ner_types)
-        if page.compound_mentions:
-            metadata["compound_smiles"] = [
-                cm.canonical_smiles
-                for cm in page.compound_mentions
-                if cm.canonical_smiles and cm.is_smiles_valid
-            ]
-        return metadata
+    def _build_page_metadata(self, page: Page, source_class: SourceClass) -> dict:
+        """Build Qdrant payload metadata for a page. See build_page_payload."""
+        return build_page_payload(page, source_class)
 
     async def execute(self, artifact_id: UUID) -> dict:
         """Re-embed all pages of an artifact with full contextual prefixes.
@@ -144,6 +132,7 @@ class BatchReEmbedArtifactPagesUseCase:
                 artifact_title,
                 artifact_id,
                 ir_by_page,
+                artifact.source_class,
             )
             total_pages += pages_processed
             total_chunks += chunks_processed
@@ -168,6 +157,7 @@ class BatchReEmbedArtifactPagesUseCase:
         artifact_title: str | None,
         artifact_id: UUID,
         ir_by_page: dict[int, list[Block]] | None,
+        source_class: SourceClass,
     ) -> tuple[int, int]:
         """Process a batch of pages: chunk, encode, upsert.
 
@@ -238,7 +228,7 @@ class BatchReEmbedArtifactPagesUseCase:
             page_embeddings = embeddings[embedding_offset : embedding_offset + page_embedding_count]
             embedding_offset += page_embedding_count
 
-            metadata = self._build_page_metadata(page)
+            metadata = self._build_page_metadata(page, source_class)
 
             # Upsert per-page (sparse_embeddings=None — we skip sparse on re-embed)
             await self.vector_store.upsert_page_chunk_embeddings(
