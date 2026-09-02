@@ -29,7 +29,7 @@ export function ChatNotifications() {
   // Consume "answer ready" signals for the conversation being viewed,
   // however the user got there (toast View button, sidebar, reload).
   useEffect(() => {
-    const convId = pathname?.match(/\/chat\/([0-9a-f-]{36})/)?.[1];
+    const convId = pathname?.match(/\/(?:chat|literature)\/([0-9a-f-]{36})/)?.[1];
     if (convId) {
       toast.dismiss(`chat-ready-${convId}`);
       useChatStore.getState().clearUnread(convId);
@@ -42,8 +42,13 @@ export function ChatNotifications() {
 
     // Freeze the workspace segment at stream start: the cleanup below runs
     // arbitrarily later, and pathnameRef tracks wherever the user has since
-    // navigated — possibly a different workspace.
-    const workspace = (pathnameRef.current ?? "").split("/")[1] ?? "";
+    // navigated — possibly a different workspace. A conversation belongs to
+    // the surface it was started on, and the two surfaces are separate
+    // routes, so freeze that too (defaulting to "chat" if the segment isn't
+    // a known surface, matching prior behavior).
+    const segments = (pathnameRef.current ?? "").split("/");
+    const workspace = segments[1] ?? "";
+    const surface = segments[2] === "literature" ? "literature" : "chat";
 
     // Rising edge: one-time permission offer if the answer is slow.
     const timer = setTimeout(() => {
@@ -73,12 +78,12 @@ export function ChatNotifications() {
       const convId = s.streamingConversationId;
       if (!convId) return;
       const path = pathnameRef.current ?? "";
-      const onConvRoute = path.includes(`/chat/${convId}`);
+      const onConvRoute = path.includes(`/${surface}/${convId}`);
       if (onConvRoute && !document.hidden) return; // watching — nothing to signal
 
       const goToConversation = () => {
         window.focus();
-        router.push(`/${workspace}/chat/${convId}`);
+        router.push(`/${workspace}/${surface}/${convId}`);
       };
 
       // In-app channel: sticky toast + unread dot, unless the conversation
