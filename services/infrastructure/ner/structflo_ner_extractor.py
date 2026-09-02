@@ -28,8 +28,12 @@ logger = structlog.get_logger()
 
 # Entity types the fast extractor is specifically tuned for.
 # Its gazetteer coverage for these classes is reliable and deterministic.
+# compound_name earns its place from structflo-ner 0.5.0, where registry and
+# programme identifiers (CHEMBL…, SACC-3060, LGENI-9743) match by regex rather
+# than by gazetteer — the LLM lane labels those inconsistently, half of them
+# landing on accession_number, which QUERY_FILTER_ENTITY_TYPES then drops.
 FAST_TARGET_TYPES: frozenset[str] = frozenset(
-    {"accession_number", "gene_name", "screening_method", "target"},
+    {"accession_number", "compound_name", "gene_name", "screening_method", "target"},
 )
 
 # Providers langextract can route for NER. Anything else (anthropic, azure)

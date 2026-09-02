@@ -135,3 +135,25 @@ async def test_unknown_llm_failure_still_propagates(stub_structflo):
     ex = StructfloNERExtractor(model_id="gemma3:27b", provider="ollama")
     with pytest.raises(RuntimeError):
         await ex.extract("some text")
+
+
+async def test_registry_identifiers_survive_the_fast_type_filter():
+    """Regex-matched identifiers must reach the caller as compound_name.
+
+    structflo-ner 0.5.0 types CHEMBL and programme identifiers compound_name from
+    the deterministic lane. The LLM lane types the same tokens accession_number
+    roughly half the time, and the chat planner keeps only compound_name /
+    target / gene_name as retrieval filters — so dropping compound_name from
+    FAST_TARGET_TYPES leaves an identifier query with no filter at all.
+    """
+    # Unsupported provider → LLM lane off, so this exercises the fast lane alone.
+    extractor = StructfloNERExtractor(model_id="unused", provider="anthropic")
+
+    found = {
+        (e.text, e.entity_type)
+        for e in await extractor.extract("SACC-3060 and CHEMBL5077530 inhibit DprE1 (Rv3790).")
+    }
+
+    assert ("CHEMBL5077530", "compound_name") in found
+    assert ("SACC-3060", "compound_name") in found
+    assert ("Rv3790", "accession_number") in found
