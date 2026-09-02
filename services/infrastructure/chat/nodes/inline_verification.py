@@ -30,26 +30,14 @@ _FACTUAL_INDICATORS = re.compile(
     re.IGNORECASE,
 )
 
-# A citation trailing the sentence-ending period — "…0.19 µM. [2]" — is a common
-# style, and the splitter below would tear it off into a fragment too short to
-# survive the length filter, leaving the claim counted as uncited. Move such
-# markers back inside the sentence before counting. This normalisation is local
-# to the count: the answer shown to the reader is never altered.
-#
-# Only reattach when the citation genuinely ends a sentence: what follows must be
-# the end of the answer or the start of the next one. Without that guard the
-# pattern also fires on an abbreviation's period ("…, e.g. [1] in DMSO buffer."),
-# dragging the citation backward onto a claim it does not support and
-# manufacturing coverage. A sentence opening with a digit or a lowercase word
-# keeps the old under-count — a conservative failure, and the safe direction.
-_TRAILING_CITATION = re.compile(
-    r"([.!?])\s*((?:\[\d{1,2}(?:\s*,\s*\d{1,2})*\]\s*)+)(?=[A-Z]|$)",
-)
-
-
-def _attach_trailing_citations(answer: str) -> str:
-    """Pull citation markers that trail a sentence back inside it."""
-    return _TRAILING_CITATION.sub(lambda m: f" {m.group(2).strip()}{m.group(1)} ", answer)
+# A citation trailing its sentence — "…0.19 µM. [2]" — splits off as a fragment
+# of its own, which the length filter below would then discard, leaving the claim
+# it supports counted as uncited. Merge such fragments back into the sentence
+# they belong to. Done after the split rather than by rewriting the answer: the
+# boundaries are already decided here, so this cannot create or destroy one, and
+# cannot drag a citation backward across an abbreviation's period the way a
+# text-level substitution does.
+_CITATION_ONLY = re.compile(r"(?:\[\d{1,2}(?:\s*,\s*\d{1,2})*\]\s*)+")
 
 
 class InlineVerificationNode:
@@ -123,9 +111,17 @@ class InlineVerificationNode:
     def _compute_citation_coverage(self, answer: str) -> dict:
         """Parse answer, classify sentences, compute coverage ratio."""
         # Split into sentences (rough but effective)
-        counted = _attach_trailing_citations(answer)
-        sentences = re.split(r"(?<=[.!?])\s+", counted.strip())
-        sentences = [s.strip() for s in sentences if len(s.strip()) > 10]
+        split = re.split(r"(?<=[.!?])\s+", answer.strip())
+
+        merged: list[str] = []
+        for fragment in split:
+            stripped = fragment.strip()
+            if merged and _CITATION_ONLY.fullmatch(stripped):
+                merged[-1] = f"{merged[-1]} {stripped}"
+            else:
+                merged.append(fragment)
+
+        sentences = [s.strip() for s in merged if len(s.strip()) > 10]
 
         factual_sentences = 0
         cited_sentences = 0
