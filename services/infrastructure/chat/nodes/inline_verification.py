@@ -30,6 +30,18 @@ _FACTUAL_INDICATORS = re.compile(
     re.IGNORECASE,
 )
 
+# A citation trailing the sentence-ending period — "…0.19 µM. [2]" — is a common
+# style, and the splitter below would tear it off into a fragment too short to
+# survive the length filter, leaving the claim counted as uncited. Move such
+# markers back inside the sentence before counting. This normalisation is local
+# to the count: the answer shown to the reader is never altered.
+_TRAILING_CITATION = re.compile(r"([.!?])(\s*(?:\[\d{1,2}(?:\s*,\s*\d{1,2})*\]\s*)+)")
+
+
+def _attach_trailing_citations(answer: str) -> str:
+    """Pull citation markers that trail a sentence back inside it."""
+    return _TRAILING_CITATION.sub(lambda m: f" {m.group(2).strip()}{m.group(1)} ", answer)
+
 
 class InlineVerificationNode:
     """Verify grounding with algorithmic check + selective LLM fallback."""
@@ -102,7 +114,8 @@ class InlineVerificationNode:
     def _compute_citation_coverage(self, answer: str) -> dict:
         """Parse answer, classify sentences, compute coverage ratio."""
         # Split into sentences (rough but effective)
-        sentences = re.split(r"(?<=[.!?])\s+", answer.strip())
+        counted = _attach_trailing_citations(answer)
+        sentences = re.split(r"(?<=[.!?])\s+", counted.strip())
         sentences = [s.strip() for s in sentences if len(s.strip()) > 10]
 
         factual_sentences = 0
