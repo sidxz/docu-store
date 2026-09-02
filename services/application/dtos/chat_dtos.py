@@ -187,6 +187,10 @@ class ChatMessageDTO(BaseModel):
     agent_trace: AgentTraceDTO | None = None
     token_usage: TokenUsageDTO | None = None
     query_context: QueryContextDTO | None = None
+    # Papers the literature searches returned this turn. Persisted with the
+    # message because the panel is rebuilt from it when a conversation is
+    # reopened -- a citation whose panel is empty leads nowhere.
+    literature_results: list[dict] | None = None
     created_at: datetime
 
 

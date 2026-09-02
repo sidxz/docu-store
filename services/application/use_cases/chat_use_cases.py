@@ -428,6 +428,8 @@ class SendMessageUseCase:
             grounding_is_grounded: bool | None = None
             grounding_confidence: float | None = None
             query_context: QueryContextDTO | None = None
+            literature_results: list[dict] = []
+            literature_seen: set[tuple] = set()
             structured_blocks: list[ContentBlockDTO] = []
             reasoning_parts: list[str] = []
 
@@ -490,6 +492,15 @@ class SendMessageUseCase:
                                 smiles_detected=event.query_context_smiles or [],
                                 smiles_resolved=event.query_context_smiles_resolved or [],
                             )
+                        elif event.type == "literature_results":
+                            # The agent searches several times a turn; keep them
+                            # all, in the order first seen, so the reopened panel
+                            # holds every paper the answer could have cited.
+                            for hit in event.literature_results or []:
+                                key = (hit.get("source"), hit.get("external_id"))
+                                if key not in literature_seen:
+                                    literature_seen.add(key)
+                                    literature_results.append(hit)
                         elif event.type == "structured_block" and event.block:
                             structured_blocks.append(event.block)
                         elif event.type == "grounding_result":
@@ -552,6 +563,7 @@ class SendMessageUseCase:
                         structured_content=structured_blocks or None,
                         token_usage=token_usage,
                         query_context=query_context,
+                        literature_results=literature_results or None,
                         created_at=datetime.now(UTC),
                     )
                     await self._repo.append_message(assistant_msg)

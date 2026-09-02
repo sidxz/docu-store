@@ -586,6 +586,8 @@ def _message_to_doc(msg: ChatMessageDTO) -> dict:
         doc["token_usage"] = msg.token_usage.model_dump(mode="json")
     if msg.query_context:
         doc["query_context"] = msg.query_context.model_dump(mode="json")
+    if msg.literature_results:
+        doc["literature_results"] = msg.literature_results
     return doc
 
 
@@ -614,5 +616,6 @@ def _doc_to_message(doc: dict) -> ChatMessageDTO:
         agent_trace=agent_trace,
         token_usage=token_usage,
         query_context=query_context,
+        literature_results=doc.get("literature_results"),
         created_at=_utc(doc["created_at"]),
     )

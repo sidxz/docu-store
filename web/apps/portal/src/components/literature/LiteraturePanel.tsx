@@ -1,7 +1,7 @@
 "use client";
 
 import { Library, X } from "lucide-react";
-import type { LiteratureHit } from "@docu-store/types";
+import type { LiteratureHit, SourceCitation } from "@docu-store/types";
 
 import { useChatStore } from "@/lib/stores/chat-store";
 import { LiteratureResultCard } from "./LiteratureResultCard";
@@ -13,9 +13,14 @@ import { LiteratureResultCard } from "./LiteratureResultCard";
  */
 export function LiteraturePanel({
   results,
+  sources,
   onClose,
 }: {
   results: LiteratureHit[];
+  /** Citations from the same turn as `results` — passed in rather than read
+   *  from the store so a reopened conversation shows its own, not the last
+   *  streamed one's. */
+  sources: SourceCitation[];
   onClose: () => void;
 }) {
   const ingestable = results.filter((r) => r.is_ingestable).length;
@@ -23,9 +28,6 @@ export function LiteraturePanel({
   // Which of these the answer actually leaned on. Matched by external_url
   // rather than by citation id: the id is a uuid5 of the same URL, so the URL
   // is the thing they genuinely share and needs no hashing in the browser.
-  const finalSources = useChatStore((s) => s.finalSources);
-  const streamingSources = useChatStore((s) => s.streamingSources);
-  const sources = finalSources ?? streamingSources;
   const citedUrls = new Set(
     sources.map((s) => s.external_url).filter((u): u is string => !!u),
   );

@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import type { SourceCitation } from "@docu-store/types";
 import { useChatStore } from "@/lib/stores/chat-store";
+import { useConversation } from "@/hooks/use-chat";
 import { ConversationSidebar } from "@/components/chat/ConversationSidebar";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { LiteraturePanel } from "./LiteraturePanel";
@@ -21,7 +23,40 @@ export function LiteratureLayout({
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
-  const results = useChatStore((s) => s.literatureResults);
+
+  // The live list only speaks for the conversation being streamed. Reopening a
+  // past conversation has no stream to fill it, so fall back to what the last
+  // answered turn was persisted with — otherwise its citations lead to an empty
+  // panel, which is the same as leading nowhere.
+  const live = useChatStore((s) => s.literatureResults);
+  const liveFinal = useChatStore((s) => s.finalSources);
+  const liveStreaming = useChatStore((s) => s.streamingSources);
+  const streamingConversationId = useChatStore((s) => s.streamingConversationId);
+  const { data } = useConversation(conversationId);
+
+  const streamingHere = !!conversationId && streamingConversationId === conversationId;
+  let results = streamingHere ? live : [];
+  // Papers and citations must come from the *same* turn, or the green tint
+  // marks the wrong cards and [n] scrolls to the wrong paper.
+  let sources: SourceCitation[] = streamingHere ? (liveFinal ?? liveStreaming) : [];
+
+  if (!streamingHere) {
+    const messages = data?.messages ?? [];
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const message = messages[i];
+      if (message.role === "assistant" && message.literature_results?.length) {
+        results = message.literature_results;
+        sources = message.sources ?? [];
+        break;
+      }
+    }
+    // A turn that has just finished streaming is in the store but not yet
+    // refetched; prefer the live pair over an empty fallback.
+    if (results.length === 0) {
+      results = live;
+      sources = liveFinal ?? liveStreaming;
+    }
+  }
 
   const showPanel = results.length > 0 && panelOpen;
 
@@ -64,7 +99,11 @@ export function LiteratureLayout({
       >
         <div className="h-full w-96">
           {results.length > 0 && (
-            <LiteraturePanel results={results} onClose={() => setPanelOpen(false)} />
+            <LiteraturePanel
+              results={results}
+              sources={sources}
+              onClose={() => setPanelOpen(false)}
+            />
           )}
         </div>
       </div>

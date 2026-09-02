@@ -148,6 +148,10 @@ export interface ChatMessage {
   agent_trace: AgentTrace | null;
   token_usage: TokenUsage | null;
   query_context?: QueryContext | null;
+  /** Papers the literature searches returned for this message. Persisted so a
+   *  reopened conversation can rebuild its panel — a citation whose panel is
+   *  empty leads nowhere. */
+  literature_results?: LiteratureHit[] | null;
   created_at: string;
 }
 
