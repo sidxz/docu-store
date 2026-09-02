@@ -114,9 +114,8 @@ class MongoChatRepository:
             "owner_id": str(owner_id),
             "is_archived": False,
             "message_count": {"$gt": 0},
-            # The dashboard's recents link into /chat, so a literature
-            # conversation listed here would open on the wrong surface.
-            **_surface_query(ChatSurface.RESEARCH),
+            # Recents now span both surfaces, interleaved by recency; each
+            # card routes to the surface its own conversation belongs to.
         }
         cursor = self._conversations.find(query).sort("updated_at", -1).limit(limit)
         return [_doc_to_conversation(doc) async for doc in cursor]
