@@ -1090,6 +1090,7 @@ def create_container() -> Container:
         ),
         prompt_repository=c[PromptRepositoryPort],
         reranker=c[Reranker],
+        accumulator_budget_chars=settings.literature_accumulator_budget_chars,
     )
     literature_agent = lambda c: ThinkingAgent(
         query_planning=c[QueryPlanningNode],

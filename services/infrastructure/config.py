@@ -465,6 +465,22 @@ class Settings(BaseSettings):
         validation_alias="CHAT_CONTEXT_BUDGET_CHARS",
         description="Max chars for assembled context in Thinking Mode (~3000 tokens).",
     )
+    literature_accumulator_budget_chars: int = Field(
+        default=1_000_000,
+        validation_alias="LITERATURE_ACCUMULATOR_BUDGET_CHARS",
+        description=(
+            "Retrieval-loop capacity for Literature mode. Separate from the "
+            "assembly budget because a literature search accumulates 25-50 full "
+            "abstracts per call: charging those against the 12k assembly budget "
+            "ends the agentic loop before its second iteration, so the model "
+            "never sees a result before choosing its next query. Set high "
+            "deliberately — one measured round already reached 173,485 chars, so "
+            "anything near that reintroduces the bug. The real bounds on this "
+            "loop are chat_agent_max_iterations and the total timeout; this "
+            "value is only a runaway backstop. Assembly's own 12k budget still "
+            "decides what reaches the answer."
+        ),
+    )
     chat_verification_coverage_threshold: float = Field(
         default=0.7,
         validation_alias="CHAT_VERIFICATION_COVERAGE_THRESHOLD",

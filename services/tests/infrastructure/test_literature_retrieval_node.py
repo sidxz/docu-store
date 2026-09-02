@@ -117,3 +117,37 @@ async def test_results_beyond_the_rerank_cap_are_kept_and_sort_last():
     tail = ranked[-5:]
     assert all(r.rerank_score == 0.0 for r in tail)
     assert ranked[0].rerank_score > 0.0
+
+
+from infrastructure.chat.nodes.agentic_retrieval import AgenticRetrievalNode
+from infrastructure.chat.retrieval_accumulator import RetrievalAccumulator
+from infrastructure.config import settings
+
+
+def test_default_accumulator_budget_is_unchanged_for_the_shared_node():
+    """Deep Research must keep the exact behaviour it has today."""
+    node = AgenticRetrievalNode(
+        tool_llm=object(),
+        tool_registry=object(),
+        prompt_repository=object(),
+    )
+
+    assert node._accumulator_budget is None
+    assert RetrievalAccumulator(node._accumulator_budget)._budget == (
+        settings.chat_context_budget_chars
+    )
+
+
+def test_literature_gets_a_budget_large_enough_to_iterate():
+    """One round of 3-4 searches accumulates 100k-173k chars (measured)."""
+    node = LiteratureRetrievalNode(
+        tool_llm=object(),
+        tool_registry=object(),
+        prompt_repository=object(),
+        accumulator_budget_chars=settings.literature_accumulator_budget_chars,
+    )
+
+    # One measured round of 3-4 searches reached 173,485 chars. The budget must
+    # clear that with room, or the loop still ends at iteration 0.
+    assert node._accumulator_budget >= 500_000
+    assert node._accumulator_budget > settings.chat_context_budget_chars * 10

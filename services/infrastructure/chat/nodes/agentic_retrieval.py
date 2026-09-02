@@ -52,10 +52,14 @@ class AgenticRetrievalNode:
         tool_llm: ToolCallingLLMPort,
         tool_registry: ToolRegistry,
         prompt_repository: PromptRepositoryPort,
+        accumulator_budget_chars: int | None = None,
     ) -> None:
         self._tool_llm = tool_llm
         self._tools = tool_registry
         self._prompts = prompt_repository
+        # None keeps RetrievalAccumulator's own default, which is
+        # settings.chat_context_budget_chars. Only Literature mode overrides it.
+        self._accumulator_budget = accumulator_budget_chars
 
     async def run(
         self,
@@ -87,7 +91,7 @@ class AgenticRetrievalNode:
         max_iterations = settings.chat_agent_max_iterations
         iteration_timeout = settings.chat_agent_iteration_timeout_s
         total_timeout = settings.chat_agent_total_timeout_s
-        accumulator = RetrievalAccumulator()
+        accumulator = RetrievalAccumulator(self._accumulator_budget)
         loop_start = time.monotonic()
 
         # ── 0. Seed carried-forward citations from previous grounded turn ──
