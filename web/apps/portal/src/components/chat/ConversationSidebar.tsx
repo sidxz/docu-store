@@ -29,7 +29,6 @@ export function ConversationSidebar({
   // Derived from basePath rather than passed separately: two props that must
   // agree are two props that can disagree.
   const surface: ChatSurface = surfaceFromBasePath(basePath);
-  const sidebarSurface = surface;
   const EmptySurfaceIcon = SURFACES[surface].icon;
   const { data: conversations, isLoading } = useConversations(surface);
   const createConversation = useCreateConversation(surface);
@@ -100,8 +99,8 @@ export function ConversationSidebar({
           </div>
         ) : !conversations?.length ? (
           <div className="p-4 text-center text-text-muted text-sm">
-            <EmptySurfaceIcon className={cn("w-8 h-8 mx-auto mb-2 opacity-50", SURFACES[sidebarSurface].iconColor)} />
-            <p>{SURFACES[sidebarSurface].emptyListText}</p>
+            <EmptySurfaceIcon className={cn("w-8 h-8 mx-auto mb-2 opacity-50", SURFACES[surface].iconColor)} />
+            <p>{SURFACES[surface].emptyListText}</p>
           </div>
         ) : (
           <div className="p-2 space-y-1">

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, MessageSquare, ChevronLeft } from "lucide-react";
+import { conversationHref } from "@/lib/surfaces";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRecentChats, useCreateConversation } from "@/hooks/use-chat";
@@ -37,7 +38,9 @@ export function RecentChatsPanel({ workspace }: { workspace: string }) {
 
   const handleNew = async () => {
     const conv = await createConversation.mutateAsync(undefined);
-    router.push(`/${workspace}/chat/${conv.conversation_id}`);
+    // Research by default (useCreateConversation() takes no surface here);
+    // routed through the helper so the URL follows if that ever changes.
+    router.push(conversationHref(workspace, "research", conv.conversation_id));
   };
 
   const inFolder = selectedFolderId !== null;
