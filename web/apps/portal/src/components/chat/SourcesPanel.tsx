@@ -115,7 +115,7 @@ function RetrievalFilters({ conversationId }: { conversationId?: string }) {
           <span
             key={`${t.entity_type}:${t.entity_text}`}
             title={t.entity_type.replace(/_name$/, "").replace(/_/g, " ")}
-            className="rounded-full border border-border-subtle bg-surface-sunken px-2 py-0.5 text-2xs text-text-secondary"
+            className="rounded-full border border-border-subtle bg-surface-sunken px-2 py-0.5 text-[0.6875rem] text-text-secondary"
           >
             {t.entity_text}
           </span>
@@ -203,7 +203,7 @@ function SourceArtifactCard({
 
           {/* Score */}
           {best.similarity_score != null && (
-            <span className="inline-block mt-1.5 text-2xs font-mono text-text-muted">
+            <span className="inline-block mt-1.5 text-[0.6875rem] font-mono text-text-muted">
               relevance: {best.similarity_score.toFixed(2)}
             </span>
           )}
@@ -294,7 +294,7 @@ function SourcePageRow({
         }}
         className={`group flex items-start gap-2 px-3 py-2 hover:bg-surface-hover transition-colors border-t border-border-subtle rounded-sm ${previewSrc ? "cursor-pointer" : ""} ${isHighlighted ? "citation-highlight" : ""}`}
       >
-        <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-accent-light text-accent-text font-semibold text-2xs flex-shrink-0 mt-0.5">
+        <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-accent-light text-accent-text font-semibold text-[0.6875rem] flex-shrink-0 mt-0.5">
           {citation.citation_index}
         </span>
 
@@ -314,12 +314,12 @@ function SourcePageRow({
             {pageLabel}
           </Link>
           {citation.text_excerpt && (
-            <p className="text-2xs text-text-muted mt-0.5 line-clamp-2 leading-relaxed">
+            <p className="text-[0.6875rem] text-text-muted mt-0.5 line-clamp-2 leading-relaxed">
               {citation.text_excerpt}
             </p>
           )}
           {devMode && (
-            <div className="flex gap-2 mt-0.5 text-2xs font-mono text-text-muted">
+            <div className="flex gap-2 mt-0.5 text-[0.6875rem] font-mono text-text-muted">
               {citation.similarity_score != null && (
                 <span>score: <span className="text-blue-500">{citation.similarity_score.toFixed(3)}</span></span>
               )}

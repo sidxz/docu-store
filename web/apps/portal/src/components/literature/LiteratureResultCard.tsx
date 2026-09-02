@@ -67,7 +67,7 @@ export function LiteratureResultCard({
       } ${highlighted ? "ring-2 ring-emerald-500/60" : ""}`}
     >
       {cited && (
-        <p className="mb-1.5 flex items-center gap-1 text-2xs font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+        <p className="mb-1.5 flex items-center gap-1 text-[0.6875rem] font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
           {citationIndex != null ? (
             <span className="inline-flex h-4 min-w-4 items-center justify-center rounded bg-emerald-600 px-1 font-semibold text-white">
               {citationIndex}
@@ -112,7 +112,7 @@ export function LiteratureResultCard({
 
       <div className="mt-3 flex items-center justify-between gap-2">
         {hit.is_ingestable ? (
-          <Badge variant="outline" className="gap-1 text-2xs uppercase">
+          <Badge variant="outline" className="gap-1 text-[0.6875rem] uppercase">
             <BookOpen className="h-3 w-3" />
             {hit.licence}
           </Badge>
@@ -121,7 +121,7 @@ export function LiteratureResultCard({
           // to fetch" are entirely different situations for a reader.
           <Badge
             variant="outline"
-            className="gap-1 text-2xs text-text-muted"
+            className="gap-1 text-[0.6875rem] text-text-muted"
             title={hit.ingest_blocker ?? undefined}
           >
             <Lock className="h-3 w-3" />
@@ -169,7 +169,7 @@ export function LiteratureResultCard({
       </div>
 
       {ingest.isError && (
-        <p className="mt-2 text-2xs text-destructive">{ingest.error.message}</p>
+        <p className="mt-2 text-[0.6875rem] text-destructive">{ingest.error.message}</p>
       )}
     </article>
   );

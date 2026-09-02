@@ -61,7 +61,7 @@ function SourceCard({
             : "border-border-default bg-surface-elevated hover:bg-surface-hover"
         }`}
       >
-        <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-accent-light text-accent-text font-semibold text-2xs">
+        <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-accent-light text-accent-text font-semibold text-[0.6875rem]">
           {source.citation_index}
         </span>
         {isLiterature ? (
@@ -81,7 +81,7 @@ function SourceCard({
       </a>
       {/* Dev-mode: score + excerpt length */}
       {devMode && (
-        <div className="flex gap-2 px-1 mt-0.5 text-2xs font-mono text-text-muted">
+        <div className="flex gap-2 px-1 mt-0.5 text-[0.6875rem] font-mono text-text-muted">
           {source.similarity_score != null && (
             <span>score: <span className="text-blue-500">{source.similarity_score.toFixed(3)}</span></span>
           )}
