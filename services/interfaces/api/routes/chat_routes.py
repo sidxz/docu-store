@@ -63,9 +63,9 @@ class SendMessageRequest(BaseModel):
     """Request to send a message in a conversation."""
 
     message: str = Field(..., min_length=1, max_length=10000)
-    mode: Literal["quick", "thinking", "deep_thinking"] | None = Field(
+    mode: Literal["quick", "thinking", "deep_thinking", "literature"] | None = Field(
         default=None,
-        description="Pipeline mode. 'quick' = 4-step, 'thinking' = 5-stage, 'deep_thinking' = thinking + page images. None = server default.",
+        description="Pipeline mode. 'quick' = 4-step, 'thinking' = 5-stage, 'deep_thinking' = thinking + page images, 'literature' = published papers rather than this corpus. None = server default.",
     )
     reasoning: (
         dict[Literal["synthesis", "retrieval", "base"], Literal["off", "low", "medium", "high"]]

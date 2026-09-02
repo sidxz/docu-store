@@ -686,15 +686,24 @@ class ToolRegistry:
         artifact_read_model: ArtifactReadModel | None = None,
         compound_vector_store: CompoundVectorStore | None = None,
         compound_activity_query: CompoundActivityQuery | None = None,
+        literature_client: object | None = None,
+        literature_only: bool = False,
     ) -> None:
-        self._tools: dict[
-            str,
-            SearchDocumentsTool
-            | SearchSummariesTool
-            | GetPageContentTool
-            | SearchStructuredBioactivityTool
-            | SearchCompoundStructureTool,
-        ] = {
+        self._tools: dict[str, Any] = {}
+
+        # Literature chat gets exactly one tool. Expressed as an early return
+        # rather than a filter over the full set, so the corpus tools are never
+        # constructed for it and cannot be reached by a hallucinated tool name.
+        if literature_only:
+            if literature_client is None:
+                msg = "a literature-only ToolRegistry needs a literature client"
+                raise ValueError(msg)
+            from infrastructure.chat.tools.literature_tools import SearchLiteratureTool
+
+            self._tools["search_literature"] = SearchLiteratureTool(literature_client)
+            return
+
+        self._tools = {
             "search_documents": SearchDocumentsTool(hierarchical_search),
             "search_summaries": SearchSummariesTool(summary_search),
             "get_page_content": GetPageContentTool(page_read_model),

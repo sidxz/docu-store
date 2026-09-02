@@ -137,11 +137,43 @@ already reaches it, so nothing new had to be injected to read the value.
    identity only and re-fetches the record: every fact the decision turns on,
    the licence above all, is read server-side. A gate the caller supplies the
    input to is not a gate. Refusal and dedup both land before the PDF fetch.
-5. **Tool + mode** — `SearchLiteratureTool`; `ToolRegistry` exposes only it when
-   mode is `literature`.
+5. ~~**Tool + mode** — `SearchLiteratureTool`; `ToolRegistry` exposes only it
+   when mode is `literature`.~~ **Done.** No mode threaded through the pipeline:
+   the router already picks *agents* by mode, so literature is its own
+   `ThinkingAgent` over a literature-only registry, the same trick
+   `deep_thinking` uses. Citations are synthetic — `uuid5` of the DOI, carrying
+   `source_type: "literature"` and `external_url`.
 6. **Frontend** — `/[workspace]/literature`, `LiteratureResultCard` with the
    OA badge and the Private/Workspace ingest split button, flag-gated sidebar
    entry. `ChatPanel` / `MessageList` / `ChatInput` reused unchanged.
+
+## The query trap
+
+Europe PMC's default search matches full text, and it only has full text for
+open papers. So handing it the user's question verbatim returns what is *open*
+before what is *relevant* — and the mistake is invisible, because every result
+comes back with an Add button.
+
+"what are known inhibitors of Pks13", measured:
+
+| Query | Hits | Top results | Ingestable |
+|---|---|---|---|
+| the question, verbatim | 61 | a TB treatment review, an assay-artifact paper | **6/6** |
+| `Pks13 inhibitor` | 289 | on-target | 1/6 |
+| `TITLE_ABS:"Pks13" AND TITLE_ABS:"inhibitor"` | 19 | the actual med-chem series | 1/6 |
+
+Precision and ingestability are inversely correlated: the better the query, the
+more of the top results are paywalled J Med Chem and Eur J Med Chem papers. Two
+consequences, both load-bearing — the tool description teaches the field syntax
+rather than leaving the model to guess, and **nothing sorts or filters results
+by ingestability**, or the most relevant papers get systematically buried.
+
+## What the surface is for
+
+Literature chat answers *what should I read*; Deep Research answers *what does
+it say*. It can never do the second — it only ever sees abstracts. The loop is:
+ask here, add the open papers, wait for the parse, ask again in Deep Research
+and get an answer grounded in full text with CSER molecule blocks.
 
 ## Checks
 

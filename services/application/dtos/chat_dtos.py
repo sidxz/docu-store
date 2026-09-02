@@ -20,6 +20,7 @@ class AgentEvent(BaseModel):
         "step_started",
         "step_completed",
         "retrieval_results",
+        "literature_results",
         "token",
         "reasoning_token",
         "structured_block",
@@ -47,6 +48,10 @@ class AgentEvent(BaseModel):
     # Grounding verification result (emitted as grounding_result event)
     grounding_is_grounded: bool | None = None
     grounding_confidence: float | None = None
+    # Papers found by search_literature (emitted as literature_results event).
+    # Carried whole rather than as citations: the cards need the licence and the
+    # ingest verdict, which a citation has no business holding.
+    literature_results: list[dict] | None = None
     # Query context (emitted as query_context event)
     query_context_entities: list[dict] | None = None
     query_context_authors: list[str] | None = None
@@ -75,6 +80,12 @@ class SourceCitationDTO(BaseModel):
     text_excerpt: str | None = None
     similarity_score: float | None = None
     citation_index: int
+    # "document" cites a page in this corpus; "literature" cites a paper the
+    # agent has only ever seen the abstract of. The client renders the two
+    # differently on purpose -- an abstract-derived claim should not look as
+    # grounded as one read off a page.
+    source_type: str = "document"
+    external_url: str | None = None
 
 
 # --- Content Blocks ---

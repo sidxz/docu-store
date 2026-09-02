@@ -6,6 +6,26 @@ import type { Bioactivity } from "./extraction";
 
 // --- Source citations ---
 
+/** A paper Europe PMC knows about, which this workspace may or may not hold. */
+export interface LiteratureHit {
+  external_id: string;
+  source: string;
+  title: string;
+  doi: string | null;
+  pmcid: string | null;
+  abstract: string | null;
+  journal: string | null;
+  year: number | null;
+  authors: string | null;
+  licence: string | null;
+  is_open_access: boolean;
+  url: string;
+  /** Whether this workspace may keep a copy. Decided from the licence, not the access flag. */
+  is_ingestable: boolean;
+  /** Why not, in words meant for a reader. Null when ingestable. */
+  ingest_blocker: string | null;
+}
+
 export interface SourceCitation {
   artifact_id: string;
   artifact_title: string | null;
@@ -17,6 +37,13 @@ export interface SourceCitation {
   text_excerpt: string | null;
   similarity_score: number | null;
   citation_index: number;
+  /** "document" cites a page in this corpus; "literature" cites a paper the
+   *  agent has only seen the abstract of. Render the two differently — an
+   *  abstract-derived claim should not look as grounded as one read off a page,
+   *  and its artifact_id points at nothing storable. */
+  source_type?: "document" | "literature";
+  /** Where to send a reader for a literature citation. Never a document route. */
+  external_url?: string | null;
 }
 
 // --- Retrieval filters ---
@@ -179,6 +206,7 @@ export interface AgentEvent {
     | "structured_block"
     | "grounding_result"
     | "query_context"
+    | "literature_results"
     | "done"
     | "error";
   step?: string;
@@ -198,6 +226,7 @@ export interface AgentEvent {
   grounding_is_grounded?: boolean;
   grounding_confidence?: number;
   query_context_entities?: NerFilterTag[];
+  literature_results?: LiteratureHit[];
 }
 
 export interface GroundingStatus {

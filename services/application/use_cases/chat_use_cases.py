@@ -361,7 +361,7 @@ class SendMessageUseCase:
         owner_id: UUID,
         message: str,
         allowed_artifact_ids: list[UUID] | None = None,
-        mode: Literal["quick", "thinking", "deep_thinking"] | None = None,
+        mode: Literal["quick", "thinking", "deep_thinking", "literature"] | None = None,
         reasoning: dict[str, str] | None = None,
     ) -> AsyncGenerator[AgentEvent, None]:
         from infrastructure.llm import reasoning_context

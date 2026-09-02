@@ -258,6 +258,8 @@ class ContextAssemblyNode:
                 elif r.query_source.startswith("tool_structure:"):
                     compound_name = r.query_source.split(":", 1)[1] if ":" in r.query_source else ""
                     label = f"COMPOUND STRUCTURE DATA for {compound_name}"
+                elif r.source_type == "literature":
+                    label = f"ABSTRACT ONLY - {artifact_title}"
                 elif r.source_type == "chunk":
                     label = f"Page {r.page_index}" if r.page_index is not None else "Page"
                     if r.page_name:
@@ -279,6 +281,10 @@ class ContextAssemblyNode:
                         text_excerpt=r.matched_text[:500],
                         similarity_score=self._score(r),
                         citation_index=idx,
+                        source_type=(
+                            "literature" if r.source_type == "literature" else "document"
+                        ),
+                        external_url=r.external_url,
                     ),
                 )
                 idx += 1

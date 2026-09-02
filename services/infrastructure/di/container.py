@@ -1071,11 +1071,38 @@ def create_container() -> Container:
         include_images=True,
     )
 
-    # --- Agent Router (dispatches to quick, thinking, or deep thinking) ---
+    # --- Literature Mode (the thinking pipeline, one tool, no corpus) ---
+    # Its own registry and retrieval node rather than a mode threaded through
+    # four layers: the router already picks agents by mode, and deep_thinking is
+    # the same trick. Built unconditionally; LITERATURE_ENABLED closes the routes.
+    literature_retrieval = lambda c: AgenticRetrievalNode(
+        tool_llm=tool_calling_llm,
+        tool_registry=ToolRegistry(
+            hierarchical_search=c[HierarchicalSearchUseCase],
+            summary_search=c[SearchSummariesUseCase],
+            page_read_model=c[PageReadModel],
+            literature_client=c[EuropePmcClient],
+            literature_only=True,
+        ),
+        prompt_repository=c[PromptRepositoryPort],
+    )
+    literature_agent = lambda c: ThinkingAgent(
+        query_planning=c[QueryPlanningNode],
+        agentic_retrieval=literature_retrieval(c),
+        context_assembly=c[ContextAssemblyNode],
+        adaptive_synthesis=c[AdaptiveSynthesisNode],
+        inline_verification=c[InlineVerificationNode],
+        answer_formatting=c[AnswerFormattingNode],
+        tag_dictionary=c[TagDictionaryReadModel],
+        max_retries=settings.chat_max_retries,
+    )
+
+    # --- Agent Router (quick, thinking, deep thinking, literature) ---
     container[ChatAgentPort] = lambda c: ChatAgentRouter(
         quick_agent=quick_agent(c),
         thinking_agent=thinking_agent(c),
         deep_thinking_agent=deep_thinking_agent(c),
+        literature_agent=literature_agent(c),
         default_mode=settings.chat_default_mode,
     )
 
