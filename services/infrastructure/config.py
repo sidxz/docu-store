@@ -551,6 +551,16 @@ class Settings(BaseSettings):
     self_serve_enabled: bool = Field(default=False, validation_alias="APP_SELF_SERVE_ENABLED")
     terms_version: str = Field(default="2026-08-28", validation_alias="APP_TERMS_VERSION")
 
+    # Literature search: query Europe PMC and ingest open-licensed papers. Off by
+    # default because it puts documents nobody in the workspace vetted into the
+    # same corpus the evaluations run against, and because every ingest spends
+    # parse, NER, CSER and embedding budget. The portal reads the mirror of this
+    # at APP_LITERATURE_ENABLED to decide whether to offer the surface at all.
+    literature_enabled: bool = Field(
+        default=False,
+        validation_alias="LITERATURE_ENABLED",
+    )
+
     # Duar (AuthZ mode)
     duar_url: str = Field(default="http://localhost:9003", validation_alias="DUAR_URL")
     duar_service_key: str = Field(default="", validation_alias="DUAR_SERVICE_KEY")

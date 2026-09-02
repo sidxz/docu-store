@@ -8,6 +8,8 @@ export interface AppConfig {
   duarUrl: string;
   /** Duar SELF_SERVE_ENABLED mirror — shows sign-up / invite links (public instances only). */
   selfServeEnabled: boolean;
+  /** Backend LITERATURE_ENABLED mirror — offers the Literature Search surface at all. */
+  literatureEnabled: boolean;
   googleClientId: string;
   githubClientId: string;
   entraIdClientId: string;
@@ -20,6 +22,7 @@ const defaultConfig: AppConfig = {
   appUrl: "http://localhost:15000",
   duarUrl: "http://localhost:9003",
   selfServeEnabled: false,
+  literatureEnabled: false,
   googleClientId: "",
   githubClientId: "",
   entraIdClientId: "",
@@ -67,6 +70,7 @@ export async function fetchAppConfig(): Promise<AppConfig> {
     duarUrl:
       process.env.NEXT_PUBLIC_DUAR_URL ?? defaultConfig.duarUrl,
     selfServeEnabled: process.env.NEXT_PUBLIC_SELF_SERVE_ENABLED === "true",
+    literatureEnabled: process.env.NEXT_PUBLIC_LITERATURE_ENABLED === "true",
     googleClientId:
       process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? defaultConfig.googleClientId,
     githubClientId:

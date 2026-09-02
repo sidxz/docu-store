@@ -7,6 +7,7 @@ import {
   Search,
   Atom,
   MessageSquare,
+  Library,
   Settings,
   Code2,
   Sun,
@@ -19,6 +20,7 @@ import type { LucideIcon } from "lucide-react";
 import { useThemeStore } from "@/lib/stores/theme-store";
 import { useSidebarStore } from "@/lib/stores/sidebar-store";
 import { useAnalytics } from "@/hooks/use-analytics";
+import { useAppConfig } from "@/lib/app-config";
 
 import { SidebarNavItem } from "./SidebarNavItem";
 import { LogoMark } from "@/components/ui/LogoMark";
@@ -38,11 +40,24 @@ const mainNav: NavItem[] = [
   { label: "Compounds", icon: Atom, href: "/compounds", color: "text-emerald-500" },
 ];
 
+/** Sits after Deep Research: same shape of surface, a different corpus. */
+const literatureNav: NavItem = {
+  label: "Literature",
+  icon: Library,
+  href: "/literature",
+  color: "text-rose-500",
+};
+
 export function Sidebar({ workspaceSlug }: { workspaceSlug: string }) {
   const pathname = usePathname();
   const { theme, toggleTheme } = useThemeStore();
   const { collapsed, toggleCollapsed } = useSidebarStore();
   const { trackEvent } = useAnalytics();
+  const { literatureEnabled } = useAppConfig();
+
+  const nav = literatureEnabled
+    ? [...mainNav.slice(0, 2), literatureNav, ...mainNav.slice(2)]
+    : mainNav;
 
   const isActive = (href: string) => {
     const fullHref = `/${workspaceSlug}${href}`;
@@ -83,7 +98,7 @@ export function Sidebar({ workspaceSlug }: { workspaceSlug: string }) {
           </span>
         )}
         <div className="flex flex-col gap-0.5">
-          {mainNav.map((item) => (
+          {nav.map((item) => (
             <div key={item.label} onClick={() => trackEvent("nav_clicked", { section: item.label.toLowerCase() })}>
               <SidebarNavItem
                 icon={item.icon}
