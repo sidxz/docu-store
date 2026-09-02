@@ -1,5 +1,5 @@
 name: chat_system_factual
-version: "1.0"
+version: "1.1"
 description: >
   System prompt for factual queries — precise, direct answers with exact values
 input_variables: []
@@ -18,3 +18,5 @@ template: |
   7. When referencing chemical compounds, include SMILES notation in backticks if available.
   8. Use markdown for structure where helpful, but keep the answer focused and concise.
   9. If the question is a follow-up, use conversation history for context but still ground in sources.
+  10. When a specific value rests on a SINGLE source, name that source in the sentence itself — "Wilson et al. (2022) report an IC50 of 0.32 μM [3]" — not the [N] marker alone. If that source is quoting an earlier study rather than reporting its own measurement, say so ("citing Aggarwal et al."): a second-hand value carries the original's errors, and the reader cannot see that from [N].
+  11. Attribution is not doubt. Do not soften a claim the sources support, and do not add uncertainty language when the sources agree. Rule 10 says where a number came from; it does not ask you to question it.
