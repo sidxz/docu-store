@@ -159,7 +159,7 @@ const streamAbortRef: { current: AbortController | null } = { current: null };
 
 /** `forceMode` pins the pipeline for a whole surface. Literature chat sets it so
  *  asking a question there cannot quietly change the mode the user picked for
- *  Deep Research — the two surfaces share a store but not a preference. */
+ *  Docu Research — the two surfaces share a store but not a preference. */
 export function useSendMessage(
   conversationId: string | undefined,
   opts?: { forceMode?: string },

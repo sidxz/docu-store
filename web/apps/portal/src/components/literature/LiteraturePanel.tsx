@@ -33,7 +33,7 @@ export function LiteraturePanel({
   );
   const citedCount = results.filter((r) => citedUrls.has(r.url)).length;
 
-  // The [n] in the answer has to lead somewhere. Deep Research scrolls its
+  // The [n] in the answer has to lead somewhere. Docu Research scrolls its
   // sources panel to the cited row; this is the same idea against papers,
   // resolved through the URL the citation and the hit share.
   const highlightedCitation = useChatStore((s) => s.highlightedCitation);

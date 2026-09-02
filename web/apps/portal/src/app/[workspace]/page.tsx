@@ -181,7 +181,7 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-text-primary">
-                    Deep Research
+                    Docu Research
                   </p>
                   <p className="text-xs text-text-muted">
                     Ask questions about your documents

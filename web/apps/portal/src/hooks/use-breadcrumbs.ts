@@ -17,7 +17,7 @@ const LABEL_MAP: Record<string, string> = {
   documents: "Documents",
   search: "Search",
   compounds: "Compounds",
-  chat: "Deep Research",
+  chat: "Docu Research",
   literature: "Literature",
   settings: "Settings",
   upload: "Upload",

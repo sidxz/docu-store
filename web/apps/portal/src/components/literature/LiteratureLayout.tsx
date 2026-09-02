@@ -9,10 +9,10 @@ import { ChatPanel } from "@/components/chat/ChatPanel";
 import { LiteraturePanel } from "./LiteraturePanel";
 
 /**
- * Deep Research's layout with the right-hand panel swapped: papers instead of
+ * Docu Research's layout with the right-hand panel swapped: papers instead of
  * corpus sources. Everything down the middle is reused unchanged, and the mode
  * is pinned here rather than read from the store so that asking a question in
- * this surface cannot change the mode selected for Deep Research.
+ * this surface cannot change the mode selected for Docu Research.
  */
 export function LiteratureLayout({
   workspace,
