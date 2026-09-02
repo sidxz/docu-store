@@ -141,3 +141,26 @@ def test_a_markdown_header_after_a_citation_is_not_absorbed():
 
     assert coverage["ratio"] == 0.0
     assert coverage["total_sentences"] == 2
+
+
+def test_a_mid_answer_trailing_citation_is_not_attributed_backwards():
+    """A trailing citation between two sentences stays with the FOLLOWING one.
+
+    This is an accepted undercount, not an oversight. The splitter only breaks at
+    [.!?] followed by whitespace, so a mid-answer "[7]" is preceded by "]" and is
+    never isolated — it glues onto the next sentence's fragment. Rescuing it would
+    mean pulling a leading citation back across a boundary we cannot distinguish
+    from an abbreviation's period ("…, i.e. [1] Compound 44 …"), which measurably
+    reintroduces the manufactured-coverage regression this file already fixed once.
+
+    Undercounting only causes more verification than necessary; manufacturing
+    coverage suppresses verification that was warranted. We take the safe side.
+    """
+    node = _node()
+    answer = "Page 3 reports a yield of 82%. [7]  A second run reported 79%. [8]"
+
+    result = node._compute_citation_coverage(answer)
+
+    assert result["factual_sentences"] == 2
+    assert result["cited_sentences"] == 1
+    assert result["ratio"] == 0.5

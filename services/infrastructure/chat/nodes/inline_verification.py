@@ -37,6 +37,16 @@ _FACTUAL_INDICATORS = re.compile(
 # boundaries are already decided here, so this cannot create or destroy one, and
 # cannot drag a citation backward across an abbreviation's period the way a
 # text-level substitution does.
+#
+# Only a citation isolated as its OWN fragment gets rescued this way. A citation
+# trailing the middle of a multi-sentence answer stays glued to the sentence that
+# follows it instead — an accepted undercount, pinned by
+# test_a_mid_answer_trailing_citation_is_not_attributed_backwards. Pulling a
+# leading citation run back onto the previous fragment would rescue that shape
+# too, but it also reintroduces the abbreviation regression ("…, i.e. [1]
+# Compound 44 …"), since a fragment boundary made by an abbreviation's period is
+# indistinguishable from a real one at this layer. The undercount is the safe
+# direction: it can only trigger more verification than needed, never less.
 _CITATION_ONLY = re.compile(r"(?:\[\d{1,2}(?:\s*,\s*\d{1,2})*\]\s*)+")
 
 
