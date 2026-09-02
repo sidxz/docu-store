@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, MessageSquare, Loader2 } from "lucide-react";
+import { Plus, Trash2, Loader2 } from "lucide-react";
+import { SURFACE_ICON, SURFACE_ICON_COLOR, surfaceFromBasePath } from "@/lib/surfaces";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useConversations, useCreateConversation, useDeleteConversation } from "@/hooks/use-chat";
@@ -27,7 +28,9 @@ export function ConversationSidebar({
   const router = useRouter();
   // Derived from basePath rather than passed separately: two props that must
   // agree are two props that can disagree.
-  const surface: ChatSurface = basePath === "literature" ? "literature" : "research";
+  const surface: ChatSurface = surfaceFromBasePath(basePath);
+  const sidebarSurface = surface;
+  const EmptySurfaceIcon = SURFACE_ICON[surface];
   const { data: conversations, isLoading } = useConversations(surface);
   const createConversation = useCreateConversation(surface);
   const deleteConversation = useDeleteConversation();
@@ -97,8 +100,8 @@ export function ConversationSidebar({
           </div>
         ) : !conversations?.length ? (
           <div className="p-4 text-center text-text-muted text-sm">
-            <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-40" />
-            <p>No conversations yet</p>
+            <EmptySurfaceIcon className={cn("w-8 h-8 mx-auto mb-2 opacity-50", SURFACE_ICON_COLOR[sidebarSurface])} />
+            <p>{sidebarSurface === "literature" ? "No searches yet" : "No conversations yet"}</p>
           </div>
         ) : (
           <div className="p-2 space-y-1">
@@ -133,6 +136,10 @@ function ConversationItem({
   onDelete: (e: React.MouseEvent, id: string) => void;
 }) {
   const title = conversation.title || "Untitled";
+  // Read the surface off the conversation rather than the sidebar: it is fixed
+  // at creation, and conversations written before surfaces existed have none.
+  const surface = conversation.surface ?? "research";
+  const SurfaceIcon = SURFACE_ICON[surface];
   const date = new Date(conversation.updated_at).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
@@ -148,7 +155,7 @@ function ConversationItem({
           : "text-text-primary hover:bg-surface-hover",
       )}
     >
-      <MessageSquare className="size-4 shrink-0 opacity-60" />
+      <SurfaceIcon className={cn("size-4 shrink-0", SURFACE_ICON_COLOR[surface], isActive ? "" : "opacity-70")} />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{title}</p>
         <p className="text-xs text-text-muted">

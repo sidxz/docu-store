@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { MessageSquare, FileText, Library, ShieldCheck, MoreHorizontal } from "lucide-react";
+import { FileText, Library, ShieldCheck, MoreHorizontal } from "lucide-react";
 import type { RecentConversation } from "@docu-store/types";
 import { entityChipClass } from "@/lib/entity-colors";
+import { SURFACE_ICON, SURFACE_ICON_COLOR } from "@/lib/surfaces";
 import { formatRelativeTime } from "@/lib/utils";
 import { MoveToFolderMenu } from "@/components/folders/MoveToFolderMenu";
 import { setChatDragData } from "@/components/folders/dnd";
@@ -12,8 +13,11 @@ export function RecentChatCard({ chat, workspace }: { chat: RecentConversation; 
   const hasChips = chat.entities.length > 0;
   const hasDocs = !hasChips && chat.cited_documents.length > 0;
   // A conversation's surface is fixed at creation, so the card must route to
-  // the surface it actually belongs to, not always /chat.
-  const isLiterature = chat.surface === "literature";
+  // the surface it actually belongs to, not always /chat. Icon and colour come
+  // from lib/surfaces so a recent card matches its sidebar entry exactly.
+  const surface = chat.surface ?? "research";
+  const isLiterature = surface === "literature";
+  const SurfaceIcon = SURFACE_ICON[surface];
   return (
     <div className="group relative">
     <Link
@@ -24,11 +28,7 @@ export function RecentChatCard({ chat, workspace }: { chat: RecentConversation; 
     >
       <div className="flex items-start gap-3">
         <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-light">
-          {isLiterature ? (
-            <Library className="h-4 w-4 text-accent-text" />
-          ) : (
-            <MessageSquare className="h-4 w-4 text-accent-text" />
-          )}
+          <SurfaceIcon className={`h-4 w-4 ${SURFACE_ICON_COLOR[surface]}`} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-3">

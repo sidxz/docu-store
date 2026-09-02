@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { MessageSquare, PanelLeftOpen, FileText, Folder, Library } from "lucide-react";
+import { PanelLeftOpen, FileText, Folder } from "lucide-react";
+import { SURFACE_ICON, SURFACE_ICON_COLOR } from "@/lib/surfaces";
 import { Button } from "@/components/ui/button";
 import { MoveToFolderMenu } from "@/components/folders/MoveToFolderMenu";
 import { useFolders } from "@/hooks/use-folders";
@@ -203,9 +204,10 @@ export function ChatPanel({
         )}
         <div className="flex-1 flex items-center justify-center">
           {/* The two surfaces search different corpora — the empty state has to
-              say which, and carry the same icon as its sidebar entry. */}
+              say which, and wear the same icon and colour as its sidebar entry. */}
           <EmptyState
-            icon={surface === "literature" ? Library : MessageSquare}
+            icon={SURFACE_ICON[surface]}
+            iconColor={SURFACE_ICON_COLOR[surface]}
             title={surface === "literature" ? "Find relevant papers" : "Start a conversation"}
             description={
               surface === "literature"

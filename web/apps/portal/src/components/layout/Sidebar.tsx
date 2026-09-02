@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+import { SURFACE_ICON, SURFACE_ICON_COLOR } from "@/lib/surfaces";
 import { useThemeStore } from "@/lib/stores/theme-store";
 import { useSidebarStore } from "@/lib/stores/sidebar-store";
 import { useAnalytics } from "@/hooks/use-analytics";
@@ -34,18 +35,20 @@ interface NavItem {
 
 const mainNav: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard, href: "", color: "text-blue-500" },
-  { label: "Deep Research", icon: MessageSquare, href: "/chat", color: "text-indigo-500" },
+  { label: "Deep Research", icon: SURFACE_ICON.research, href: "/chat", color: SURFACE_ICON_COLOR.research },
   { label: "Search", icon: Search, href: "/search", color: "text-violet-500" },
   { label: "Documents", icon: FileText, href: "/documents", color: "text-amber-500" },
   { label: "Compounds", icon: Atom, href: "/compounds", color: "text-emerald-500" },
 ];
 
-/** Sits after Deep Research: same shape of surface, a different corpus. */
+/** Sits after Deep Research: same shape of surface, a different corpus.
+ *  Icon and colour come from lib/surfaces so the conversation rows, empty
+ *  states and dashboard cards cannot drift away from what the nav shows. */
 const literatureNav: NavItem = {
   label: "Literature",
-  icon: Library,
+  icon: SURFACE_ICON.literature,
   href: "/literature",
-  color: "text-rose-500",
+  color: SURFACE_ICON_COLOR.literature,
 };
 
 export function Sidebar({ workspaceSlug }: { workspaceSlug: string }) {
