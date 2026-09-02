@@ -9,6 +9,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from application.dtos.compound_dtos import BioactivityDTO
+from domain.value_objects.chat_surface import ChatSurface
 
 # --- Agent Events (streaming) ---
 
@@ -205,6 +206,9 @@ class ConversationDTO(BaseModel):
     message_count: int = 0
     model_used: str | None = None
     is_archived: bool = False
+    # Conversations created before surfaces existed have no value stored and
+    # read back as RESEARCH, which is where they were in fact created.
+    surface: ChatSurface = ChatSurface.RESEARCH
 
 
 class ConversationDetailDTO(ConversationDTO):

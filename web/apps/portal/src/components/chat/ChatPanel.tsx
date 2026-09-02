@@ -18,7 +18,7 @@ import { MessageList } from "./MessageList";
 import { ChatInput } from "./ChatInput";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatTokens } from "@/lib/utils";
-import type { SourceCitation } from "@docu-store/types";
+import type { ChatSurface, SourceCitation } from "@docu-store/types";
 
 interface ChatPanelProps {
   workspace: string;
@@ -53,7 +53,8 @@ export function ChatPanel({
   const router = useRouter();
   const { data, isLoading } = useConversation(conversationId);
   const { data: folders } = useFolders();
-  const createConversation = useCreateConversation();
+  const surface: ChatSurface = basePath === "literature" ? "literature" : "research";
+  const createConversation = useCreateConversation(surface);
   const sendMessage = useSendMessage(conversationId, { forceMode });
 
   const feedbackMutation = useChatFeedback(conversationId);

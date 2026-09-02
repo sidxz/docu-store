@@ -13,6 +13,7 @@ import type {
   AgentEvent,
   AgentStep,
   ContentBlock,
+  ChatSurface,
   GroundingStatus,
   LiteratureHit,
   NerFilterTag,
@@ -22,10 +23,12 @@ import type {
 
 // ── Conversation CRUD ──────────────────────────────────────────────────────
 
-export function useConversations() {
+/** Conversations for one surface. The key varies by surface too — otherwise the
+ *  two sidebars share a cache entry and show each other's history. */
+export function useConversations(surface: ChatSurface = "research") {
   return useQuery({
-    queryKey: queryKeys.chat.list(),
-    queryFn: () => authFetchJson<Conversation[]>("/chat"),
+    queryKey: queryKeys.chat.list(surface),
+    queryFn: () => authFetchJson<Conversation[]>(`/chat?surface=${surface}`),
     staleTime: 30_000,
   });
 }
@@ -50,14 +53,14 @@ export function useConversation(conversationId: string | undefined) {
   });
 }
 
-export function useCreateConversation() {
+export function useCreateConversation(surface: ChatSurface = "research") {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (title?: string) => {
       const res = await authFetch("/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title ?? null }),
+        body: JSON.stringify({ title: title ?? null, surface }),
       });
       if (!res.ok) throw new Error("Failed to create conversation");
       return res.json() as Promise<Conversation>;

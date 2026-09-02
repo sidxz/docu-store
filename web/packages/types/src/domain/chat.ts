@@ -4,6 +4,11 @@
 
 import type { Bioactivity } from "./extraction";
 
+/** Which chat surface a conversation belongs to. Fixed at creation: it decides
+ *  which sidebar shows it and which corpus answers it, and a follow-up should
+ *  not be able to switch either. */
+export type ChatSurface = "research" | "literature";
+
 // --- Source citations ---
 
 /** A paper Europe PMC knows about, which this workspace may or may not hold. */
@@ -155,6 +160,7 @@ export interface Conversation {
   created_at: string;
   updated_at: string;
   message_count: number;
+  surface?: ChatSurface;
   model_used: string | null;
   is_archived: boolean;
   /** True while an answer is being generated server-side (detail endpoint only). */

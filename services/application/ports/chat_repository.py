@@ -11,6 +11,7 @@ from application.dtos.chat_dtos import (
     ChatMessageDTO,
     ConversationDTO,
 )
+from domain.value_objects.chat_surface import ChatSurface
 
 
 class ChatRepository(Protocol):
@@ -45,6 +46,7 @@ class ChatRepository(Protocol):
         limit: int = 20,
         is_archived: bool = False,
         folder_id: UUID | None = None,
+        surface: ChatSurface = ChatSurface.RESEARCH,
     ) -> list[ConversationDTO]: ...
 
     async def list_recent_conversations(

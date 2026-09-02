@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { useConversations, useCreateConversation, useDeleteConversation } from "@/hooks/use-chat";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { useChatStore } from "@/lib/stores/chat-store";
-import type { Conversation } from "@docu-store/types";
+import type { ChatSurface, Conversation } from "@docu-store/types";
 
 interface ConversationSidebarProps {
   workspace: string;
@@ -25,8 +25,11 @@ export function ConversationSidebar({
   basePath = "chat",
 }: ConversationSidebarProps) {
   const router = useRouter();
-  const { data: conversations, isLoading } = useConversations();
-  const createConversation = useCreateConversation();
+  // Derived from basePath rather than passed separately: two props that must
+  // agree are two props that can disagree.
+  const surface: ChatSurface = basePath === "literature" ? "literature" : "research";
+  const { data: conversations, isLoading } = useConversations(surface);
+  const createConversation = useCreateConversation(surface);
   const deleteConversation = useDeleteConversation();
   const confirm = useConfirm();
 

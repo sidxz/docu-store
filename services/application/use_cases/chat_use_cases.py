@@ -39,6 +39,7 @@ from application.use_cases.token_limit_use_cases import (
     month_total,
     month_usage_by_kind,
 )
+from domain.value_objects.chat_surface import ChatSurface
 from infrastructure.llm.token_counter import TokenCounter
 
 if TYPE_CHECKING:
@@ -79,6 +80,7 @@ class CreateConversationUseCase:
         workspace_id: UUID,
         owner_id: UUID,
         title: str | None = None,
+        surface: ChatSurface = ChatSurface.RESEARCH,
     ) -> Result[ConversationDTO, AppError]:
         try:
             now = datetime.now(UTC)
@@ -89,6 +91,7 @@ class CreateConversationUseCase:
                 title=title,
                 created_at=now,
                 updated_at=now,
+                surface=surface,
             )
             created = await self._repo.create_conversation(conversation)
             log.info("chat.conversation.created", id=str(created.conversation_id))
@@ -112,11 +115,13 @@ class ListConversationsUseCase:
         limit: int = 20,
         is_archived: bool = False,
         folder_id: UUID | None = None,
+        surface: ChatSurface = ChatSurface.RESEARCH,
     ) -> Result[list[ConversationDTO], AppError]:
         try:
             conversations = await self._repo.list_conversations(
                 workspace_id=workspace_id,
                 owner_id=owner_id,
+                surface=surface,
                 skip=skip,
                 limit=limit,
                 is_archived=is_archived,

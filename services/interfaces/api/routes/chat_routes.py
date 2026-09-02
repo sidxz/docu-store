@@ -32,6 +32,7 @@ from application.use_cases.chat_use_cases import (
     RecordFeedbackUseCase,
     SendMessageUseCase,
 )
+from domain.value_objects.chat_surface import ChatSurface
 from infrastructure.chat.run_registry import ChatRunRegistry, RunAlreadyActiveError
 from interfaces.api.middleware import handle_use_case_errors
 from interfaces.api.routes.helpers import (
@@ -57,6 +58,7 @@ class CreateConversationRequest(BaseModel):
     """Request to create a new conversation."""
 
     title: str | None = None
+    surface: ChatSurface = ChatSurface.RESEARCH
 
 
 class SendMessageRequest(BaseModel):
@@ -106,6 +108,7 @@ async def create_conversation(
         workspace_id=auth.workspace_id,
         owner_id=auth.user_id,
         title=request.title,
+        surface=request.surface,
     )
 
 
@@ -118,12 +121,19 @@ async def list_conversations(
     limit: int = 20,
     is_archived: bool = False,
     folder_id: UUID | None = None,
+    surface: ChatSurface = ChatSurface.RESEARCH,
 ) -> list[ConversationDTO]:
-    """List conversations for the current user. Pass ``folder_id`` for a folder view."""
+    """List conversations for the current user. Pass ``folder_id`` for a folder view.
+
+    ``surface`` keeps the two chat surfaces apart: Deep Research and Literature
+    share a store but not a history, since a question asked of the corpus and one
+    asked of the literature are not the same kind of thing to come back to.
+    """
     use_case = container[ListConversationsUseCase]
     return await use_case.execute(
         workspace_id=auth.workspace_id,
         owner_id=auth.user_id,
+        surface=surface,
         skip=skip,
         limit=limit,
         is_archived=is_archived,

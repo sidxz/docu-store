@@ -170,6 +170,17 @@ consequences, both load-bearing — the tool description teaches the field synta
 rather than leaving the model to guess, and **nothing sorts or filters results
 by ingestability**, or the most relevant papers get systematically buried.
 
+## Separate histories
+
+A conversation carries a `ChatSurface` fixed at creation — distinct from the
+pipeline `mode`, which is per-message and can change mid-conversation. The
+sidebar filter needs no backfill: `RESEARCH` matches documents where `surface`
+is anything other than `literature`, so the conversations written before the
+field existed keep showing where they were in fact created.
+
+The dashboard's recents are filtered to research too. They link into `/chat`,
+so a literature conversation listed there would open on the wrong surface.
+
 ## What the surface is for
 
 Literature chat answers *what should I read*; Deep Research answers *what does

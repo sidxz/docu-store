@@ -20,6 +20,7 @@ from application.dtos.chat_dtos import (
     SourceCitationDTO,
     TokenUsageDTO,
 )
+from domain.value_objects.chat_surface import ChatSurface
 
 log = structlog.get_logger(__name__)
 
@@ -89,11 +90,13 @@ class MongoChatRepository:
         limit: int = 20,
         is_archived: bool = False,
         folder_id: UUID | None = None,
+        surface: ChatSurface = ChatSurface.RESEARCH,
     ) -> list[ConversationDTO]:
-        query = {
+        query: dict = {
             "workspace_id": str(workspace_id),
             "owner_id": str(owner_id),
             "is_archived": is_archived,
+            **_surface_query(surface),
         }
         if folder_id is not None:
             query["folder_id"] = str(folder_id)
@@ -111,6 +114,9 @@ class MongoChatRepository:
             "owner_id": str(owner_id),
             "is_archived": False,
             "message_count": {"$gt": 0},
+            # The dashboard's recents link into /chat, so a literature
+            # conversation listed here would open on the wrong surface.
+            **_surface_query(ChatSurface.RESEARCH),
         }
         cursor = self._conversations.find(query).sort("updated_at", -1).limit(limit)
         return [_doc_to_conversation(doc) async for doc in cursor]
@@ -496,6 +502,18 @@ def _utc(dt: datetime) -> datetime:
     return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
 
 
+def _surface_query(surface: ChatSurface) -> dict:
+    """Mongo clause selecting one surface.
+
+    RESEARCH matches documents with no ``surface`` at all: every conversation
+    written before surfaces existed was created there, so absence is not
+    unknown -- it is research, and treating it that way avoids a backfill.
+    """
+    if surface == ChatSurface.RESEARCH:
+        return {"surface": {"$ne": str(ChatSurface.LITERATURE)}}
+    return {"surface": str(surface)}
+
+
 def _conversation_to_doc(conv: ConversationDTO) -> dict:
     return {
         "conversation_id": str(conv.conversation_id),
@@ -508,6 +526,7 @@ def _conversation_to_doc(conv: ConversationDTO) -> dict:
         "message_count": conv.message_count,
         "model_used": conv.model_used,
         "is_archived": conv.is_archived,
+        "surface": str(conv.surface),
     }
 
 
@@ -523,6 +542,7 @@ def _doc_to_conversation(doc: dict) -> ConversationDTO:
         message_count=doc.get("message_count", 0),
         model_used=doc.get("model_used"),
         is_archived=doc.get("is_archived", False),
+        surface=ChatSurface(doc.get("surface") or ChatSurface.RESEARCH),
     )
 
 
