@@ -12,10 +12,8 @@ from uuid import uuid4
 from application.ports.reranker import RerankResult
 from infrastructure.chat.models import RetrievalResult
 from infrastructure.chat.nodes import literature_retrieval
-from infrastructure.chat.nodes.literature_retrieval import (
-    LiteratureRetrievalNode,
-    _sigmoid,
-)
+from infrastructure.chat.nodes.literature_retrieval import LiteratureRetrievalNode
+from infrastructure.rerankers.cross_encoder_reranker import _sigmoid
 from infrastructure.config import settings
 
 
@@ -32,7 +30,13 @@ def _result(title: str, text: str) -> RetrievalResult:
 
 
 class _FakeReranker:
-    """Scores by a lookup on the document text, mimicking measured logits."""
+    """Scores by a lookup on the document text, mimicking measured logits.
+
+    The lookup is kept in logit space because that is what the measurements in
+    these tests record, but it squashes on the way out: a Reranker returns a
+    calibrated probability in (0, 1), and a fake that emits raw logits would let
+    tests pass against a contract nothing honours.
+    """
 
     model_name = "fake"
 
@@ -45,7 +49,7 @@ class _FakeReranker:
         out = [
             RerankResult(
                 id=d.id,
-                score=next(v for k, v in self._scores.items() if k in d.text),
+                score=_sigmoid(next(v for k, v in self._scores.items() if k in d.text)),
                 original_rank=i,
             )
             for i, d in enumerate(documents)

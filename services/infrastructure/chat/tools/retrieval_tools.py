@@ -33,6 +33,13 @@ ToolResult = tuple[list[RetrievalResult], str, list[AgentEvent]]
 
 log = structlog.get_logger(__name__)
 
+# How much page text a chat search hit carries. The search UI's 500 is a snippet
+# length for a clamped card; a model has to actually read this, and a page cut
+# mid-table answers the question wrongly rather than partially. Matches
+# GetPageContentTool's cap so the two views of a page agree, and matches the HIGH
+# tier's per-source cap in ContextAssemblyNode, which does the real limiting.
+_CHAT_PREVIEW_CHARS = 3000
+
 
 # ── Tool Definitions ──
 
@@ -176,6 +183,7 @@ class SearchDocumentsTool:
             request,
             workspace_id=workspace_id,
             allowed_artifact_ids=allowed_artifact_ids,
+            text_preview_chars=_CHAT_PREVIEW_CHARS,
         )
 
         if isinstance(result, Failure):
@@ -349,8 +357,11 @@ class GetPageContentTool:
             page_id=page_id,
             page_index=page.index,
             page_name=page.name,
-            expanded_text=full_text[:3000],  # Cap to avoid blowing context
-            matched_text=full_text[:500],
+            expanded_text=full_text[:_CHAT_PREVIEW_CHARS],  # Cap to avoid blowing context
+            # matched_text is what the MEDIUM tier renders (up to 1000 chars), so
+            # capping it at 500 truncated the fetch a second time, on a path
+            # neither the preview cap nor the dedup merge covers.
+            matched_text=full_text[:1000],
             similarity_score=1.0,  # Direct fetch = max relevance
             query_source="tool_page_content",
         )

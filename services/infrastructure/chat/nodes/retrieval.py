@@ -120,7 +120,12 @@ class RetrievalNode:
                     page_index=hit.page_index,
                     page_name=hit.page_name,
                     text_excerpt=excerpt[:500],
-                    similarity_score=hit.rerank_score or hit.score,
+                    # `or` would treat a legitimate score of 0.0 as "absent" and
+                    # silently fall back to the cosine, mixing two scales in one
+                    # field on the value where they disagree most.
+                    similarity_score=(
+                        hit.rerank_score if hit.rerank_score is not None else hit.score
+                    ),
                     citation_index=idx,
                 ),
             )

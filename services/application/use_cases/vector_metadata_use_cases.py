@@ -12,6 +12,7 @@ from application.ports.repositories.artifact_repository import ArtifactRepositor
 from application.ports.repositories.page_repository import PageRepository
 from application.ports.summary_vector_store import SummaryVectorStore
 from application.ports.vector_store import VectorStore
+from application.use_cases.page_payload import artifact_tag_normalized
 from domain.exceptions import AggregateNotFoundError
 
 logger = structlog.get_logger()
@@ -72,15 +73,12 @@ class SyncPageTagsToVectorStoreUseCase:
 
 
 def _build_artifact_metadata_payload(artifact: object) -> dict:
-    """Build the artifact-level tag payload from artifact metadata."""
-    tags: list[str] = []
-    if artifact.tag_mentions:
-        tags.extend(tm.tag.lower() for tm in artifact.tag_mentions)
-    if artifact.author_mentions:
-        tags.extend(am.name.lower() for am in artifact.author_mentions)
-    if artifact.presentation_date and artifact.presentation_date.date:
-        tags.append(str(artifact.presentation_date.date.year))
-    return {"artifact_tag_normalized": tags}
+    """Build the artifact-level tag payload from artifact metadata.
+
+    Same list the embedding paths write at point-creation time -- one definition,
+    so the patch-after path can never disagree with what an upsert lays down.
+    """
+    return {"artifact_tag_normalized": artifact_tag_normalized(artifact)}
 
 
 class SyncArtifactMetadataToVectorStoreUseCase:

@@ -39,12 +39,10 @@ class RetrievalAccumulator:
         for r in results:
             key = self._dedup_key(r)
             if key in self._results:
-                # Keep the higher-scoring version
                 existing = self._results[key]
-                if self._score(r) > self._score(existing):
-                    self._chars_used -= len(existing.expanded_text)
-                    self._results[key] = r
-                    self._chars_used += len(r.expanded_text)
+                merged = self._merge(existing, r)
+                self._chars_used += len(merged.expanded_text) - len(existing.expanded_text)
+                self._results[key] = merged
                 continue
 
             self._results[key] = r
@@ -147,6 +145,35 @@ class RetrievalAccumulator:
         if r.source_type == "summary":
             return f"summary:{r.artifact_id}:{r.page_id or 'artifact'}"
         return f"{r.source_type}:{r.artifact_id}:{r.page_id}"
+
+    @staticmethod
+    def _merge(a: RetrievalResult, b: RetrievalResult) -> RetrievalResult:
+        """Resolve a dedup collision: best score to rank by, longest text to read.
+
+        A collision here is two *views of one page*, not two competing candidates
+        -- everything sharing a ``chunk:{page_id}`` key is a prefix of the same
+        page string. "Which is more relevant" and "which should we show" are
+        different questions, and a relevance score only answers the first.
+        Letting it answer both is how an explicit full-page fetch gets thrown
+        away in favour of a truncated search preview that happened to score
+        higher, silently deleting the rows past the cut.
+
+        Keeping the winner's *score pair* intact matters as much as keeping the
+        longer text: stamping the loser's rerank score onto the winner can demote
+        a no-rerank fetch (which tiers on similarity) out of the HIGH tier and
+        re-truncate it. So only text moves across.
+        """
+        winner, loser = (
+            (a, b)
+            if RetrievalAccumulator._score(a) >= RetrievalAccumulator._score(b)
+            else (b, a)
+        )
+        update: dict[str, str] = {}
+        if len(loser.expanded_text) > len(winner.expanded_text):
+            update["expanded_text"] = loser.expanded_text
+        if len(loser.matched_text) > len(winner.matched_text):
+            update["matched_text"] = loser.matched_text
+        return winner.model_copy(update=update) if update else winner
 
     @staticmethod
     def _score(r: RetrievalResult) -> float:

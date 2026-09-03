@@ -14,7 +14,14 @@ class RerankDocument:
 
 @dataclass
 class RerankResult:
-    """A reranked document with cross-encoder score."""
+    """A reranked document with its relevance score.
+
+    ``score`` is a calibrated probability in (0, 1), never a raw logit. Cross
+    encoders emit unbounded logits; squashing them is the adapter's job so that
+    no caller has to remember to do it, and so a score can be compared against a
+    probability-shaped threshold or averaged with a cosine similarity. 0.0 is
+    reserved as an "unscored" sentinel and is strictly below every real score.
+    """
 
     id: str
     score: float

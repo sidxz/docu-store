@@ -118,6 +118,7 @@ class SummaryQdrantStore(SummaryVectorStore):
         workspace_id: UUID | None = None,
         tags: list[str] | None = None,
         entity_types: list[str] | None = None,
+        artifact_tags: list[str] | None = None,
     ) -> None:
         client = await self._get_client()
 
@@ -137,6 +138,8 @@ class SummaryQdrantStore(SummaryVectorStore):
         if tags:
             payload["tags"] = tags
             payload["tag_normalized"] = [t.lower() for t in tags]
+        if artifact_tags:
+            payload["artifact_tag_normalized"] = artifact_tags
         if entity_types:
             payload["entity_types"] = entity_types
 
@@ -168,6 +171,7 @@ class SummaryQdrantStore(SummaryVectorStore):
         workspace_id: UUID | None = None,
         tags: list[str] | None = None,
         entity_types: list[str] | None = None,
+        artifact_tags: list[str] | None = None,
     ) -> None:
         client = await self._get_client()
 
@@ -187,6 +191,8 @@ class SummaryQdrantStore(SummaryVectorStore):
         if tags:
             payload["tags"] = tags
             payload["tag_normalized"] = [t.lower() for t in tags]
+        if artifact_tags:
+            payload["artifact_tag_normalized"] = artifact_tags
         if entity_types:
             payload["entity_types"] = entity_types
 

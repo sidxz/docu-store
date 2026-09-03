@@ -275,6 +275,7 @@ class GeneratePageEmbeddingUseCase:
             upsert_metadata = build_page_payload(
                 page,
                 artifact.source_class if artifact is not None else SourceClass.INTERNAL,
+                artifact,
             )
 
             await self.vector_store.upsert_page_chunk_embeddings(

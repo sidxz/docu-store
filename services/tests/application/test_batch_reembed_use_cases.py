@@ -137,3 +137,45 @@ async def test_batch_reembed_writes_provenance(source_class):
 
     assert out["status"] == "success"
     assert vs.upsert_chunk_calls[-1]["metadata"]["source_class"] == source_class
+
+
+@pytest.mark.asyncio
+async def test_batch_reembed_writes_artifact_tags():
+    """A re-embed must lay down artifact_tag_normalized itself.
+
+    The regression: SyncArtifactMetadataToVectorStoreUseCase patched this field
+    onto existing points, but upsert_page_chunk_embeddings deletes and recreates
+    them -- and the batch re-embed runs at the *end* of ingestion, after tag
+    aggregation. So every fully-ingested artifact lost its artifact-level tags,
+    and the "any" tag-match mode (page tags OR artifact tags) silently collapsed
+    to page-tags-only. A page that never spells out the document's own topic
+    became unreachable by a query filtered on that topic.
+    """
+    artifact_repo, page_repo = MockArtifactRepository(), MockPageRepository()
+    artifact = Artifact.create(
+        source_uri="https://doi.org/10.1021/jm500204s",
+        source_filename="mrsa.pdf",
+        artifact_type=ArtifactType.RESEARCH_ARTICLE,
+        mime_type=MimeType.PDF,
+        storage_location="artifacts/x/source.pdf",
+        source_class=SourceClass.INTERNAL,
+        licence="cc by",
+    )
+    artifact.update_tag_mentions([TagMention(tag="MRSA", entity_type="disease")])
+    # The page's own text never says MRSA -- only the artifact-level tag can match it.
+    page = Page.create(name="P6", artifact_id=artifact.id, index=5)
+    page.update_text_mention(TextMention(text="CHEMBL3265193 13.6 | CHEMBL3265194 18.1"))
+    artifact.add_pages([page.id])
+    artifact_repo.artifacts[artifact.id] = artifact
+    page_repo.pages[page.id] = page
+
+    vs = MockVectorStore()
+    uc = BatchReEmbedArtifactPagesUseCase(
+        artifact_repository=artifact_repo, page_repository=page_repo,
+        embedding_generator=MockEmbeddingGenerator(), vector_store=vs,
+        text_chunker=MockTextChunker(),
+    )
+    out = await uc.execute(artifact.id)
+
+    assert out["status"] == "success"
+    assert vs.upsert_chunk_calls[-1]["metadata"]["artifact_tag_normalized"] == ["mrsa"]

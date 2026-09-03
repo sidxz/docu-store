@@ -16,11 +16,25 @@ from infrastructure.config import settings
 
 log = structlog.get_logger(__name__)
 
-# Relevance thresholds
-_HIGH_RERANK = 0.7
+# Relevance thresholds. Two pairs because two different scales arrive here: a
+# reranker probability and a bi-encoder cosine are both in (0, 1) but are not the
+# same quantity, so a single cut-point cannot serve both.
+#
+# The rerank cut-points are the ones measured for this cross-encoder on real
+# text, and match LiteratureContextAssemblyNode. They used to be 0.7/0.4, which
+# were cosine-shaped numbers compared against raw unbounded logits (roughly -11
+# to +4): a nonsense comparison that put most reranked sources in LOW and cut
+# them to 200 characters. The reranker now returns calibrated probabilities.
+_HIGH_RERANK = 0.5  # sigmoid(0.0)
+_MED_RERANK = 0.05  # sigmoid(-2.9)
 _HIGH_SIM = 0.85
-_MED_RERANK = 0.4
 _MED_SIM = 0.6
+
+# Per-source caps. HIGH is capped at all so that one long page cannot spend the
+# whole budget and starve every source behind it.
+_HIGH_CHARS = 3000
+_MEDIUM_CHARS = 1000
+_LOW_CHARS = 200
 
 
 class ContextAssemblyNode:
@@ -107,35 +121,64 @@ class ContextAssemblyNode:
     def _score(self, r: RetrievalResult) -> float:
         return r.rerank_score if r.rerank_score is not None else r.similarity_score
 
+    def _tier_of(self, r: RetrievalResult) -> str:
+        """Which relevance tier a source belongs to: high, medium or low.
+
+        The single place this is decided. It used to be decided twice, once to
+        size the budget and once to pick the text, from the same constants but by
+        two independent expressions -- so a threshold edit applied to one and not
+        the other would silently charge a source for text it never emitted.
+        """
+        # Carried-forward sources go to MEDIUM regardless of score
+        if r.query_source == "carried_forward":
+            return "medium"
+
+        # Bioactivity and structure results always HIGH (deterministic structured data)
+        if r.query_source.startswith(("tool_bioactivity:", "tool_structure:")):
+            return "high"
+
+        score = self._score(r)
+        high, medium = (
+            (_HIGH_RERANK, _MED_RERANK)
+            if r.rerank_score is not None
+            else (_HIGH_SIM, _MED_SIM)
+        )
+        if score > high:
+            return "high"
+        if score > medium:
+            return "medium"
+        return "low"
+
+    def _display_text(self, r: RetrievalResult) -> str:
+        """The exact text this source contributes, tier cap applied.
+
+        Both the budget and the emitted prompt call this, so what a source is
+        charged is by construction what it costs.
+        """
+        tier = self._tier_of(r)
+        if tier == "high":
+            # Structured tool output is exempt from the length cap: it is
+            # deterministic, already privileged with reserved budget, and a
+            # half-delivered assay table is worse than a long one -- the rows
+            # past the cut read as "no such measurement" rather than as elided.
+            # The cap exists to stop one long *page* starving the sources behind
+            # it, and a page is never this.
+            if r.query_source.startswith(("tool_bioactivity:", "tool_structure:")):
+                return r.expanded_text
+            return r.expanded_text[:_HIGH_CHARS]
+        if tier == "medium":
+            return r.matched_text[:_MEDIUM_CHARS]
+        text = r.expanded_text[:_LOW_CHARS]
+        return f"{text}..." if len(r.expanded_text) > _LOW_CHARS else text
+
     def _tier_results(
         self,
         results: list[RetrievalResult],
     ) -> tuple[list[RetrievalResult], list[RetrievalResult], list[RetrievalResult]]:
-        high, medium, low = [], [], []
+        buckets: dict[str, list[RetrievalResult]] = {"high": [], "medium": [], "low": []}
         for r in results:
-            # Carried-forward sources go to MEDIUM regardless of score
-            if r.query_source == "carried_forward":
-                medium.append(r)
-                continue
-
-            # Bioactivity and structure results always HIGH (deterministic structured data)
-            if r.query_source.startswith("tool_bioactivity:") or r.query_source.startswith(
-                "tool_structure:",
-            ):
-                high.append(r)
-                continue
-
-            score = self._score(r)
-            has_rerank = r.rerank_score is not None
-
-            if (has_rerank and score > _HIGH_RERANK) or (not has_rerank and score > _HIGH_SIM):
-                high.append(r)
-            elif (has_rerank and score > _MED_RERANK) or (not has_rerank and score > _MED_SIM):
-                medium.append(r)
-            else:
-                low.append(r)
-
-        return high, medium, low
+            buckets[self._tier_of(r)].append(r)
+        return buckets["high"], buckets["medium"], buckets["low"]
 
     def _cross_source_dedup(
         self,
@@ -165,36 +208,16 @@ class ContextAssemblyNode:
         bio_high = [r for r in high if r.query_source.startswith("tool_bioactivity:")]
         other_high = [r for r in high if not r.query_source.startswith("tool_bioactivity:")]
 
-        for r in bio_high:
-            text_len = len(r.expanded_text)
-            if chars_used + text_len > budget:
-                break
-            selected.append(r)
-            chars_used += text_len
-
-        # High tier: full expanded text
-        for r in other_high:
-            text_len = len(r.expanded_text)
-            if chars_used + text_len > budget:
-                break
-            selected.append(r)
-            chars_used += text_len
-
-        # Medium tier: matched chunk only (truncated to ~1000 chars)
-        for r in medium:
-            text_len = min(len(r.matched_text), 1000)
-            if chars_used + text_len > budget:
-                break
-            selected.append(r)
-            chars_used += text_len
-
-        # Low tier: first 200 chars summary
-        for r in low:
-            text_len = min(len(r.expanded_text), 200)
-            if chars_used + text_len > budget:
-                break
-            selected.append(r)
-            chars_used += text_len
+        for tier in (bio_high, other_high, medium, low):
+            for r in tier:
+                text_len = len(self._display_text(r))
+                if chars_used + text_len > budget:
+                    # continue, not break: one long source must not shut out
+                    # every shorter one ranked below it. Skipping just the source
+                    # that does not fit costs nothing and keeps the rest.
+                    continue
+                selected.append(r)
+                chars_used += text_len
 
         return selected, chars_used
 
@@ -232,24 +255,7 @@ class ContextAssemblyNode:
             text_sections.append(header)
 
             for r in group:
-                # Determine text to include based on tier
-                score = self._score(r)
-                has_rerank = r.rerank_score is not None
-                is_high = (has_rerank and score > _HIGH_RERANK) or (
-                    not has_rerank and score > _HIGH_SIM
-                )
-                is_low = not (
-                    (has_rerank and score > _MED_RERANK) or (not has_rerank and score > _MED_SIM)
-                )
-
-                if is_high:
-                    display_text = r.expanded_text
-                elif is_low:
-                    display_text = r.expanded_text[:200] + (
-                        "..." if len(r.expanded_text) > 200 else ""
-                    )
-                else:
-                    display_text = r.matched_text[:1000]
+                display_text = self._display_text(r)
 
                 # Format citation
                 if r.query_source.startswith("tool_bioactivity:"):

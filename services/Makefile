@@ -1,5 +1,12 @@
 COMPOSE := docker-compose -f docker-compose.yml -f docker-compose-langfuse.yml -f docker-compose-umami.yml
 
+# Override per-invocation: `PORT=8010 make run-all`. Defined once so that
+# run, run-all and stop-all cannot drift onto different ports -- stop-all used to
+# hardcode 8000 while run-all honoured $(PORT), so stopping a service started on
+# any other port reached for the wrong one.
+HOST ?= 0.0.0.0
+PORT ?= 8000
+
 .PHONY: help install dev-install run run-read-models run-all stop-all test lint format clean docker-up docker-down docker-clean langfuse-seed
 
 help: ## Show this help message
@@ -13,7 +20,7 @@ dev-install: ## Install development dependencies using uv
 	uv sync --dev
 
 run: ## Run the FastAPI application
-	uv run uvicorn interfaces.api.main:app --host $(or $(HOST),0.0.0.0) --port $(or $(PORT),8000) --reload
+	uv run uvicorn interfaces.api.main:app --host $(HOST) --port $(PORT) --reload
 
 run-read-models: ## Run the MongoDB read model projector
 	uv run python -m infrastructure.read_worker
@@ -34,7 +41,7 @@ run-all: stop-all ## Start all services (API, read models, workflow worker, temp
 	@echo "Starting all services..."
 	@bash -c '\
 		trap "kill 0" SIGINT SIGTERM; \
-		uv run uvicorn interfaces.api.main:app --host 0.0.0.0 --port $(or $(PORT),8000) --reload & \
+		uv run uvicorn interfaces.api.main:app --host $(HOST) --port $(PORT) --reload & \
 		uv run python -m infrastructure.read_worker & \
 		uv run python -m infrastructure.pipeline_worker & \
 		uv run python -m infrastructure.temporal.worker & \
@@ -58,7 +65,20 @@ stop-all: ## Stop all services started by run-all
 	@-pkill -9 -f "infrastructure\.temporal\.worker" 2>/dev/null
 	@-pkill -9 -f "infrastructure\.temporal\.llm_worker" 2>/dev/null
 	@-pkill -9 -f "infrastructure\.plugins\.plugin_consumer" 2>/dev/null
-	@-lsof -ti:8000 | xargs kill -9 2>/dev/null
+	@# Last resort for a port left held after the pattern kills above. Scoped to
+	@# our own listener on purpose: this was `lsof -ti:8000 | xargs kill -9`,
+	@# which killed whoever held 8000 -- on a dev box sharing a machine with
+	@# other services, that is a different project's API, stopped without a word.
+	@# It also hardcoded 8000 while run-all honoured $(PORT), so it could not
+	@# reap the port it had actually started on.
+	@-for pid in $$(lsof -tiTCP:$(PORT) -sTCP:LISTEN 2>/dev/null); do \
+		if ps -o command= -p $$pid 2>/dev/null | grep -q "interfaces.api.main"; then \
+			echo "  reaping stuck API listener $$pid on port $(PORT)"; \
+			kill -9 $$pid 2>/dev/null || true; \
+		else \
+			echo "  port $(PORT) held by pid $$pid, not ours -- leaving it alone"; \
+		fi; \
+	done
 	@echo "All services stopped."
 
 lint: ## Run linting checks

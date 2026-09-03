@@ -10,6 +10,7 @@ from application.ports.embedding_generator import EmbeddingGenerator
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_repository import PageRepository
 from application.ports.summary_vector_store import SummaryVectorStore
+from application.use_cases.page_payload import artifact_tag_normalized
 from domain.exceptions import AggregateNotFoundError
 
 logger = structlog.get_logger()
@@ -53,8 +54,9 @@ class EmbedPageSummaryUseCase:
 
             summary_text = page.summary_candidate.summary
 
-            # Load artifact for context metadata (title)
+            # Load artifact for context metadata (title) and its aggregated tags
             artifact_title = None
+            artifact = None
             try:
                 artifact = self.artifact_repository.get_by_id(page.artifact_id)
                 if artifact.title_mention:
@@ -78,6 +80,7 @@ class EmbedPageSummaryUseCase:
                     if page.tag_mentions
                     else None
                 ),
+                artifact_tags=artifact_tag_normalized(artifact) or None,
             )
 
             logger.info(
@@ -149,6 +152,7 @@ class EmbedArtifactSummaryUseCase:
                     if artifact.tag_mentions
                     else None
                 ),
+                artifact_tags=artifact_tag_normalized(artifact) or None,
             )
 
             logger.info(

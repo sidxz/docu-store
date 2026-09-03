@@ -465,6 +465,21 @@ class Settings(BaseSettings):
         validation_alias="CHAT_CONTEXT_BUDGET_CHARS",
         description="Max chars for assembled context in Thinking Mode (~3000 tokens).",
     )
+    chat_accumulator_budget_chars: int = Field(
+        default=1_000_000,
+        validation_alias="CHAT_ACCUMULATOR_BUDGET_CHARS",
+        description=(
+            "Retrieval-loop capacity for the internal-docs agentic loop. Gathering "
+            "is not sending, so this must not be the assembly budget: the "
+            "accumulator holds every page the model looked at, including ones "
+            "assembly will truncate to 200 chars or drop entirely. Sharing the 12k "
+            "made retrieval stop early on 55 of 93 measured corpus runs (median "
+            "15,235 chars accumulated) — the model was cut off mid-investigation, "
+            "having gathered more than it could keep. Assembly's own budget still "
+            "bounds what actually reaches the prompt; this is a runaway backstop, "
+            "and the real limits are chat_agent_max_iterations and the timeout."
+        ),
+    )
     literature_accumulator_budget_chars: int = Field(
         default=1_000_000,
         validation_alias="LITERATURE_ACCUMULATOR_BUDGET_CHARS",

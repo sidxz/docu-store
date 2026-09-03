@@ -13,7 +13,6 @@ a literature-shaped code path it never executes.
 from __future__ import annotations
 
 import asyncio
-import math
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -44,16 +43,6 @@ _MAX_RERANK_CANDIDATES = 200
 # that threshold so verification runs, above _MEDIUM (0.05) so abstracts are not
 # cut to 200 characters.
 _UNSCORED = 0.3
-
-
-def _sigmoid(x: float) -> float:
-    """Squash a cross-encoder logit into (0, 1).
-
-    ms-marco-MiniLM returns raw logits — measured range on real abstracts is about
-    -7.2 to +1.3 — while every threshold downstream is expressed as a probability.
-    Clamped because math.exp overflows around 710.
-    """
-    return 1.0 / (1.0 + math.exp(-max(-30.0, min(30.0, x))))
 
 
 class LiteratureRetrievalNode(AgenticRetrievalNode):
@@ -115,8 +104,11 @@ class LiteratureRetrievalNode(AgenticRetrievalNode):
             for i, r in enumerate(candidates)
         ]
 
+        # The reranker already returns calibrated probabilities in (0, 1); the
+        # squash used to live here and was hoisted into the adapter so the
+        # internal-docs path gets it too.
         scored = await asyncio.to_thread(self._reranker.rerank, question, docs)
-        by_index = {int(s.id): _sigmoid(s.score) for s in scored}
+        by_index = {int(s.id): s.score for s in scored}
 
         ranked = [
             r.model_copy(update={"rerank_score": by_index[i]})

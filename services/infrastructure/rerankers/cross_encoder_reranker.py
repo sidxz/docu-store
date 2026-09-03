@@ -19,6 +19,25 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger()
 
+# Below this the sigmoid underflows to 0.0, which is the sentinel callers use for
+# "not scored"; clamping keeps every real score strictly above it.
+_LOGIT_CLAMP = 30.0
+
+
+def _sigmoid(x: float) -> float:
+    """Squash a cross-encoder logit into (0, 1).
+
+    ms-marco cross-encoders are trained with a BCE-with-logits objective and ship
+    with ``num_labels=1`` and an ``Identity()`` activation, so ``predict`` returns
+    an unbounded logit -- measured range on this corpus is about -11.3 to +4.0.
+    Every threshold downstream is written as a probability, so the squash belongs
+    here, at the single point all callers route through, rather than in each of
+    them. Sigmoid is the inverse of the training link, so this is calibration
+    rather than an arbitrary rescale. It is order-preserving, so ranking is
+    unchanged. Clamped because ``math.exp`` overflows around 710.
+    """
+    return 1.0 / (1.0 + math.exp(-max(-_LOGIT_CLAMP, min(_LOGIT_CLAMP, x))))
+
 
 class CrossEncoderReranker(Reranker):
     """Reranker using a cross-encoder model from sentence-transformers."""
@@ -57,7 +76,11 @@ class CrossEncoderReranker(Reranker):
         documents: list[RerankDocument],
         top_k: int | None = None,
     ) -> list[RerankResult]:
-        """Score each (query, document) pair and re-sort by cross-encoder score."""
+        """Score each (query, document) pair and re-sort by relevance.
+
+        Scores are calibrated probabilities in (0, 1), not raw logits -- see
+        :func:`_sigmoid`. Compare them against probability-shaped thresholds.
+        """
         if not documents:
             return []
 
@@ -69,7 +92,9 @@ class CrossEncoderReranker(Reranker):
         results = [
             RerankResult(
                 id=doc.id,
-                score=float(score) if not math.isnan(float(score)) else -100.0,
+                # A nan (empty/degenerate passage) must sort last, so it keeps a
+                # logit far below any real one and squashes with everything else.
+                score=_sigmoid(float(score) if not math.isnan(float(score)) else -100.0),
                 original_rank=i,
             )
             for i, (doc, score) in enumerate(zip(documents, scores))

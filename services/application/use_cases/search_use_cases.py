@@ -33,6 +33,10 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger()
 
+# Enough page text for a search card's clamped snippet. Callers that feed the
+# text to a model ask for more; see HierarchicalSearchUseCase.execute.
+_DEFAULT_PREVIEW_CHARS = 500
+
 
 # ---------------------------------------------------------------------------
 # Shared enrichment helpers
@@ -220,7 +224,17 @@ class HierarchicalSearchUseCase:
         request: HierarchicalSearchRequest,
         workspace_id: UUID | None = None,
         allowed_artifact_ids: list[UUID] | None = None,
+        text_preview_chars: int = _DEFAULT_PREVIEW_CHARS,
     ) -> Result[HierarchicalSearchResponse, AppError]:
+        """Search summaries and chunks, merged and reranked.
+
+        ``text_preview_chars`` is how much page text a chunk hit carries back. It
+        is an argument rather than a constant because the two consumers need
+        different amounts and neither should silently impose its answer on the
+        other: the search UI renders a clamped snippet, while chat feeds the text
+        to a model that must read it. It is deliberately not a field on the
+        request DTO, which is an HTTP body -- this is an internal concern.
+        """
         try:
             logger.info(
                 "hierarchical_search_start",
@@ -248,6 +262,7 @@ class HierarchicalSearchUseCase:
                     request,
                     allowed_artifact_ids,
                     workspace_id,
+                    text_preview_chars,
                 )
 
             model_info = await self.embedding_generator.get_model_info()
@@ -328,6 +343,7 @@ class HierarchicalSearchUseCase:
         request: HierarchicalSearchRequest,
         allowed_artifact_ids: list[UUID] | None,
         workspace_id: UUID | None,
+        text_preview_chars: int = _DEFAULT_PREVIEW_CHARS,
     ) -> tuple[list[ChunkHit], RerankInfoDTO | None]:
         """Query the raw chunk collection with server-side dedup, rerank, then enrich."""
         retrieval_limit = request.limit * 3 if self.reranker else request.limit
@@ -404,7 +420,13 @@ class HierarchicalSearchUseCase:
         chunk_hits: list[ChunkHit] = []
         for r in grouped_results:
             rr_score, rr_original = rerank_scores.get(str(r.page_id), (None, None))
-            hit = await self._enrich_chunk_hit(r.page_id, r.artifact_id, r.page_index, r.score)
+            hit = await self._enrich_chunk_hit(
+                r.page_id,
+                r.artifact_id,
+                r.page_index,
+                r.score,
+                text_preview_chars,
+            )
             hit.rerank_score = rr_score
             hit.original_rank = rr_original
             chunk_hits.append(hit)
@@ -416,6 +438,7 @@ class HierarchicalSearchUseCase:
         artifact_id: UUID,
         page_index: int,
         score: float,
+        text_preview_chars: int = _DEFAULT_PREVIEW_CHARS,
     ) -> ChunkHit:
         """Build a single ChunkHit enriched with read-model data."""
         text_preview = None
@@ -424,7 +447,7 @@ class HierarchicalSearchUseCase:
         if page:
             page_name = page.name
             if page.text_mention and page.text_mention.text:
-                text_preview = page.text_mention.text[:500]
+                text_preview = page.text_mention.text[:text_preview_chars]
 
         info = await _resolve_artifact_info(artifact_id, self.artifact_read_model)
 

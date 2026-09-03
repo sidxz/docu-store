@@ -376,6 +376,37 @@ class QdrantStore(VectorStore):
             )
             # Don't raise - deletion is idempotent
 
+    @staticmethod
+    def _page_or_document_tag(match: models.Match) -> models.Filter:
+        """Match the chunk's own tags -- or its document's tags, if not a table.
+
+        ``artifact_tag_normalized`` is a document-wide bag of tags: it says "this
+        paper mentions Pks13 somewhere". That is the right scope for prose, which
+        carries enough of its own context for a reader to place it. It is the
+        wrong scope for a table, where the match *is* the attribution: a
+        compound/IC50 table pulled into a Pks13 query because some other target
+        appears elsewhere in the paper gets its numbers read as Pks13 numbers.
+
+        Phase D already narrows a table's own tags to what the table itself says,
+        for exactly that reason (see scope_table_entities). Document-level
+        matching would route straight around it -- of the 226 table chunks a
+        target-filtered query could reach when this was measured, 225 were
+        reachable on a target that was not in the table.
+        """
+        return models.Filter(
+            should=[
+                models.FieldCondition(key="tag_normalized", match=match),
+                models.Filter(
+                    must=[models.FieldCondition(key="artifact_tag_normalized", match=match)],
+                    must_not=[
+                        models.FieldCondition(
+                            key="is_table", match=models.MatchValue(value=True),
+                        ),
+                    ],
+                ),
+            ],
+        )
+
     def _build_tag_conditions(
         self,
         tags: list[str] | None = None,
@@ -385,8 +416,10 @@ class QdrantStore(VectorStore):
         """Build Qdrant filter conditions for tag-based filtering.
 
         Modes:
-            any — match page-level OR artifact-level tags (broad)
-            all — require ALL tags, each matching page OR artifact level
+            any — match page-level tags, or document-level tags on non-table
+                chunks (broad; see _page_or_document_tag for why tables are
+                held to their own tags)
+            all — require ALL tags, each matching under the same rule
             page_any — match page-level tags only (strict, for compound queries)
         """
         conditions: list[models.Condition] = []
@@ -401,36 +434,12 @@ class QdrantStore(VectorStore):
                     ),
                 )
             elif tag_match_mode == "any":
-                conditions.append(
-                    models.Filter(
-                        should=[
-                            models.FieldCondition(
-                                key="tag_normalized",
-                                match=models.MatchAny(any=normalized),
-                            ),
-                            models.FieldCondition(
-                                key="artifact_tag_normalized",
-                                match=models.MatchAny(any=normalized),
-                            ),
-                        ],
-                    ),
-                )
+                conditions.append(self._page_or_document_tag(models.MatchAny(any=normalized)))
             else:
-                for tag in normalized:
-                    conditions.append(
-                        models.Filter(
-                            should=[
-                                models.FieldCondition(
-                                    key="tag_normalized",
-                                    match=models.MatchValue(value=tag),
-                                ),
-                                models.FieldCondition(
-                                    key="artifact_tag_normalized",
-                                    match=models.MatchValue(value=tag),
-                                ),
-                            ],
-                        ),
-                    )
+                conditions.extend(
+                    self._page_or_document_tag(models.MatchValue(value=tag))
+                    for tag in normalized
+                )
         if entity_types:
             conditions.append(
                 models.FieldCondition(

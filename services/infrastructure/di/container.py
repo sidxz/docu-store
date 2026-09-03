@@ -1027,6 +1027,7 @@ def create_container() -> Container:
         tool_llm=tool_calling_llm,
         tool_registry=c[ToolRegistry],
         prompt_repository=c[PromptRepositoryPort],
+        accumulator_budget_chars=settings.chat_accumulator_budget_chars,
     )
 
     container[CompoundActivityQuery] = lambda c: CompoundActivityQuery(

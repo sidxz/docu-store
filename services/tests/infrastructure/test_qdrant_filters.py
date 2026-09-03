@@ -96,3 +96,40 @@ async def test_one_failing_index_does_not_stop_the_rest(monkeypatch):
     monkeypatch.setattr(store, "_get_client", lambda: _as_awaitable(boom))
     await store.ensure_collection_exists()
     assert len(boom.indexed) == ok  # stepped over, not stopped at
+
+
+def _tag_subfilter(flt: models.Filter) -> models.Filter:
+    """The one nested tag Filter inside a built filter's must-conditions."""
+    return next(c for c in flt.must if isinstance(c, models.Filter))
+
+
+@pytest.mark.parametrize("mode", ["any", "all"])
+def test_document_level_tags_never_match_a_table(mode):
+    """A table must match on its own tags, never on its document's.
+
+    ``artifact_tag_normalized`` says "this paper mentions Pks13 somewhere", which
+    is fine for prose and wrong for a table: the match is the attribution, so a
+    compound/IC50 table about a *different* target gets its numbers read as
+    Pks13's. Phase D narrows a table's own tags for this reason; document-level
+    matching must not route around it.
+    """
+    store = QdrantStore(collection_name="t")
+    sub = _tag_subfilter(
+        store._build_filter(workspace_id=uuid4(), tags=["Pks13"], tag_match_mode=mode),
+    )
+
+    own, doc = sub.should
+    assert own.key == "tag_normalized"          # a table may match this
+    assert doc.must[0].key == "artifact_tag_normalized"
+    assert doc.must_not[0].key == "is_table"    # ...but not this
+    assert doc.must_not[0].match.value is True
+
+
+def test_page_any_mode_stays_page_only():
+    """The strict mode never looked at document tags; it still must not."""
+    store = QdrantStore(collection_name="t")
+    flt = store._build_filter(
+        workspace_id=uuid4(), tags=["Pks13"], tag_match_mode="page_any",
+    )
+    assert not any(isinstance(c, models.Filter) for c in flt.must)
+    assert "tag_normalized" in _keys(flt)

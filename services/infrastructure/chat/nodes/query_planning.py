@@ -41,9 +41,22 @@ if TYPE_CHECKING:
 
 log = structlog.get_logger(__name__)
 
-# GLiNER2 schema for author/person extraction
+# GLiNER2 schema for author/person extraction.
+#
+# document_title is here to be *not* chosen. GLiNER2 scores each span against the
+# labels it is handed and has no "none of the above", so with author_name as the
+# only option a quoted paper title in a scholarly question got assigned to it:
+# 'Making MRSA sensitive again' came back as an author at 0.814 confidence, which
+# no threshold below 0.9 rejects (and 0.9 loses real authors). Offering the
+# competing label moves that same span to document_title at 0.999 and leaves
+# author_name empty -- the model was never confused, it just had a one-item menu.
+#
+# Only the part before the first "::" reaches the model; the adapter drops the
+# rest, and passing a description as the label extracts nothing at all. So keep
+# labels short and add options rather than prose.
 _AUTHOR_SCHEMA = [
     "author_name::person::Author or person name mentioned in the text",
+    "document_title::title::Title of a document, paper, or presentation",
 ]
 
 
@@ -176,13 +189,21 @@ class QueryPlanningNode:
         # Ablation: drop entity constraints entirely, leaving pure vector search.
         # Cleared here — after accumulation — so no downstream consumer (seed search,
         # factual force-injection, tool calls) sees a filter.
+        #
+        # author_mentions go too: retrieval builds its tag filter from the entity
+        # texts *plus* the author mentions, so clearing only the entities left the
+        # "unconstrained" arm still filtered by author. On a question naming a
+        # paper that meant tags=['Making MRSA sensitive again'] -- a tag no chunk
+        # in the corpus carries -- so the arm measured zero-recall search rather
+        # than unfiltered search.
         if settings.chat_clear_ner_filters:
             log.info(
                 "chat.planning.ner_filters_cleared",
                 dropped=[f.entity_text for f in plan.ner_entity_filters],
+                dropped_authors=plan.author_mentions,
                 reason="ablation:chat_clear_ner_filters",
             )
-            plan = plan.model_copy(update={"ner_entity_filters": []})
+            plan = plan.model_copy(update={"ner_entity_filters": [], "author_mentions": []})
 
         if _debug:
             log.info(
@@ -227,7 +248,14 @@ class QueryPlanningNode:
             threshold=0.4,
         )
         authors = [f.value for f in fields if f.name == "author_name" and f.value.strip()]
-        log.info("chat.planning.authors_done", count=len(authors), authors=authors)
+        log.info(
+            "chat.planning.authors_done",
+            count=len(authors),
+            authors=authors,
+            # Not used as a filter yet -- logged so a title absorbed by the author
+            # label is visible next time instead of silently becoming a tag.
+            titles=[f.value for f in fields if f.name == "document_title" and f.value.strip()],
+        )
         return authors
 
     async def _run_smiles_resolution(self, question: str) -> SmilesContext | None:

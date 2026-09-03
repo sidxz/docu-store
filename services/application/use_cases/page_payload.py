@@ -13,18 +13,55 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from domain.aggregates.artifact import Artifact
     from domain.aggregates.page import Page
     from domain.value_objects.source_class import SourceClass
 
 
-def build_page_payload(page: Page, source_class: SourceClass) -> dict:
+def artifact_tag_normalized(artifact: Artifact | None) -> list[str]:
+    """Lowercased artifact-level tags: aggregated tags, authors, publication year.
+
+    This is the field the ``any`` tag-match mode ORs against the page-level tags,
+    so a document *about* a topic matches on every one of its pages, not only the
+    pages that happen to spell the topic out.
+    """
+    if artifact is None:
+        return []
+    tags: list[str] = []
+    if artifact.tag_mentions:
+        tags.extend(tm.tag.lower() for tm in artifact.tag_mentions)
+    if artifact.author_mentions:
+        tags.extend(am.name.lower() for am in artifact.author_mentions)
+    if artifact.presentation_date and artifact.presentation_date.date:
+        tags.append(str(artifact.presentation_date.date.year))
+    return tags
+
+
+def build_page_payload(
+    page: Page,
+    source_class: SourceClass,
+    artifact: Artifact | None,
+) -> dict:
     """Payload fields derived from a page, plus the provenance of its artifact.
 
     ``source_class`` is written unconditionally while everything else is
     conditional: a point missing it matches no provenance filter, so it drops
     out of a filtered search rather than failing it.
+
+    ``artifact`` is required rather than defaulted because the artifact-level
+    tags have to be written *here*, at point creation. They used to be patched on
+    afterwards by SyncArtifactMetadataToVectorStoreUseCase, and an upsert deletes
+    and recreates its points -- so every re-embed silently dropped them, and the
+    batch re-embed runs at the end of ingestion. Half the corpus ended up with no
+    artifact tags at all, which quietly turned ``any`` tag matching into
+    ``page_any``. The sync use case still exists for the reverse ordering (tags
+    aggregated after the pages were embedded); between the two, either order works.
     """
     payload: dict = {"source_class": str(source_class)}
+
+    artifact_tags = artifact_tag_normalized(artifact)
+    if artifact_tags:
+        payload["artifact_tag_normalized"] = artifact_tags
 
     if page.workspace_id:
         payload["workspace_id"] = str(page.workspace_id)

@@ -15,7 +15,6 @@ import structlog
 
 from application.dtos.parsed_document import Block, ParsedDocument
 from application.use_cases.page_payload import build_page_payload
-from domain.value_objects.source_class import SourceClass
 from infrastructure.text_chunkers.block_aware_chunker import (
     chunk_blocks,
     chunk_payload,
@@ -31,6 +30,7 @@ if TYPE_CHECKING:
     from application.ports.summary_vector_store import SummaryVectorStore
     from application.ports.text_chunker import TextChunker
     from application.ports.vector_store import VectorStore
+    from domain.aggregates.artifact import Artifact
     from domain.aggregates.page import Page
 
 logger = structlog.get_logger()
@@ -108,7 +108,6 @@ class BatchReEmbedArtifactPagesUseCase:
         logger.info("batch_reembed_start", artifact_id=str(artifact_id))
 
         artifact = self.artifact_repository.get_by_id(artifact_id)
-        artifact_title = artifact.title_mention.title if artifact.title_mention else None
 
         if not artifact.pages:
             logger.info("batch_reembed_no_pages", artifact_id=str(artifact_id))
@@ -125,10 +124,8 @@ class BatchReEmbedArtifactPagesUseCase:
             batch_page_ids = artifact.pages[batch_start : batch_start + _PAGE_BATCH_SIZE]
             pages_processed, chunks_processed = await self._process_page_batch(
                 batch_page_ids,
-                artifact_title,
-                artifact_id,
+                artifact,
                 ir_by_page,
-                artifact.source_class,
             )
             total_pages += pages_processed
             total_chunks += chunks_processed
@@ -150,10 +147,8 @@ class BatchReEmbedArtifactPagesUseCase:
     async def _process_page_batch(
         self,
         page_ids: list[UUID],
-        artifact_title: str | None,
-        artifact_id: UUID,
+        artifact: Artifact,
         ir_by_page: dict[int, list[Block]] | None,
-        source_class: SourceClass,
     ) -> tuple[int, int]:
         """Process a batch of pages: chunk, encode, upsert.
 
@@ -162,6 +157,9 @@ class BatchReEmbedArtifactPagesUseCase:
 
         """
         from infrastructure.config import settings as _settings
+
+        artifact_id = artifact.id
+        artifact_title = artifact.title_mention.title if artifact.title_mention else None
 
         # Collect all chunks across pages in this batch
         page_chunk_groups: list[tuple[Page, int, list[dict] | None]] = []
@@ -224,7 +222,7 @@ class BatchReEmbedArtifactPagesUseCase:
             page_embeddings = embeddings[embedding_offset : embedding_offset + page_embedding_count]
             embedding_offset += page_embedding_count
 
-            metadata = build_page_payload(page, source_class)
+            metadata = build_page_payload(page, artifact.source_class, artifact)
 
             # Upsert per-page (sparse_embeddings=None — we skip sparse on re-embed)
             await self.vector_store.upsert_page_chunk_embeddings(
