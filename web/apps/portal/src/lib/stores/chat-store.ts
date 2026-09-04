@@ -92,6 +92,10 @@ interface ChatState {
   // Reasoning
   reasoningDefaults: ReasoningDefaults;
   synthesisOverride: "on" | "off" | null;
+  /** Chart panels for the next message. Off by default — each one costs extra
+   *  Europe PMC requests, and stance costs a model call against the user's key. */
+  statsOn: boolean;
+  setStatsOn: (v: boolean) => void;
   setReasoningDefault: (lane: keyof ReasoningDefaults, level: ReasoningDefault) => void;
   setSynthesisOverride: (v: "on" | "off" | null) => void;
   effectiveReasoning: () => Partial<Record<"synthesis" | "retrieval" | "base", ReasoningLevel>>;
@@ -151,10 +155,12 @@ export const useChatStore = create<ChatState>()(
 
   reasoningDefaults: { retrieval: "inherit", base: "inherit" },
   synthesisOverride: null,
+  statsOn: false,
 
   setReasoningDefault: (lane, level) =>
     set((state) => ({ reasoningDefaults: { ...state.reasoningDefaults, [lane]: level } })),
   setSynthesisOverride: (v) => set({ synthesisOverride: v }),
+  setStatsOn: (v) => set({ statsOn: v }),
   effectiveReasoning: () => {
     const { chatMode, reasoningDefaults, synthesisOverride } = get();
     const result: Partial<Record<"synthesis" | "retrieval" | "base", ReasoningLevel>> = {};

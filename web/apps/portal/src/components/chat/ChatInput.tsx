@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState, type FormEvent } from "react";
-import { Zap, Search, Telescope, Brain } from "lucide-react";
+import { Zap, Search, Telescope, Brain, ChartColumn } from "lucide-react";
 import {
   PromptInput,
   PromptInputButton,
@@ -39,6 +39,8 @@ export function ChatInput({
   const setChatMode = useChatStore((s) => s.setChatMode);
   const synthesisOverride = useChatStore((s) => s.synthesisOverride);
   const setSynthesisOverride = useChatStore((s) => s.setSynthesisOverride);
+  const statsOn = useChatStore((s) => s.statsOn);
+  const setStatsOn = useChatStore((s) => s.setStatsOn);
 
   const reasoningOn = isReasoningOn(chatMode, synthesisOverride);
 
@@ -92,6 +94,15 @@ export function ChatInput({
                 onToggle={() => setSynthesisOverride(reasoningOn ? "off" : "on")}
                 disabled={disabled}
               />
+              {/* Literature only: Deep Research answers from full text and has
+                  no external result set to count. */}
+              {modeLocked && (
+                <StatsToggle
+                  on={statsOn}
+                  onToggle={() => setStatsOn(!statsOn)}
+                  disabled={disabled}
+                />
+              )}
             </PromptInputTools>
             {disabled ? (
               <PromptInputSubmit
@@ -162,6 +173,37 @@ function ReasoningToggle({
       </TooltipTrigger>
       <TooltipContent>
         {on ? "Reasoning on — model thinks step by step (slower)" : "Reasoning off — model answers directly"}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function StatsToggle({
+  on,
+  onToggle,
+  disabled,
+}: {
+  on: boolean;
+  onToggle: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <PromptInputButton
+          onClick={onToggle}
+          disabled={disabled}
+          className={on ? "text-teal-600 dark:text-teal-400 hover:text-teal-600 dark:hover:text-teal-400 bg-teal-500/10 hover:bg-teal-500/20" : ""}
+          aria-label={`Stats ${on ? "on" : "off"}. Click to toggle.`}
+        >
+          <ChartColumn className="size-3.5" />
+          <span>Stats</span>
+        </PromptInputButton>
+      </TooltipTrigger>
+      <TooltipContent>
+        {on
+          ? "Stats on — charts describing the papers found (slower)"
+          : "Stats off — answer and paper list only"}
       </TooltipContent>
     </Tooltip>
   );
