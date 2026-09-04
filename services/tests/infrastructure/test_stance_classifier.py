@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
 
 from infrastructure.chat.stance_classifier import (
     STANCE_LABELS,

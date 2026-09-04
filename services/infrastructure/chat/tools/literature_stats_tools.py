@@ -52,8 +52,9 @@ PLOT_LITERATURE_DEF = ToolDefinition(
         "Chart the papers a query matches, when the question's shape calls for a "
         "picture rather than a list. You choose the panel and write the queries; "
         "the counts are computed from Europe PMC, not by you.\n\n"
-        "Call this AFTER searching, at most twice in a turn, and only when a panel "
-        "genuinely answers the question. Most questions need none.\n\n"
+        "Call this AFTER searching and BEFORE finish_retrieval, at most twice in a "
+        "turn. The reader asked for a chart; pick the panel that fits the "
+        "question's shape.\n\n"
         "Panels:\n"
         "  timeline    — volume over time. For 'is this growing', 'what is new', "
         "and any question comparing eras. Each facet becomes a series, so a "
@@ -116,6 +117,11 @@ _PUB_TYPE_BUCKETS = (
 # sampled chart would claim to have scored a population it never read.
 _STANCE_MAX_HITS = 60
 
+# A fan-out ceiling, not a design limit: above the exhaustive limit each facet
+# costs one request per year since 1990, so a four-facet call is ~150 requests
+# to Europe PMC for one picture nobody can read anyway.
+_MAX_FACETS = 3
+
 _TOO_MANY_MSG = (
     "That panel needs the individual records, and this query matches "
     "too many to fetch them. Narrow the query, or use a timeline."
@@ -138,6 +144,28 @@ def bucket_pub_type(raw: str | None) -> str:
         if needle in lowered:
             return label
     return "Research article"
+
+
+def _timeline_footnote(counted: list[tuple[str, Any]]) -> str:
+    """Where the counts come from, honestly, in each of the two regimes.
+
+    Above the exhaustive limit the counts are per-year requests from ``since``
+    (1990), so calling them "the whole Europe PMC match" hides every paper
+    before 1990 -- thousands of them, for an established field.
+    """
+    if all(c.exhaustive for _n, c in counted):
+        return "Counts are the whole Europe PMC match, not the papers retrieved."
+    total = sum(c.total for _n, c in counted)
+    return f"Counts from 1990 onward; the query matches {total:,} papers in total."
+
+
+def _deduped_records(counted: list[tuple[str, Any]]) -> list[Any]:
+    """Every record across the facets, each once.
+
+    Facets overlap by construction -- two sides of one question share papers --
+    and an undeduped concatenation draws the shared ones twice.
+    """
+    return list({r.external_id: r for _n, c in counted for r in c.records}.values())
 
 
 class PlotLiteratureTool:
@@ -201,7 +229,7 @@ class PlotLiteratureTool:
             facets=len(counted),
             total=sum(c.total for _n, c in counted),
         )
-        return [], _summarise(panel, counted), [
+        return [], _summarise(panel, counted, spec), [
             AgentEvent(
                 type="structured_block",
                 block=ContentBlockDTO(type="chart", chart=spec),
@@ -214,6 +242,11 @@ class PlotLiteratureTool:
         """The readable refusal for a bad call, or None when it may proceed."""
         if not facets:
             return "plot_literature needs at least one facet with a query."
+        if len(facets) > _MAX_FACETS:
+            return (
+                f"plot_literature takes at most {_MAX_FACETS} facets; {len(facets)} "
+                "were given. Pick the facets that actually contrast."
+            )
         if panel not in {"timeline", "evidence_mix", "landmarks", "stance"}:
             return f"Unknown panel '{panel}'. Use timeline, evidence_mix, landmarks or stance."
         if panel == "stance" and not claim:
@@ -226,12 +259,21 @@ class PlotLiteratureTool:
         self, panel: str, counted: list[tuple[str, Any]], claim: str,
     ) -> ChartSpecDTO:
         if panel == "timeline":
-            return self._timeline(counted)
-        if panel == "evidence_mix":
-            return self._evidence_mix(counted)
-        if panel == "stance":
-            return await self._stance(counted, claim)
-        return self._landmarks(counted)
+            spec = self._timeline(counted)
+        elif panel == "evidence_mix":
+            spec = self._evidence_mix(counted)
+        elif panel == "stance":
+            spec = await self._stance(counted, claim)
+        else:
+            spec = self._landmarks(counted)
+        # An axis with no bars under it is worse than no chart: it reads as
+        # "nothing was published", when it means nothing was counted.
+        if not any(s.points for s in spec.series):
+            no_points_msg = (
+                "No papers matched, so there is nothing to draw. Answer without the panel."
+            )
+            raise _PanelRefusedError(no_points_msg)
+        return spec
 
     async def _count_facets(
         self, facets: list[dict[str, Any]],
@@ -263,7 +305,7 @@ class PlotLiteratureTool:
             ],
             partial_x=float(datetime.now(UTC).year),
             source_query=" · ".join(c.query for _n, c in counted),
-            footnote="Counts are the whole Europe PMC match, not the papers retrieved.",
+            footnote=_timeline_footnote(counted),
         )
 
     def _evidence_mix(self, counted: list[tuple[str, Any]]) -> ChartSpecDTO:
@@ -271,7 +313,7 @@ class PlotLiteratureTool:
         # limit. Above it, only counts were fetched.
         if not all(c.exhaustive for _n, c in counted):
             raise _PanelRefusedError(_TOO_MANY_MSG)
-        records = [r for _n, c in counted for r in c.records]
+        records = _deduped_records(counted)
 
         by_bucket: dict[str, dict[int, int]] = {}
         for hit in records:
@@ -300,7 +342,7 @@ class PlotLiteratureTool:
     def _landmarks(self, counted: list[tuple[str, Any]]) -> ChartSpecDTO:
         if not all(c.exhaustive for _n, c in counted):
             raise _PanelRefusedError(_TOO_MANY_MSG)
-        records = [r for _n, c in counted for r in c.records]
+        records = _deduped_records(counted)
         top = sorted(records, key=lambda r: -r.cited_by_count)[:40]
         return ChartSpecDTO(
             panel="landmarks",
@@ -329,16 +371,24 @@ class PlotLiteratureTool:
 
         if not all(c.exhaustive for _n, c in counted):
             raise _PanelRefusedError(_TOO_MANY_MSG)
-        hits = [r for _n, c in counted for r in c.records]
-        if not hits:
+        counted_records = _deduped_records(counted)
+        if not counted_records:
             no_records_msg = "No papers matched, so there is nothing to score for stance."
             raise _PanelRefusedError(no_records_msg)
-        if len(hits) > _STANCE_MAX_HITS:
+        if len(counted_records) > _STANCE_MAX_HITS:
             over_cap_msg = (
-                f"Stance would need to read {len(hits)} papers, over the reading "
+                f"Stance would need to read {len(counted_records)} papers, over the reading "
                 f"budget of {_STANCE_MAX_HITS}. Narrow the facet query and try again."
             )
             raise _PanelRefusedError(over_cap_msg)
+
+        hits = await self._core_records(counted)
+        if not hits:
+            no_abstracts_msg = (
+                "No abstracts could be fetched for those papers, and stance is a "
+                "judgement over abstracts. Answer without the panel."
+            )
+            raise _PanelRefusedError(no_abstracts_msg)
 
         try:
             verdicts = await classify_stance(self._stance_llm, claim, hits)
@@ -360,7 +410,7 @@ class PlotLiteratureTool:
 
         return ChartSpecDTO(
             panel="stance",
-            title=f"Papers on: {claim}",
+            title=f"Papers on: {claim[:120]}",
             x_label="Year",
             y_label="Papers",
             series=[
@@ -373,14 +423,56 @@ class PlotLiteratureTool:
             ],
             partial_x=float(datetime.now(UTC).year),
             source_query=" · ".join(c.query for _n, c in counted),
+            # A stance verdict is a judgement, and the reader has to be able to
+            # overrule it. Without the fragment the chart is an assertion.
+            notes=[
+                f"{hit.year} · {v.label} · {hit.title[:80]} — “{v.evidence}”"
+                for hit, v in zip(hits, verdicts, strict=False)
+                if v.label != "none" and v.evidence
+            ][:60],
             footnote=(
                 "Each paper scored against the claim, not for sentiment. "
                 "Most papers take no position, which is expected."
             ),
         )
 
+    async def _core_records(self, counted: list[tuple[str, Any]]) -> list[Any]:
+        """The same papers again, as core records — the only ones with abstracts.
 
-def _summarise(panel: str, counted: list[tuple[str, Any]]) -> str:
+        ``year_counts`` uses ``resultType=lite``, which carries no abstractText
+        at all. Classifying its records scored titles against a prompt that
+        demands a verbatim abstract quote, so every verdict was decided by a
+        title and most evidence strings came back empty.
+        """
+        by_id: dict[str, Any] = {}
+        for _name, c in counted:
+            try:
+                fetched = await self._client.search_or_raise(c.query, limit=_STANCE_MAX_HITS)
+            except LiteratureQueryError as exc:
+                raise _PanelRefusedError(_rejected_summary(c.query, exc)) from exc
+            except LiteratureSourceUnavailableError as exc:
+                raise _PanelRefusedError(_outage_summary(c.query, exc)) from exc
+            for hit in fetched:
+                by_id.setdefault(hit.external_id, hit)
+        return list(by_id.values())
+
+
+def _stance_shape(spec: ChartSpecDTO) -> str:
+    """The stance split in one line: the counts, and when the field turned.
+
+    Shape only. The per-year series is on the chart the reader can see, and a
+    model handed the whole series restates it as if it had read the papers.
+    """
+    from infrastructure.chat.stance_classifier import STANCE_LABELS
+
+    totals = {s.name: int(sum(n for _y, n in s.points)) for s in spec.series}
+    parts = ", ".join(f"{label} {totals[label]}" for label in STANCE_LABELS if label in totals)
+    refutes = next((s for s in spec.series if s.name == "refutes" and s.points), None)
+    turned = f"; first refutes {int(min(y for y, _n in refutes.points))}" if refutes else ""
+    return f"- Stance: {parts}{turned}."
+
+
+def _summarise(panel: str, counted: list[tuple[str, Any]], spec: ChartSpecDTO) -> str:
     """What the model reads: the shape, never the series.
 
     Chart payloads never enter conversation history — history is the prose,
@@ -399,6 +491,8 @@ def _summarise(panel: str, counted: list[tuple[str, Any]]) -> str:
             f"- {name}: {c.total} papers, {years[0]}–{years[-1]}, "
             f"{recent} in the last five years.",
         )
+    if spec.panel == "stance":
+        lines.append(_stance_shape(spec))
     lines.append(
         "Describe the shape in your answer. Do not restate these numbers as if "
         "you had read them in an abstract.",

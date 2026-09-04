@@ -209,12 +209,31 @@ def _flag(value: object) -> bool:
     return str(value).strip().upper() == "Y"
 
 
+def _pub_types(record: dict) -> tuple[str, ...]:
+    """Publication types, from either result shape.
+
+    ``resultType=core`` sends ``pubTypeList.pubType`` as a list;
+    ``resultType=lite`` -- what year_counts uses -- sends ``pubTypeList: null``
+    and a flat semicolon-joined ``pubType`` string instead. Reading only the
+    core shape left every lite record with no types at all, which silently
+    bucketed reviews and preprints as research articles and disarmed the
+    retraction check on the counting path.
+    """
+    listed = (record.get("pubTypeList") or {}).get("pubType")
+    if listed:
+        return tuple(listed)
+    flat = record.get("pubType")
+    if isinstance(flat, str):
+        return tuple(p.strip() for p in flat.split(";") if p.strip())
+    return ()
+
+
 def parse_hit(record: dict) -> LiteratureHit:
     """One ``resultList.result`` entry to a LiteratureHit."""
     journal = (record.get("journalInfo") or {}).get("journal") or {}
     licence = record.get("license")
     year = record.get("pubYear")
-    pub_types = tuple((record.get("pubTypeList") or {}).get("pubType") or ())
+    pub_types = _pub_types(record)
     corrections = (record.get("commentCorrectionList") or {}).get("commentCorrection") or []
     retraction_notice = next(
         (
@@ -409,7 +428,14 @@ class EuropePmcClient:
         """
         first = await self._raw_search(query, page_size=_EXHAUSTIVE_LIMIT)
         total = int(first.get("hitCount") or 0)
-        records = [parse_hit(r) for r in first["resultList"]["result"]]
+        # A 200 whose body is not the shape we expect is an outage, not a bug in
+        # the caller: raising KeyError here goes past every caller's handler and
+        # out as a bare 500 on a panel that was meant to be refusable.
+        try:
+            records = [parse_hit(r) for r in first["resultList"]["result"]]
+        except (KeyError, TypeError, ValueError) as exc:
+            msg = f"Europe PMC returned an unexpected body: {exc}"
+            raise LiteratureSourceUnavailableError(msg) from exc
 
         if total <= _EXHAUSTIVE_LIMIT:
             counts: dict[int, int] = {}

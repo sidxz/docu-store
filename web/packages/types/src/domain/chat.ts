@@ -102,6 +102,8 @@ export interface ChartSpec {
   /** The incomplete x value — the current year. Rendered hatched. */
   partial_x: number | null;
   footnote: string | null;
+  /** Per-item annotations under the chart — stance's deciding fragments. */
+  notes: string[] | null;
   /** The Europe PMC query behind these counts. */
   source_query: string | null;
 }

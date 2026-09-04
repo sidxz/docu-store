@@ -118,6 +118,10 @@ class ChartSpecDTO(BaseModel):
     """The x value that is incomplete -- the current year. Rendered hatched;
     without it every chart ends on a false decline."""
     footnote: str | None = None
+    notes: list[str] | None = None
+    """Per-item annotations shown under the chart. Stance uses it for the
+    fragment of the abstract that decided each verdict, so a reader can
+    overrule the classifier instead of taking the bars on trust."""
     source_query: str | None = None
     """The Europe PMC query these counts came from, so a reader can check that
     the chart and the cards describe the same population."""

@@ -132,6 +132,21 @@ export function ChartBlock({ spec }: { spec: ChartSpec }) {
         </ResponsiveContainer>
       </div>
 
+      {spec.notes?.length ? (
+        // Stance is a judgement, and a reader must be able to overrule it.
+        // Collapsed: the fragments are the appeal, not the finding.
+        <details className="mt-2">
+          <summary className="text-[0.6875rem] text-text-muted cursor-pointer">Verdicts</summary>
+          <ul>
+            {spec.notes.map((note) => (
+              <li key={note} className="text-[0.6875rem] leading-relaxed text-text-muted">
+                {note}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+
       {(spec.footnote || spec.partial_x != null || spec.source_query) && (
         <p className="mt-2 text-[0.6875rem] leading-relaxed text-text-muted">
           {spec.footnote}

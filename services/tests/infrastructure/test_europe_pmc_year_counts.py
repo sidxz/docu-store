@@ -78,6 +78,10 @@ async def test_small_result_set_is_counted_from_one_request(monkeypatch):
     # free once this call has been made.
     assert len(result.records) == 4
     assert result.records[0].cited_by_count == 0
+    # ``resultType=lite`` carries pubType as a flat string with pubTypeList
+    # null. Reading only the core shape left pub_types empty for every record,
+    # and bucket_pub_type then called all of them research articles.
+    assert result.records[0].pub_types == ("research-article",)
 
 
 async def test_the_counting_query_is_sent_unchanged(monkeypatch):
@@ -118,6 +122,26 @@ async def test_an_outage_raises_rather_than_returning_empty_counts(monkeypatch):
 
     monkeypatch.setattr(epmc.httpx, "AsyncClient", _Failing([]), raising=False)
     monkeypatch.setattr(epmc, "_RETRY_BACKOFF_SECONDS", 0.0)
+
+    with pytest.raises(epmc.LiteratureSourceUnavailableError):
+        await EuropePmcClient().year_counts('TITLE_ABS:"MmpL3"')
+
+
+async def test_a_malformed_200_body_is_an_outage_not_a_key_error(monkeypatch):
+    # Europe PMC answers 200 with a body missing resultList often enough to
+    # matter. Letting the KeyError out takes it past every caller's handler and
+    # surfaces as a bare 500 on a chart nobody asked to be fatal.
+    fake = _FakeAsyncClient([json.dumps({"hitCount": 3})])
+    monkeypatch.setattr(epmc.httpx, "AsyncClient", fake, raising=False)
+
+    with pytest.raises(epmc.LiteratureSourceUnavailableError):
+        await EuropePmcClient().year_counts('TITLE_ABS:"MmpL3"')
+
+
+async def test_a_record_that_cannot_be_parsed_is_an_outage_too(monkeypatch):
+    body = json.dumps({"hitCount": 1, "resultList": {"result": [{"source": "MED"}]}})
+    fake = _FakeAsyncClient([body])
+    monkeypatch.setattr(epmc.httpx, "AsyncClient", fake, raising=False)
 
     with pytest.raises(epmc.LiteratureSourceUnavailableError):
         await EuropePmcClient().year_counts('TITLE_ABS:"MmpL3"')

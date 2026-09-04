@@ -40,6 +40,7 @@ class _StubClient:
 
     def __init__(self) -> None:
         self.queries: list[str] = []
+        self.core_queries: list[str] = []
 
     async def year_counts(self, query: str, *, since: int = 1990) -> YearCounts:
         self.queries.append(query)
@@ -59,6 +60,20 @@ class _StubClient:
             ],
             exhaustive=True,
         )
+
+    async def search_or_raise(self, query: str, *, limit: int = 25) -> list[LiteratureHit]:
+        # The counting path is resultType=lite and carries no abstract; stance
+        # re-fetches core records through here to get one.
+        self.core_queries.append(query)
+        return [
+            LiteratureHit(
+                external_id="1",
+                source="MED",
+                title="A paper",
+                abstract="MmpL3 inhibitors act directly on the transporter.",
+                year=2019,
+            ),
+        ]
 
 
 async def test_a_timeline_emits_one_chart_block_per_facet_as_a_series():
@@ -424,3 +439,185 @@ async def test_an_unparseable_stance_response_does_not_say_too_many_and_names_th
     assert events == []
     assert "too many" not in summary.lower()
     assert "classifier" in summary.lower()
+
+
+# ── The lite/core split, the fan-out ceiling, and the honest footnote ──
+
+
+class _NonExhaustiveWithCountsClient:
+    """Over the exhaustive limit: real per-year counts, but only from `since`."""
+
+    async def year_counts(self, query: str, *, since: int = 1990) -> YearCounts:
+        return YearCounts(
+            query=query,
+            total=15158,
+            counts={2020: 500, 2021: 700},
+            records=[],
+            exhaustive=False,
+        )
+
+
+class _SharedRecordClient:
+    """Two facets whose queries both match the same paper."""
+
+    async def year_counts(self, query: str, *, since: int = 1990) -> YearCounts:
+        return YearCounts(
+            query=query,
+            total=1,
+            counts={2020: 1},
+            records=[
+                LiteratureHit(
+                    external_id="shared", source="MED", title="Both facets match this",
+                    year=2020, cited_by_count=9, pub_types=("research-article",),
+                ),
+            ],
+            exhaustive=True,
+        )
+
+    async def search_or_raise(self, query: str, *, limit: int = 25) -> list[LiteratureHit]:
+        return [
+            LiteratureHit(
+                external_id="shared", source="MED", title="Both facets match this",
+                abstract="An abstract.", year=2020,
+            ),
+        ]
+
+
+async def test_a_record_matched_by_two_facets_is_counted_once():
+    # Facets overlap constantly -- two sides of one question share papers. Left
+    # undeduped, the shared paper is drawn twice and every total is inflated.
+    tool = PlotLiteratureTool(_SharedRecordClient())
+    _r, _s, events = await tool.execute(
+        {
+            "panel": "evidence_mix",
+            "facets": [{"name": "a", "query": "x"}, {"name": "b", "query": "y"}],
+        },
+        uuid4(),
+        None,
+    )
+    series = events[0].block.chart.series
+    assert [p for s in series for p in s.points] == [(2020.0, 1.0)]
+
+
+async def test_a_non_exhaustive_timeline_says_where_its_counts_start():
+    # The per-year path counts from 1990 only, so "the whole Europe PMC match"
+    # would be a lie by a few thousand papers.
+    tool = PlotLiteratureTool(_NonExhaustiveWithCountsClient())
+    _r, _s, events = await tool.execute(
+        {"panel": "timeline", "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    footnote = events[0].block.chart.footnote
+    assert "1990" in footnote
+    assert "15,158" in footnote
+
+
+async def test_more_than_three_facets_is_refused_before_any_request():
+    client = _StubClient()
+    tool = PlotLiteratureTool(client)
+    _r, summary, events = await tool.execute(
+        {
+            "panel": "timeline",
+            "facets": [{"name": str(i), "query": f"q{i}"} for i in range(4)],
+        },
+        uuid4(),
+        None,
+    )
+    assert events == []
+    assert client.queries == []
+    assert "facet" in summary.lower()
+
+
+async def test_a_chart_with_no_points_at_all_is_refused_rather_than_drawn_empty():
+    tool = PlotLiteratureTool(_NonExhaustiveClient())
+    _r, summary, events = await tool.execute(
+        {"panel": "timeline", "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    assert events == []
+    assert "no papers" in summary.lower()
+
+
+# ── Stance: abstracts, evidence, and the shape the model is told ──
+
+
+class _RecordingStanceLLM:
+    def __init__(self, payload: str) -> None:
+        self.payload = payload
+        self.prompts: list[str] = []
+
+    async def complete(self, prompt: str, **kwargs) -> str:
+        self.prompts.append(prompt)
+        return self.payload
+
+
+async def test_stance_classifies_abstracts_refetched_as_core_not_lite_titles():
+    # year_counts uses resultType=lite, whose records have no abstractText at
+    # all, while the classifier prompt demands a verbatim abstract quote.
+    client = _StubClient()
+    llm = _RecordingStanceLLM('{"verdicts": [{"id": "1", "label": "refutes", "evidence": "act directly"}]}')
+    tool = PlotLiteratureTool(client, stance_llm=llm)
+    _r, _s, events = await tool.execute(
+        {"panel": "stance", "claim": "a claim", "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    assert client.core_queries == ["x"]
+    assert "act directly on the transporter" in llm.prompts[0]
+    assert len(events) == 1
+
+
+async def test_stance_ships_the_fragment_that_decided_each_verdict():
+    llm = _RecordingStanceLLM('{"verdicts": [{"id": "1", "label": "refutes", "evidence": "act directly"}]}')
+    tool = PlotLiteratureTool(_StubClient(), stance_llm=llm)
+    _r, _s, events = await tool.execute(
+        {"panel": "stance", "claim": "a claim", "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    notes = events[0].block.chart.notes
+    assert notes and "act directly" in notes[0]
+    assert "refutes" in notes[0]
+
+
+async def test_the_model_is_told_the_stance_split_and_when_it_turned():
+    llm = _RecordingStanceLLM('{"verdicts": [{"id": "1", "label": "refutes", "evidence": "act directly"}]}')
+    tool = PlotLiteratureTool(_StubClient(), stance_llm=llm)
+    _r, summary, _e = await tool.execute(
+        {"panel": "stance", "claim": "a claim", "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    assert "refutes" in summary
+    assert "2019" in summary
+
+
+async def test_a_long_claim_does_not_become_a_paragraph_of_chart_title():
+    llm = _RecordingStanceLLM('{"verdicts": [{"id": "1", "label": "none", "evidence": ""}]}')
+    tool = PlotLiteratureTool(_StubClient(), stance_llm=llm)
+    claim = "x" * 400
+    _r, _s, events = await tool.execute(
+        {"panel": "stance", "claim": claim, "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    assert len(events[0].block.chart.title) < 160
+
+
+async def test_a_stance_facet_whose_refetch_fails_is_refused_readably():
+    class _RefetchFails(_StubClient):
+        async def search_or_raise(self, query: str, *, limit: int = 25):
+            raise LiteratureSourceUnavailableError("503")
+
+    llm = _RecordingStanceLLM('{"verdicts": []}')
+    tool = PlotLiteratureTool(_RefetchFails(), stance_llm=llm)
+    _r, summary, events = await tool.execute(
+        {"panel": "stance", "claim": "a claim", "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    assert events == []
+    assert llm.prompts == []
+    assert "unreachable" in summary.lower()
