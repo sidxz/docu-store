@@ -146,6 +146,7 @@ export function ChartBlock({ spec }: { spec: ChartSpec }) {
                     label: s.labels?.[p],
                   }))}
                   fill={colorFor(spec, s.name, i)}
+                  isAnimationActive={false}
                 />
               ))}
               {spec.series.length > 1 && (
@@ -180,6 +181,13 @@ export function ChartBlock({ spec }: { spec: ChartSpec }) {
                   stackId={stacked ? "a" : undefined}
                   fill={colorFor(spec, s.name, i)}
                   radius={[2, 2, 0, 0]}
+                  /* No grow-in. The block now appears when the answer
+                     completes, and the optimistic message (key "streaming")
+                     is replaced by the persisted one (key message_id) a few
+                     hundred ms later — a remount, which restarts recharts'
+                     1.5s animation mid-flight. A static analytical chart in a
+                     transcript gains nothing from it either way. */
+                  isAnimationActive={false}
                 >
                   {/* The partial year is drawn faint. Without it the chart
                       always ends on a decline that is an artefact of the
