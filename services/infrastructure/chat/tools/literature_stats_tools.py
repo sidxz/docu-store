@@ -112,6 +112,19 @@ _PUB_TYPE_BUCKETS = (
     ("review", "Review"),
 )
 
+# A reading budget on the user's own key: refuse rather than sample, because a
+# sampled chart would claim to have scored a population it never read.
+_STANCE_MAX_HITS = 60
+
+_TOO_MANY_MSG = (
+    "That panel needs the individual records, and this query matches "
+    "too many to fetch them. Narrow the query, or use a timeline."
+)
+
+
+class _PanelRefusedError(Exception):
+    """A panel could not be drawn. The message is what the model reads."""
+
 
 def bucket_pub_type(raw: str | None) -> str:
     """Europe PMC's pubType is semicolon-joined free text, not an enum.
@@ -176,14 +189,10 @@ class PlotLiteratureTool:
         if error_summary is not None:
             return [], error_summary, []
 
-        spec = await self._build_spec(panel, counted, claim)
-        if spec is None:
-            return (
-                [],
-                "That panel needs the individual records, and this query matches "
-                "too many to fetch them. Narrow the query, or use a timeline.",
-                [],
-            )
+        try:
+            spec = await self._build_spec(panel, counted, claim)
+        except _PanelRefusedError as exc:
+            return [], str(exc), []
 
         claim_panel_slot()
         log.info(
@@ -215,7 +224,7 @@ class PlotLiteratureTool:
 
     async def _build_spec(
         self, panel: str, counted: list[tuple[str, Any]], claim: str,
-    ) -> ChartSpecDTO | None:
+    ) -> ChartSpecDTO:
         if panel == "timeline":
             return self._timeline(counted)
         if panel == "evidence_mix":
@@ -257,11 +266,11 @@ class PlotLiteratureTool:
             footnote="Counts are the whole Europe PMC match, not the papers retrieved.",
         )
 
-    def _evidence_mix(self, counted: list[tuple[str, Any]]) -> ChartSpecDTO | None:
+    def _evidence_mix(self, counted: list[tuple[str, Any]]) -> ChartSpecDTO:
         # Needs the records themselves, which only exist below the exhaustive
         # limit. Above it, only counts were fetched.
         if not all(c.exhaustive for _n, c in counted):
-            return None
+            raise _PanelRefusedError(_TOO_MANY_MSG)
         records = [r for _n, c in counted for r in c.records]
 
         by_bucket: dict[str, dict[int, int]] = {}
@@ -288,9 +297,9 @@ class PlotLiteratureTool:
             source_query=" · ".join(c.query for _n, c in counted),
         )
 
-    def _landmarks(self, counted: list[tuple[str, Any]]) -> ChartSpecDTO | None:
+    def _landmarks(self, counted: list[tuple[str, Any]]) -> ChartSpecDTO:
         if not all(c.exhaustive for _n, c in counted):
-            return None
+            raise _PanelRefusedError(_TOO_MANY_MSG)
         records = [r for _n, c in counted for r in c.records]
         top = sorted(records, key=lambda r: -r.cited_by_count)[:40]
         return ChartSpecDTO(
@@ -315,18 +324,31 @@ class PlotLiteratureTool:
             ),
         )
 
-    async def _stance(self, counted: list[tuple[str, Any]], claim: str) -> ChartSpecDTO | None:
+    async def _stance(self, counted: list[tuple[str, Any]], claim: str) -> ChartSpecDTO:
         from infrastructure.chat.stance_classifier import STANCE_LABELS, classify_stance
 
         if not all(c.exhaustive for _n, c in counted):
-            return None
+            raise _PanelRefusedError(_TOO_MANY_MSG)
         hits = [r for _n, c in counted for r in c.records]
         if not hits:
-            return None
+            no_records_msg = "No papers matched, so there is nothing to score for stance."
+            raise _PanelRefusedError(no_records_msg)
+        if len(hits) > _STANCE_MAX_HITS:
+            over_cap_msg = (
+                f"Stance would need to read {len(hits)} papers, over the reading "
+                f"budget of {_STANCE_MAX_HITS}. Narrow the facet query and try again."
+            )
+            raise _PanelRefusedError(over_cap_msg)
 
-        verdicts = await classify_stance(self._stance_llm, claim, hits)
+        try:
+            verdicts = await classify_stance(self._stance_llm, claim, hits)
+        except Exception as exc:
+            log.warning("tool.literature.stance_failed", error=str(exc))
+            failed_msg = f"Stance classification failed: {exc}. Answer without the panel."
+            raise _PanelRefusedError(failed_msg) from exc
         if not verdicts:
-            return None
+            unusable_msg = "The stance classifier returned nothing usable. Answer without the panel."
+            raise _PanelRefusedError(unusable_msg)
 
         by_id = {v.external_id: v.label for v in verdicts}
         stacks: dict[str, dict[int, int]] = {label: {} for label in STANCE_LABELS}

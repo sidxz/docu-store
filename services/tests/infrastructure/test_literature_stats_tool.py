@@ -353,3 +353,74 @@ async def test_a_stance_panel_without_a_claim_is_refused():
     )
     assert events == []
     assert "claim" in summary.lower()
+
+
+class _ManyHitsClient:
+    """One facet, exhaustively fetched, matching more than the stance reading cap."""
+
+    def __init__(self, count: int) -> None:
+        self._count = count
+
+    async def year_counts(self, query: str, *, since: int = 1990) -> YearCounts:
+        records = [
+            LiteratureHit(external_id=str(i), source="MED", title="A paper", year=2020)
+            for i in range(self._count)
+        ]
+        return YearCounts(
+            query=query,
+            total=self._count,
+            counts={2020: self._count},
+            records=records,
+            exhaustive=True,
+        )
+
+
+async def test_a_stance_panel_over_the_reading_cap_is_refused_without_calling_the_classifier():
+    calls: list[str] = []
+
+    class _CountingLLM:
+        async def complete(self, prompt: str, **kwargs) -> str:
+            calls.append(prompt)
+            return '{"verdicts": []}'
+
+    tool = PlotLiteratureTool(_ManyHitsClient(61), stance_llm=_CountingLLM())
+    _r, summary, events = await tool.execute(
+        {"panel": "stance", "claim": "a claim", "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    assert events == []
+    assert calls == []
+    assert "narrow" in summary.lower()
+    assert "61" in summary
+
+
+async def test_a_stance_panel_whose_classifier_raises_is_refused_readably():
+    class _RaisingLLM:
+        async def complete(self, prompt: str, **kwargs) -> str:
+            raise RuntimeError("provider timed out")
+
+    tool = PlotLiteratureTool(_StubClient(), stance_llm=_RaisingLLM())
+    _r, summary, events = await tool.execute(
+        {"panel": "stance", "claim": "a claim", "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    assert events == []
+    assert "failed" in summary.lower()
+
+
+async def test_an_unparseable_stance_response_does_not_say_too_many_and_names_the_classifier():
+    class _GibberishLLM:
+        async def complete(self, prompt: str, **kwargs) -> str:
+            return "not json"
+
+    tool = PlotLiteratureTool(_StubClient(), stance_llm=_GibberishLLM())
+    _r, summary, events = await tool.execute(
+        {"panel": "stance", "claim": "a claim", "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    assert events == []
+    assert "too many" not in summary.lower()
+    assert "classifier" in summary.lower()
