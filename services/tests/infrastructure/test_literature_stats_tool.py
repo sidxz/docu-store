@@ -10,8 +10,16 @@ from uuid import uuid4
 
 import pytest
 
-from infrastructure.chat.tools.literature_stats_tools import PlotLiteratureTool
-from infrastructure.literature.europe_pmc import LiteratureHit, YearCounts
+from infrastructure.chat.tools.literature_stats_tools import (
+    PlotLiteratureTool,
+    bucket_pub_type,
+)
+from infrastructure.literature.europe_pmc import (
+    LiteratureHit,
+    LiteratureQueryError,
+    LiteratureSourceUnavailableError,
+    YearCounts,
+)
 from infrastructure.llm.stats_context import (
     MAX_PANELS_PER_TURN,
     reset_panel_budget,
@@ -140,3 +148,176 @@ async def test_a_panel_with_no_facets_is_refused_without_calling_europe_pmc():
     assert events == []
     assert client.queries == []
     assert "facet" in summary.lower()
+
+
+class _NonExhaustiveClient:
+    """Above the exhaustive limit: counts only, no individual records."""
+
+    async def year_counts(self, query: str, *, since: int = 1990) -> YearCounts:
+        return YearCounts(query=query, total=999_999, counts={}, records=[], exhaustive=False)
+
+
+class _MultiTypeClient:
+    """One facet whose records span every pub-type bucket."""
+
+    async def year_counts(self, query: str, *, since: int = 1990) -> YearCounts:
+        records = [
+            LiteratureHit(
+                external_id="1", source="MED", title="Article",
+                year=2020, cited_by_count=3, pub_types=("research-article",),
+            ),
+            LiteratureHit(
+                external_id="2", source="MED", title="Review",
+                year=2020, cited_by_count=50, pub_types=("review",),
+            ),
+            LiteratureHit(
+                external_id="3", source="PAT", title="Patent",
+                year=2018, cited_by_count=0, pub_types=("patent",),
+            ),
+            LiteratureHit(
+                external_id="4", source="PPR", title="Preprint",
+                year=2021, cited_by_count=1, pub_types=("preprint",),
+            ),
+        ]
+        return YearCounts(
+            query=query,
+            total=len(records),
+            counts={2020: 2, 2018: 1, 2021: 1},
+            records=records,
+            exhaustive=True,
+        )
+
+
+class _MixedExhaustivenessClient:
+    """One facet's query matches few enough records to be exhaustive; the other doesn't."""
+
+    async def year_counts(self, query: str, *, since: int = 1990) -> YearCounts:
+        if query == "exhaustive":
+            return YearCounts(
+                query=query,
+                total=1,
+                counts={2020: 1},
+                records=[
+                    LiteratureHit(
+                        external_id="1", source="MED", title="A",
+                        year=2020, cited_by_count=1, pub_types=("research-article",),
+                    ),
+                ],
+                exhaustive=True,
+            )
+        return YearCounts(query=query, total=999_999, counts={}, records=[], exhaustive=False)
+
+
+class _RaisingClient:
+    def __init__(self, exc: Exception) -> None:
+        self._exc = exc
+
+    async def year_counts(self, query: str, *, since: int = 1990) -> YearCounts:
+        raise self._exc
+
+
+async def test_a_non_exhaustive_evidence_mix_is_refused_with_no_event():
+    tool = PlotLiteratureTool(_NonExhaustiveClient())
+    _r, summary, events = await tool.execute(
+        {"panel": "evidence_mix", "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    assert events == []
+    assert "narrow" in summary.lower()
+
+
+async def test_a_refused_evidence_mix_does_not_burn_a_panel_slot():
+    tool = PlotLiteratureTool(_NonExhaustiveClient())
+    for _ in range(MAX_PANELS_PER_TURN + 1):
+        _r, _s, events = await tool.execute(
+            {"panel": "evidence_mix", "facets": [{"name": "a", "query": "x"}]},
+            uuid4(),
+            None,
+        )
+        assert events == []
+
+    # The budget was never touched by the refusals above, so a timeline still draws.
+    tool2 = PlotLiteratureTool(_StubClient())
+    _r, _s, events = await tool2.execute(
+        {"panel": "timeline", "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    assert len(events) == 1
+
+
+async def test_evidence_mix_refuses_when_only_some_facets_are_exhaustive():
+    tool = PlotLiteratureTool(_MixedExhaustivenessClient())
+    _r, summary, events = await tool.execute(
+        {
+            "panel": "evidence_mix",
+            "facets": [
+                {"name": "Exhaustive", "query": "exhaustive"},
+                {"name": "TooMany", "query": "too many"},
+            ],
+        },
+        uuid4(),
+        None,
+    )
+    assert events == []
+    assert "narrow" in summary.lower()
+
+
+async def test_evidence_mix_buckets_records_by_pub_type():
+    tool = PlotLiteratureTool(_MultiTypeClient())
+    _r, _s, events = await tool.execute(
+        {"panel": "evidence_mix", "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    assert len(events) == 1
+    chart = events[0].block.chart
+    assert chart.panel == "evidence_mix"
+    names = {s.name for s in chart.series}
+    assert names == {"Research article", "Review", "Patent", "Preprint"}
+    patent_series = next(s for s in chart.series if s.name == "Patent")
+    assert (2018.0, 1.0) in patent_series.points
+
+
+async def test_landmarks_plots_citations_against_year():
+    tool = PlotLiteratureTool(_MultiTypeClient())
+    _r, _s, events = await tool.execute(
+        {"panel": "landmarks", "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    assert len(events) == 1
+    chart = events[0].block.chart
+    assert chart.panel == "landmarks"
+    assert (2020.0, 50.0) in chart.series[0].points
+
+
+def test_bucket_pub_type_prefers_review_over_journal_article():
+    assert bucket_pub_type("research support, non-u.s. gov't; review; journal article") == "Review"
+
+
+def test_bucket_pub_type_recognises_a_patent():
+    assert bucket_pub_type("patent") == "Patent"
+
+
+async def test_a_rejected_query_reaches_the_model_as_readable_guidance():
+    tool = PlotLiteratureTool(_RaisingClient(LiteratureQueryError("bad syntax")))
+    _r, summary, events = await tool.execute(
+        {"panel": "timeline", "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    assert events == []
+    assert "rejected" in summary.lower()
+
+
+async def test_a_source_outage_reaches_the_model_as_readable_guidance():
+    tool = PlotLiteratureTool(_RaisingClient(LiteratureSourceUnavailableError("503")))
+    _r, summary, events = await tool.execute(
+        {"panel": "timeline", "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    assert events == []
+    assert "unreachable" in summary.lower()

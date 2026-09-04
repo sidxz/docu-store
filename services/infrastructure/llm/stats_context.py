@@ -47,6 +47,16 @@ def claim_panel_slot() -> bool:
     return True
 
 
+def panel_budget_spent() -> bool:
+    """Whether the turn's budget is already exhausted, without claiming a slot.
+
+    The budget counts panels drawn, not panels attempted: a caller that may
+    still refuse after this check (no data, a source error) should peek here
+    first, so a refusal costs zero Europe PMC requests and zero slots.
+    """
+    return _panels_drawn.get() >= MAX_PANELS_PER_TURN
+
+
 def reset_panel_budget() -> Token:
     """Start a turn with a full budget. Reset with :func:`reset_stats_enabled`'s twin."""
     return _panels_drawn.set(0)

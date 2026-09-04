@@ -26,7 +26,16 @@ from application.dtos.chat_dtos import (
     ContentBlockDTO,
 )
 from application.ports.tool_calling_llm import ToolDefinition
-from infrastructure.llm.stats_context import MAX_PANELS_PER_TURN, claim_panel_slot
+from infrastructure.chat.tools.literature_tools import _outage_summary, _rejected_summary
+from infrastructure.literature.europe_pmc import (
+    LiteratureQueryError,
+    LiteratureSourceUnavailableError,
+)
+from infrastructure.llm.stats_context import (
+    MAX_PANELS_PER_TURN,
+    claim_panel_slot,
+    panel_budget_spent,
+)
 
 if TYPE_CHECKING:
     from infrastructure.chat.models import RetrievalResult
@@ -144,7 +153,10 @@ class PlotLiteratureTool:
         if panel not in {"timeline", "evidence_mix", "landmarks"}:
             return [], f"Unknown panel '{panel}'. Use timeline, evidence_mix or landmarks.", []
 
-        if not claim_panel_slot():
+        # Peek rather than claim: the budget counts panels DRAWN, and a refusal
+        # below (no data, a source error) must cost zero Europe PMC requests and
+        # zero slots. The slot is claimed only once a chart is actually emitted.
+        if panel_budget_spent():
             return (
                 [],
                 f"Panel not drawn: the maximum of {MAX_PANELS_PER_TURN} charts per "
@@ -152,9 +164,9 @@ class PlotLiteratureTool:
                 [],
             )
 
-        counted = []
-        for facet in facets:
-            counted.append((str(facet.get("name") or "Papers"), await self._client.year_counts(str(facet["query"]))))
+        counted, error_summary = await self._count_facets(facets)
+        if error_summary is not None:
+            return [], error_summary, []
 
         if panel == "timeline":
             spec = self._timeline(counted)
@@ -171,6 +183,7 @@ class PlotLiteratureTool:
                 [],
             )
 
+        claim_panel_slot()
         log.info(
             "tool.literature.plotted",
             panel=panel,
@@ -183,6 +196,21 @@ class PlotLiteratureTool:
                 block=ContentBlockDTO(type="chart", chart=spec),
             ),
         ]
+
+    async def _count_facets(
+        self, facets: list[dict[str, Any]],
+    ) -> tuple[list[tuple[str, Any]], str | None]:
+        """Fetch each facet's counts, or the readable summary for the first failure."""
+        counted: list[tuple[str, Any]] = []
+        for facet in facets:
+            query = str(facet["query"])
+            try:
+                counted.append((str(facet.get("name") or "Papers"), await self._client.year_counts(query)))
+            except LiteratureQueryError as exc:
+                return [], _rejected_summary(query, exc)
+            except LiteratureSourceUnavailableError as exc:
+                return [], _outage_summary(query, exc)
+        return counted, None
 
     def _timeline(self, counted: list[tuple[str, Any]]) -> ChartSpecDTO:
         return ChartSpecDTO(
@@ -205,9 +233,9 @@ class PlotLiteratureTool:
     def _evidence_mix(self, counted: list[tuple[str, Any]]) -> ChartSpecDTO | None:
         # Needs the records themselves, which only exist below the exhaustive
         # limit. Above it, only counts were fetched.
-        records = [r for _n, c in counted if c.exhaustive for r in c.records]
-        if not any(c.exhaustive for _n, c in counted):
+        if not all(c.exhaustive for _n, c in counted):
             return None
+        records = [r for _n, c in counted for r in c.records]
 
         by_bucket: dict[str, dict[int, int]] = {}
         for hit in records:
@@ -234,9 +262,9 @@ class PlotLiteratureTool:
         )
 
     def _landmarks(self, counted: list[tuple[str, Any]]) -> ChartSpecDTO | None:
-        records = [r for _n, c in counted if c.exhaustive for r in c.records]
-        if not any(c.exhaustive for _n, c in counted):
+        if not all(c.exhaustive for _n, c in counted):
             return None
+        records = [r for _n, c in counted for r in c.records]
         top = sorted(records, key=lambda r: -r.cited_by_count)[:40]
         return ChartSpecDTO(
             panel="landmarks",
