@@ -82,14 +82,12 @@ export interface ChartSeries {
   name: string;
   /** (x, y) pairs. x is a year on time panels, a category index otherwise. */
   points: [number, number][];
+  /** One label per point, index-parallel to `points`. Set when a point names a
+   *  paper rather than a bucket. */
+  labels?: string[] | null;
 }
 
-export type ChartPanel =
-  | "timeline"
-  | "evidence_mix"
-  | "landmarks"
-  | "stance"
-  | "terms";
+export type ChartPanel = "timeline" | "evidence_mix" | "landmarks" | "stance";
 
 export interface ChartSpec {
   panel: ChartPanel;

@@ -22,8 +22,11 @@ from infrastructure.literature.europe_pmc import (
 )
 from infrastructure.llm.stats_context import (
     MAX_PANELS_PER_TURN,
+    record_searched_query,
     reset_panel_budget,
+    reset_searched_queries,
     restore_panel_budget,
+    restore_searched_queries,
 )
 
 
@@ -41,13 +44,18 @@ class _StubClient:
     def __init__(self) -> None:
         self.queries: list[str] = []
         self.core_queries: list[str] = []
+        self.cited_queries: list[str] = []
 
-    async def year_counts(self, query: str, *, since: int = 1990) -> YearCounts:
+    async def year_counts(
+        self, query: str, *, since: int = 1990, per_year: bool = True,
+    ) -> YearCounts:
         self.queries.append(query)
         return YearCounts(
             query=query,
-            total=5,
-            counts={2019: 2, 2020: 3},
+            # Above every _MIN_RECORDS floor: the fixtures used to hold five
+            # papers, which the thin-set guard now refuses on sight.
+            total=42,
+            counts={2019: 20, 2020: 22},
             records=[
                 LiteratureHit(
                     external_id="1",
@@ -60,6 +68,15 @@ class _StubClient:
             ],
             exhaustive=True,
         )
+
+    async def top_cited(self, query: str, *, limit: int = 40) -> list[LiteratureHit]:
+        self.cited_queries.append(query)
+        return [
+            LiteratureHit(
+                external_id="1", source="MED", title="A paper",
+                year=2019, cited_by_count=7, pub_types=("research-article",),
+            ),
+        ]
 
     async def search_or_raise(self, query: str, *, limit: int = 25) -> list[LiteratureHit]:
         # The counting path is resultType=lite and carries no abstract; stance
@@ -96,10 +113,10 @@ async def test_a_timeline_emits_one_chart_block_per_facet_as_a_series():
     assert block.type == "chart"
     assert block.chart.panel == "timeline"
     assert [s.name for s in block.chart.series] == ["PMF", "Structure"]
-    assert (2020.0, 3.0) in block.chart.series[0].points
+    assert (2020.0, 22.0) in block.chart.series[0].points
     # The summary the model reads describes the shape, never the whole series:
     # it is what survives into history, inside answer_synthesis's 500 chars.
-    assert "5" in summary
+    assert "42" in summary
     assert len(summary) < 600
 
 
@@ -117,10 +134,16 @@ async def test_the_query_reaching_europe_pmc_is_the_one_the_model_supplied():
 
 async def test_the_third_panel_in_one_turn_is_refused():
     tool = PlotLiteratureTool(_StubClient())
+    # Distinct subjects each time: the same panel over the same subjects is
+    # refused by the duplicate guard before the budget is ever consulted.
     args = {"panel": "timeline", "facets": [{"name": "a", "query": "x"}]}
 
-    for _ in range(MAX_PANELS_PER_TURN):
-        _r, _s, events = await tool.execute(args, uuid4(), None)
+    for i in range(MAX_PANELS_PER_TURN):
+        _r, _s, events = await tool.execute(
+            {"panel": "timeline", "facets": [{"name": "a", "query": f"q{i}"}]},
+            uuid4(),
+            None,
+        )
         assert len(events) == 1
 
     _r, summary, events = await tool.execute(args, uuid4(), None)
@@ -168,14 +191,18 @@ async def test_a_panel_with_no_facets_is_refused_without_calling_europe_pmc():
 class _NonExhaustiveClient:
     """Above the exhaustive limit: counts only, no individual records."""
 
-    async def year_counts(self, query: str, *, since: int = 1990) -> YearCounts:
+    async def year_counts(
+        self, query: str, *, since: int = 1990, per_year: bool = True,
+    ) -> YearCounts:
         return YearCounts(query=query, total=999_999, counts={}, records=[], exhaustive=False)
 
 
 class _MultiTypeClient:
     """One facet whose records span every pub-type bucket."""
 
-    async def year_counts(self, query: str, *, since: int = 1990) -> YearCounts:
+    async def year_counts(
+        self, query: str, *, since: int = 1990, per_year: bool = True,
+    ) -> YearCounts:
         records = [
             LiteratureHit(
                 external_id="1", source="MED", title="Article",
@@ -194,24 +221,39 @@ class _MultiTypeClient:
                 year=2021, cited_by_count=1, pub_types=("preprint",),
             ),
         ]
+        # Padded past the evidence_mix floor with plain articles: the panel is
+        # about proportions, and four papers has none worth drawing.
+        records += [
+            LiteratureHit(
+                external_id=f"pad{i}", source="MED", title="Padding",
+                year=2020, cited_by_count=1, pub_types=("research-article",),
+            )
+            for i in range(20)
+        ]
         return YearCounts(
             query=query,
             total=len(records),
-            counts={2020: 2, 2018: 1, 2021: 1},
+            counts={2020: 22, 2018: 1, 2021: 1},
             records=records,
             exhaustive=True,
         )
+
+    async def top_cited(self, query: str, *, limit: int = 40) -> list[LiteratureHit]:
+        counts = await self.year_counts(query)
+        return sorted(counts.records, key=lambda r: -r.cited_by_count)[:limit]
 
 
 class _MixedExhaustivenessClient:
     """One facet's query matches few enough records to be exhaustive; the other doesn't."""
 
-    async def year_counts(self, query: str, *, since: int = 1990) -> YearCounts:
+    async def year_counts(
+        self, query: str, *, since: int = 1990, per_year: bool = True,
+    ) -> YearCounts:
         if query == "exhaustive":
             return YearCounts(
                 query=query,
-                total=1,
-                counts={2020: 1},
+                total=30,
+                counts={2020: 30},
                 records=[
                     LiteratureHit(
                         external_id="1", source="MED", title="A",
@@ -227,19 +269,61 @@ class _RaisingClient:
     def __init__(self, exc: Exception) -> None:
         self._exc = exc
 
-    async def year_counts(self, query: str, *, since: int = 1990) -> YearCounts:
+    async def year_counts(
+        self, query: str, *, since: int = 1990, per_year: bool = True,
+    ) -> YearCounts:
+        raise self._exc
+
+    async def top_cited(self, query: str, *, limit: int = 40) -> list[LiteratureHit]:
         raise self._exc
 
 
-async def test_a_non_exhaustive_evidence_mix_is_refused_with_no_event():
-    tool = PlotLiteratureTool(_NonExhaustiveClient())
-    _r, summary, events = await tool.execute(
+class _BucketCountingClient:
+    """Over the exhaustive limit, so evidence_mix must count buckets server-side."""
+
+    def __init__(self) -> None:
+        self.queries: list[str] = []
+
+    async def year_counts(
+        self, query: str, *, since: int = 1990, per_year: bool = True,
+    ) -> YearCounts:
+        self.queries.append(query)
+        lowered = query.lower()
+        if 'pub_type:"review"' in lowered:
+            counts = {2020: 40, 2021: 60}
+        elif "src:ppr" in lowered:
+            counts = {2021: 15}
+        elif "not pub_type" in lowered:
+            counts = {2020: 300, 2021: 500}
+        else:  # the bare facet, counted only for its total
+            counts = {}
+        return YearCounts(
+            query=query,
+            total=sum(counts.values()) or 915,
+            counts=counts,
+            records=[],
+            exhaustive=False,
+        )
+
+
+async def test_evidence_mix_above_the_exhaustive_limit_counts_buckets_server_side():
+    # The panel used to require every facet exhaustive, which meant it drew only
+    # for topics too narrow for anyone to ask whether they were primary work.
+    # It was attempted three times in the live pass and drew zero times.
+    client = _BucketCountingClient()
+    tool = PlotLiteratureTool(client)
+    _r, _s, events = await tool.execute(
         {"panel": "evidence_mix", "facets": [{"name": "a", "query": "x"}]},
         uuid4(),
         None,
     )
-    assert events == []
-    assert "narrow" in summary.lower()
+    assert len(events) == 1
+    chart = events[0].block.chart
+    assert {s.name for s in chart.series} == {"Review", "Preprint", "Research article"}
+    review = next(s for s in chart.series if s.name == "Review")
+    assert (2021.0, 60.0) in review.points
+    # One sweep per bucket over the merged facets, not one per facet.
+    assert sum('and pub_type:"review"' in q.lower() for q in client.queries) == 1
 
 
 async def test_a_refused_evidence_mix_does_not_burn_a_panel_slot():
@@ -262,9 +346,12 @@ async def test_a_refused_evidence_mix_does_not_burn_a_panel_slot():
     assert len(events) == 1
 
 
-async def test_evidence_mix_refuses_when_only_some_facets_are_exhaustive():
-    tool = PlotLiteratureTool(_MixedExhaustivenessClient())
-    _r, summary, events = await tool.execute(
+async def test_a_mixed_regime_evidence_mix_counts_rather_than_using_partial_records():
+    # One facet's records are in hand and the other's are not. Bucketing the
+    # records it has would draw a mix of one facet and call it both.
+    client = _BucketCountingClient()
+    tool = PlotLiteratureTool(client)
+    _r, _s, events = await tool.execute(
         {
             "panel": "evidence_mix",
             "facets": [
@@ -275,8 +362,11 @@ async def test_evidence_mix_refuses_when_only_some_facets_are_exhaustive():
         uuid4(),
         None,
     )
-    assert events == []
-    assert "narrow" in summary.lower()
+    assert len(events) == 1
+    # Both facets are merged into each bucket sweep, so neither is dropped.
+    review = next(q for q in client.queries if 'and pub_type:"review"' in q.lower())
+    assert "exhaustive" in review
+    assert "too many" in review
 
 
 async def test_evidence_mix_buckets_records_by_pub_type():
@@ -376,7 +466,9 @@ class _ManyHitsClient:
     def __init__(self, count: int) -> None:
         self._count = count
 
-    async def year_counts(self, query: str, *, since: int = 1990) -> YearCounts:
+    async def year_counts(
+        self, query: str, *, since: int = 1990, per_year: bool = True,
+    ) -> YearCounts:
         records = [
             LiteratureHit(external_id=str(i), source="MED", title="A paper", year=2020)
             for i in range(self._count)
@@ -447,7 +539,9 @@ async def test_an_unparseable_stance_response_does_not_say_too_many_and_names_th
 class _NonExhaustiveWithCountsClient:
     """Over the exhaustive limit: real per-year counts, but only from `since`."""
 
-    async def year_counts(self, query: str, *, since: int = 1990) -> YearCounts:
+    async def year_counts(
+        self, query: str, *, since: int = 1990, per_year: bool = True,
+    ) -> YearCounts:
         return YearCounts(
             query=query,
             total=15158,
@@ -460,11 +554,13 @@ class _NonExhaustiveWithCountsClient:
 class _SharedRecordClient:
     """Two facets whose queries both match the same paper."""
 
-    async def year_counts(self, query: str, *, since: int = 1990) -> YearCounts:
+    async def year_counts(
+        self, query: str, *, since: int = 1990, per_year: bool = True,
+    ) -> YearCounts:
         return YearCounts(
             query=query,
-            total=1,
-            counts={2020: 1},
+            total=30,
+            counts={2020: 30},
             records=[
                 LiteratureHit(
                     external_id="shared", source="MED", title="Both facets match this",
@@ -650,3 +746,221 @@ async def test_a_stance_facet_whose_refetch_fails_is_refused_readably():
     assert events == []
     assert llm.prompts == []
     assert "unreachable" in summary.lower()
+
+
+# ── The guards added after the 2026-09-04 live pass ──
+
+
+class _ThinClient:
+    """A real but tiny match: three papers, one per year."""
+
+    def __init__(self) -> None:
+        self.queries: list[str] = []
+
+    async def year_counts(
+        self, query: str, *, since: int = 1990, per_year: bool = True,
+    ) -> YearCounts:
+        self.queries.append(query)
+        records = [
+            LiteratureHit(external_id=str(i), source="MED", title="A paper", year=2018 + i)
+            for i in range(3)
+        ]
+        return YearCounts(
+            query=query,
+            total=3,
+            counts={2018: 1, 2019: 1, 2020: 1},
+            records=records,
+            exhaustive=True,
+        )
+
+    async def search_or_raise(self, query: str, *, limit: int = 25) -> list[LiteratureHit]:
+        return []
+
+
+async def test_a_timeline_over_three_papers_is_refused_rather_than_drawn_flat():
+    # Measured twice in the live pass: three bars of height one with a 0-to-1
+    # y-axis, which invites a trend to be read out of the paper list.
+    tool = PlotLiteratureTool(_ThinClient())
+    _r, summary, events = await tool.execute(
+        {"panel": "timeline", "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    assert events == []
+    assert "3 papers" in summary
+    assert "15" in summary
+
+
+async def test_a_thin_stance_panel_is_refused_before_the_classifier_is_called():
+    # The floor sits before the dispatch, not after it: by the time _stance has
+    # built a spec it has already refetched core records and spent an LLM call
+    # on the user's own key.
+    calls: list[str] = []
+
+    class _CountingLLM:
+        async def complete(self, prompt: str, **kwargs) -> str:
+            calls.append(prompt)
+            return '{"verdicts": []}'
+
+    tool = PlotLiteratureTool(_ThinClient(), stance_llm=_CountingLLM())
+    _r, _s, events = await tool.execute(
+        {"panel": "stance", "claim": "a claim", "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    assert events == []
+    assert calls == []
+
+
+async def test_a_facet_built_from_a_retrieved_title_is_refused_before_any_request():
+    # The measured failure: the searches ran a subject query, the facets came
+    # back as the titles of the papers those searches returned, and the chart
+    # counted a population the answer had never read.
+    token = reset_searched_queries()
+    try:
+        record_searched_query('TITLE_ABS:"MmpL3" AND TITLE_ABS:"proton motive force"')
+        client = _StubClient()
+        tool = PlotLiteratureTool(client)
+        _r, summary, events = await tool.execute(
+            {
+                "panel": "timeline",
+                "facets": [{"name": "a", "query": 'TITLE_ABS:"Direct Inhibition of MmpL3"'}],
+            },
+            uuid4(),
+            None,
+        )
+        assert events == []
+        assert client.queries == []
+        assert "Direct Inhibition of MmpL3" in summary
+    finally:
+        restore_searched_queries(token)
+
+
+async def test_a_facet_reusing_a_searched_subject_is_allowed():
+    token = reset_searched_queries()
+    try:
+        record_searched_query('TITLE_ABS:"MmpL3" AND PUB_YEAR:[2010 TO 2026]')
+        tool = PlotLiteratureTool(_StubClient())
+        _r, _s, events = await tool.execute(
+            {"panel": "timeline", "facets": [{"name": "a", "query": 'TITLE_ABS:"MmpL3"'}]},
+            uuid4(),
+            None,
+        )
+        assert len(events) == 1
+    finally:
+        restore_searched_queries(token)
+
+
+async def test_a_date_windowed_facet_is_refused_whichever_field_it_uses():
+    # The rule is "no date filter", not "no PUB_YEAR": a FIRST_PDATE window
+    # truncates the series exactly the same way.
+    client = _StubClient()
+    tool = PlotLiteratureTool(client)
+    _r, summary, events = await tool.execute(
+        {
+            "panel": "timeline",
+            "facets": [{"name": "a", "query": "x AND FIRST_PDATE:[2015-01-01 TO 2026-12-31]"}],
+        },
+        uuid4(),
+        None,
+    )
+    assert events == []
+    assert client.queries == []
+    assert "date" in summary.lower()
+
+
+async def test_the_same_panel_over_the_same_subjects_is_not_redrawn():
+    # The turn's grounding retry reruns retrieval from scratch and replots the
+    # first pass's chart, usually with a facet dropped, spending the second
+    # budget slot on a strictly worse copy.
+    tool = PlotLiteratureTool(_StubClient())
+    _r, _s, first = await tool.execute(
+        {
+            "panel": "timeline",
+            "facets": [{"name": "a", "query": "x"}, {"name": "b", "query": "y"}],
+        },
+        uuid4(),
+        None,
+    )
+    assert len(first) == 1
+    _r, summary, second = await tool.execute(
+        {"panel": "timeline", "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    assert second == []
+    assert "already drawn" in summary.lower()
+
+
+async def test_two_facets_sharing_a_name_are_refused_rather_than_silently_merged():
+    client = _StubClient()
+    tool = PlotLiteratureTool(client)
+    _r, summary, events = await tool.execute(
+        {
+            "panel": "timeline",
+            "facets": [{"name": "Papers", "query": "x"}, {"name": "Papers", "query": "y"}],
+        },
+        uuid4(),
+        None,
+    )
+    assert events == []
+    assert client.queries == []
+    assert "name" in summary.lower()
+
+
+class _GappyClient:
+    """A field that stopped publishing for a decade and started again."""
+
+    async def year_counts(
+        self, query: str, *, since: int = 1990, per_year: bool = True,
+    ) -> YearCounts:
+        return YearCounts(
+            query=query,
+            total=40,
+            counts={2000: 20, 2010: 20},
+            records=[],
+            exhaustive=False,
+        )
+
+
+async def test_years_with_no_papers_are_drawn_as_zero_not_closed_up():
+    # year_counts returns only years that have papers and the bar chart's axis
+    # is categorical, so a decade of silence rendered as two adjacent bars —
+    # a dormant field drawn as continuous activity.
+    tool = PlotLiteratureTool(_GappyClient())
+    _r, _s, events = await tool.execute(
+        {"panel": "timeline", "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    points = events[0].block.chart.series[0].points
+    assert len(points) == 11
+    assert (2005.0, 0.0) in points
+
+
+async def test_landmarks_names_the_papers_it_plots():
+    # The panel exists to surface canonical papers, and without a label per
+    # point the tooltip reads "Citations : 1490" over an anonymous dot.
+    tool = PlotLiteratureTool(_StubClient())
+    _r, _s, events = await tool.execute(
+        {"panel": "landmarks", "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    series = events[0].block.chart.series[0]
+    assert series.labels == ["A paper"]
+    assert len(series.labels) == len(series.points)
+
+
+async def test_the_footnote_names_the_population_the_counts_describe():
+    # The answer above is written from the abstracts that fit the context
+    # budget; these counts are the whole match. Nothing else reconciles them.
+    tool = PlotLiteratureTool(_StubClient())
+    _r, _s, events = await tool.execute(
+        {"panel": "timeline", "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    footnote = events[0].block.chart.footnote
+    assert "42" in footnote
+    assert "not only the papers cited above" in footnote

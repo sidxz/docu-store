@@ -13,9 +13,14 @@ from uuid import uuid4
 
 from infrastructure.llm.stats_context import (
     claim_panel_slot,
+    panel_already_drawn,
+    record_searched_query,
     reset_panel_budget,
+    reset_searched_queries,
     reset_stats_enabled,
     restore_panel_budget,
+    restore_searched_queries,
+    searched_queries,
     set_stats_enabled,
     stats_enabled,
 )
@@ -35,9 +40,9 @@ def test_set_and_reset_restore_the_previous_value():
 def test_the_panel_budget_allows_exactly_two_then_refuses():
     token = reset_panel_budget()
     try:
-        assert claim_panel_slot() is True
-        assert claim_panel_slot() is True
-        assert claim_panel_slot() is False
+        assert claim_panel_slot("timeline", ["a"]) is True
+        assert claim_panel_slot("timeline", ["b"]) is True
+        assert claim_panel_slot("timeline", ["c"]) is False
     finally:
         restore_panel_budget(token)
 
@@ -48,7 +53,11 @@ async def test_the_panel_budget_is_per_turn_not_per_process():
     async def turn() -> list[bool]:
         token = reset_panel_budget()
         try:
-            return [claim_panel_slot(), claim_panel_slot(), claim_panel_slot()]
+            return [
+                claim_panel_slot("timeline", ["a"]),
+                claim_panel_slot("timeline", ["b"]),
+                claim_panel_slot("timeline", ["c"]),
+            ]
         finally:
             restore_panel_budget(token)
 
@@ -149,3 +158,40 @@ async def test_a_stats_only_tool_is_not_executed_when_stats_is_off():
     )
     assert (results, events) == ([], [])
     assert "Stats is off" in summary
+
+
+async def test_a_redrawn_panel_is_recognised_even_when_a_facet_was_dropped():
+    """The grounding retry replots the first pass's chart, minus a facet.
+
+    Subset rather than equality: the observed duplicate plotted [A] after
+    [A, B], so signature equality would have let it through and spent the
+    second panel slot on a strictly worse copy of the first.
+    """
+    token = reset_panel_budget()
+    try:
+        claim_panel_slot("timeline", ["A", "B"])
+        assert panel_already_drawn("timeline", ["A"]) is True
+        assert panel_already_drawn("timeline", ["A", "B"]) is True
+        assert panel_already_drawn("timeline", ["C"]) is False
+        assert panel_already_drawn("landmarks", ["A"]) is False
+    finally:
+        restore_panel_budget(token)
+
+
+async def test_the_searched_query_record_is_empty_outside_a_turn_and_per_turn_inside_one():
+    assert searched_queries() == []
+    record_searched_query("leaked")  # no-op: no turn is open
+    assert searched_queries() == []
+
+    async def turn(query: str) -> list[str]:
+        token = reset_searched_queries()
+        try:
+            record_searched_query(query)
+            await asyncio.sleep(0.01)
+            return searched_queries()
+        finally:
+            restore_searched_queries(token)
+
+    first, second = await asyncio.gather(turn("one"), turn("two"))
+    assert first == ["one"]
+    assert second == ["two"]

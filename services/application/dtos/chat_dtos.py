@@ -102,12 +102,18 @@ class ChartSeriesDTO(BaseModel):
 
     name: str
     points: list[tuple[float, float]]
+    labels: list[str] | None = None
+    """One label per point, index-parallel to ``points``. Set when a point is an
+    identifiable thing -- a paper -- rather than a bucket, so the tooltip can
+    name it. A parallel array rather than a third tuple slot: ``points`` is
+    shared by every panel and mirrored in TS, and widening it breaks both
+    renderer paths."""
 
 
 class ChartSpecDTO(BaseModel):
     """A chart the tool computed. No value here originates in model output."""
 
-    panel: Literal["timeline", "evidence_mix", "landmarks", "stance", "terms"]
+    panel: Literal["timeline", "evidence_mix", "landmarks", "stance"]
     title: str
     x_label: str
     y_label: str

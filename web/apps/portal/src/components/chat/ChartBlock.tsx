@@ -29,6 +29,30 @@ const STANCE_COLORS: Record<string, string> = {
   none: "#B8BFB7",
 };
 
+/** The classifier's vocabulary is not the reader's. `none` is the largest
+ *  bucket by design and read as a bug when the legend prints it raw. */
+const STANCE_NAMES: Record<string, string> = { none: "no position" };
+
+/** recharts hardcodes light-mode greys — tooltip background #fff, axis stroke
+ *  #666 — and its legend colours each label with the series fill, which makes
+ *  the neutral stance labels near-invisible. All three need explicit tokens. */
+const TOOLTIP_STYLE = {
+  backgroundColor: "var(--ds-surface-elevated)",
+  border: "1px solid var(--ds-border)",
+  borderRadius: "0.375rem",
+  color: "var(--ds-text-primary)",
+  fontSize: 11,
+} as const;
+const TOOLTIP_LABEL_STYLE = { color: "var(--ds-text-primary)" } as const;
+const TOOLTIP_ITEM_STYLE = { color: "var(--ds-text-secondary)" } as const;
+const AXIS_TICK = { fontSize: 11, fill: "var(--ds-text-muted)" } as const;
+const AXIS_LABEL = { fontSize: 11, fill: "var(--ds-text-muted)" } as const;
+const LEGEND_STYLE = { fontSize: 11, color: "var(--ds-text-secondary)" } as const;
+
+function displayName(spec: ChartSpec, name: string): string {
+  return spec.panel === "stance" ? (STANCE_NAMES[name.toLowerCase()] ?? name) : name;
+}
+
 function colorFor(spec: ChartSpec, name: string, index: number): string {
   if (spec.panel === "stance") {
     return STANCE_COLORS[name.toLowerCase()] ?? SERIES_COLORS[index % SERIES_COLORS.length];
@@ -54,6 +78,12 @@ export function ChartBlock({ spec }: { spec: ChartSpec }) {
   const rows = toRows(spec);
   const isScatter = spec.panel === "landmarks";
   const stacked = spec.panel === "stance" || spec.panel === "evidence_mix";
+  // Shown whenever there is more than one colour to name. Stance and
+  // evidence_mix routinely collapse to one series — a well-supported claim is
+  // all `supports` — and an unlabelled coloured bar names nothing.
+  const showLegend = spec.series.length > 1 || stacked;
+  const partialDrawn =
+    spec.partial_x != null && rows.some((r) => r.x === spec.partial_x);
 
   const tickFor = (x: number) =>
     spec.categories ? (spec.categories[x] ?? String(x)) : String(x);
@@ -72,27 +102,47 @@ export function ChartBlock({ spec }: { spec: ChartSpec }) {
               <XAxis
                 type="number"
                 dataKey="x"
+                /* `name`, not a labelFormatter: ScatterChart forces item-type
+                   tooltips, where labelFormatter never runs and the axis's
+                   dataKey leaks through as the row label ("x : 2005"). */
+                name={spec.x_label}
                 domain={["dataMin", "dataMax"]}
-                tick={{ fontSize: 11 }}
-                label={{ value: spec.x_label, position: "insideBottom", offset: -12, fontSize: 11 }}
+                tick={AXIS_TICK}
+                label={{ value: spec.x_label, position: "insideBottom", offset: -12, ...AXIS_LABEL }}
               />
               <YAxis
                 type="number"
                 dataKey={spec.series[0]?.name ?? "y"}
-                tick={{ fontSize: 11 }}
-                label={{ value: spec.y_label, angle: -90, position: "insideLeft", fontSize: 11 }}
+                name={spec.y_label}
+                tick={AXIS_TICK}
+                label={{ value: spec.y_label, angle: -90, position: "insideLeft", ...AXIS_LABEL }}
               />
-              <Tooltip />
+              <Tooltip
+                contentStyle={TOOLTIP_STYLE}
+                labelStyle={TOOLTIP_LABEL_STYLE}
+                itemStyle={TOOLTIP_ITEM_STYLE}
+                cursor={{ strokeOpacity: 0.3 }}
+                /* The panel exists to surface canonical papers, so hovering a
+                   point has to name one. */
+                formatter={(value, name, item) => {
+                  const label = (item?.payload as { label?: string } | undefined)?.label;
+                  return label ? [`${value} — ${label}`, name] : [value, name];
+                }}
+              />
               {spec.series.map((s, i) => (
                 <Scatter
                   key={s.name}
                   name={s.name}
-                  data={s.points.map(([x, y]) => ({ x, [s.name]: y }))}
+                  data={s.points.map(([x, y], p) => ({
+                    x,
+                    [s.name]: y,
+                    label: s.labels?.[p],
+                  }))}
                   fill={colorFor(spec, s.name, i)}
                 />
               ))}
               {spec.series.length > 1 && (
-                <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11 }} />
+                <Legend verticalAlign="top" wrapperStyle={LEGEND_STYLE} />
               )}
             </ScatterChart>
           ) : (
@@ -101,18 +151,25 @@ export function ChartBlock({ spec }: { spec: ChartSpec }) {
               <XAxis
                 dataKey="x"
                 tickFormatter={tickFor}
-                tick={{ fontSize: 11 }}
-                label={{ value: spec.x_label, position: "insideBottom", offset: -12, fontSize: 11 }}
+                tick={AXIS_TICK}
+                label={{ value: spec.x_label, position: "insideBottom", offset: -12, ...AXIS_LABEL }}
               />
               <YAxis
-                tick={{ fontSize: 11 }}
-                label={{ value: spec.y_label, angle: -90, position: "insideLeft", fontSize: 11 }}
+                tick={AXIS_TICK}
+                label={{ value: spec.y_label, angle: -90, position: "insideLeft", ...AXIS_LABEL }}
               />
-              <Tooltip labelFormatter={(x) => tickFor(Number(x))} />
+              <Tooltip
+                labelFormatter={(x) => tickFor(Number(x))}
+                contentStyle={TOOLTIP_STYLE}
+                labelStyle={TOOLTIP_LABEL_STYLE}
+                itemStyle={TOOLTIP_ITEM_STYLE}
+                cursor={{ fillOpacity: 0.08 }}
+              />
               {spec.series.map((s, i) => (
                 <Bar
                   key={s.name}
                   dataKey={s.name}
+                  name={displayName(spec, s.name)}
                   stackId={stacked ? "a" : undefined}
                   fill={colorFor(spec, s.name, i)}
                   radius={[2, 2, 0, 0]}
@@ -128,8 +185,15 @@ export function ChartBlock({ spec }: { spec: ChartSpec }) {
                   ))}
                 </Bar>
               ))}
-              {spec.series.length > 1 && (
-                <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11 }} />
+              {showLegend && (
+                /* itemSorter off: recharts alphabetises by default, which
+                   scrambles the deliberate supports/refutes/mixed polarity
+                   order into mixed/none/refutes/supports. */
+                <Legend
+                  verticalAlign="top"
+                  wrapperStyle={LEGEND_STYLE}
+                  itemSorter={() => 0}
+                />
               )}
             </BarChart>
           )}
@@ -140,20 +204,29 @@ export function ChartBlock({ spec }: { spec: ChartSpec }) {
         // Stance is a judgement, and a reader must be able to overrule it.
         // Collapsed: the fragments are the appeal, not the finding.
         <details className="mt-2">
-          <summary className="text-[0.6875rem] text-text-muted cursor-pointer">Verdicts</summary>
+          <summary className="text-[0.6875rem] text-text-muted cursor-pointer">
+            {spec.panel === "stance" ? "Verdicts" : "Papers"}
+          </summary>
           <ul>
-            {spec.notes.map((note) => (
-              <li key={note} className="text-[0.6875rem] leading-relaxed text-text-muted">
+            {/* Keyed by index: Europe PMC indexes a preprint and its version of
+                record separately, so two notes can be byte-identical. */}
+            {spec.notes.map((note, i) => (
+              <li key={i} className="text-[0.6875rem] leading-relaxed text-text-muted">
                 {note}
               </li>
             ))}
           </ul>
         </details>
       ) : null}
-      {spec.footnote ? (
-        <p className="mt-2 text-[0.6875rem] leading-relaxed text-text-muted">{spec.footnote}</p>
+      {spec.footnote || partialDrawn ? (
+        <p className="mt-2 text-[0.6875rem] leading-relaxed text-text-muted">
+          {spec.footnote}
+          {/* The faint bar is meaningless unless it is named: unexplained it
+              reads as a real decline rather than an incomplete year. */}
+          {partialDrawn ? ` ${tickFor(Number(spec.partial_x))} is still in progress.` : ""}
+        </p>
       ) : null}
-      {/* source_query and partial_x stay on the block but are not drawn. */}
+      {/* source_query stays on the block but is not drawn. */}
     </figure>
   );
 }

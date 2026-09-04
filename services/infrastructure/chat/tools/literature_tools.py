@@ -31,6 +31,7 @@ from infrastructure.literature.europe_pmc import (
     LiteratureSourceUnavailableError,
     hit_payload,
 )
+from infrastructure.llm.stats_context import record_searched_query
 
 if TYPE_CHECKING:
     from infrastructure.literature.europe_pmc import EuropePmcClient, LiteratureHit
@@ -130,6 +131,12 @@ class SearchLiteratureTool:
             return [], _outage_summary(query, exc), []
         if not hits:
             return [], f"No Europe PMC results for: {query}", []
+
+        # Recorded only once it produced cards: this is the record a chart's
+        # facets are checked against, and a query that found nothing is not a
+        # population anything may claim to be counting. A no-op when Stats is
+        # off, so every other surface is unaffected.
+        record_searched_query(query)
 
         results = []
         for h in hits:

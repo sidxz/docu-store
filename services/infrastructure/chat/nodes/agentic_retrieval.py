@@ -47,7 +47,12 @@ def stats_briefing_note() -> str:
         "\n\nThe reader turned Stats on and expects a chart. Before calling "
         "finish_retrieval, call plot_literature with the panel that fits the "
         "question; the tool's description says which panel suits which shape. "
-        "At most two panels; the tool refuses a third."
+        "Skip it only when the question asks for one fact about one thing — a "
+        "structure, an identifier, a single value — where there is no body of "
+        "literature to picture; a chart under an answer that says 'I cannot "
+        "supply this' is worse than no chart. One panel is the normal answer; "
+        "two is the maximum and the tool refuses a third. Use the same fielded "
+        "queries you searched with, minus any date filter."
     )
 
 
@@ -634,9 +639,15 @@ class AgenticRetrievalNode:
                         type="step_completed",
                         step="retrieval",
                         status="completed",
+                        # A tool with no `query` and no results is not a search.
+                        # plot_literature has neither by design ("a chart is not
+                        # evidence"), and read as a search it narrated every
+                        # chart as "plot_literature → 0 results".
                         output=(
                             f"Searched: {tc.tool_args.get('query', tc.tool_name)[:80]} "
                             f"→ {len(tool_results)} results ({new_count} new)"
+                            if tc.tool_args.get("query") or tool_results
+                            else tool_summary.split("\n", 1)[0][:120]
                         ),
                         thinking_content=tc_thinking,
                         thinking_label=f"Search Iteration {iterations + 1}"

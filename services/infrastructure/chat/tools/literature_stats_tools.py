@@ -13,6 +13,7 @@ records returns a first page that is almost entirely the current year.
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
@@ -34,7 +35,9 @@ from infrastructure.literature.europe_pmc import (
 from infrastructure.llm.stats_context import (
     MAX_PANELS_PER_TURN,
     claim_panel_slot,
+    panel_already_drawn,
     panel_budget_spent,
+    searched_queries,
 )
 
 if TYPE_CHECKING:
@@ -53,15 +56,18 @@ PLOT_LITERATURE_DEF = ToolDefinition(
         "picture rather than a list. You choose the panel and write the queries; "
         "the counts are computed from Europe PMC, not by you.\n\n"
         "Call this AFTER searching and BEFORE finish_retrieval, at most twice in a "
-        "turn. The reader asked for a chart; pick the panel that fits the "
-        "question's shape.\n\n"
+        "turn — one panel is the normal answer. The reader asked for a chart: draw "
+        "when the question is about a body of literature, and skip it when the "
+        "question asks for a single fact about one thing — a structure, an "
+        "identifier, a single value — where there is no body of literature to "
+        "picture.\n\n"
         "Panels:\n"
         "  timeline    — volume over time. For 'is this growing', 'what is new', "
         "and for when the question asks how one thing gave way to another. Each "
         "facet becomes a series drawn across the whole span.\n"
-        "  evidence_mix— research articles vs reviews vs preprints vs patents "
-        "over time. For 'is this primary work', and it exposes industrial "
-        "programmes, which show up as patent clusters years before papers.\n"
+        "  evidence_mix— research articles vs reviews vs preprints over time. For "
+        "'is this primary work', and for seeing whether a field's recent growth is "
+        "new results or people reviewing each other.\n"
         "  landmarks   — citations against year. For settled knowledge, where a "
         "timeline is noise and the reader needs the canonical papers.\n"
         "  stance      — how each paper stands on a CLAIM, over time. Only when the "
@@ -131,9 +137,53 @@ _STANCE_MAX_HITS = 60
 # to Europe PMC for one picture nobody can read anyway.
 _MAX_FACETS = 3
 
+# The year the per-year counting regime starts from, mirroring year_counts'
+# ``since``. The counts cover this year onward while ``total`` counts the whole
+# match, and for an old field that gap is 29% of the papers -- so nothing may
+# print ``total`` and a 1990-on span in the same sentence.
+_COUNT_FLOOR_YEAR = 1990
+
+# Bucket clauses that partition a match exactly, verified against Europe PMC:
+# PROTAC 734 + 274 + 2084 == 3092; ferroptosis 6182 + 1953 + 23571 == 31706.
+# The labels must match ``bucket_pub_type``'s output or the same question draws
+# differently-named series either side of the exhaustive limit.
+#
+# No patent bucket: patents carry no TITLE_ABS-indexed text (TITLE_ABS:"PROTAC"
+# AND SRC:PAT is 0 against 4.2M indexed patents), so no fielded facet query the
+# model is asked to write can ever surface one.
+_MIX_BUCKETS = (
+    ("Preprint", "AND SRC:PPR"),
+    ("Review", 'AND PUB_TYPE:"review"'),
+    ("Research article", 'NOT PUB_TYPE:"review" NOT SRC:PPR'),
+)
+
+# A floor, the opposite of _STANCE_MAX_HITS. Below it a panel is a picture of
+# the paper list: three papers drawn as three bars of height one, with a 0-to-1
+# axis that invites a trend to be read out of nothing. Landmarks is the
+# exception on purpose -- its y-axis is citations, so six canonical papers at
+# 400-1200 IS the answer.
+_MIN_RECORDS = {"timeline": 15, "evidence_mix": 20, "stance": 10, "landmarks": 5}
+
+# Europe PMC honours several date fields, and the rule is "no year filter", not
+# "no PUB_YEAR". A facet windowed by FIRST_PDATE truncates the series exactly as
+# PUB_YEAR would, and passed the original substring check untouched.
+_DATE_FIELD_RE = re.compile(
+    r"\b(pub_year|first_pdate|first_idate|pub_date|ppub_pdate|electronic_pdate|creation_date)\b",
+    re.IGNORECASE,
+)
+
+# Quoted phrases are how a facet smuggles in a subject nobody searched for --
+# the measured failure was a retrieved paper's title re-quoted as a facet query.
+_PHRASE_RE = re.compile(r'"([^"]+)"')
+
+# Only stance still needs the records themselves; the other panels now count
+# server-side. Narrowing is the one recovery a model reaches for, and left
+# unqualified it narrows to a single paper's title -- measured, twice.
 _TOO_MANY_MSG = (
-    "That panel needs the individual records, and this query matches "
-    "too many to fetch them. Narrow the query, or use a timeline."
+    "Stance reads the abstracts themselves, and this query matches too many to "
+    "read. Narrow the SUBJECT, never the paper set: a facet naming one paper's "
+    "title charts that paper alone. If the subject will not narrow without "
+    "naming individual papers, use a timeline instead."
 )
 
 
@@ -155,16 +205,34 @@ def bucket_pub_type(raw: str | None) -> str:
     return "Research article"
 
 
-def _timeline_footnote(counted: list[tuple[str, Any]]) -> str:
-    """Where the counts come from, honestly, in each of the two regimes.
+def _plural(n: int, noun: str) -> str:
+    return f"{n:,} {noun}" if n == 1 else f"{n:,} {noun}s"
 
-    Above the exhaustive limit the counts are per-year requests from ``since``
-    (1990), so claiming "all years" would hide every paper before 1990 --
-    thousands of them, for an established field.
+
+def _scope_footnote(counted: list[tuple[str, Any]], *, all_years: bool | None = None) -> str:
+    """Whose papers these are, and over what span.
+
+    Two things a reader cannot otherwise know. The span, because above the
+    exhaustive limit the counts are per-year requests from 1990, so claiming
+    "all years" would hide every paper before it -- 29% of them for
+    tuberculosis. And the population, because the answer above is written from
+    the handful of abstracts that fit the context budget while these counts are
+    the whole Europe PMC match; a reader comparing "6 of 13" against a 3,826-bar
+    chart has nothing else telling them the two describe different things.
+
+    Mixed facets get the conservative span: one facet counted from 1990 makes
+    the chart's left edge 1990, whatever its sibling reached.
     """
-    if all(c.exhaustive for _n, c in counted):
-        return "All years."
-    return "From 1990 on."
+    # The panel knows its own span: landmarks reads the citation ranking, which
+    # Europe PMC applies over the whole match, so its counts' 1990 floor says
+    # nothing about what it drew.
+    covers_all = (
+        all(c.exhaustive for _n, c in counted) if all_years is None else all_years
+    )
+    span = "All years" if covers_all else f"From {_COUNT_FLOOR_YEAR} on"
+    # Not a sum: facets overlap by construction, so adding them over-reports.
+    totals = " · ".join(f"{n} {c.total:,}" for n, c in counted)
+    return f"{span}. Every Europe PMC match ({totals}), not only the papers cited above."
 
 
 def _truncate_claim(claim: str, limit: int = 120) -> str:
@@ -175,13 +243,38 @@ def _truncate_claim(claim: str, limit: int = 120) -> str:
     return f"{claim[: cut if cut > 0 else limit]}…"
 
 
+def _densify_years(spec: ChartSpecDTO) -> None:
+    """Give every year in the span a point, including the empty ones.
+
+    ``year_counts`` returns only years that have papers, and the bar chart's
+    x-axis is categorical -- it draws the values it is given, evenly spaced. A
+    field with a thirty-year gap therefore renders as continuous activity:
+    thiacetazone resistance spans 1963-2021 across 31 distinct years with 28
+    empty ones inside it, and every one of those gaps closed up silently.
+
+    Filled in place, over the union of the series' spans, so stacked panels
+    keep a common axis. Landmarks is exempt -- it is a scatter over individual
+    papers, and a year with no landmark is not a zero.
+    """
+    years = [int(x) for s in spec.series for x, _y in s.points]
+    if not years:
+        return
+    span = range(min(years), max(years) + 1)
+    for series in spec.series:
+        have = {int(x): y for x, y in series.points}
+        series.points = [(float(y), have.get(y, 0.0)) for y in span]
+
+
 def _deduped_records(counted: list[tuple[str, Any]]) -> list[Any]:
     """Every record across the facets, each once.
 
     Facets overlap by construction -- two sides of one question share papers --
     and an undeduped concatenation draws the shared ones twice.
     """
-    return list({r.external_id: r for _n, c in counted for r in c.records}.values())
+    # Keyed by (source, id): Europe PMC ids are unique per source, not globally
+    # -- a CBA record and a MED record can share a bare numeric id and name
+    # different papers.
+    return list({(r.source, r.external_id): r for _n, c in counted for r in c.records}.values())
 
 
 class PlotLiteratureTool:
@@ -228,8 +321,23 @@ class PlotLiteratureTool:
                 "answer has been reached. Answer with what you already have.",
                 [],
             )
+        # A turn can run retrieval twice -- the grounding retry rebuilds the
+        # agent loop from scratch -- and the second pass redraws the first
+        # pass's chart, usually with a facet dropped. That spent the second
+        # budget slot on a strictly worse copy of the first panel.
+        queries = [str(f["query"]) for f in facets]
+        if panel_already_drawn(panel, queries):
+            return (
+                [],
+                f"Panel not drawn: a {panel.replace('_', ' ')} panel over these same "
+                "subjects was already drawn this turn. Draw a different panel, or "
+                "answer with what you have.",
+                [],
+            )
 
-        counted, error_summary = await self._count_facets(facets)
+        counted, error_summary = await self._count_facets(
+            facets, per_year=panel == "timeline",
+        )
         if error_summary is not None:
             return [], error_summary, []
 
@@ -238,7 +346,7 @@ class PlotLiteratureTool:
         except _PanelRefusedError as exc:
             return [], str(exc), []
 
-        claim_panel_slot()
+        claim_panel_slot(panel, queries)
         log.info(
             "tool.literature.plotted",
             panel=panel,
@@ -263,31 +371,90 @@ class PlotLiteratureTool:
                 f"plot_literature takes at most {_MAX_FACETS} facets; {len(facets)} "
                 "were given. Pick the facets that actually contrast."
             )
-        if any("pub_year" in str(f["query"]).lower() for f in facets):
+        if any(_DATE_FIELD_RE.search(str(f["query"])) for f in facets):
             return (
-                "Facet queries must not filter by year: the chart's x-axis is already the "
+                "Facet queries must not filter by date: the chart's x-axis is already the "
                 "year, so a windowed query draws a series that stops where the filter "
-                "does. Resend the same queries with the PUB_YEAR clause removed."
+                "does. Resend the same queries with the date clause removed "
+                "(PUB_YEAR, FIRST_PDATE and the other date fields alike)."
             )
         if panel not in {"timeline", "evidence_mix", "landmarks", "stance"}:
             return f"Unknown panel '{panel}'. Use timeline, evidence_mix, landmarks or stance."
+        names = [str(f.get("name") or "Papers") for f in facets]
+        if len(set(names)) != len(names):
+            return (
+                "Two facets share a name, and a chart keys its series by name — they "
+                "would silently merge into one. Give each facet a distinct label."
+            )
+        stray = self._unsearched_phrases(facets)
+        if stray:
+            return (
+                "Facet queries must count the papers you searched. These phrases appear "
+                f"in no search this turn: {', '.join(stray)}. Reuse the fielded queries "
+                "you searched with, minus any date filter — do not build a facet out of "
+                "the titles of the papers that came back."
+            )
         if panel == "stance" and not claim:
             return "panel=stance needs a 'claim': the assertion to score papers against."
         if panel == "stance" and self._stance_llm is None:
             return "Stance classification is not configured on this deployment."
         return None
 
+    @staticmethod
+    def _unsearched_phrases(facets: list[dict[str, Any]]) -> list[str]:
+        """Quoted phrases in the facets that no search this turn used.
+
+        The rule the design calls "the counting query is the search query" no
+        longer means byte equality -- a facet legitimately drops the date filter
+        the search carried. What it still means is that every subject came from
+        a query that actually produced cards. The measured failure was a facet
+        built from a retrieved paper's own title, which passes every other
+        guard and charts a population the answer never read.
+
+        Permissive when nothing was searched: plot-before-search is a different
+        defect, and refusing here would make this guard fire in every unit test
+        that drives the tool directly.
+        """
+        searched = searched_queries()
+        if not searched:
+            return []
+        blob = " ".join(searched).lower()
+        return sorted(
+            {
+                phrase
+                for facet in facets
+                for phrase in _PHRASE_RE.findall(str(facet["query"]))
+                if phrase.lower() not in blob
+            },
+        )
+
     async def _build_spec(
         self, panel: str, counted: list[tuple[str, Any]], claim: str,
     ) -> ChartSpecDTO:
+        # Before the dispatch, not after it: by the time stance has built a spec
+        # it has already refetched the core records and spent the classifier
+        # call, and a thin set was never going to be drawn.
+        matched = max(len(_deduped_records(counted)), *(c.total for _n, c in counted))
+        floor = _MIN_RECORDS[panel]
+        if matched < floor:
+            thin_msg = (
+                f"Only {_plural(matched, 'paper')} matched, under the {floor} a "
+                f"{panel.replace('_', ' ')} panel needs to mean anything — a chart of "
+                "that is a picture of the paper list, not of the literature. Broaden "
+                "the facet query, or answer without the panel."
+            )
+            raise _PanelRefusedError(thin_msg)
+
         if panel == "timeline":
             spec = self._timeline(counted)
         elif panel == "evidence_mix":
-            spec = self._evidence_mix(counted)
+            spec = await self._evidence_mix(counted)
         elif panel == "stance":
             spec = await self._stance(counted, claim)
         else:
-            spec = self._landmarks(counted)
+            spec = await self._landmarks(counted)
+        if panel != "landmarks":
+            _densify_years(spec)
         # An axis with no bars under it is worse than no chart: it reads as
         # "nothing was published", when it means nothing was counted.
         if not any(s.points for s in spec.series):
@@ -298,14 +465,22 @@ class PlotLiteratureTool:
         return spec
 
     async def _count_facets(
-        self, facets: list[dict[str, Any]],
+        self, facets: list[dict[str, Any]], *, per_year: bool = True,
     ) -> tuple[list[tuple[str, Any]], str | None]:
-        """Fetch each facet's counts, or the readable summary for the first failure."""
+        """Fetch each facet's counts, or the readable summary for the first failure.
+
+        ``per_year=False`` for every panel but the timeline: they draw their own
+        series and only need each facet's total, so paying 38 requests a facet
+        for per-year counts nobody reads is pure waste.
+        """
         counted: list[tuple[str, Any]] = []
         for facet in facets:
             query = str(facet["query"])
             try:
-                counted.append((str(facet.get("name") or "Papers"), await self._client.year_counts(query)))
+                counted.append((
+                    str(facet.get("name") or "Papers"),
+                    await self._client.year_counts(query, per_year=per_year),
+                ))
             except LiteratureQueryError as exc:
                 return [], _rejected_summary(query, exc)
             except LiteratureSourceUnavailableError as exc:
@@ -327,23 +502,29 @@ class PlotLiteratureTool:
             ],
             partial_x=float(datetime.now(UTC).year),
             source_query=" · ".join(c.query for _n, c in counted),
-            footnote=_timeline_footnote(counted),
+            footnote=_scope_footnote(counted),
         )
 
-    def _evidence_mix(self, counted: list[tuple[str, Any]]) -> ChartSpecDTO:
-        # Needs the records themselves, which only exist below the exhaustive
-        # limit. Above it, only counts were fetched.
-        if not all(c.exhaustive for _n, c in counted):
-            raise _PanelRefusedError(_TOO_MANY_MSG)
-        records = _deduped_records(counted)
+    async def _evidence_mix(self, counted: list[tuple[str, Any]]) -> ChartSpecDTO:
+        """Record kind per year, from records when we have them and counts when not.
 
-        by_bucket: dict[str, dict[int, int]] = {}
-        for hit in records:
-            if hit.year is None:
-                continue
-            bucket = bucket_pub_type("; ".join(hit.pub_types))
-            by_bucket.setdefault(bucket, {})
-            by_bucket[bucket][hit.year] = by_bucket[bucket].get(hit.year, 0) + 1
+        The panel used to require every facet exhaustive, which meant it only
+        drew for topics too narrow for anyone to wonder whether they were
+        primary research. It was attempted three times in the live pass and
+        drew zero times. Europe PMC filters on publication type server-side,
+        so above the limit the same picture is three count-only sweeps.
+        """
+        if all(c.exhaustive for _n, c in counted):
+            by_bucket: dict[str, dict[int, int]] = {}
+            for hit in _deduped_records(counted):
+                if hit.year is None:
+                    continue
+                bucket = bucket_pub_type("; ".join(hit.pub_types))
+                by_bucket.setdefault(bucket, {})
+                by_bucket[bucket][hit.year] = by_bucket[bucket].get(hit.year, 0) + 1
+            mix_all_years = True
+        else:
+            by_bucket, mix_all_years = await self._mix_by_counting(counted)
 
         return ChartSpecDTO(
             panel="evidence_mix",
@@ -359,13 +540,56 @@ class PlotLiteratureTool:
             ],
             partial_x=float(datetime.now(UTC).year),
             source_query=" · ".join(c.query for _n, c in counted),
+            footnote=_scope_footnote(counted, all_years=mix_all_years),
         )
 
-    def _landmarks(self, counted: list[tuple[str, Any]]) -> ChartSpecDTO:
-        if not all(c.exhaustive for _n, c in counted):
-            raise _PanelRefusedError(_TOO_MANY_MSG)
-        records = _deduped_records(counted)
-        top = sorted(records, key=lambda r: -r.cited_by_count)[:40]
+    async def _mix_by_counting(
+        self, counted: list[tuple[str, Any]],
+    ) -> tuple[dict[str, dict[int, int]], bool]:
+        """One per-year sweep per bucket, over the facets merged server-side.
+
+        Merged with OR rather than summed per facet: facets overlap by
+        construction, and summing their counts would double the shared papers.
+        """
+        merged = " OR ".join(f"({c.query})" for _n, c in counted)
+        by_bucket: dict[str, dict[int, int]] = {}
+        all_years = True
+        for label, clause in _MIX_BUCKETS:
+            try:
+                bucket = await self._client.year_counts(f"({merged}) {clause}")
+            except LiteratureQueryError as exc:
+                raise _PanelRefusedError(_rejected_summary(merged, exc)) from exc
+            except LiteratureSourceUnavailableError as exc:
+                raise _PanelRefusedError(_outage_summary(merged, exc)) from exc
+            if bucket.counts:
+                by_bucket[label] = dict(bucket.counts)
+            all_years = all_years and bucket.exhaustive
+        return by_bucket, all_years
+
+    _LANDMARK_LIMIT = 40
+
+    async def _landmarks(self, counted: list[tuple[str, Any]]) -> ChartSpecDTO:
+        """The head of the citation distribution, named.
+
+        Europe PMC sorts by citation count server-side, so this is one request
+        whatever the match size — which is why the panel no longer requires an
+        exhaustive fetch. That requirement was not a budget: it forced the model
+        into queries narrow enough to fit under 1000, and those queries excluded
+        the canonical papers the panel exists to surface. The measured case
+        plotted metformin-mechanism papers while omitting Zhou 2001.
+
+        Undated records are dropped before the slice, not after: taking the top
+        forty and then filtering silently returned a shorter chart.
+        """
+        merged = " OR ".join(f"({c.query})" for _n, c in counted)
+        try:
+            records = await self._client.top_cited(merged, limit=self._LANDMARK_LIMIT * 2)
+        except LiteratureQueryError as exc:
+            raise _PanelRefusedError(_rejected_summary(merged, exc)) from exc
+        except LiteratureSourceUnavailableError as exc:
+            raise _PanelRefusedError(_outage_summary(merged, exc)) from exc
+
+        dated = [r for r in records if r.year is not None][: self._LANDMARK_LIMIT]
         return ChartSpecDTO(
             panel="landmarks",
             title="Citations against year",
@@ -374,15 +598,15 @@ class PlotLiteratureTool:
             series=[
                 ChartSeriesDTO(
                     name="Citations",
-                    points=[
-                        (float(r.year), float(r.cited_by_count))
-                        for r in top
-                        if r.year is not None
-                    ],
+                    points=[(float(r.year), float(r.cited_by_count)) for r in dated],
+                    # A panel whose stated purpose is "the reader needs the
+                    # canonical papers" has to be able to name one. Without this
+                    # the tooltip reads "Citations : 1490" over an anonymous dot.
+                    labels=[r.title or r.external_id for r in dated],
                 ),
             ],
             source_query=" · ".join(c.query for _n, c in counted),
-            footnote="All years.",
+            footnote=_scope_footnote(counted, all_years=True),
         )
 
     async def _stance(self, counted: list[tuple[str, Any]], claim: str) -> ChartSpecDTO:
@@ -397,7 +621,10 @@ class PlotLiteratureTool:
         if len(counted_records) > _STANCE_MAX_HITS:
             over_cap_msg = (
                 f"Stance would need to read {len(counted_records)} papers, over the reading "
-                f"budget of {_STANCE_MAX_HITS}. Narrow the facet query and try again."
+                f"budget of {_STANCE_MAX_HITS}. Narrow the SUBJECT, not the paper set: a "
+                "facet naming one paper's title charts that paper alone. If the subject "
+                f"will not go under {_STANCE_MAX_HITS} without naming individual papers, "
+                "draw a timeline instead or answer without a panel."
             )
             raise _PanelRefusedError(over_cap_msg)
 
@@ -419,12 +646,15 @@ class PlotLiteratureTool:
             unusable_msg = "The stance classifier returned nothing usable. Answer without the panel."
             raise _PanelRefusedError(unusable_msg)
 
-        by_id = {v.external_id: v.label for v in verdicts}
+        by_id = {v.external_id: v for v in verdicts}
+        # Undated hits are dropped, and must be dropped from the verdict list
+        # too: a fragment under the chart for a paper that has no bar is an
+        # entry the reader cannot find.
+        dated = [h for h in hits if h.year is not None]
         stacks: dict[str, dict[int, int]] = {label: {} for label in STANCE_LABELS}
-        for hit in hits:
-            if hit.year is None:
-                continue
-            label = by_id.get(hit.external_id, "none")
+        for hit in dated:
+            verdict = by_id.get(hit.external_id)
+            label = verdict.label if verdict else "none"
             stacks[label][hit.year] = stacks[label].get(hit.year, 0) + 1
 
         return ChartSpecDTO(
@@ -444,10 +674,12 @@ class PlotLiteratureTool:
             source_query=" · ".join(c.query for _n, c in counted),
             # A stance verdict is a judgement, and the reader has to be able to
             # overrule it. Without the fragment the chart is an assertion.
+            # Joined by id, the way the bars are. The two agreed only because
+            # classify_stance happens to rebuild one verdict per hit in order.
             notes=[
                 f"{hit.year} · {v.label} · {hit.title[:80]} — “{v.evidence}”"
-                for hit, v in zip(hits, verdicts, strict=False)
-                if v.label != "none" and v.evidence
+                for hit in dated
+                if (v := by_id.get(hit.external_id)) is not None and v.evidence
             ][:60],
             footnote="All years.",
         )
@@ -469,7 +701,7 @@ class PlotLiteratureTool:
             except LiteratureSourceUnavailableError as exc:
                 raise _PanelRefusedError(_outage_summary(c.query, exc)) from exc
             for hit in fetched:
-                by_id.setdefault(hit.external_id, hit)
+                by_id.setdefault((hit.source, hit.external_id), hit)
         return list(by_id.values())
 
 
@@ -496,19 +728,38 @@ def _summarise(panel: str, counted: list[tuple[str, Any]], spec: ChartSpecDTO) -
     sentence about the chart survives, and shaped enough that the sentence is
     worth having.
     """
+    this_year = datetime.now(UTC).year
     lines = [f"A {panel.replace('_', ' ')} panel was drawn for the reader."]
     for name, c in counted:
         years = sorted(c.counts)
         if not years:
-            lines.append(f"- {name}: no papers matched.")
+            # No per-year counts: either nothing matched, or this panel asked
+            # for the total alone. Saying a span here would invent one.
+            lines.append(
+                f"- {name}: {c.total:,} papers." if c.total else f"- {name}: no papers matched.",
+            )
             continue
-        recent = sum(c.counts[y] for y in years if y >= years[-1] - 4)
+        # Anchored on today, not on years[-1]: a field whose last paper was
+        # 2015 otherwise reports twelve papers "in the last five years".
+        recent = sum(c.counts[y] for y in years if y >= this_year - 4)
+        # ``total`` is the whole match; ``counts`` starts at 1990 in the
+        # non-exhaustive regime, and for an old field that is a third of the
+        # papers. Two numbers for two populations, never one sentence claiming
+        # the total spans the counted years.
+        span = (
+            f"{years[0]}–{years[-1]}"
+            if c.exhaustive
+            else f"{max(years[0], _COUNT_FLOOR_YEAR)}–{years[-1]}, counted from {_COUNT_FLOOR_YEAR}"
+        )
         lines.append(
-            f"- {name}: {c.total} papers, {years[0]}–{years[-1]}, "
-            f"{recent} in the last five years.",
+            f"- {name}: {c.total:,} papers matched; {span}; "
+            f"{recent} since {this_year - 4}.",
         )
     if spec.panel == "stance":
         lines.append(_stance_shape(spec))
+    if spec.panel == "landmarks":
+        drawn = len(spec.series[0].points) if spec.series else 0
+        lines.append(f"- The panel plots the {drawn} most-cited of those, not all of them.")
     lines.append(
         "Describe the shape in your answer. Do not restate these numbers as if "
         "you had read them in an abstract.",

@@ -415,13 +415,20 @@ class EuropePmcClient:
             return None
         return body
 
-    async def year_counts(self, query: str, *, since: int = 1990) -> YearCounts:
+    async def year_counts(
+        self, query: str, *, since: int = 1990, per_year: bool = True,
+    ) -> YearCounts:
         """Papers per year across the whole match, in two regimes.
 
         Under ``_EXHAUSTIVE_LIMIT`` matches one request returns every record, so
         the caller also gets citations and publication types for free. Above it,
         one count-only request per year -- exact, tiny, and all that is available
         without paging the whole set.
+
+        ``per_year=False`` skips that fan-out and returns the total alone. The
+        fan-out is ~38 requests per facet and only the timeline can spend them;
+        every other panel refuses on ``exhaustive is False``, so it was firing
+        111 requests to build counts it then threw away.
 
         ``query`` is sent unchanged. A broadened counting query would describe a
         different population than the cards the same search produced.
@@ -450,8 +457,17 @@ class EuropePmcClient:
                 exhaustive=True,
             )
 
+        if not per_year:
+            return YearCounts(
+                query=query, total=total, counts={}, records=[], exhaustive=False,
+            )
+
+        # Through next year, not this one: Europe PMC takes pubYear from the
+        # journal issue, which runs ahead of the calendar. PUB_YEAR:2027 already
+        # holds 519 records, and stopping at the current year drops them from
+        # the counts while leaving them in ``total``.
         this_year = datetime.now(UTC).year
-        years = list(range(since, this_year + 1))
+        years = list(range(since, this_year + 2))
         payloads = await asyncio.gather(
             *(
                 self._raw_search(f"({query}) AND PUB_YEAR:{y}", page_size=1)
@@ -470,13 +486,33 @@ class EuropePmcClient:
             exhaustive=False,
         )
 
-    async def _raw_search(self, query: str, *, page_size: int) -> dict:
+    async def top_cited(self, query: str, *, limit: int = 40) -> list[LiteratureHit]:
+        """The most-cited records of a match, in one request.
+
+        Europe PMC sorts server-side, so the top 40 of a 31,000-record match
+        costs exactly what the top 40 of nineteen costs. This is why landmarks
+        needs no exhaustive fetch: the panel wants the head of the citation
+        distribution, and asking for the head is one parameter.
+        """
+        body = await self._raw_search(query, page_size=limit, sort="CITED desc")
+        try:
+            return [parse_hit(r) for r in body["resultList"]["result"]]
+        except (KeyError, TypeError, ValueError) as exc:
+            msg = f"Europe PMC returned an unexpected body: {exc}"
+            raise LiteratureSourceUnavailableError(msg) from exc
+
+    async def _raw_search(self, query: str, *, page_size: int, sort: str = "") -> dict:
         """One search request, retried on transient 5xx, returning parsed JSON.
 
         ``resultType=lite`` rather than ``core``: it carries pubYear, pubType,
         citedByCount, isOpenAccess and journalTitle -- everything the panels
         need -- at roughly a tenth the bytes of core, which matters at 1000
         records.
+
+        ``sort`` is Europe PMC's own ordering, e.g. ``"CITED desc"``. Sorting
+        server-side is what lets a panel read the top of a 31,000-record match
+        without fetching it: the default is relevance, which correlates hard
+        with recency.
         """
         params = {
             "query": query,
@@ -484,6 +520,8 @@ class EuropePmcClient:
             "resultType": "lite",
             "pageSize": str(page_size),
         }
+        if sort:
+            params["sort"] = sort
         last_exc: Exception | None = None
         for attempt in range(_MAX_ATTEMPTS):
             try:

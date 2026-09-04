@@ -100,7 +100,9 @@ async def test_large_result_set_falls_back_to_per_year_counts(monkeypatch):
     # 15,158 matches whose first page is almost entirely the current year is the
     # real measured case; histogramming that page reports the field began now.
     probe = _payload(15158, [2026])
-    per_year = [_payload(n, []) for n in (10, 20, 30)]
+    # One request per year from `since` through NEXT year: Europe PMC dates a
+    # paper by its journal issue, which runs ahead of the calendar.
+    per_year = [_payload(n, []) for n in (10, 20, 30, 40)]
     fake = _FakeAsyncClient([probe, *per_year])
     monkeypatch.setattr(epmc.httpx, "AsyncClient", fake, raising=False)
 
@@ -111,8 +113,38 @@ async def test_large_result_set_falls_back_to_per_year_counts(monkeypatch):
     assert result.total == 15158
     assert result.exhaustive is False
     assert result.records == []
-    assert result.counts == {2024: 10, 2025: 20, 2026: 30}
+    assert result.counts == {2024: 10, 2025: 20, 2026: 30, 2027: 40}
     assert 'PUB_YEAR:2024' in fake.requests[1]["query"]
+
+
+async def test_per_year_false_returns_the_total_without_the_fan_out(monkeypatch):
+    # Only the timeline can spend the per-year sweep; every other panel draws
+    # its own series and needs the total alone. Firing 38 requests a facet to
+    # build counts nobody reads was most of this feature's Europe PMC traffic.
+    fake = _FakeAsyncClient([_payload(15158, [2026])])
+    monkeypatch.setattr(epmc.httpx, "AsyncClient", fake, raising=False)
+
+    result = await EuropePmcClient().year_counts('TITLE_ABS:"x"', per_year=False)
+
+    assert len(fake.requests) == 1
+    assert result.total == 15158
+    assert result.counts == {}
+    assert result.exhaustive is False
+
+
+async def test_top_cited_asks_europe_pmc_to_do_the_sorting(monkeypatch):
+    # One request at any match size, which is why landmarks no longer needs an
+    # exhaustive fetch — and why it stopped forcing the model into queries
+    # narrow enough to exclude the canonical papers it exists to surface.
+    fake = _FakeAsyncClient([_payload(31706, [2001, 2017])])
+    monkeypatch.setattr(epmc.httpx, "AsyncClient", fake, raising=False)
+
+    hits = await EuropePmcClient().top_cited('TITLE_ABS:"metformin"', limit=40)
+
+    assert len(fake.requests) == 1
+    assert fake.requests[0]["sort"] == "CITED desc"
+    assert fake.requests[0]["pageSize"] == "40"
+    assert [h.year for h in hits] == [2001, 2017]
 
 
 async def test_an_outage_raises_rather_than_returning_empty_counts(monkeypatch):
