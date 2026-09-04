@@ -26,6 +26,7 @@ from infrastructure.config import settings
 
 log = structlog.get_logger(__name__)
 
+
 # Cut-points on the sigmoid of an ms-marco logit, from measurement on real
 # abstracts (2026-09-02): an on-topic InhA inhibitor paper scored +1.23 (0.774),
 # a "Correction to" notice -0.36 (0.411), a wrong-gene INHA paper -7.17 (0.0008).

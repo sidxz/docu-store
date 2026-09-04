@@ -699,6 +699,7 @@ class ToolRegistry:
         compound_activity_query: CompoundActivityQuery | None = None,
         literature_client: object | None = None,
         literature_only: bool = False,
+        stance_llm: object | None = None,
     ) -> None:
         self._tools: dict[str, Any] = {}
 
@@ -709,9 +710,13 @@ class ToolRegistry:
             if literature_client is None:
                 msg = "a literature-only ToolRegistry needs a literature client"
                 raise ValueError(msg)
+            from infrastructure.chat.tools.literature_stats_tools import PlotLiteratureTool
             from infrastructure.chat.tools.literature_tools import SearchLiteratureTool
 
             self._tools["search_literature"] = SearchLiteratureTool(literature_client)
+            self._tools["plot_literature"] = PlotLiteratureTool(
+                literature_client, stance_llm=stance_llm,
+            )
             return
 
         self._tools = {
@@ -733,10 +738,26 @@ class ToolRegistry:
                 compound_vector_store=compound_vector_store,
             )
 
+    # Tools that only exist when the reader asked for Stats on this message.
+    # Gated here rather than at construction because the registry is a DI
+    # singleton and the flag is per-message.
+    _STATS_ONLY = frozenset({"plot_literature"})
+
     @property
     def definitions(self) -> list[ToolDefinition]:
-        """All tool definitions including finish_retrieval."""
-        return [t.definition for t in self._tools.values()] + [FINISH_RETRIEVAL_DEF]
+        """All tool definitions including finish_retrieval.
+
+        Stats-only tools are withheld when the turn did not ask for them, so the
+        model never sees a tool it may not call.
+        """
+        from infrastructure.llm.stats_context import stats_enabled
+
+        show_stats = stats_enabled()
+        return [
+            t.definition
+            for name, t in self._tools.items()
+            if show_stats or name not in self._STATS_ONLY
+        ] + [FINISH_RETRIEVAL_DEF]
 
     async def execute(
         self,
@@ -746,7 +767,14 @@ class ToolRegistry:
         allowed_artifact_ids: list[UUID] | None,
     ) -> ToolResult:
         """Execute a tool by name. Returns (results, summary_for_model, events)."""
+        from infrastructure.llm.stats_context import stats_enabled
+
         tool = self._tools.get(tool_name)
+        # `definitions` already withholds these, but a model that saw one on an
+        # earlier turn can still name it. Same shape as an unknown tool: the
+        # registry never runs a tool this message did not offer.
+        if tool_name in self._STATS_ONLY and not stats_enabled():
+            return [], "plot_literature is not available on this message (Stats is off).", []
         if not tool:
             return [], f"Unknown tool: {tool_name}", []
 

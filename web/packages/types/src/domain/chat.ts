@@ -78,8 +78,36 @@ export interface QueryContext {
 
 // --- Structured content blocks ---
 
+export interface ChartSeries {
+  name: string;
+  /** (x, y) pairs. x is a year on time panels, a category index otherwise. */
+  points: [number, number][];
+  /** One label per point, index-parallel to `points`. Set when a point names a
+   *  paper rather than a bucket. */
+  labels?: string[] | null;
+}
+
+export type ChartPanel = "timeline" | "evidence_mix" | "landmarks" | "stance";
+
+export interface ChartSpec {
+  panel: ChartPanel;
+  title: string;
+  x_label: string;
+  y_label: string;
+  series: ChartSeries[];
+  /** Tick labels when x is a category index. */
+  categories: string[] | null;
+  /** The incomplete x value — the current year. Rendered hatched. */
+  partial_x: number | null;
+  footnote: string | null;
+  /** Per-item annotations under the chart — stance's deciding fragments. */
+  notes: string[] | null;
+  /** The Europe PMC query behind these counts. */
+  source_query: string | null;
+}
+
 export interface ContentBlock {
-  type: "text" | "table" | "molecule" | "citation_list" | "source_card";
+  type: "text" | "table" | "molecule" | "citation_list" | "source_card" | "chart";
   content: string | null;
   headers: string[] | null;
   rows: string[][] | null;
@@ -89,6 +117,7 @@ export interface ContentBlock {
   page_id: string | null;
   artifact_id: string | null;
   bioactivities: Bioactivity[] | null;
+  chart: ChartSpec | null;
 }
 
 // --- Agent tracing ---

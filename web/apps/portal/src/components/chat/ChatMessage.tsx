@@ -97,7 +97,15 @@ export function ChatMessage({ message, workspace, isStreaming, onFeedback }: Cha
             )}
             <MarkdownRenderer content={message.content} messageId={message.message_id} />
             {isStreaming && !message.content && <ThinkingIndicator />}
-            {message.structured_content && message.structured_content.length > 0 && (
+            {/* Blocks wait for the answer. A chart is emitted during retrieval,
+                so it used to land under an empty reply and then get shoved down
+                by every token of the answer streaming in beneath it. Gated on
+                the streaming flag rather than on the block type, so molecule
+                grids and bioactivity tables settle the same way.
+                `isStreaming` is undefined on persisted messages, and
+                finishStreaming() runs on every terminal path — done, error,
+                abort and stop — so nothing can strand a block unrendered. */}
+            {!isStreaming && message.structured_content && message.structured_content.length > 0 && (
               <div className="mt-3 border-t border-border-subtle pt-3">
                 <RichContentRenderer blocks={message.structured_content} workspace={workspace} />
               </div>

@@ -294,3 +294,42 @@ def test_an_ordinary_record_is_unaffected():
 
     assert all(h.is_retracted is False for h in hits)
     assert any(h.is_ingestable for h in hits), "the open-licence fixture must still ingest"
+
+
+def test_pub_types_are_read_from_the_lite_shape_as_well_as_core():
+    # `resultType=lite` (what year_counts uses) sends a semicolon-joined string
+    # and no pubTypeList at all; `core` sends the list. Both must parse, or the
+    # evidence-mix panel buckets every lite record as a research article and the
+    # retraction gate never fires on the counting path.
+    lite = parse_hit(
+        {
+            "id": "1",
+            "source": "MED",
+            "title": "A paper",
+            "pubTypeList": None,
+            "pubType": "research-article; Journal Article; Review",
+        },
+    )
+    assert lite.pub_types == ("research-article", "Journal Article", "Review")
+
+    core = parse_hit(
+        {
+            "id": "2",
+            "source": "MED",
+            "title": "A paper",
+            "pubTypeList": {"pubType": ["research-article", "Review"]},
+        },
+    )
+    assert core.pub_types == ("research-article", "Review")
+
+
+def test_a_retraction_is_detected_in_the_lite_pub_type_string():
+    hit = parse_hit(
+        {
+            "id": "3",
+            "source": "MED",
+            "title": "A withdrawn paper",
+            "pubType": "Journal Article; Retracted Publication",
+        },
+    )
+    assert hit.is_retracted is True

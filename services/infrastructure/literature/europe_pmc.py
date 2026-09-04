@@ -38,6 +38,7 @@ from __future__ import annotations
 import asyncio
 import re
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from html import unescape
 
 import httpx
@@ -144,6 +145,25 @@ class LiteratureHit:
         return self.ingest_blocker() is None
 
 
+# Above this many matches, one request cannot return every record. Europe PMC
+# caps pageSize at 1000 and orders by relevance, which correlates hard with
+# recency -- so the first page of a large result set is NOT a sample of the
+# field, and histogramming it reports that the field began this year.
+_EXHAUSTIVE_LIMIT = 1000
+
+
+@dataclass(frozen=True)
+class YearCounts:
+    """Publication counts per year for a whole query, not for a fetched page."""
+
+    query: str
+    total: int
+    counts: dict[int, int]
+    records: list[LiteratureHit]
+    exhaustive: bool
+    """True when ``records`` holds every match, so other panels are free."""
+
+
 # Europe PMC returns JATS markup inside titles and abstracts, in both forms:
 # raw (`<i>Mycobacterium tuberculosis</i>`, `<h4>Background</h4>`) and escaped
 # (`&lt;i&gt;N&lt;/i&gt;`). Both reach the reader as literal angle brackets, and
@@ -189,12 +209,31 @@ def _flag(value: object) -> bool:
     return str(value).strip().upper() == "Y"
 
 
+def _pub_types(record: dict) -> tuple[str, ...]:
+    """Publication types, from either result shape.
+
+    ``resultType=core`` sends ``pubTypeList.pubType`` as a list;
+    ``resultType=lite`` -- what year_counts uses -- sends ``pubTypeList: null``
+    and a flat semicolon-joined ``pubType`` string instead. Reading only the
+    core shape left every lite record with no types at all, which silently
+    bucketed reviews and preprints as research articles and disarmed the
+    retraction check on the counting path.
+    """
+    listed = (record.get("pubTypeList") or {}).get("pubType")
+    if listed:
+        return tuple(listed)
+    flat = record.get("pubType")
+    if isinstance(flat, str):
+        return tuple(p.strip() for p in flat.split(";") if p.strip())
+    return ()
+
+
 def parse_hit(record: dict) -> LiteratureHit:
     """One ``resultList.result`` entry to a LiteratureHit."""
     journal = (record.get("journalInfo") or {}).get("journal") or {}
     licence = record.get("license")
     year = record.get("pubYear")
-    pub_types = tuple((record.get("pubTypeList") or {}).get("pubType") or ())
+    pub_types = _pub_types(record)
     corrections = (record.get("commentCorrectionList") or {}).get("commentCorrection") or []
     retraction_notice = next(
         (
@@ -375,3 +414,133 @@ class EuropePmcClient:
             )
             return None
         return body
+
+    async def year_counts(
+        self, query: str, *, since: int = 1990, per_year: bool = True,
+    ) -> YearCounts:
+        """Papers per year across the whole match, in two regimes.
+
+        Under ``_EXHAUSTIVE_LIMIT`` matches one request returns every record, so
+        the caller also gets citations and publication types for free. Above it,
+        one count-only request per year -- exact, tiny, and all that is available
+        without paging the whole set.
+
+        ``per_year=False`` skips that fan-out and returns the total alone. The
+        fan-out is ~38 requests per facet and only the timeline can spend them;
+        every other panel refuses on ``exhaustive is False``, so it was firing
+        111 requests to build counts it then threw away.
+
+        ``query`` is sent unchanged. A broadened counting query would describe a
+        different population than the cards the same search produced.
+        """
+        first = await self._raw_search(query, page_size=_EXHAUSTIVE_LIMIT)
+        total = int(first.get("hitCount") or 0)
+        # A 200 whose body is not the shape we expect is an outage, not a bug in
+        # the caller: raising KeyError here goes past every caller's handler and
+        # out as a bare 500 on a panel that was meant to be refusable.
+        try:
+            records = [parse_hit(r) for r in first["resultList"]["result"]]
+        except (KeyError, TypeError, ValueError) as exc:
+            msg = f"Europe PMC returned an unexpected body: {exc}"
+            raise LiteratureSourceUnavailableError(msg) from exc
+
+        if total <= _EXHAUSTIVE_LIMIT:
+            counts: dict[int, int] = {}
+            for hit in records:
+                if hit.year is not None:
+                    counts[hit.year] = counts.get(hit.year, 0) + 1
+            return YearCounts(
+                query=query,
+                total=total,
+                counts=counts,
+                records=records,
+                exhaustive=True,
+            )
+
+        if not per_year:
+            return YearCounts(
+                query=query, total=total, counts={}, records=[], exhaustive=False,
+            )
+
+        # Through next year, not this one: Europe PMC takes pubYear from the
+        # journal issue, which runs ahead of the calendar. PUB_YEAR:2027 already
+        # holds 519 records, and stopping at the current year drops them from
+        # the counts while leaving them in ``total``.
+        this_year = datetime.now(UTC).year
+        years = list(range(since, this_year + 2))
+        payloads = await asyncio.gather(
+            *(
+                self._raw_search(f"({query}) AND PUB_YEAR:{y}", page_size=1)
+                for y in years
+            ),
+        )
+        return YearCounts(
+            query=query,
+            total=total,
+            counts={
+                y: int(p.get("hitCount") or 0)
+                for y, p in zip(years, payloads, strict=True)
+                if int(p.get("hitCount") or 0) > 0
+            },
+            records=[],
+            exhaustive=False,
+        )
+
+    async def top_cited(self, query: str, *, limit: int = 40) -> list[LiteratureHit]:
+        """The most-cited records of a match, in one request.
+
+        Europe PMC sorts server-side, so the top 40 of a 31,000-record match
+        costs exactly what the top 40 of nineteen costs. This is why landmarks
+        needs no exhaustive fetch: the panel wants the head of the citation
+        distribution, and asking for the head is one parameter.
+        """
+        body = await self._raw_search(query, page_size=limit, sort="CITED desc")
+        try:
+            return [parse_hit(r) for r in body["resultList"]["result"]]
+        except (KeyError, TypeError, ValueError) as exc:
+            msg = f"Europe PMC returned an unexpected body: {exc}"
+            raise LiteratureSourceUnavailableError(msg) from exc
+
+    async def _raw_search(self, query: str, *, page_size: int, sort: str = "") -> dict:
+        """One search request, retried on transient 5xx, returning parsed JSON.
+
+        ``resultType=lite`` rather than ``core``: it carries pubYear, pubType,
+        citedByCount, isOpenAccess and journalTitle -- everything the panels
+        need -- at roughly a tenth the bytes of core, which matters at 1000
+        records.
+
+        ``sort`` is Europe PMC's own ordering, e.g. ``"CITED desc"``. Sorting
+        server-side is what lets a panel read the top of a 31,000-record match
+        without fetching it: the default is relevance, which correlates hard
+        with recency.
+        """
+        params = {
+            "query": query,
+            "format": "json",
+            "resultType": "lite",
+            "pageSize": str(page_size),
+        }
+        if sort:
+            params["sort"] = sort
+        last_exc: Exception | None = None
+        for attempt in range(_MAX_ATTEMPTS):
+            try:
+                async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as client:
+                    response = await client.get(self._search_url, params=params)
+                    response.raise_for_status()
+                    body = response.json()
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code not in _RETRYABLE_STATUS:
+                    msg = f"Europe PMC rejected the query ({exc.response.status_code}): {query}"
+                    raise LiteratureQueryError(msg) from exc
+                last_exc = exc
+            except Exception as exc:
+                last_exc = exc
+            else:
+                return body
+
+            if attempt < _MAX_ATTEMPTS - 1:
+                await asyncio.sleep(_RETRY_BACKOFF_SECONDS * (attempt + 1))
+
+        msg = f"Europe PMC is unreachable: {last_exc}"
+        raise LiteratureSourceUnavailableError(msg) from last_exc

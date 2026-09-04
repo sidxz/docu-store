@@ -92,10 +92,51 @@ class SourceCitationDTO(BaseModel):
 # --- Content Blocks ---
 
 
+class ChartSeriesDTO(BaseModel):
+    """One line, bar group or point cloud. ``points`` are (x, y) pairs.
+
+    x is a year for the time panels and a category index for the categorical
+    ones, so a single shape covers every panel and the renderer needs one
+    switch rather than six.
+    """
+
+    name: str
+    points: list[tuple[float, float]]
+    labels: list[str] | None = None
+    """One label per point, index-parallel to ``points``. Set when a point is an
+    identifiable thing -- a paper -- rather than a bucket, so the tooltip can
+    name it. A parallel array rather than a third tuple slot: ``points`` is
+    shared by every panel and mirrored in TS, and widening it breaks both
+    renderer paths."""
+
+
+class ChartSpecDTO(BaseModel):
+    """A chart the tool computed. No value here originates in model output."""
+
+    panel: Literal["timeline", "evidence_mix", "landmarks", "stance"]
+    title: str
+    x_label: str
+    y_label: str
+    series: list[ChartSeriesDTO]
+    categories: list[str] | None = None
+    """Tick labels when x is a category index rather than a year."""
+    partial_x: float | None = None
+    """The x value that is incomplete -- the current year. Rendered hatched;
+    without it every chart ends on a false decline."""
+    footnote: str | None = None
+    notes: list[str] | None = None
+    """Per-item annotations shown under the chart. Stance uses it for the
+    fragment of the abstract that decided each verdict, so a reader can
+    overrule the classifier instead of taking the bars on trust."""
+    source_query: str | None = None
+    """The Europe PMC query these counts came from, so a reader can check that
+    the chart and the cards describe the same population."""
+
+
 class ContentBlockDTO(BaseModel):
     """A typed content block in an assistant message."""
 
-    type: Literal["text", "table", "molecule", "citation_list", "source_card"]
+    type: Literal["text", "table", "molecule", "citation_list", "source_card", "chart"]
     content: str | None = None
     headers: list[str] | None = None
     rows: list[list[str]] | None = None
@@ -105,6 +146,7 @@ class ContentBlockDTO(BaseModel):
     page_id: UUID | None = None
     artifact_id: UUID | None = None
     bioactivities: list[BioactivityDTO] | None = None
+    chart: ChartSpecDTO | None = None
 
 
 # --- Thinking Blocks ---

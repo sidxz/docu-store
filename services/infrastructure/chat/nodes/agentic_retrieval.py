@@ -31,6 +31,31 @@ if TYPE_CHECKING:
 log = structlog.get_logger(__name__)
 
 
+def stats_briefing_note() -> str:
+    """The nudge to draw, or "" when Stats is off.
+
+    Without it the model never charts: the retrieval prompt says "call
+    finish_retrieval when you have enough sources" and mentions no panel, and 54
+    live searches produced zero plot_literature calls. Empty when Stats is off,
+    so Deep Research's briefing is byte-identical.
+    """
+    from infrastructure.llm.stats_context import stats_enabled
+
+    if not stats_enabled():
+        return ""
+    return (
+        "\n\nThe reader turned Stats on and expects a chart. Before calling "
+        "finish_retrieval, call plot_literature with the panel that fits the "
+        "question; the tool's description says which panel suits which shape. "
+        "Skip it only when the question asks for one fact about one thing — a "
+        "structure, an identifier, a single value — where there is no body of "
+        "literature to picture; a chart under an answer that says 'I cannot "
+        "supply this' is worse than no chart. One panel is the normal answer; "
+        "two is the maximum and the tool refuses a third. Use the same fielded "
+        "queries you searched with, minus any date filter."
+    )
+
+
 def attach_bioactivities_to_molecule_blocks(
     blocks: list[ContentBlockDTO],
     bios_by_name: dict[str, list[BioactivityDTO]],
@@ -452,7 +477,8 @@ class AgenticRetrievalNode:
                     f"I need to answer: {question}\n\n"
                     f"Here are the initial search results:\n"
                     f"{seed_summary or '(none — no search has run yet; call a search tool)'}\n\n"
-                    f"{accumulator.summary_for_model()}{carried_note}{smiles_note}\n\n"
+                    f"{accumulator.summary_for_model()}{carried_note}{smiles_note}"
+                    f"{stats_briefing_note()}\n\n"
                     "Evaluate these results. If they are sufficient, call finish_retrieval. "
                     "Otherwise, search for additional information."
                 ),
@@ -613,9 +639,15 @@ class AgenticRetrievalNode:
                         type="step_completed",
                         step="retrieval",
                         status="completed",
+                        # A tool with no `query` and no results is not a search.
+                        # plot_literature has neither by design ("a chart is not
+                        # evidence"), and read as a search it narrated every
+                        # chart as "plot_literature → 0 results".
                         output=(
                             f"Searched: {tc.tool_args.get('query', tc.tool_name)[:80]} "
                             f"→ {len(tool_results)} results ({new_count} new)"
+                            if tc.tool_args.get("query") or tool_results
+                            else tool_summary.split("\n", 1)[0][:120]
                         ),
                         thinking_content=tc_thinking,
                         thinking_label=f"Search Iteration {iterations + 1}"
