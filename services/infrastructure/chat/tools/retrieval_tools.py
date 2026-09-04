@@ -709,9 +709,11 @@ class ToolRegistry:
             if literature_client is None:
                 msg = "a literature-only ToolRegistry needs a literature client"
                 raise ValueError(msg)
+            from infrastructure.chat.tools.literature_stats_tools import PlotLiteratureTool
             from infrastructure.chat.tools.literature_tools import SearchLiteratureTool
 
             self._tools["search_literature"] = SearchLiteratureTool(literature_client)
+            self._tools["plot_literature"] = PlotLiteratureTool(literature_client)
             return
 
         self._tools = {

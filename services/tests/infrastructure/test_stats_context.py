@@ -96,7 +96,6 @@ def test_plot_literature_is_hidden_when_stats_is_off():
     assert "plot_literature" not in names
 
 
-@pytest.mark.xfail(reason="plot_literature lands in Task 5", strict=True)
 def test_plot_literature_appears_when_stats_is_on():
     token = set_stats_enabled(True)
     try:
