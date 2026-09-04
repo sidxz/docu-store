@@ -70,3 +70,6 @@ services/coverage.xml
 
 paper/
 services/evaluation/
+
+# Literature Stats design doc — Siddhant controls its first commit
+services/design_docs/LITERATURE_STATS_DESIGN.md
