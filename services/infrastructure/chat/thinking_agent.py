@@ -266,6 +266,26 @@ class ThinkingAgent:
                         unique_artifacts=context_meta.unique_artifacts,
                     )
 
+                from infrastructure.llm.stats_context import stats_enabled
+
+                if stats_enabled():
+                    from application.dtos.chat_dtos import ContentBlockDTO
+                    from infrastructure.chat.nodes.literature_context_assembly import (
+                        build_provenance_spec,
+                    )
+
+                    yield AgentEvent(
+                        type="structured_block",
+                        block=ContentBlockDTO(
+                            type="chart",
+                            chart=build_provenance_spec(
+                                retrieved=len(retrieval_results),
+                                assembled=context_meta.total_sources,
+                                cited=len(citations),
+                            ),
+                        ),
+                    )
+
                 # ── Stage 3.5: Image Loading (Deep Thinking only) ──
                 images_b64: list[str] | None = None
                 if self._include_images and self._blob_store:

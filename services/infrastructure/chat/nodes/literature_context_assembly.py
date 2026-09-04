@@ -19,12 +19,34 @@ from __future__ import annotations
 
 import structlog
 
-from application.dtos.chat_dtos import SourceCitationDTO
+from application.dtos.chat_dtos import ChartSeriesDTO, ChartSpecDTO, SourceCitationDTO
 from infrastructure.chat.models import ContextMetadata, RetrievalResult
 from infrastructure.chat.nodes.context_assembly import ContextAssemblyNode
 from infrastructure.config import settings
 
 log = structlog.get_logger(__name__)
+
+
+def build_provenance_spec(*, retrieved: int, assembled: int, cited: int) -> ChartSpecDTO:
+    """What the answer stands on, at the three stages that can silently drop it.
+
+    Not model-selected and not counted against the panel budget: it costs no
+    request and no model call, and it is instrumentation rather than a finding.
+    """
+    return ChartSpecDTO(
+        panel="provenance",
+        title="Papers behind this answer",
+        x_label="",
+        y_label="Papers",
+        categories=["Returned", "Assembled", "Cited"],
+        series=[
+            ChartSeriesDTO(
+                name="Papers",
+                points=[(0.0, float(retrieved)), (1.0, float(assembled)), (2.0, float(cited))],
+            ),
+        ],
+    )
+
 
 # Cut-points on the sigmoid of an ms-marco logit, from measurement on real
 # abstracts (2026-09-02): an on-topic InhA inhibitor paper scored +1.23 (0.774),

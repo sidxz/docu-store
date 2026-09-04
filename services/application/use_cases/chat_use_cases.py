@@ -373,7 +373,9 @@ class SendMessageUseCase:
         from infrastructure.llm import reasoning_context, stats_context
 
         _reasoning_token = reasoning_context.set_reasoning_override(reasoning)
-        _stats_token = stats_context.set_stats_enabled(stats)
+        # Stats is a literature-surface feature; the flag is ignored elsewhere
+        # (a shared client toggle must not leak charts into other surfaces).
+        _stats_token = stats_context.set_stats_enabled(stats and mode == "literature")
         _panel_token = stats_context.reset_panel_budget()
         try:
             # Verify conversation exists and belongs to the sender
