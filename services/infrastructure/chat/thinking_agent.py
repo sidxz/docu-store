@@ -84,6 +84,10 @@ class ThinkingAgent:
         message_id = uuid4()
         total_tokens = 0
         citations: list[SourceCitationDTO] = []
+        # Bound only once assembly has actually run inside the loop below; the
+        # provenance strip after the loop is guarded on this rather than on
+        # `citations`, which is pre-seeded above and so proves nothing.
+        context_meta = None
         _debug = settings.chat_debug
 
         if _debug:
@@ -266,26 +270,6 @@ class ThinkingAgent:
                         unique_artifacts=context_meta.unique_artifacts,
                     )
 
-                from infrastructure.llm.stats_context import stats_enabled
-
-                if stats_enabled():
-                    from application.dtos.chat_dtos import ContentBlockDTO
-                    from infrastructure.chat.nodes.literature_context_assembly import (
-                        build_provenance_spec,
-                    )
-
-                    yield AgentEvent(
-                        type="structured_block",
-                        block=ContentBlockDTO(
-                            type="chart",
-                            chart=build_provenance_spec(
-                                retrieved=len(retrieval_results),
-                                assembled=context_meta.total_sources,
-                                cited=len(citations),
-                            ),
-                        ),
-                    )
-
                 # ── Stage 3.5: Image Loading (Deep Thinking only) ──
                 images_b64: list[str] | None = None
                 if self._include_images and self._blob_store:
@@ -440,6 +424,32 @@ class ThinkingAgent:
                         },
                     )
                 retry_count += 1
+
+            # Provenance strip: emitted once, after the retry loop has settled on a
+            # final draft -- emitting inside the loop double-counted it on any turn
+            # that retried, with the first block's counts from a discarded draft.
+            # Guarded on context_meta (only bound once assembly has run in the loop
+            # above) rather than a bare stats_enabled() check, so a loop exit that
+            # never reached assembly cannot raise here.
+            from infrastructure.llm.stats_context import stats_enabled
+
+            if stats_enabled() and context_meta is not None:
+                from application.dtos.chat_dtos import ContentBlockDTO
+                from infrastructure.chat.nodes.literature_context_assembly import (
+                    build_provenance_spec,
+                )
+
+                yield AgentEvent(
+                    type="structured_block",
+                    block=ContentBlockDTO(
+                        type="chart",
+                        chart=build_provenance_spec(
+                            retrieved=len(retrieval_results),
+                            assembled=context_meta.total_sources,
+                            cited=len(citations),
+                        ),
+                    ),
+                )
 
             # ── Stage 6: Answer Formatting ──
             t6 = time.monotonic()
