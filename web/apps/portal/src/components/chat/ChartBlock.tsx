@@ -42,6 +42,10 @@ const TOOLTIP_STYLE = {
   borderRadius: "0.375rem",
   color: "var(--ds-text-primary)",
   fontSize: 11,
+  // A landmark's title runs to 90 characters; unwrapped it puts the tooltip
+  // wider than the chart it describes.
+  maxWidth: 320,
+  whiteSpace: "normal" as const,
 } as const;
 const TOOLTIP_LABEL_STYLE = { color: "var(--ds-text-primary)" } as const;
 const TOOLTIP_ITEM_STYLE = { color: "var(--ds-text-secondary)" } as const;
@@ -124,9 +128,12 @@ export function ChartBlock({ spec }: { spec: ChartSpec }) {
                 cursor={{ strokeOpacity: 0.3 }}
                 /* The panel exists to surface canonical papers, so hovering a
                    point has to name one. */
+                /* The title goes on the citations row only. A scatter point
+                   carries one payload entry per axis, so appending it to both
+                   printed the paper's name twice. */
                 formatter={(value, name, item) => {
                   const label = (item?.payload as { label?: string } | undefined)?.label;
-                  return label ? [`${value} — ${label}`, name] : [value, name];
+                  return label && name !== spec.x_label ? [`${value} — ${label}`, name] : [value, name];
                 }}
               />
               {spec.series.map((s, i) => (
