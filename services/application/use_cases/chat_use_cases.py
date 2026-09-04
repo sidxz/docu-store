@@ -368,10 +368,13 @@ class SendMessageUseCase:
         allowed_artifact_ids: list[UUID] | None = None,
         mode: Literal["quick", "thinking", "deep_thinking", "literature"] | None = None,
         reasoning: dict[str, str] | None = None,
+        stats: bool = False,
     ) -> AsyncGenerator[AgentEvent, None]:
-        from infrastructure.llm import reasoning_context
+        from infrastructure.llm import reasoning_context, stats_context
 
         _reasoning_token = reasoning_context.set_reasoning_override(reasoning)
+        _stats_token = stats_context.set_stats_enabled(stats)
+        _panel_token = stats_context.reset_panel_budget()
         try:
             # Verify conversation exists and belongs to the sender
             conversation = await self._repo.get_conversation(
@@ -577,6 +580,8 @@ class SendMessageUseCase:
                 )
         finally:
             reasoning_context.reset_reasoning_override(_reasoning_token)
+            stats_context.reset_stats_enabled(_stats_token)
+            stats_context.restore_panel_budget(_panel_token)
 
     async def _safe_record(self, event: TokenUsageEvent, conversation_id: UUID) -> None:
         """Write the usage event, logging any failure with context.

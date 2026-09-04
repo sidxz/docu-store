@@ -77,6 +77,10 @@ class SendMessageRequest(BaseModel):
         default=None,
         description="Per-lane reasoning override; absent lanes use the server default.",
     )
+    stats: bool = Field(
+        False,
+        description="Compute chart panels for this answer. Off by default: each panel costs extra Europe PMC requests, and stance costs a model call.",
+    )
 
 
 class FeedbackRequest(BaseModel):
@@ -297,6 +301,7 @@ async def send_message(
                 allowed_artifact_ids=allowed_artifact_ids,
                 mode=request.mode,
                 reasoning=request.reasoning,
+                stats=request.stats,
             ),
         )
     except RunAlreadyActiveError:

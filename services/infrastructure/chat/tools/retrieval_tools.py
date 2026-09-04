@@ -733,10 +733,26 @@ class ToolRegistry:
                 compound_vector_store=compound_vector_store,
             )
 
+    # Tools that only exist when the reader asked for Stats on this message.
+    # Gated here rather than at construction because the registry is a DI
+    # singleton and the flag is per-message.
+    _STATS_ONLY = frozenset({"plot_literature"})
+
     @property
     def definitions(self) -> list[ToolDefinition]:
-        """All tool definitions including finish_retrieval."""
-        return [t.definition for t in self._tools.values()] + [FINISH_RETRIEVAL_DEF]
+        """All tool definitions including finish_retrieval.
+
+        Stats-only tools are withheld when the turn did not ask for them, so the
+        model never sees a tool it may not call.
+        """
+        from infrastructure.llm.stats_context import stats_enabled
+
+        show_stats = stats_enabled()
+        return [
+            t.definition
+            for name, t in self._tools.items()
+            if show_stats or name not in self._STATS_ONLY
+        ] + [FINISH_RETRIEVAL_DEF]
 
     async def execute(
         self,
