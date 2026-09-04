@@ -38,6 +38,7 @@ from __future__ import annotations
 import asyncio
 import re
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from html import unescape
 
 import httpx
@@ -142,6 +143,25 @@ class LiteratureHit:
     @property
     def is_ingestable(self) -> bool:
         return self.ingest_blocker() is None
+
+
+# Above this many matches, one request cannot return every record. Europe PMC
+# caps pageSize at 1000 and orders by relevance, which correlates hard with
+# recency -- so the first page of a large result set is NOT a sample of the
+# field, and histogramming it reports that the field began this year.
+_EXHAUSTIVE_LIMIT = 1000
+
+
+@dataclass(frozen=True)
+class YearCounts:
+    """Publication counts per year for a whole query, not for a fetched page."""
+
+    query: str
+    total: int
+    counts: dict[int, int]
+    records: list[LiteratureHit]
+    exhaustive: bool
+    """True when ``records`` holds every match, so other panels are free."""
 
 
 # Europe PMC returns JATS markup inside titles and abstracts, in both forms:
@@ -375,3 +395,88 @@ class EuropePmcClient:
             )
             return None
         return body
+
+    async def year_counts(self, query: str, *, since: int = 1990) -> YearCounts:
+        """Papers per year across the whole match, in two regimes.
+
+        Under ``_EXHAUSTIVE_LIMIT`` matches one request returns every record, so
+        the caller also gets citations and publication types for free. Above it,
+        one count-only request per year -- exact, tiny, and all that is available
+        without paging the whole set.
+
+        ``query`` is sent unchanged. A broadened counting query would describe a
+        different population than the cards the same search produced.
+        """
+        first = await self._raw_search(query, page_size=_EXHAUSTIVE_LIMIT)
+        total = int(first.get("hitCount") or 0)
+        records = [parse_hit(r) for r in first["resultList"]["result"]]
+
+        if total <= _EXHAUSTIVE_LIMIT:
+            counts: dict[int, int] = {}
+            for hit in records:
+                if hit.year is not None:
+                    counts[hit.year] = counts.get(hit.year, 0) + 1
+            return YearCounts(
+                query=query,
+                total=total,
+                counts=counts,
+                records=records,
+                exhaustive=True,
+            )
+
+        this_year = datetime.now(UTC).year
+        years = list(range(since, this_year + 1))
+        payloads = await asyncio.gather(
+            *(
+                self._raw_search(f"({query}) AND PUB_YEAR:{y}", page_size=1)
+                for y in years
+            ),
+        )
+        return YearCounts(
+            query=query,
+            total=total,
+            counts={
+                y: int(p.get("hitCount") or 0)
+                for y, p in zip(years, payloads, strict=True)
+                if int(p.get("hitCount") or 0) > 0
+            },
+            records=[],
+            exhaustive=False,
+        )
+
+    async def _raw_search(self, query: str, *, page_size: int) -> dict:
+        """One search request, retried on transient 5xx, returning parsed JSON.
+
+        ``resultType=lite`` rather than ``core``: it carries pubYear, pubType,
+        citedByCount, isOpenAccess and journalTitle -- everything the panels
+        need -- at roughly a tenth the bytes of core, which matters at 1000
+        records.
+        """
+        params = {
+            "query": query,
+            "format": "json",
+            "resultType": "lite",
+            "pageSize": str(page_size),
+        }
+        last_exc: Exception | None = None
+        for attempt in range(_MAX_ATTEMPTS):
+            try:
+                async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as client:
+                    response = await client.get(self._search_url, params=params)
+                    response.raise_for_status()
+                    body = response.json()
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code not in _RETRYABLE_STATUS:
+                    msg = f"Europe PMC rejected the query ({exc.response.status_code}): {query}"
+                    raise LiteratureQueryError(msg) from exc
+                last_exc = exc
+            except Exception as exc:
+                last_exc = exc
+            else:
+                return body
+
+            if attempt < _MAX_ATTEMPTS - 1:
+                await asyncio.sleep(_RETRY_BACKOFF_SECONDS * (attempt + 1))
+
+        msg = f"Europe PMC is unreachable: {last_exc}"
+        raise LiteratureSourceUnavailableError(msg) from last_exc
