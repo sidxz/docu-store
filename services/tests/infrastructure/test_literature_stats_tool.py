@@ -510,7 +510,6 @@ async def test_a_non_exhaustive_timeline_says_where_its_counts_start():
     )
     footnote = events[0].block.chart.footnote
     assert "1990" in footnote
-    assert "15,158" in footnote
 
 
 async def test_more_than_three_facets_is_refused_before_any_request():
@@ -527,6 +526,22 @@ async def test_more_than_three_facets_is_refused_before_any_request():
     assert events == []
     assert client.queries == []
     assert "facet" in summary.lower()
+
+
+async def test_a_year_filtered_facet_is_refused_before_any_request():
+    client = _StubClient()
+    tool = PlotLiteratureTool(client)
+    _r, summary, events = await tool.execute(
+        {
+            "panel": "timeline",
+            "facets": [{"name": "a", "query": 'x AND PUB_YEAR:[2020 TO 2024]'}],
+        },
+        uuid4(),
+        None,
+    )
+    assert events == []
+    assert client.queries == []
+    assert "PUB_YEAR" in summary
 
 
 async def test_a_chart_with_no_points_at_all_is_refused_rather_than_drawn_empty():

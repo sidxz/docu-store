@@ -150,8 +150,10 @@ export function ChartBlock({ spec }: { spec: ChartSpec }) {
           </ul>
         </details>
       ) : null}
-      {/* footnote, partial_x and source_query stay on the block for the
-          record but are not drawn: to a reader they look like debug output. */}
+      {spec.footnote ? (
+        <p className="mt-2 text-[0.6875rem] leading-relaxed text-text-muted">{spec.footnote}</p>
+      ) : null}
+      {/* source_query and partial_x stay on the block but are not drawn. */}
     </figure>
   );
 }

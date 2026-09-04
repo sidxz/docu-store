@@ -45,10 +45,8 @@ def stats_briefing_note() -> str:
         return ""
     return (
         "\n\nThe reader turned Stats on and expects a chart. Before calling "
-        "finish_retrieval, call plot_literature once with the panel that fits the "
-        "question's shape (timeline for growth or era comparison, stance when the "
-        "question contains a claim, landmarks for settled knowledge, evidence_mix "
-        "for evidence quality), using the same fielded queries you searched with. "
+        "finish_retrieval, call plot_literature with the panel that fits the "
+        "question; the tool's description says which panel suits which shape. "
         "At most two panels; the tool refuses a third."
     )
 

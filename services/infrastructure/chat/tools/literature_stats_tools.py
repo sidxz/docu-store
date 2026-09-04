@@ -57,8 +57,8 @@ PLOT_LITERATURE_DEF = ToolDefinition(
         "question's shape.\n\n"
         "Panels:\n"
         "  timeline    — volume over time. For 'is this growing', 'what is new', "
-        "and any question comparing eras. Each facet becomes a series, so a "
-        "question with two competing sides is best plotted as two facets.\n"
+        "and for when the question asks how one thing gave way to another. Each "
+        "facet becomes a series drawn across the whole span.\n"
         "  evidence_mix— research articles vs reviews vs preprints vs patents "
         "over time. For 'is this primary work', and it exposes industrial "
         "programmes, which show up as patent clusters years before papers.\n"
@@ -67,16 +67,19 @@ PLOT_LITERATURE_DEF = ToolDefinition(
         "  stance      — how each paper stands on a CLAIM, over time. Only when the "
         "question contains a claim to adjudicate. Requires 'claim'.\n\n"
         'Pass facets as [{"name": "short label", "query": "a fielded Europe '
-        'PMC query"}]. Use the SAME fielded queries you searched with — a '
-        "broadened query charts a different set of papers than the one the reader "
-        "sees listed.\n\n"
+        'PMC query"}]. Use the same fielded queries you searched with, minus any '
+        "year filter: the subject terms must match so the chart and the listed "
+        "papers describe the same topic, but the years belong to the chart's axis. "
+        "A facet is a subject, not a period. Sibling facets must differ in what "
+        "they count, never in when; two facets that differ only by date share no "
+        "year and compare nothing. When the question contrasts two periods, facet "
+        "by whatever the question contrasts and let the whole span show the change.\n\n"
         "Examples:\n"
         '  do MmpL3 inhibitors disrupt PMF or bind directly  ->  timeline, facets '
         '[{"name":"PMF","query":"TITLE_ABS:\\"MmpL3\\" AND TITLE_ABS:\\"proton '
         'motive force\\""}, {"name":"Structure","query":"TITLE_ABS:\\"MmpL3\\" AND '
         'TITLE_ABS:\\"structure\\""}]\n'
-        "  what is isoniazid's mechanism of action  ->  landmarks\n"
-        "  how did BTZ resistance change after 2020  ->  timeline"
+        "  what is isoniazid's mechanism of action  ->  landmarks"
     ),
     parameters={
         "type": "object",
@@ -92,7 +95,13 @@ PLOT_LITERATURE_DEF = ToolDefinition(
             },
             "facets": {
                 "type": "array",
-                "description": "One series per facet. Usually one; two when the question has two sides.",
+                "description": (
+                    "Which papers to count. Each facet is a subject with a short label and a "
+                    "fielded query. Usually one; two when the question sets two subjects "
+                    "against each other. Only the timeline panel draws one series per facet; "
+                    "the others merge the facets and split the series their own way. Never one "
+                    "facet per date range."
+                ),
                 "items": {
                     "type": "object",
                     "properties": {
@@ -150,13 +159,12 @@ def _timeline_footnote(counted: list[tuple[str, Any]]) -> str:
     """Where the counts come from, honestly, in each of the two regimes.
 
     Above the exhaustive limit the counts are per-year requests from ``since``
-    (1990), so calling them "the whole Europe PMC match" hides every paper
-    before 1990 -- thousands of them, for an established field.
+    (1990), so claiming "all years" would hide every paper before 1990 --
+    thousands of them, for an established field.
     """
     if all(c.exhaustive for _n, c in counted):
-        return "Counts are the whole Europe PMC match, not the papers retrieved."
-    total = sum(c.total for _n, c in counted)
-    return f"Counts from 1990 onward; the query matches {total:,} papers in total."
+        return "All years."
+    return "From 1990 on."
 
 
 def _truncate_claim(claim: str, limit: int = 120) -> str:
@@ -244,7 +252,7 @@ class PlotLiteratureTool:
             ),
         ]
 
-    def _validate_args(
+    def _validate_args(  # noqa: PLR0911 -- guard clauses, one refusal each
         self, panel: str, facets: list[dict[str, Any]], claim: str,
     ) -> str | None:
         """The readable refusal for a bad call, or None when it may proceed."""
@@ -254,6 +262,12 @@ class PlotLiteratureTool:
             return (
                 f"plot_literature takes at most {_MAX_FACETS} facets; {len(facets)} "
                 "were given. Pick the facets that actually contrast."
+            )
+        if any("pub_year" in str(f["query"]).lower() for f in facets):
+            return (
+                "Facet queries must not filter by year: the chart's x-axis is already the "
+                "year, so a windowed query draws a series that stops where the filter "
+                "does. Resend the same queries with the PUB_YEAR clause removed."
             )
         if panel not in {"timeline", "evidence_mix", "landmarks", "stance"}:
             return f"Unknown panel '{panel}'. Use timeline, evidence_mix, landmarks or stance."
@@ -368,10 +382,7 @@ class PlotLiteratureTool:
                 ),
             ],
             source_query=" · ".join(c.query for _n, c in counted),
-            footnote=(
-                "Citation counts favour older papers mechanically. Use this to find "
-                "what everyone cites, never to rank quality."
-            ),
+            footnote="All years.",
         )
 
     async def _stance(self, counted: list[tuple[str, Any]], claim: str) -> ChartSpecDTO:
@@ -438,10 +449,7 @@ class PlotLiteratureTool:
                 for hit, v in zip(hits, verdicts, strict=False)
                 if v.label != "none" and v.evidence
             ][:60],
-            footnote=(
-                "Each paper scored against the claim, not for sentiment. "
-                "Most papers take no position, which is expected."
-            ),
+            footnote="All years.",
         )
 
     async def _core_records(self, counted: list[tuple[str, Any]]) -> list[Any]:
