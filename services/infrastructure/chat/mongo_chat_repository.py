@@ -7,6 +7,7 @@ from uuid import UUID
 
 import structlog
 from motor.motor_asyncio import AsyncIOMotorClient
+from pydantic import ValidationError
 from pymongo import ReturnDocument
 
 from application.dtos.chat_dtos import (
@@ -598,7 +599,17 @@ def _doc_to_message(doc: dict) -> ChatMessageDTO:
     sources = [SourceCitationDTO(**s) for s in doc.get("sources", [])]
     structured_content = None
     if doc.get("structured_content"):
-        structured_content = [ContentBlockDTO(**b) for b in doc["structured_content"]]
+        kept = []
+        for block in doc["structured_content"]:
+            try:
+                kept.append(ContentBlockDTO(**block))
+            except ValidationError as exc:
+                log.warning(
+                    "chat.message.block_skipped",
+                    message_id=doc.get("message_id"),
+                    error=str(exc)[:200],
+                )
+        structured_content = kept or None
     agent_trace = None
     if doc.get("agent_trace"):
         agent_trace = AgentTraceDTO(**doc["agent_trace"])

@@ -91,7 +91,9 @@ export function ChartBlock({ spec }: { spec: ChartSpec }) {
                   fill={colorFor(spec, s.name, i)}
                 />
               ))}
-              {spec.series.length > 1 && <Legend wrapperStyle={{ fontSize: 11 }} />}
+              {spec.series.length > 1 && (
+                <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11 }} />
+              )}
             </ScatterChart>
           ) : (
             <BarChart data={rows} margin={{ top: 8, right: 12, bottom: 20, left: 4 }}>
@@ -126,7 +128,9 @@ export function ChartBlock({ spec }: { spec: ChartSpec }) {
                   ))}
                 </Bar>
               ))}
-              {spec.series.length > 1 && <Legend wrapperStyle={{ fontSize: 11 }} />}
+              {spec.series.length > 1 && (
+                <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11 }} />
+              )}
             </BarChart>
           )}
         </ResponsiveContainer>

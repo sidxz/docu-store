@@ -606,6 +606,20 @@ async def test_a_long_claim_does_not_become_a_paragraph_of_chart_title():
     assert len(events[0].block.chart.title) < 160
 
 
+async def test_a_long_claim_is_truncated_at_a_word_boundary_not_mid_word():
+    llm = _RecordingStanceLLM('{"verdicts": [{"id": "1", "label": "none", "evidence": ""}]}')
+    tool = PlotLiteratureTool(_StubClient(), stance_llm=llm)
+    claim = " ".join(["word"] * 40)  # 199 chars, well over the 120 cap
+    _r, _s, events = await tool.execute(
+        {"panel": "stance", "claim": claim, "facets": [{"name": "a", "query": "x"}]},
+        uuid4(),
+        None,
+    )
+    title = events[0].block.chart.title
+    assert title.endswith("…")
+    assert title == "Papers on: " + " ".join(["word"] * 24) + "…"
+
+
 async def test_a_stance_facet_whose_refetch_fails_is_refused_readably():
     class _RefetchFails(_StubClient):
         async def search_or_raise(self, query: str, *, limit: int = 25):

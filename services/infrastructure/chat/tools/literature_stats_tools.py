@@ -159,6 +159,14 @@ def _timeline_footnote(counted: list[tuple[str, Any]]) -> str:
     return f"Counts from 1990 onward; the query matches {total:,} papers in total."
 
 
+def _truncate_claim(claim: str, limit: int = 120) -> str:
+    """Truncate at the last space before ``limit`` chars, never mid-word."""
+    if len(claim) <= limit:
+        return claim
+    cut = claim[:limit].rfind(" ")
+    return f"{claim[: cut if cut > 0 else limit]}…"
+
+
 def _deduped_records(counted: list[tuple[str, Any]]) -> list[Any]:
     """Every record across the facets, each once.
 
@@ -410,7 +418,7 @@ class PlotLiteratureTool:
 
         return ChartSpecDTO(
             panel="stance",
-            title=f"Papers on: {claim[:120]}",
+            title=f"Papers on: {_truncate_claim(claim)}",
             x_label="Year",
             y_label="Papers",
             series=[
