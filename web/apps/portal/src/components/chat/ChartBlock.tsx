@@ -150,19 +150,8 @@ export function ChartBlock({ spec }: { spec: ChartSpec }) {
           </ul>
         </details>
       ) : null}
-
-      {(spec.footnote || spec.partial_x != null || spec.source_query) && (
-        <p className="mt-2 text-[0.6875rem] leading-relaxed text-text-muted">
-          {spec.footnote}
-          {spec.partial_x != null && ` ${spec.partial_x} is a partial year.`}
-          {spec.source_query && (
-            <>
-              {" "}
-              <span className="font-mono">{spec.source_query}</span>
-            </>
-          )}
-        </p>
-      )}
+      {/* footnote, partial_x and source_query stay on the block for the
+          record but are not drawn: to a reader they look like debug output. */}
     </figure>
   );
 }
