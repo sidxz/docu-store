@@ -8,8 +8,8 @@ here: two concurrent turns must not see each other's flag.
 from __future__ import annotations
 
 import asyncio
+from uuid import uuid4
 
-import pytest
 
 from infrastructure.llm.stats_context import (
     claim_panel_slot,
@@ -120,3 +120,32 @@ def test_the_corpus_registry_is_unchanged_by_the_stats_flag():
     finally:
         reset_stats_enabled(token)
     assert off == on
+
+
+from infrastructure.chat.nodes.agentic_retrieval import stats_briefing_note
+
+
+def test_the_retrieval_briefing_says_nothing_about_charts_when_stats_is_off():
+    # Deep Research's briefing must be byte-identical with Stats off, so the
+    # note has to be the empty string rather than a softer phrasing.
+    assert stats_briefing_note() == ""
+
+
+def test_the_retrieval_briefing_asks_for_a_panel_when_stats_is_on():
+    token = set_stats_enabled(True)
+    try:
+        note = stats_briefing_note()
+    finally:
+        reset_stats_enabled(token)
+    assert "plot_literature" in note
+    assert "finish_retrieval" in note
+
+
+async def test_a_stats_only_tool_is_not_executed_when_stats_is_off():
+    # Withholding the definition is not enough on its own: a model that saw
+    # plot_literature on an earlier turn can still name it on this one.
+    results, summary, events = await _literature_registry().execute(
+        "plot_literature", {}, uuid4(), None,
+    )
+    assert (results, events) == ([], [])
+    assert "Stats is off" in summary

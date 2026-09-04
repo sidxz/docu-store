@@ -31,6 +31,28 @@ if TYPE_CHECKING:
 log = structlog.get_logger(__name__)
 
 
+def stats_briefing_note() -> str:
+    """The nudge to draw, or "" when Stats is off.
+
+    Without it the model never charts: the retrieval prompt says "call
+    finish_retrieval when you have enough sources" and mentions no panel, and 54
+    live searches produced zero plot_literature calls. Empty when Stats is off,
+    so Deep Research's briefing is byte-identical.
+    """
+    from infrastructure.llm.stats_context import stats_enabled
+
+    if not stats_enabled():
+        return ""
+    return (
+        "\n\nThe reader turned Stats on and expects a chart. Before calling "
+        "finish_retrieval, call plot_literature once with the panel that fits the "
+        "question's shape (timeline for growth or era comparison, stance when the "
+        "question contains a claim, landmarks for settled knowledge, evidence_mix "
+        "for evidence quality), using the same fielded queries you searched with. "
+        "At most two panels; the tool refuses a third."
+    )
+
+
 def attach_bioactivities_to_molecule_blocks(
     blocks: list[ContentBlockDTO],
     bios_by_name: dict[str, list[BioactivityDTO]],
@@ -452,7 +474,8 @@ class AgenticRetrievalNode:
                     f"I need to answer: {question}\n\n"
                     f"Here are the initial search results:\n"
                     f"{seed_summary or '(none — no search has run yet; call a search tool)'}\n\n"
-                    f"{accumulator.summary_for_model()}{carried_note}{smiles_note}\n\n"
+                    f"{accumulator.summary_for_model()}{carried_note}{smiles_note}"
+                    f"{stats_briefing_note()}\n\n"
                     "Evaluate these results. If they are sufficient, call finish_retrieval. "
                     "Otherwise, search for additional information."
                 ),

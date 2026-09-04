@@ -767,7 +767,14 @@ class ToolRegistry:
         allowed_artifact_ids: list[UUID] | None,
     ) -> ToolResult:
         """Execute a tool by name. Returns (results, summary_for_model, events)."""
+        from infrastructure.llm.stats_context import stats_enabled
+
         tool = self._tools.get(tool_name)
+        # `definitions` already withholds these, but a model that saw one on an
+        # earlier turn can still name it. Same shape as an unknown tool: the
+        # registry never runs a tool this message did not offer.
+        if tool_name in self._STATS_ONLY and not stats_enabled():
+            return [], "plot_literature is not available on this message (Stats is off).", []
         if not tool:
             return [], f"Unknown tool: {tool_name}", []
 
