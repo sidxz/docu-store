@@ -4,6 +4,7 @@ import type { ContentBlock } from "@docu-store/types";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { DataTableBlock } from "./DataTableBlock";
 import { MoleculeBlock } from "./MoleculeBlock";
+import { ChartBlock } from "./ChartBlock";
 
 interface RichContentRendererProps {
   blocks: ContentBlock[];
@@ -88,6 +89,12 @@ function RenderBlock({ block, workspace }: { block: ContentBlock; workspace: str
             bioactivities={block.bioactivities ?? undefined}
           />
         );
+      }
+      return null;
+
+    case "chart":
+      if (block.chart) {
+        return <ChartBlock spec={block.chart} />;
       }
       return null;
 
