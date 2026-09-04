@@ -62,7 +62,9 @@ PLOT_LITERATURE_DEF = ToolDefinition(
         "over time. For 'is this primary work', and it exposes industrial "
         "programmes, which show up as patent clusters years before papers.\n"
         "  landmarks   — citations against year. For settled knowledge, where a "
-        "timeline is noise and the reader needs the canonical papers.\n\n"
+        "timeline is noise and the reader needs the canonical papers.\n"
+        "  stance      — how each paper stands on a CLAIM, over time. Only when the "
+        "question contains a claim to adjudicate. Requires 'claim'.\n\n"
         'Pass facets as [{"name": "short label", "query": "a fielded Europe '
         'PMC query"}]. Use the SAME fielded queries you searched with — a '
         "broadened query charts a different set of papers than the one the reader "
@@ -80,8 +82,12 @@ PLOT_LITERATURE_DEF = ToolDefinition(
         "properties": {
             "panel": {
                 "type": "string",
-                "enum": ["timeline", "evidence_mix", "landmarks"],
+                "enum": ["timeline", "evidence_mix", "landmarks", "stance"],
                 "description": "Which picture to draw",
+            },
+            "claim": {
+                "type": "string",
+                "description": "For panel=stance only: the claim in the user's question, as a single assertive sentence.",
             },
             "facets": {
                 "type": "array",
@@ -124,8 +130,9 @@ def bucket_pub_type(raw: str | None) -> str:
 class PlotLiteratureTool:
     """Computes a chart from Europe PMC counts and emits it as a content block."""
 
-    def __init__(self, client: Any) -> None:
+    def __init__(self, client: Any, stance_llm: Any | None = None) -> None:
         self._client = client
+        self._stance_llm = stance_llm
 
     @property
     def definition(self) -> ToolDefinition:
@@ -148,10 +155,11 @@ class PlotLiteratureTool:
             for f in (args.get("facets") or [])
             if isinstance(f, dict) and (f.get("query") or "").strip()
         ]
-        if not facets:
-            return [], "plot_literature needs at least one facet with a query.", []
-        if panel not in {"timeline", "evidence_mix", "landmarks"}:
-            return [], f"Unknown panel '{panel}'. Use timeline, evidence_mix or landmarks.", []
+        claim = (args.get("claim") or "").strip()
+
+        guard_error = self._validate_args(panel, facets, claim)
+        if guard_error is not None:
+            return [], guard_error, []
 
         # Peek rather than claim: the budget counts panels DRAWN, and a refusal
         # below (no data, a source error) must cost zero Europe PMC requests and
@@ -168,13 +176,7 @@ class PlotLiteratureTool:
         if error_summary is not None:
             return [], error_summary, []
 
-        if panel == "timeline":
-            spec = self._timeline(counted)
-        elif panel == "evidence_mix":
-            spec = self._evidence_mix(counted)
-        else:
-            spec = self._landmarks(counted)
-
+        spec = await self._build_spec(panel, counted, claim)
         if spec is None:
             return (
                 [],
@@ -196,6 +198,31 @@ class PlotLiteratureTool:
                 block=ContentBlockDTO(type="chart", chart=spec),
             ),
         ]
+
+    def _validate_args(
+        self, panel: str, facets: list[dict[str, Any]], claim: str,
+    ) -> str | None:
+        """The readable refusal for a bad call, or None when it may proceed."""
+        if not facets:
+            return "plot_literature needs at least one facet with a query."
+        if panel not in {"timeline", "evidence_mix", "landmarks", "stance"}:
+            return f"Unknown panel '{panel}'. Use timeline, evidence_mix, landmarks or stance."
+        if panel == "stance" and not claim:
+            return "panel=stance needs a 'claim': the assertion to score papers against."
+        if panel == "stance" and self._stance_llm is None:
+            return "Stance classification is not configured on this deployment."
+        return None
+
+    async def _build_spec(
+        self, panel: str, counted: list[tuple[str, Any]], claim: str,
+    ) -> ChartSpecDTO | None:
+        if panel == "timeline":
+            return self._timeline(counted)
+        if panel == "evidence_mix":
+            return self._evidence_mix(counted)
+        if panel == "stance":
+            return await self._stance(counted, claim)
+        return self._landmarks(counted)
 
     async def _count_facets(
         self, facets: list[dict[str, Any]],
@@ -285,6 +312,48 @@ class PlotLiteratureTool:
             footnote=(
                 "Citation counts favour older papers mechanically. Use this to find "
                 "what everyone cites, never to rank quality."
+            ),
+        )
+
+    async def _stance(self, counted: list[tuple[str, Any]], claim: str) -> ChartSpecDTO | None:
+        from infrastructure.chat.stance_classifier import STANCE_LABELS, classify_stance
+
+        if not all(c.exhaustive for _n, c in counted):
+            return None
+        hits = [r for _n, c in counted for r in c.records]
+        if not hits:
+            return None
+
+        verdicts = await classify_stance(self._stance_llm, claim, hits)
+        if not verdicts:
+            return None
+
+        by_id = {v.external_id: v.label for v in verdicts}
+        stacks: dict[str, dict[int, int]] = {label: {} for label in STANCE_LABELS}
+        for hit in hits:
+            if hit.year is None:
+                continue
+            label = by_id.get(hit.external_id, "none")
+            stacks[label][hit.year] = stacks[label].get(hit.year, 0) + 1
+
+        return ChartSpecDTO(
+            panel="stance",
+            title=f"Papers on: {claim}",
+            x_label="Year",
+            y_label="Papers",
+            series=[
+                ChartSeriesDTO(
+                    name=label,
+                    points=[(float(y), float(n)) for y, n in sorted(years.items())],
+                )
+                for label, years in stacks.items()
+                if years
+            ],
+            partial_x=float(datetime.now(UTC).year),
+            source_query=" · ".join(c.query for _n, c in counted),
+            footnote=(
+                "Each paper scored against the claim, not for sentiment. "
+                "Most papers take no position, which is expected."
             ),
         )
 

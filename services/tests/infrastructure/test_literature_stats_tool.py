@@ -321,3 +321,35 @@ async def test_a_source_outage_reaches_the_model_as_readable_guidance():
     )
     assert events == []
     assert "unreachable" in summary.lower()
+
+
+async def test_a_stance_panel_stacks_labels_by_year():
+    from infrastructure.chat.tools.literature_stats_tools import PlotLiteratureTool
+
+    class _StanceLLM:
+        async def complete(self, prompt: str, **kwargs) -> str:
+            return '{"verdicts": [{"id": "1", "label": "refutes", "evidence": "directly"}]}'
+
+    tool = PlotLiteratureTool(_StubClient(), stance_llm=_StanceLLM())
+    _r, summary, events = await tool.execute(
+        {
+            "panel": "stance",
+            "claim": "MmpL3 inhibitors act by disrupting the proton motive force",
+            "facets": [{"name": "MmpL3", "query": 'TITLE_ABS:"MmpL3"'}],
+        },
+        uuid4(),
+        None,
+    )
+    spec = events[0].block.chart
+    assert spec.panel == "stance"
+    assert {s.name for s in spec.series} <= {"supports", "refutes", "mixed", "none"}
+    assert (2019.0, 1.0) in [p for s in spec.series if s.name == "refutes" for p in s.points]
+
+
+async def test_a_stance_panel_without_a_claim_is_refused():
+    tool = PlotLiteratureTool(_StubClient())
+    _r, summary, events = await tool.execute(
+        {"panel": "stance", "facets": [{"name": "a", "query": "x"}]}, uuid4(), None,
+    )
+    assert events == []
+    assert "claim" in summary.lower()

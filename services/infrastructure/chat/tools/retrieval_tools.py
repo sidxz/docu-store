@@ -699,6 +699,7 @@ class ToolRegistry:
         compound_activity_query: CompoundActivityQuery | None = None,
         literature_client: object | None = None,
         literature_only: bool = False,
+        stance_llm: object | None = None,
     ) -> None:
         self._tools: dict[str, Any] = {}
 
@@ -713,7 +714,9 @@ class ToolRegistry:
             from infrastructure.chat.tools.literature_tools import SearchLiteratureTool
 
             self._tools["search_literature"] = SearchLiteratureTool(literature_client)
-            self._tools["plot_literature"] = PlotLiteratureTool(literature_client)
+            self._tools["plot_literature"] = PlotLiteratureTool(
+                literature_client, stance_llm=stance_llm,
+            )
             return
 
         self._tools = {

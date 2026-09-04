@@ -1089,6 +1089,7 @@ def create_container() -> Container:
             page_read_model=c[PageReadModel],
             literature_client=c[EuropePmcClient],
             literature_only=True,
+            stance_llm=c[LLMClientPort],
         ),
         prompt_repository=c[PromptRepositoryPort],
         reranker=c[Reranker],
