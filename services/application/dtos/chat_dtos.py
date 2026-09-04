@@ -107,7 +107,7 @@ class ChartSeriesDTO(BaseModel):
 class ChartSpecDTO(BaseModel):
     """A chart the tool computed. No value here originates in model output."""
 
-    panel: Literal["timeline", "evidence_mix", "landmarks", "stance", "terms", "provenance"]
+    panel: Literal["timeline", "evidence_mix", "landmarks", "stance", "terms"]
     title: str
     x_label: str
     y_label: str

@@ -84,10 +84,6 @@ class ThinkingAgent:
         message_id = uuid4()
         total_tokens = 0
         citations: list[SourceCitationDTO] = []
-        # Bound only once assembly has actually run inside the loop below; the
-        # provenance strip after the loop is guarded on this rather than on
-        # `citations`, which is pre-seeded above and so proves nothing.
-        context_meta = None
         _debug = settings.chat_debug
 
         if _debug:
@@ -466,38 +462,6 @@ class ThinkingAgent:
                 cited_indices=sorted(cited_indices),
                 used=len(used_citations),
             )
-
-            # Provenance strip: emitted once, after formatting has settled on
-            # cited_indices/used_citations -- "cited" must count what the answer
-            # actually cited, not the assembled pool (citations), or it nearly
-            # always equals "assembled" and the strip stops showing anything. It
-            # sits after the retry loop for the same reason: emitting inside the
-            # loop double-counted it on any turn that retried, with the first
-            # block's counts from a discarded draft. Guarded on context_meta
-            # (only bound once assembly has run in the loop above) rather than a
-            # bare stats_enabled() check, so a loop exit that never reached
-            # assembly cannot raise here. Stream position doesn't matter here --
-            # chat_use_cases.py collects every structured_block and persists them
-            # after the done event regardless of emission order.
-            from infrastructure.llm.stats_context import stats_enabled
-
-            if stats_enabled() and context_meta is not None:
-                from application.dtos.chat_dtos import ContentBlockDTO
-                from infrastructure.chat.nodes.literature_context_assembly import (
-                    build_provenance_spec,
-                )
-
-                yield AgentEvent(
-                    type="structured_block",
-                    block=ContentBlockDTO(
-                        type="chart",
-                        chart=build_provenance_spec(
-                            retrieved=len(retrieval_results),
-                            assembled=context_meta.total_sources,
-                            cited=len(used_citations),
-                        ),
-                    ),
-                )
 
             # Provider-reported counts only (no streamed-chunk estimates); the
             # ambient counter is owned by SendMessageUseCase.

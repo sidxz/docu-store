@@ -89,8 +89,7 @@ export type ChartPanel =
   | "evidence_mix"
   | "landmarks"
   | "stance"
-  | "terms"
-  | "provenance";
+  | "terms";
 
 export interface ChartSpec {
   panel: ChartPanel;
