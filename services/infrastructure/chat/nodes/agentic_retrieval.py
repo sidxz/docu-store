@@ -196,11 +196,24 @@ class AgenticRetrievalNode:
         # Second search: same query, NO filters — catches pages missed by NER
         # In factual mode (skip_unfiltered_seed=True), always skip the unfiltered
         # seed. Unfiltered search only runs on verification failure retry.
+        #
+        # ...except for an aggregate question, whose answer is a count or a set
+        # computed over rows the NER tag is not on. Measured on the benchmark: of
+        # 31 filtered-only failures on the aggregation and set-algebra sheets, 17
+        # retrieved ZERO sources -- the filtered seed found nothing and the
+        # force-injected follow-ups found nothing either.
+        #
+        # Only the SEED is ungated. Force-injection below stays on, so the model's
+        # own searches remain entity-scoped and compound/target binding survives
+        # even when the planner flags this wrongly. Dropping force-injection too
+        # is a separate, separately-measured change: a global
+        # CHAT_FACTUAL_SKIP_UNFILTERED=false was already rejected for breaking
+        # exactly that binding.
         seed_summary = filtered_summary
         new_from_unfiltered = 0
         did_skip_unfiltered = False
         if has_filters and can_search_documents:
-            if skip_unfiltered_seed:
+            if skip_unfiltered_seed and not plan.aggregate:
                 did_skip_unfiltered = True
                 log.info(
                     "chat.agentic_retrieval.skip_unfiltered",
