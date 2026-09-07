@@ -50,9 +50,22 @@ class SearchSimilarCompoundsUseCase:
     async def execute(
         self,
         request: CompoundSearchRequest,
-        workspace_id: UUID | None = None,
-        allowed_artifact_ids: list[UUID] | None = None,
+        workspace_id: UUID,
+        allowed_artifact_ids: list[UUID] | None,
     ) -> Result[CompoundSearchResponse, AppError]:
+        """Search compounds by structural similarity, scoped to one workspace.
+
+        Neither scoping argument has a default, deliberately. They used to
+        default to None, and two of the three callers simply omitted them: the
+        compound store fails closed on a missing workspace_id, so the search
+        raised, and the blanket ``except`` below turned that programming error
+        into an ordinary "no results" Failure. Chat compound resolution was dead
+        for two months and nothing said so. Required arguments move the mistake
+        to the call site, where it is a TypeError outside this try block and
+        cannot be swallowed. ``allowed_artifact_ids`` stays nullable because
+        None is a real answer -- an admin with no artifact restriction -- but it
+        must be passed on purpose rather than defaulted into.
+        """
         try:
             logger.info(
                 "search_similar_compounds_start",

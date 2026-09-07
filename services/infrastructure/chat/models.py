@@ -79,6 +79,13 @@ class QueryPlan(BaseModel):
 
     # From LLM
     query_type: str  # factual, comparative, exploratory, compound, follow_up
+    # Orthogonal to query_type, not a sixth value of it: a count is factual AND
+    # an aggregate, an agreement check is comparative AND an aggregate. True when
+    # the answer must be computed over an enumerated set rather than read off one
+    # page, which is the case where narrowing retrieval to entity-tagged pages
+    # excludes the very rows being counted. Defaults False, so a planner that
+    # omits the key -- or fails entirely -- keeps today's behaviour.
+    aggregate: bool = False
     reformulated_query: str
     sub_queries: list[str] = Field(default_factory=list)
     entities: list[str] = Field(default_factory=list)

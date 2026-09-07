@@ -106,7 +106,12 @@ class ThinkingAgent:
                 description="Planning query strategy...",
             )
 
-            plan, planning_llm_output = await self._planning.run(message, conversation_history)
+            plan, planning_llm_output = await self._planning.run(
+                message,
+                conversation_history,
+                workspace_id=workspace_id,
+                allowed_artifact_ids=allowed_artifact_ids,
+            )
 
             # Expand partial author names via tag dictionary prefix search
             if plan.author_mentions:
@@ -138,6 +143,7 @@ class ThinkingAgent:
                     "chat.debug.thinking.planning_done",
                     duration_ms=planning_ms,
                     query_type=plan.query_type,
+                    aggregate=plan.aggregate,
                     strategy=plan.search_strategy,
                     confidence=plan.confidence,
                     reformulated=plan.reformulated_query,

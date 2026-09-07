@@ -20,6 +20,7 @@ template: |
   Respond with ONLY a JSON object (no markdown, no extra text):
   {{
     "query_type": "factual|comparative|exploratory|compound|follow_up",
+    "aggregate": false,
     "reformulated_query": "optimized standalone search query combining context and question",
     "sub_queries": ["optional sub-query 1", "optional sub-query 2"],
     "entities": ["key", "entities", "mentioned"],
@@ -37,6 +38,7 @@ template: |
     - "exploratory": broad overview or "what do we know about X"
     - "compound": involves chemical structures or SMILES
     - "follow_up": references prior conversation context
+  - "aggregate": decide between two readings of the question. (a) The answer is already printed somewhere and the job is to find it — one value, a ratio between two printed values, the best row of one named table, a superlative inside a single named document. Set false. (b) The answer does not exist on any page and must be computed over a set that has to be enumerated first — a count of what meets a criterion, the entities carrying two named measurements, an extremum across the whole corpus, or whether the documents reporting a value agree on each other. Set true. This is INDEPENDENT of query_type: a question can be "comparative" and also an aggregate. If (a) is a defensible reading, choose false.
   - "reformulated_query": combine conversation context with the current question into a standalone search query. This is the PRIMARY search query.
   - "sub_queries": {enable_sub_queries} — If enabled and the question has multiple facets, decompose into 1-3 focused sub-queries. Each sub-query should target a different aspect. Leave empty for simple questions. Max 3.
   - "entities": list key scientific entities mentioned (targets, compounds, genes, diseases, assays). These are for context only — filtering is handled separately.

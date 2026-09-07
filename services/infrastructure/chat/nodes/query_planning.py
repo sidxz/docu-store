@@ -31,6 +31,8 @@ from infrastructure.chemistry.smiles_detector import (
 from infrastructure.config import settings
 
 if TYPE_CHECKING:
+    from uuid import UUID
+
     from application.dtos.chat_dtos import ChatMessageDTO
     from application.ports.llm_client import LLMClientPort
     from application.ports.ner_extractor import NERExtractorPort
@@ -83,6 +85,8 @@ class QueryPlanningNode:
         self,
         question: str,
         conversation_history: list[ChatMessageDTO],
+        workspace_id: UUID,
+        allowed_artifact_ids: list[UUID] | None,
     ) -> tuple[QueryPlan, str]:
         """Return (plan, raw_llm_output) — raw output is the LLM's reasoning."""
         log.info("chat.planning.v2_with_smiles_rewrite")  # confirms new code is active
@@ -100,7 +104,7 @@ class QueryPlanningNode:
         ner_task = self._run_ner(question)
         author_task = self._run_author_detection(question)
         llm_task = self._run_llm_planning(question, conversation_context)
-        smiles_task = self._run_smiles_resolution(question)
+        smiles_task = self._run_smiles_resolution(question, workspace_id, allowed_artifact_ids)
 
         ner_filters, author_mentions, llm_result, smiles_ctx = await asyncio.gather(
             ner_task,
@@ -209,6 +213,7 @@ class QueryPlanningNode:
             log.info(
                 "chat.debug.planning.done",
                 query_type=plan.query_type,
+                aggregate=plan.aggregate,
                 strategy=plan.search_strategy,
                 confidence=plan.confidence,
                 sub_queries=plan.sub_queries,
@@ -258,7 +263,12 @@ class QueryPlanningNode:
         )
         return authors
 
-    async def _run_smiles_resolution(self, question: str) -> SmilesContext | None:
+    async def _run_smiles_resolution(
+        self,
+        question: str,
+        workspace_id: UUID,
+        allowed_artifact_ids: list[UUID] | None,
+    ) -> SmilesContext | None:
         """Detect SMILES in the question and resolve against the compound store."""
         if (
             not self._smiles_validator
@@ -310,6 +320,8 @@ class QueryPlanningNode:
                     limit=settings.chat_smiles_max_results,
                     score_threshold=threshold,
                 ),
+                workspace_id=workspace_id,
+                allowed_artifact_ids=allowed_artifact_ids,
             )
             is_ok = not isinstance(result, Failure)
             log.info(
