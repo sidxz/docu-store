@@ -23,51 +23,6 @@ if TYPE_CHECKING:
 
 log = structlog.get_logger(__name__)
 
-# Appended to the context notes when the plan is flagged `aggregate`.
-#
-# Retrieval is not the whole story for these. Measured on the benchmark, 16
-# questions had EVERY gold slide in the assembled context and still answered
-# wrongly, and 11 of the 14 multi-slide cases cited fewer sources than the
-# answer's population spans -- one had 8 gold slides in front of it and cited 1.
-#
-# It is a context note rather than a system prompt on purpose. Swapping the
-# system prompt would take the citation discipline and the don't-guess rules with
-# it, and those hold the abstain questions at 96%.
-#
-# Every sentence is answering something specific that fights it:
-#   1. `chat_answer_synthesis_v2` instr. 9 ("Mentioning the same entity is NOT
-#      enough") is a per-sentence relevance test, and it is what disqualifies rows
-#      2..N of an enumeration. Naming the enumeration as the answer meets that test
-#      on its own terms; asserting the question is "about a set" does not.
-#   2. the measured failure: 11 of 14 multi-slide cases cited fewer sources than
-#      the population spans.
-#   3. result first, because `chat_system_factual` rule 2 demands it and
-#      `chat_answer_formatting` reorders to the front anyway -- asking for
-#      rows-then-total buys a conflict and loses it one stage later.
-#   4. the comparability clause exists for MISCLASSIFIED lookups. Without it,
-#      "every matching row" licenses pooling values across assays and units before
-#      taking a minimum, which turns a correct single-table answer into a wrong
-#      cross-table one that still carries a valid citation.
-#   5. `_clip` deliberately marks a cut with "..." so the model can tell rows were
-#      elided (see its docstring). A count is exactly where that matters.
-#   6. the decline clause. "If a source has no matching row, leave it out" was the
-#      first draft and it is not enough: it governs one non-matching source, never
-#      the case where NOTHING matches. Abstain questions are disproportionately
-#      aggregate-SHAPED ("how many X meet Y" where Y is simply unreported), so this
-#      hint reaches them above the classifier's base error rate, and without this
-#      sentence it hands them a template for a confident wrong number.
-_SCAN_HINT = (
-    "Here the enumeration is the answer: each matching row directly answers the "
-    "question, so listing them is not unrelated information. The set usually spans "
-    "several pages of the same document — stopping at the first page that matches "
-    "undercounts. State the result in the first sentence, then list each row you "
-    "counted with its citation. Count only rows measured the same way; never pool "
-    "values across different assays or units. If a source is cut off (shown by "
-    "'...'), the rows past the cut are not visible — say what you counted rather "
-    "than presenting it as complete. If no source states the criterion, say the "
-    "documents do not report it and give no number."
-)
-
 # Map query_type → system prompt key
 _SYSTEM_PROMPT_MAP = {
     "factual": "chat_system_factual",
@@ -152,25 +107,9 @@ class AdaptiveSynthesisNode:
         # answer, so a separate planning call would be redundant cost and a
         # duplicate "Answer Planning" block in the Process trace.
         if _synthesis_reasoning_on():
-            # This lands in "Your answer plan (follow this closely)" -- the only
-            # slot in the prompt carrying an explicit follow-this directive, and
-            # it sits AFTER the context notes. "Map each source to the part of the
-            # question it answers" is one-source-one-fact framing: for an
-            # aggregate it restates the exact failure being fixed (8 gold slides
-            # in context, 1 cited) with more authority than the hint that is
-            # trying to prevent it. So the plan has to agree with the hint here,
-            # or the hint argues with the prompt and loses.
             answer_plan = (
-                (
-                    "Enumerate every matching row across all the sources, cite each "
-                    "one, then state the result — or say the documents do not report "
-                    "it, if none of them state the criterion."
-                )
-                if plan.aggregate
-                else (
-                    "Reason step by step: map each source to the part of the question "
-                    "it answers, then write the grounded answer."
-                )
+                "Reason step by step: map each source to the part of the question "
+                "it answers, then write the grounded answer."
             )
         else:
             answer_plan = await self._plan_answer(
@@ -289,18 +228,5 @@ class AdaptiveSynthesisNode:
             hints.append(
                 f"The question was decomposed into {len(plan.sub_queries)} sub-queries. Address each aspect.",
             )
-
-        # Last, not first, for two reasons. The notes above it are the
-        # conservatism guards ("be conservative and acknowledge gaps", "be
-        # explicit about uncertainty"), and framing THOSE with "enumerate and
-        # state a result" is backwards for exactly the population that must not
-        # break. Last also puts it nearest the instructions that follow.
-        #
-        # `total_sources` gates it: with an empty context the note would open with
-        # a counting frame and nothing to count, which is the shape of a
-        # fabricated answer. `sources_text` is literally "No relevant sources
-        # found." there, so nothing is lost by staying quiet.
-        if plan.aggregate and meta.total_sources:
-            hints.append(_SCAN_HINT)
 
         return " ".join(hints) if hints else "Standard context — proceed normally."
