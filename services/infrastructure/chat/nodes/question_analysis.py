@@ -23,6 +23,8 @@ from infrastructure.chemistry.smiles_detector import (
 from infrastructure.config import settings
 
 if TYPE_CHECKING:
+    from uuid import UUID
+
     from application.dtos.chat_dtos import ChatMessageDTO
     from application.ports.llm_client import LLMClientPort
     from application.ports.prompt_repository import PromptRepositoryPort
@@ -51,6 +53,8 @@ class QuestionAnalysisNode:
         self,
         question: str,
         conversation_history: list[ChatMessageDTO],
+        workspace_id: UUID,
+        allowed_artifact_ids: list[UUID] | None,
     ) -> QuestionAnalysis:
         conversation_context = build_follow_up_context(conversation_history)
 
@@ -73,7 +77,7 @@ class QuestionAnalysisNode:
 
         # Run LLM analysis and SMILES resolution in parallel
         llm_task = self._run_llm_analysis(prompt)
-        smiles_task = self._run_smiles_resolution(question)
+        smiles_task = self._run_smiles_resolution(question, workspace_id, allowed_artifact_ids)
 
         llm_result, smiles_ctx = await asyncio.gather(
             llm_task,
@@ -164,7 +168,12 @@ class QuestionAnalysisNode:
         )
         return analysis
 
-    async def _run_smiles_resolution(self, question: str) -> SmilesContext | None:
+    async def _run_smiles_resolution(
+        self,
+        question: str,
+        workspace_id: UUID,
+        allowed_artifact_ids: list[UUID] | None,
+    ) -> SmilesContext | None:
         """Detect SMILES in the question and resolve against the compound store."""
         if (
             not self._smiles_validator
@@ -196,6 +205,8 @@ class QuestionAnalysisNode:
                     limit=settings.chat_smiles_max_results,
                     score_threshold=threshold,
                 ),
+                workspace_id=workspace_id,
+                allowed_artifact_ids=allowed_artifact_ids,
             )
             is_ok = not isinstance(result, Failure)
             if is_ok and result.unwrap().results:

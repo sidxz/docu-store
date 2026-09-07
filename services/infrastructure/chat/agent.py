@@ -83,7 +83,12 @@ class ChatAgent:
                 description="Analyzing your question...",
             )
 
-            analysis = await self._analysis.run(message, conversation_history)
+            analysis = await self._analysis.run(
+                message,
+                conversation_history,
+                workspace_id=workspace_id,
+                allowed_artifact_ids=allowed_artifact_ids,
+            )
 
             analysis_ms = int((time.monotonic() - t1) * 1000)
             yield AgentEvent(

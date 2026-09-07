@@ -82,7 +82,12 @@ class ThinkingAgent:
                 description="Planning query strategy...",
             )
 
-            plan, planning_llm_output = await self._planning.run(message, conversation_history)
+            plan, planning_llm_output = await self._planning.run(
+                message,
+                conversation_history,
+                workspace_id=workspace_id,
+                allowed_artifact_ids=allowed_artifact_ids,
+            )
 
             planning_ms = int((time.monotonic() - t1) * 1000)
             ner_desc = ", ".join(

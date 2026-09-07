@@ -1,5 +1,6 @@
 """The planner's entity labels, and the ablation that is supposed to remove them."""
 
+from uuid import uuid4
 import pytest
 
 from application.ports.ner_extractor import NEREntity
@@ -55,7 +56,9 @@ async def test_ablation_clears_author_mentions_too(monkeypatch):
         ner_extractor=_Fake([NEREntity(text="MRSA", entity_type="gene_name")]),
         structured_extractor=_Fake([ExtractedField(name="author_name", value="Chang", score=0.9)]),
     )
-    plan, _ = await node.run("what did Chang report about MRSA?", [])
+    plan, _ = await node.run(
+        "what did Chang report about MRSA?", [], workspace_id=uuid4(), allowed_artifact_ids=None
+    )
 
     assert plan.ner_entity_filters == []
     assert plan.author_mentions == [], "author mentions still become a tag filter"
