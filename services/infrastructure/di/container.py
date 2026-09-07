@@ -484,6 +484,7 @@ def create_container() -> Container:
         reranker_instance = CrossEncoderReranker(
             model_name=settings.reranker_model_name,
             device=settings.reranker_device,
+            abstain_floor=settings.reranker_abstain_floor,
         )
         container[Reranker] = reranker_instance
     else:

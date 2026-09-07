@@ -1,9 +1,10 @@
-"""Dedup collisions must not lose text.
+"""Dedup collisions must not lose text, or the document the text came from.
 
 The accumulator keys every view of a page under `chunk:{page_id}`, so an explicit
 full-page fetch and a truncated search preview of the same page collide. Deciding
 that collision on relevance alone silently deleted whatever sat past the shorter
-one's cut -- for a page holding a table, the rows past the cut.
+one's cut -- for a page holding a table, the rows past the cut, and for the
+untitled fetch that wins every such collision, the document's own name.
 """
 
 from uuid import uuid4
@@ -13,6 +14,7 @@ from infrastructure.chat.retrieval_accumulator import RetrievalAccumulator
 
 PAGE = uuid4()
 ARTIFACT = uuid4()
+TITLE = "Next generation RmlA inhibitors"
 FULL_PAGE = "| cpd | GI50 |\n| 13c | 18.3 |\n| 13h | 17.0 |\n| 13i | 8.7 |"
 PREVIEW = FULL_PAGE[:30]
 
@@ -22,6 +24,9 @@ def _search_hit(rerank: float, text: str = PREVIEW) -> RetrievalResult:
     return RetrievalResult(
         source_type="chunk",
         artifact_id=ARTIFACT,
+        artifact_title=TITLE,
+        authors=["Sherman"],
+        presentation_date="2021-04-01",
         page_id=PAGE,
         page_index=8,
         expanded_text=text,
@@ -68,7 +73,7 @@ def test_text_survives_regardless_of_arrival_order():
 
 
 def test_the_winner_keeps_its_own_score_pair():
-    """Only text moves across.
+    """The score pair never moves across.
 
     Stamping the loser's rerank score onto a no-rerank page fetch would demote it
     out of the HIGH tier, which tiers such a result on similarity, and re-truncate
@@ -111,3 +116,25 @@ def test_distinct_pages_are_not_merged():
     other = _page_fetch()
     acc.add_results([other.model_copy(update={"page_id": uuid4()})], "b")
     assert acc.result_count == 2
+
+
+def test_the_page_fetch_does_not_delete_the_title_the_search_hit_carried():
+    """The winner is the untitled fetch; the document name must still survive.
+
+    A page fetch scores a flat 1.0 and carries no artifact metadata, so it wins
+    every same-page collision. Resolving the collision on text alone therefore
+    threw away a title the pipeline already had one step earlier, and the answer
+    ended up citing "Unknown Document" for a document the search had just named.
+    """
+    for first, second in ((_search_hit(0.4), _page_fetch()), (_page_fetch(), _search_hit(0.4))):
+        acc = RetrievalAccumulator()
+        acc.add_results([first], "a")
+        acc.add_results([second], "b")
+
+        (kept,) = acc.get_all_results()
+        assert kept.artifact_title == TITLE
+        assert kept.authors == ["Sherman"]
+        assert kept.presentation_date == "2021-04-01"
+        # Still the fetch's full text and its own score pair.
+        assert kept.expanded_text == FULL_PAGE
+        assert kept.rerank_score is None

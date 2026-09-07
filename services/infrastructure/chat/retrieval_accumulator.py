@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -24,7 +24,12 @@ class RetrievalAccumulator:
 
     def __init__(self, budget_chars: int | None = None) -> None:
         self._results: dict[str, RetrievalResult] = {}  # dedup_key -> result
-        self._budget = budget_chars or settings.chat_context_budget_chars
+        # Gathering is not sending: this is the retrieval-loop backstop, not the
+        # assembly budget. The two were split so retrieval would stop being cut
+        # off mid-investigation, but only the call site was updated -- this
+        # default still read the assembly budget, so any zero-arg construction
+        # silently got the small one back.
+        self._budget = budget_chars or settings.chat_accumulator_budget_chars
         self._chars_used = 0
         self._queries_seen: set[str] = set()
 
@@ -161,18 +166,27 @@ class RetrievalAccumulator:
         Keeping the winner's *score pair* intact matters as much as keeping the
         longer text: stamping the loser's rerank score onto the winner can demote
         a no-rerank fetch (which tiers on similarity) out of the HIGH tier and
-        re-truncate it. So only text moves across.
+        re-truncate it. So the score pair never moves across -- only text, and
+        metadata the winner is missing.
         """
         winner, loser = (
             (a, b)
             if RetrievalAccumulator._score(a) >= RetrievalAccumulator._score(b)
             else (b, a)
         )
-        update: dict[str, str] = {}
+        update: dict[str, Any] = {}
         if len(loser.expanded_text) > len(winner.expanded_text):
             update["expanded_text"] = loser.expanded_text
         if len(loser.matched_text) > len(winner.matched_text):
             update["matched_text"] = loser.matched_text
+        # Metadata is not a competing claim the way text and scores are: both
+        # sides are the same page of the same artifact, so "which is right" does
+        # not arise -- whichever side has it, keep it. Without this a page fetch
+        # (a flat 1.0, so always the winner) silently deletes the title the
+        # search hit for that same page arrived with.
+        for field in ("artifact_title", "authors", "presentation_date"):
+            if not getattr(winner, field) and getattr(loser, field):
+                update[field] = getattr(loser, field)
         return winner.model_copy(update=update) if update else winner
 
     @staticmethod

@@ -16,6 +16,7 @@ from returns.result import Failure
 from application.dtos.chat_dtos import AgentEvent, ContentBlockDTO
 from application.dtos.search_dtos import HierarchicalSearchRequest, SummarySearchRequest
 from application.ports.tool_calling_llm import ToolDefinition
+from application.use_cases.search_use_cases import resolve_artifact_info
 from infrastructure.chat.models import RetrievalResult
 
 if TYPE_CHECKING:
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
     from application.ports.repositories.page_read_models import PageReadModel
     from application.services.compound_activity_query import CompoundActivityQuery
     from application.use_cases.search_use_cases import (
+        ArtifactInfo,
         HierarchicalSearchUseCase,
         SearchSummariesUseCase,
     )
@@ -184,6 +186,11 @@ class SearchDocumentsTool:
             workspace_id=workspace_id,
             allowed_artifact_ids=allowed_artifact_ids,
             text_preview_chars=_CHAT_PREVIEW_CHARS,
+            # The agent issues several sub-queries per turn and the accumulator
+            # merges them on best-score-per-page, so a page only needs to win
+            # once. Cutting each search to ``limit`` throws away candidates that
+            # were already retrieved and scored, before the merge can see them.
+            keep_full_rerank_pool=True,
         )
 
         if isinstance(result, Failure):
@@ -702,6 +709,9 @@ class ToolRegistry:
         stance_llm: object | None = None,
     ) -> None:
         self._tools: dict[str, Any] = {}
+        # Set before the literature-only early return: `execute` reads it on
+        # every path, including that one.
+        self._artifacts = artifact_read_model
 
         # Literature chat gets exactly one tool. Expressed as an early return
         # rather than a filter over the full set, so the corpus tools are never
@@ -779,10 +789,63 @@ class ToolRegistry:
             return [], f"Unknown tool: {tool_name}", []
 
         try:
-            return await tool.execute(args, workspace_id, allowed_artifact_ids)
+            results, summary, events = await tool.execute(args, workspace_id, allowed_artifact_ids)
         except Exception as exc:
             log.warning("tool.execution_failed", tool=tool_name, error=str(exc))
             return [], f"Tool {tool_name} failed: {exc!s}", []
+
+        await self._fill_artifact_metadata(results, workspace_id)
+        return results, summary, events
+
+    async def _fill_artifact_metadata(
+        self,
+        results: list[RetrievalResult],
+        workspace_id: UUID,
+    ) -> None:
+        """Fill in the document name on any result whose tool left it blank.
+
+        Here rather than in each tool because "which document is this from" is
+        a property of every retrieval result, not of the tool that produced it:
+        get_page_content and search_compound_structure both hardcode it to
+        None, and any tool added later starts out the same way.
+
+        It is not merely a missing title. RetrievalAccumulator resolves a
+        same-page collision by score, and a page fetch scores a flat 1.0 -- so
+        an untitled fetch always beats the titled search hit for that page and
+        the merge *discards* a title the pipeline already had. Filling it on
+        the way out of the registry closes that off before dedup sees it.
+        """
+        if self._artifacts is None:
+            return
+        cache: dict[UUID, ArtifactInfo] = {}
+        for r in results:
+            # A literature artifact_id is a uuid5 of a DOI with nothing stored
+            # under it, so the lookup is a guaranteed miss. Those results carry
+            # the paper's title from the search hit already.
+            if r.artifact_title or r.source_type == "literature":
+                continue
+            info = cache.get(r.artifact_id)
+            if info is None:
+                try:
+                    info = await resolve_artifact_info(
+                        r.artifact_id,
+                        self._artifacts,
+                        workspace_id=workspace_id,
+                    )
+                except Exception:
+                    # A metadata lookup must never cost us the retrieval itself.
+                    log.warning(
+                        "tool.artifact_metadata_failed",
+                        artifact_id=str(r.artifact_id),
+                        exc_info=True,
+                    )
+                    return
+                cache[r.artifact_id] = info
+            r.artifact_title = info.title
+            if not r.authors:
+                r.authors = info.authors
+            if r.presentation_date is None:
+                r.presentation_date = info.presentation_date
 
 
 # ── Helpers ──

@@ -23,6 +23,19 @@ logger = structlog.get_logger()
 # "not scored"; clamping keeps every real score strictly above it.
 _LOGIT_CLAMP = 30.0
 
+# A candidate scoring below this was not judged relevant-or-not; the model failed
+# to judge it at all, and the number it returned is noise rather than a ranking. Measured on this
+# corpus: a passage the model recognises scores 0.73-0.99, while a query it
+# cannot match collapses the whole distribution below 0.04 -- including the
+# passages that hold the answer. Sorting on that is worse than not sorting,
+# because it also overwrites the first-stage similarity that did find them.
+#
+# The default is the MEDIUM tier line the assembly stage already uses: if not
+# one candidate clears the bar for "worth more than 200 characters", there is
+# nothing to rank. It is a Settings field because it is calibrated against a
+# specific model's score distribution and has to be retuned when that changes.
+_DEFAULT_ABSTAIN_FLOOR = 0.05
+
 
 def _sigmoid(x: float) -> float:
     """Squash a cross-encoder logit into (0, 1).
@@ -46,9 +59,11 @@ class CrossEncoderReranker(Reranker):
         self,
         model_name: str = "cross-encoder/ms-marco-MiniLM-L-12-v2",
         device: Literal["cpu", "cuda", "mps"] = "cpu",
+        abstain_floor: float = _DEFAULT_ABSTAIN_FLOOR,
     ) -> None:
         self.model_name = model_name
         self.device = device
+        self.abstain_floor = abstain_floor
         self._model: _CrossEncoder | None = None
         self._lock = threading.Lock()
 
@@ -56,6 +71,7 @@ class CrossEncoderReranker(Reranker):
             "initializing_cross_encoder_reranker",
             model_name=model_name,
             device=device,
+            abstain_floor=abstain_floor,
         )
 
     def _ensure_model_loaded(self) -> None:
@@ -80,6 +96,12 @@ class CrossEncoderReranker(Reranker):
 
         Scores are calibrated probabilities in (0, 1), not raw logits -- see
         :func:`_sigmoid`. Compare them against probability-shaped thresholds.
+
+        Any candidate scoring below :attr:`abstain_floor` comes back with
+        ``score=None`` rather than a near-zero float -- the model failed to judge
+        it, which is not the same claim as "scored, and terrible". Those keep the
+        first-stage order, behind everything that was scored. See
+        :data:`_DEFAULT_ABSTAIN_FLOOR`.
         """
         if not documents:
             return []
@@ -89,18 +111,61 @@ class CrossEncoderReranker(Reranker):
         pairs = [(query, doc.text) for doc in documents]
         scores = self._model.predict(pairs)
 
-        results = [
-            RerankResult(
-                id=doc.id,
-                # A nan (empty/degenerate passage) must sort last, so it keeps a
-                # logit far below any real one and squashes with everything else.
-                score=_sigmoid(float(score) if not math.isnan(float(score)) else -100.0),
-                original_rank=i,
-            )
-            for i, (doc, score) in enumerate(zip(documents, scores))
-        ]
+        results: list[RerankResult] = []
+        # 0 = scored, 1 = below the floor, 2 = nan. Sorting on this before the
+        # score keeps the three groups in that order without comparing a
+        # probability against None.
+        rank_group: dict[int, int] = {}
+        abstained_count = 0
 
-        results.sort(key=lambda r: r.score, reverse=True)
+        for i, (doc, raw) in enumerate(zip(documents, scores)):
+            value = float(raw)
+            if math.isnan(value):
+                # A degenerate passage was not judged, and must not displace one
+                # that was. It sorts behind even the unscored.
+                score, group = None, 2
+            else:
+                calibrated = _sigmoid(value)
+                if calibrated < self.abstain_floor:
+                    # Below the floor the model is not expressing weak relevance,
+                    # it is failing to judge: measured on this corpus a passage it
+                    # recognises scores 0.73-0.99, and a query it cannot match
+                    # collapses to 0.000x whether or not the passage is the answer.
+                    # Passing that on as a score is worse than passing nothing,
+                    # because a real number outranks the first-stage similarity
+                    # that did find the passage.
+                    #
+                    # Judged per candidate, not per batch. A single lexical false
+                    # positive -- a title slide sharing words with the question --
+                    # scoring above the floor must not certify the rest of the
+                    # pool: on the HARD-0305 deck exactly that happened, and a
+                    # batch-level max() test left ten collapsed gold slides
+                    # tiered LOW behind it.
+                    score, group = None, 1
+                    abstained_count += 1
+                else:
+                    score, group = calibrated, 0
+            rank_group[i] = group
+            results.append(RerankResult(id=doc.id, score=score, original_rank=i))
+
+        if abstained_count:
+            logger.info(
+                "rerank_abstained",
+                query_length=len(query),
+                candidates=len(documents),
+                abstained=abstained_count,
+                abstain_floor=self.abstain_floor,
+            )
+
+        # Scored candidates by score; everything the model could not judge keeps
+        # the first-stage order behind them, which is the ranking it was going to
+        # fall back to anyway.
+        results.sort(
+            key=lambda r: (
+                rank_group[r.original_rank],
+                -r.score if r.score is not None else r.original_rank,
+            )
+        )
 
         if top_k:
             results = results[:top_k]

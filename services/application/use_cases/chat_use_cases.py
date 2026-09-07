@@ -178,7 +178,12 @@ def _build_recent_summary(
     seen_art: dict = {}
     for m in messages:
         for s in m.sources:
-            seen_art.setdefault(s.artifact_id, s.artifact_title)
+            # First source that actually names the document wins, not simply the
+            # first source: a page-fetch citation carries no title, and
+            # setdefault would let it claim the artifact and show as blank even
+            # though a later citation for the same document names it.
+            if not seen_art.get(s.artifact_id):
+                seen_art[s.artifact_id] = s.artifact_title
     cited = [CitedDocumentDTO(artifact_id=a, title=t) for a, t in list(seen_art.items())[:2]]
 
     trace = last.agent_trace if last else None

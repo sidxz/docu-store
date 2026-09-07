@@ -69,6 +69,7 @@ services/coverage.xml
 
 
 paper/
+services/evaluation
 services/evaluation/
 
 # Literature Stats design doc — Siddhant controls its first commit

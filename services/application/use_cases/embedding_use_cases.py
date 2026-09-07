@@ -37,8 +37,52 @@ from infrastructure.text_chunkers.block_aware_chunker import (
 logger = structlog.get_logger()
 
 
-def _rerank_doc_text(page_text: str, metadata: dict | None) -> str:
-    """Prepend section breadcrumb + caption (if any) to the reranker document."""
+def build_chunk_context(
+    artifact_title: str | None,
+    page_index: int,
+    tags: list[str] | None,
+    page_summary: str | None,
+) -> str:
+    """Build a context prefix to prepend to a chunk.
+
+    The prefix gives each chunk awareness of its parent document, improving
+    retrieval for ambiguous passages like "IC50 was 2.3 uM".
+
+    Module level, and shared with the rerankers rather than duplicated, because
+    the two stages seeing the *same* passage is a correctness property and not
+    merely DRY. While only the embedder used it, a chunk was indexed carrying its
+    document identity and then rescored without it, so the reranker could not
+    tell one deck's IC50 table from another deck's -- measured on the H8
+    set-algebra questions with production sub-queries, that cost 87.8% against
+    97.6% gold recall, and 4 against 9 of 10 questions fully answered. Any
+    divergence here reintroduces the asymmetry silently.
+
+    ``page_summary`` is supplied by the embedder and deliberately NOT by the
+    rerankers: a cross-encoder's window is small enough that 200 characters of
+    prose summary displaces table rows, and it measured slightly worse
+    (128/129 gold against 127/129 across the 22 H8 questions).
+    """
+    parts = []
+    if artifact_title:
+        parts.append(f"Document: {artifact_title}")
+    if tags:
+        parts.append(f"Tags: {', '.join(tags[:10])}")
+    parts.append(f"Page {page_index + 1}")
+    if page_summary:
+        parts.append(f"Summary: {page_summary[:200]}")
+    return " | ".join(parts) + "\n\n" if parts else ""
+
+
+def _rerank_doc_text(
+    page_text: str, metadata: dict | None, artifact_title: str | None = None
+) -> str:
+    """Prepend document context, section breadcrumb and caption to a rerank doc.
+
+    ``artifact_title`` is the identity :func:`build_chunk_context` put in front of
+    the chunk at index time; without it the reranker scores a passage stripped of
+    the document it belongs to. Applied only when a title is supplied, so a
+    caller that cannot resolve one still gets exactly the old text.
+    """
     prefix_parts: list[str] = []
     if metadata:
         section_path = metadata.get("section_path")
@@ -47,9 +91,14 @@ def _rerank_doc_text(page_text: str, metadata: dict | None) -> str:
         caption = metadata.get("caption")
         if caption:
             prefix_parts.append(caption)
-    if not prefix_parts:
-        return page_text
-    return " | ".join(prefix_parts) + "\n\n" + page_text
+    body = " | ".join(prefix_parts) + "\n\n" + page_text if prefix_parts else page_text
+    if not artifact_title:
+        return body
+    meta = metadata or {}
+    return (
+        build_chunk_context(artifact_title, meta.get("page_index") or 0, meta.get("tags"), None)
+        + body
+    )
 
 
 class GeneratePageEmbeddingUseCase:
@@ -80,28 +129,6 @@ class GeneratePageEmbeddingUseCase:
         self.sparse_embedding_generator = sparse_embedding_generator
         self.artifact_repository = artifact_repository
         self.blob_store = blob_store
-
-    @staticmethod
-    def _build_chunk_context(
-        artifact_title: str | None,
-        page_index: int,
-        tags: list[str] | None,
-        page_summary: str | None,
-    ) -> str:
-        """Build a context prefix to prepend to chunks before embedding.
-
-        The prefix gives each chunk awareness of its parent document,
-        improving retrieval for ambiguous passages like "IC50 was 2.3 uM".
-        """
-        parts = []
-        if artifact_title:
-            parts.append(f"Document: {artifact_title}")
-        if tags:
-            parts.append(f"Tags: {', '.join(tags[:10])}")
-        parts.append(f"Page {page_index + 1}")
-        if page_summary:
-            parts.append(f"Summary: {page_summary[:200]}")
-        return " | ".join(parts) + "\n\n" if parts else ""
 
     def _load_page_blocks(self, artifact_id: UUID, page_index: int) -> list[Block] | None:
         if self.blob_store is None:
@@ -236,7 +263,7 @@ class GeneratePageEmbeddingUseCase:
                 tags = [tm.tag for tm in page.tag_mentions] if page.tag_mentions else None
                 summary = page.summary_candidate.summary if page.summary_candidate else None
 
-                context_prefix = self._build_chunk_context(
+                context_prefix = build_chunk_context(
                     artifact_title=artifact_title,
                     page_index=page.index,
                     tags=tags,
@@ -426,7 +453,7 @@ class SearchSimilarPagesUseCase:
 
             # 2b. Rerank with cross-encoder if available
             rerank_info = None
-            rerank_scores: dict[str, tuple[float, int]] = {}  # page_id → (score, original_rank)
+            rerank_scores: dict[str, tuple[float | None, int | None]] = {}  # page_id → (score, original_rank)
 
             if self.reranker and search_results:
                 rerank_docs = []
@@ -475,7 +502,7 @@ class SearchSimilarPagesUseCase:
                             "page_id": r.id[:8],
                             "original": r.original_rank,
                             "new": i,
-                            "score": round(r.score, 4),
+                            "score": round(r.score, 4) if r.score is not None else None,
                         }
                         for i, r in enumerate(reranked[:5])
                     ],

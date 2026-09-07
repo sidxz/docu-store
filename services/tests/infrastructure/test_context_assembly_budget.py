@@ -108,3 +108,76 @@ def test_cosine_scored_sources_keep_their_own_cut_points():
 def test_carried_forward_stays_medium_regardless_of_score():
     node = ca.ContextAssemblyNode()
     assert node._tier_of(_result("t", sim=0.99, source="carried_forward")) == "medium"
+
+
+def test_every_tier_marks_its_truncation():
+    """A cut value must not read as a whole one.
+
+    MEDIUM and HIGH used to truncate silently, and they are the tiers that carry
+    tables: a page cut mid-number handed the model ``Rifampicin ... 0.`` with
+    nothing to say that was half of 0.20.
+    """
+    node = ca.ContextAssemblyNode()
+    for text, kw, cap in (
+        ("A" * 9000, {"rerank": 0.99}, ca._HIGH_CHARS),
+        ("A" * 9000, {"rerank": 0.1}, ca._MEDIUM_CHARS),
+        ("A" * 9000, {"rerank": 0.001}, ca._LOW_CHARS),
+    ):
+        out = node._display_text(_result(text, **kw))
+        assert out.endswith("..."), kw
+        assert len(out) == cap, kw  # the marker fits inside the cap, not past it
+
+
+def test_text_that_fits_is_left_alone():
+    node = ca.ContextAssemblyNode()
+    short = "Rifampicin - CHEMBL374478 - 0.20 uM"
+    assert node._display_text(_result(short, rerank=0.99)) == short
+    assert node._display_text(_result(short, rerank=0.001)) == short
+
+
+def test_a_source_is_charged_what_it_emits():
+    """The ellipsis is inside the cap, so budget arithmetic needs no allowance."""
+    node = ca.ContextAssemblyNode()
+    r = _result("A" * 9000, rerank=0.1)
+    selected, used = node._apply_budget([], [r], [], budget=ca._MEDIUM_CHARS)
+    assert selected == [r]
+    assert used == len(node._display_text(r)) == ca._MEDIUM_CHARS
+
+
+TABLE = "# MIC against H37Rv\n\n| cpd | MIC |\n| --- | --- |\n| 8k | 0.06 |\n" + "| 8t | 0.03 |\n" * 400
+PROSE = "The series was profiled against H37Rv. " * 60
+
+
+def test_a_medium_page_holding_a_table_gets_the_high_cap():
+    """Rows past a cut read as "no such measurement", so tables are not clipped
+    to 1000 characters just because a prose chunk outscored them."""
+    node = ca.ContextAssemblyNode()
+    assert len(TABLE) > ca._HIGH_CHARS
+    assert len(node._display_text(_result(TABLE, rerank=0.1))) == ca._HIGH_CHARS
+
+
+def test_prose_keeps_the_medium_cap():
+    node = ca.ContextAssemblyNode()
+    assert len(PROSE) > ca._MEDIUM_CHARS
+    assert len(node._display_text(_result(PROSE, rerank=0.1))) == ca._MEDIUM_CHARS
+
+
+def test_a_table_page_that_fits_is_untouched():
+    node = ca.ContextAssemblyNode()
+    small = "| cpd | MIC |\n| --- | --- |\n| 8t | 0.03 |"
+    assert node._display_text(_result(small, rerank=0.1)) == small
+
+
+def test_tables_are_still_capped_so_one_page_cannot_eat_the_budget():
+    """Promoted, not exempt: the HIGH cap still bounds what a table can spend."""
+    node = ca.ContextAssemblyNode()
+    huge = _result("| a | b |\n" * 5000, rerank=0.1)
+    selected, used = node._apply_budget([], [huge], [], budget=ca._HIGH_CHARS)
+    assert selected == [huge]
+    assert used == ca._HIGH_CHARS
+
+
+def test_table_detection_needs_a_pipe_row_not_just_a_pipe():
+    node = ca.ContextAssemblyNode()
+    piped = "Use grep foo | wc -l to count. " * 60
+    assert len(node._display_text(_result(piped, rerank=0.1))) == ca._MEDIUM_CHARS

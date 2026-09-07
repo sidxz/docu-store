@@ -186,8 +186,17 @@ from infrastructure.chat.retrieval_accumulator import RetrievalAccumulator
 from infrastructure.config import settings
 
 
-def test_default_accumulator_budget_is_unchanged_for_the_shared_node():
-    """Deep Research must keep the exact behaviour it has today."""
+def test_accumulator_falls_back_to_a_gathering_budget_not_a_sending_one():
+    """An unbudgeted accumulator must not inherit the assembly budget.
+
+    The two were split so the retrieval loop would stop being cut off
+    mid-investigation, but only the call sites were updated -- the constructor
+    default still read chat_context_budget_chars, so a zero-arg accumulator
+    silently got the small one back. Both production call sites pass explicitly
+    (container.py:1031 internal docs, :1097 Literature), so this guards the
+    default rather than any live path, and Deep Research is unaffected either
+    way: it supplies its own budget.
+    """
     node = AgenticRetrievalNode(
         tool_llm=object(),
         tool_registry=object(),
@@ -195,9 +204,9 @@ def test_default_accumulator_budget_is_unchanged_for_the_shared_node():
     )
 
     assert node._accumulator_budget is None
-    assert RetrievalAccumulator(node._accumulator_budget)._budget == (
-        settings.chat_context_budget_chars
-    )
+    budget = RetrievalAccumulator(node._accumulator_budget)._budget
+    assert budget == settings.chat_accumulator_budget_chars
+    assert budget > settings.chat_context_budget_chars
 
 
 def test_literature_gets_a_budget_large_enough_to_iterate():

@@ -207,6 +207,18 @@ class Settings(BaseSettings):
         default=True,
         validation_alias="RERANKER_ENABLED",
     )
+    reranker_abstain_floor: float = Field(
+        default=0.05,
+        ge=0.0,
+        le=1.0,
+        validation_alias="RERANKER_ABSTAIN_FLOOR",
+        description=(
+            "If no candidate scores above this, the reranker returns the "
+            "first-stage order unscored instead of a ranking it has no signal "
+            "for. Calibrated to the model's score distribution -- retune when "
+            "changing RERANKER_MODEL_NAME. 0 disables abstention."
+        ),
+    )
 
     # Text Chunking
     chunk_size: int = Field(
@@ -463,7 +475,20 @@ class Settings(BaseSettings):
     chat_context_budget_chars: int = Field(
         default=12000,
         validation_alias="CHAT_CONTEXT_BUDGET_CHARS",
-        description="Max chars for assembled context in Thinking Mode (~3000 tokens).",
+        description=(
+            "Max chars of assembled context per turn. About 4,800 tokens, not the "
+            "'~3000' this once claimed: chemistry tables tokenize near 2.9 "
+            "chars/token, not the ~4 a prose estimate assumes. Shared by every "
+            "mode -- ContextAssemblyNode and LiteratureContextAssemblyNode both "
+            "read it -- so a raise is charged to Deep Research too, which is "
+            "almost all traffic. 16,000 was measured and reverted: once the "
+            "reranker sees build_chunk_context it selects the right sources "
+            "inside 12,000, and the extra 4,000 chars changed not one slide "
+            "across the ten hardest H8 questions. Raise it only against a "
+            "measurement taken WITH passage enrichment; the 14,000-16,000 knee "
+            "was measured without it. Splitting it per mode is the honest move "
+            "if internal-docs ever needs more, mirroring the accumulator split."
+        ),
     )
     chat_accumulator_budget_chars: int = Field(
         default=1_000_000,

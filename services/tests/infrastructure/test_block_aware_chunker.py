@@ -43,6 +43,7 @@ def test_chunk_payload_shape():
                    is_table=True, is_figure=False, caption="Table 1")
     p = chunk_payload(c)
     assert p == {
+        "chunk_text": "t",
         "block_type": "table", "is_table": True, "is_figure": False,
         "section_path": ["Results", "Assay"],
         "section_path_normalized": ["results", "assay"],

@@ -21,10 +21,17 @@ class RerankResult:
     no caller has to remember to do it, and so a score can be compared against a
     probability-shaped threshold or averaged with a cosine similarity. 0.0 is
     reserved as an "unscored" sentinel and is strictly below every real score.
+
+    ``score`` is ``None`` when the reranker abstained: no candidate cleared the
+    floor, so its ordering carries no signal and callers must fall back to the
+    first-stage similarity. Every consumer already spells that fallback
+    ``r.rerank_score if r.rerank_score is not None else r.similarity_score``, so
+    None routes through the path they already have. A near-zero float would not:
+    it reads as "scored, and terrible", which is a claim the model did not make.
     """
 
     id: str
-    score: float
+    score: float | None
     original_rank: int
 
 

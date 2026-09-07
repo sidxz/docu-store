@@ -82,8 +82,9 @@ class AgenticRetrievalNode:
         self._tool_llm = tool_llm
         self._tools = tool_registry
         self._prompts = prompt_repository
-        # None keeps RetrievalAccumulator's own default, which is
-        # settings.chat_context_budget_chars. Only Literature mode overrides it.
+        # None falls back to RetrievalAccumulator's own default, the *gathering*
+        # budget (settings.chat_accumulator_budget_chars). Both wirings pass this
+        # explicitly, so the fallback is a guard rather than a live path.
         self._accumulator_budget = accumulator_budget_chars
 
     async def run(

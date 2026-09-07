@@ -188,6 +188,9 @@ class IntelligentRetrievalNode:
             request,
             workspace_id=workspace_id,
             allowed_artifact_ids=allowed_artifact_ids,
+            # See SearchDocumentsTool: this path merges multiple sub-queries too,
+            # so the reranker must not cut the pool before the merge.
+            keep_full_rerank_pool=True,
         )
 
         if isinstance(result, Failure):

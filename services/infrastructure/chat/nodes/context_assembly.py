@@ -37,6 +37,39 @@ _MEDIUM_CHARS = 1000
 _LOW_CHARS = 200
 
 
+def _has_table(text: str) -> bool:
+    """Whether this page holds a table -- BlockAwareChunker emits markdown pipes.
+
+    Read off the text rather than the ``is_table`` payload field, for two
+    reasons. The payload is per *chunk* and grouped search returns only the
+    best-scoring chunk per page, so it answers "did a table chunk match?" while
+    what gets truncated here is the whole page: measured on the deck this was
+    written for, all three pages holding the answer tables came back with
+    ``is_table=False`` because a prose chunk outscored the table on each. And the
+    field is absent entirely on every point written before block-aware chunking,
+    which is most of the corpus until the backfill lands.
+    """
+    return any(line.lstrip().startswith("|") for line in text.split("\n"))
+
+
+def _clip(text: str, cap: int) -> str:
+    """Cut ``text`` to ``cap``, marking it so the model can tell it was cut.
+
+    The ellipsis is the whole point. A page cut mid-value hands the model
+    ``Rifampicin - CHEMBL374478 - 0.`` and nothing to say that is half a number:
+    the rows past the cut read as "no such measurement" rather than as elided,
+    which is the same reason structured tool output is exempt from the cap
+    entirely in :meth:`ContextAssemblyNode._display_text`. LOW has always marked
+    its truncation; MEDIUM and HIGH silently did not, and they are the tiers that
+    carry tables.
+
+    The marker fits *inside* the cap rather than extending it, so a cap stays a
+    cap and the budget arithmetic in _apply_budget -- which charges exactly what
+    this returns -- needs no allowance for it.
+    """
+    return f"{text[: cap - 3]}..." if len(text) > cap else text
+
+
 class ContextAssemblyNode:
     """Assemble retrieval results into tiered, hierarchical context."""
 
@@ -165,11 +198,16 @@ class ContextAssemblyNode:
             # it, and a page is never this.
             if r.query_source.startswith(("tool_bioactivity:", "tool_structure:")):
                 return r.expanded_text
-            return r.expanded_text[:_HIGH_CHARS]
+            return _clip(r.expanded_text, _HIGH_CHARS)
         if tier == "medium":
-            return r.matched_text[:_MEDIUM_CHARS]
-        text = r.expanded_text[:_LOW_CHARS]
-        return f"{text}..." if len(r.expanded_text) > _LOW_CHARS else text
+            # A page holding a table gets HIGH's cap. Same reason structured tool
+            # output is exempt above: rows past the cut read as "no such
+            # measurement" rather than as elided, and the rows are the answer.
+            # Still capped, not exempt, so the budget invariant survives -- 8
+            # pages in this corpus have a table and exceed 3000 characters.
+            cap = _HIGH_CHARS if _has_table(r.matched_text) else _MEDIUM_CHARS
+            return _clip(r.matched_text, cap)
+        return _clip(r.expanded_text, _LOW_CHARS)
 
     def _tier_results(
         self,

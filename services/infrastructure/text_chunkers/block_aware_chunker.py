@@ -112,9 +112,15 @@ def chunk_blocks(blocks: list[Block], *, max_chars: int = 1000) -> list[BlockChu
 
 def chunk_payload(c: BlockChunk) -> dict:
     """Qdrant per-chunk payload for a BlockChunk. Single source of truth for
-    the structure-signal keys — imported by both embed paths so they never drift.
+    the per-chunk keys — imported by both embed paths so they never drift.
+
+    ``chunk_text`` is the chunk's own text. Without it a reader that needs the
+    passage which actually matched (reranking, context assembly) has to refetch
+    the whole page from Mongo and take its first N characters — which on a dense
+    page is the title block, not the matched content.
     """
     payload: dict = {
+        "chunk_text": c.text,
         "block_type": c.block_type,
         "is_table": c.is_table,
         "is_figure": c.is_figure,
