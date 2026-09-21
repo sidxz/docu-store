@@ -20,6 +20,7 @@ from application.use_cases.search_use_cases import resolve_artifact_info
 from infrastructure.chat.models import RetrievalResult
 
 if TYPE_CHECKING:
+    from application.dtos.compound_dtos import BioactivityDTO
     from application.ports.compound_vector_store import CompoundVectorStore
     from application.ports.repositories.artifact_read_models import ArtifactReadModel
     from application.ports.repositories.page_read_models import PageReadModel
@@ -454,9 +455,14 @@ class SearchStructuredBioactivityTool:
         # stays blank exactly as before (the reducer never writes a per-bio
         # target, so the old bio_target was always "").
         bio_target = ""
+        def _assay_cell(b: BioactivityDTO) -> str:
+            # A table column headed "FP (µM)" names the assay and no endpoint.
+            if b.assay_type and b.assay:
+                return f"{b.assay_type} ({b.assay})"
+            return b.assay_type or b.assay or ""
+
         table_rows = [
-            f"| {compound} | {bio_target} | {b.assay_type}{f' ({b.assay})' if b.assay else ''}"
-            f" | {b.value} {b.unit or ''} |"
+            f"| {compound} | {bio_target} | {_assay_cell(b)} | {b.value} {b.unit or ''} |"
             for b in bios
         ]
         if table_rows:

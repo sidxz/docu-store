@@ -237,3 +237,22 @@ def test_a_merged_card_does_not_carry_the_placeholder_forward():
     alias_map = build_alias_map(tags)
 
     assert merge_compound_aliases(tags, alias_map)[0].additional_model_params["synonyms"] == "TAM16"
+
+
+def test_a_value_survives_without_an_endpoint_when_its_assay_names_one():
+    """A column headed "FP (µM)" states the assay and no endpoint, so NER writes
+    assay_type "None": the measurement is still real. A value with neither is not."""
+    tags = [
+        _compound("CHEMBL4464825", "27"),
+        _bio("2", "CHEMBL4464825", "None", "2", assay="FP"),
+        _bio("1.5", "CHEMBL4464825", "None", "1.5", assay="PPIase"),
+        _bio("9.9", "CHEMBL4464825", "None", "9.9"),
+    ]
+    rows = associate_bioactivities(tags, build_alias_map(tags))[0].additional_model_params[
+        "bioactivities"
+    ]
+
+    assert [(r.get("assay_type", ""), r["value"], r.get("assay")) for r in rows] == [
+        ("", "2", "FP"),
+        ("", "1.5", "PPIase"),
+    ]

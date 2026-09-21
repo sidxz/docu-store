@@ -15,7 +15,7 @@ export function BioactivityTable({ activities }: { activities: Bioactivity[] }) 
         <tbody>
           {activities.map((a, j) => (
             <tr key={j} className="border-b border-border-subtle last:border-0">
-              <td className="px-2 py-1.5 font-mono font-medium text-text-primary">{a.assay_type}</td>
+              <td className="px-2 py-1.5 font-mono font-medium text-text-primary">{a.assay_type || "—"}</td>
               <td className="px-2 py-1.5 text-text-primary">{a.assay ?? "—"}</td>
               <td className="px-2 py-1.5 font-mono text-text-primary">{a.value}{a.unit ? ` ${a.unit}` : ""}</td>
               <td className="px-2 py-1.5 text-text-muted">{a.raw_text}</td>

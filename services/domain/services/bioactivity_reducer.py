@@ -74,10 +74,17 @@ def associate_bioactivities(
         if idx is None:
             continue
 
+        # NER writes the same null placeholders here as in synonyms ("None") when a
+        # field is not stated, so a placeholder counts as absent.
         assay_type = (params.get("assay_type") or "").strip()
+        assay_type = assay_type if is_alias(assay_type) else ""
+        assay = (params.get("assay") or "").strip()
+        assay = assay if is_alias(assay) else ""
         value = (params.get("value") or "").strip()
-        # Skip bioactivities with missing assay type or value, as they are unlikely to be useful in this form
-        if not assay_type or not value:
+        # A value needs something to hang on: an endpoint, or the assay it was read in
+        # (a column headed "FP (µM)" names the assay and no endpoint). A bare number
+        # says nothing.
+        if not value or not (assay_type or assay):
             continue
 
         activity: dict = {
@@ -86,10 +93,7 @@ def associate_bioactivities(
             "unit": params.get("unit", ""),
             "raw_text": bio.tag,
         }
-        # The assay or cell line the value was measured in ("HepG2 MTT"). NER writes
-        # the same null placeholders here as in synonyms ("None") when none is stated.
-        assay = (params.get("assay") or "").strip()
-        if is_alias(assay):
+        if assay:
             activity["assay"] = assay
         # ponytail: structflo-ner strips footnote markers ('0.3*' -> '0.3'), so the
         # footnote's caveat (disputed, single determination, precipitated) is lost.
