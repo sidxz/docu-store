@@ -76,6 +76,8 @@ export interface Bioactivity {
   value: string;
   unit: string;
   raw_text: string;
+  /** Assay or cell line the value was measured in ("HepG2 MTT"); absent when NER found none. */
+  assay?: string | null;
 }
 
 export interface EmbeddingMetadata {

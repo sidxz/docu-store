@@ -10,6 +10,7 @@ class BioactivityDTO(BaseModel):
     value: str
     unit: str | None = None
     raw_text: str | None = None
+    assay: str | None = None
 
 
 class CompoundPageRefDTO(BaseModel):

@@ -71,6 +71,21 @@ def test_collect_dedupes_bioactivities_and_keeps_all_refs():
     assert refs[0].artifact_title == "Deck A"
 
 
+def test_collect_keeps_repeats_within_a_page_and_collapses_them_across_pages():
+    """One table's three '>20.0' cells are three measurements; a slide repeating one is not."""
+    aid = uuid4()
+    gt20 = {"assay_type": "CC50", "value": ">20.0", "unit": "µM", "raw_text": "x"}
+    q = _make(
+        {"compound_name": [str(aid)]},
+        pages=[
+            _page(uuid4(), 1, aid, [_tm("compound_name", "8t", bioactivities=[gt20, gt20, gt20])]),
+            _page(uuid4(), 2, aid, [_tm("compound_name", "8t", bioactivities=[gt20])]),
+        ],
+    )
+    bios, _, _ = asyncio.run(q.collect("8t", uuid4(), None))
+    assert len(bios) == 3
+
+
 def test_collect_target_intersection_narrows_artifacts():
     a, b = uuid4(), uuid4()
     pages = [

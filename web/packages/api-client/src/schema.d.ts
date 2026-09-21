@@ -2193,6 +2193,8 @@ export interface components {
             unit?: string | null;
             /** Raw Text */
             raw_text?: string | null;
+            /** Assay */
+            assay?: string | null;
         };
         /** Body_upload_blob_artifacts_upload_post */
         Body_upload_blob_artifacts_upload_post: {

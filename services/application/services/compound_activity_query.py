@@ -21,7 +21,7 @@ from uuid import UUID
 import structlog
 
 from application.dtos.compound_dtos import BioactivityDTO, CompoundPageRefDTO
-from domain.services.compound_alias_resolver import synonyms_of
+from domain.services.compound_alias_resolver import synonyms_of, union_bioactivities
 
 if TYPE_CHECKING:
     from application.ports.repositories.artifact_read_models import ArtifactReadModel
@@ -99,8 +99,7 @@ class CompoundActivityQuery:
 
         pages = await self._pages.get_pages_by_artifact_ids(matched_uuids, workspace_id=workspace_id)
 
-        seen: set[tuple[str, str, str]] = set()
-        bioactivities: list[BioactivityDTO] = []
+        activity_lists: list[list[dict]] = []
         synonyms: set[str] = set()
         refs: list[CompoundPageRefDTO] = []
         lname = name.lower()
@@ -115,19 +114,7 @@ class CompoundActivityQuery:
                 ):
                     page_has = True
                     params = tm.additional_model_params or {}
-                    for bio in params.get("bioactivities") or []:
-                        key = (bio.get("assay_type", ""), bio.get("value", ""), bio.get("unit", ""))
-                        if key in seen:
-                            continue
-                        seen.add(key)
-                        bioactivities.append(
-                            BioactivityDTO(
-                                assay_type=bio.get("assay_type", ""),
-                                value=bio.get("value", ""),
-                                unit=bio.get("unit") or None,
-                                raw_text=bio.get("raw_text") or None,
-                            ),
-                        )
+                    activity_lists.append(params.get("bioactivities") or [])
                     syn = params.get("synonyms")
                     if isinstance(syn, str) and syn.strip():
                         synonyms.update(s.strip() for s in syn.split(",") if s.strip())
@@ -140,4 +127,14 @@ class CompoundActivityQuery:
                         artifact_title=titles.get(str(page.artifact_id)),
                     ),
                 )
+        bioactivities = [
+            BioactivityDTO(
+                assay_type=bio.get("assay_type", ""),
+                value=bio.get("value", ""),
+                unit=bio.get("unit") or None,
+                raw_text=bio.get("raw_text") or None,
+                assay=bio.get("assay") or None,
+            )
+            for bio in union_bioactivities(activity_lists)
+        ]
         return bioactivities, sorted(synonyms), refs

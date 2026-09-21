@@ -8,7 +8,7 @@ TagMention and discards orphan bioactivities.
 
 from __future__ import annotations
 
-from domain.services.compound_alias_resolver import build_alias_map, normalize
+from domain.services.compound_alias_resolver import build_alias_map, is_alias, normalize
 from domain.value_objects.tag_mention import TagMention
 
 
@@ -21,7 +21,7 @@ def associate_bioactivities(
     Algorithm
     ---------
     1. Partition tags into compounds, bioactivities, and others.
-    2. Index compounds by normalised tag name (first occurrence wins).
+    2. Index compounds by alias-resolved name (first occurrence wins).
     3. For each bioactivity whose ``additional_model_params["compound_name"]``
        matches a compound — through ``alias_map``, so a row citing "TAM16" lands
        on the compound that declared TAM16 as its synonym — build a structured
@@ -54,12 +54,12 @@ def associate_bioactivities(
     if not bioactivities:
         return list(tag_mentions)  # nothing to reduce; return a copy for safety
 
-    # Index compounds by normalised name (first occurrence wins on duplicates)
+    # Index compounds by resolved identity (first occurrence wins), so an activity
+    # still lands when the canonical name never appears as a mention of its own.
     compound_index: dict[str, int] = {}
     for i, c in enumerate(compounds):
         key = normalize(c.tag)
-        if key not in compound_index:
-            compound_index[key] = i
+        compound_index.setdefault(alias_map.get(key, key), i)
 
     # Collect structured activities per compound index
     activities_per_compound: dict[int, list[dict]] = {}
@@ -86,6 +86,16 @@ def associate_bioactivities(
             "unit": params.get("unit", ""),
             "raw_text": bio.tag,
         }
+        # The assay or cell line the value was measured in ("HepG2 MTT"). NER writes
+        # the same null placeholders here as in synonyms ("None") when none is stated.
+        assay = (params.get("assay") or "").strip()
+        if is_alias(assay):
+            activity["assay"] = assay
+        # ponytail: structflo-ner strips footnote markers ('0.3*' -> '0.3'), so the
+        # footnote's caveat (disputed, single determination, precipitated) is lost.
+        # Upgrade: a `note` attribute in structflo-ner holding the resolved footnote
+        # text, passed through here like `assay` (not in the dedupe key) and shown as
+        # a tooltip on the value in BioactivityTable.
         activities_per_compound.setdefault(idx, []).append(activity)
 
     # Build enriched compound TagMentions

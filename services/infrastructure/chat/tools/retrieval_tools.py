@@ -455,7 +455,8 @@ class SearchStructuredBioactivityTool:
         # target, so the old bio_target was always "").
         bio_target = ""
         table_rows = [
-            f"| {compound} | {bio_target} | {b.assay_type} | {b.value} {b.unit or ''} |"
+            f"| {compound} | {bio_target} | {b.assay_type}{f' ({b.assay})' if b.assay else ''}"
+            f" | {b.value} {b.unit or ''} |"
             for b in bios
         ]
         if table_rows:

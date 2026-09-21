@@ -1036,7 +1036,7 @@ requires-dist = [
     { name = "returns", specifier = ">=0.26.0" },
     { name = "sentence-transformers", specifier = ">=3.3.0" },
     { name = "structflo-cser", specifier = ">=1.0.1" },
-    { name = "structflo-ner", specifier = ">=0.5.0" },
+    { name = "structflo-ner", specifier = ">=0.6.0" },
     { name = "structlog", specifier = ">=25.5.0" },
     { name = "temporalio", specifier = ">=1.3.0" },
     { name = "torch", specifier = ">=2.5.0" },
@@ -5418,16 +5418,16 @@ wheels = [
 
 [[package]]
 name = "structflo-ner"
-version = "0.5.0"
+version = "0.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "langextract" },
     { name = "pyyaml" },
     { name = "rapidfuzz" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4e/fb/6adc6d400329eb745ac75afbf3cdbb9d2bd51cad5ccb0b68351179b8e889/structflo_ner-0.5.0.tar.gz", hash = "sha256:9cd098287674cae05075dfa93fbcf8d329ead1fb7f3a08224658ab4fda7cf55e", size = 2698525, upload-time = "2026-08-30T00:53:34.29Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0f/b1/8bf6a26bf7299b436922c333909e8192e9addfd6c0118656545d67e29fef/structflo_ner-0.6.0.tar.gz", hash = "sha256:2d2568f1f76dab26db691dc713c45f3936268a0dbb5eca3800f1f1dc71747ef6", size = 2701402, upload-time = "2026-09-21T20:15:55.445Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c1/ad/8bedc8f22b66a638548d56f0d59e1cda44fa07d23159c7bf5c10b083994c/structflo_ner-0.5.0-py3-none-any.whl", hash = "sha256:e421e605c0024ad0d300587e8538640cd4b89f5e7985c05b5760ce4432252faa", size = 260596, upload-time = "2026-08-30T00:53:32.944Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/4f/b4f38198bca1c807f894b76f66251714e85e7e71e779602386e3e6893387/structflo_ner-0.6.0-py3-none-any.whl", hash = "sha256:1b7762b52b21df7e46a756aec734a960eb170f6d3589a7a8065f51773b1f6e39", size = 262463, upload-time = "2026-09-21T20:15:53.566Z" },
 ]
 
 [[package]]

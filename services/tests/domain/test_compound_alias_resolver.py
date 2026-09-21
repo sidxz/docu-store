@@ -8,6 +8,7 @@ from domain.services.compound_alias_resolver import (
     build_alias_map,
     is_publishable_alias,
     merge_compound_aliases,
+    normalize,
 )
 from domain.services.tag_mention_aggregator import aggregate_tag_mentions
 from domain.value_objects.tag_mention import TagMention
@@ -33,16 +34,24 @@ def _compound(tag: str, synonyms: str | None = None, confidence: float = 0.9):
     )
 
 
-def _bio(raw: str, compound: str, assay: str, value: str, unit: str = "µM"):
+def _bio(
+    raw: str,
+    compound: str,
+    endpoint: str,
+    value: str,
+    unit: str = "µM",
+    assay: str | None = None,
+):
     return _tm(
         raw,
         "bioactivity",
         {
             "compound_name": compound,
-            "assay_type": assay,
+            "assay_type": endpoint,
             "value": value,
             "unit": unit,
-        },
+        }
+        | ({"assay": assay} if assay else {}),
     )
 
 
@@ -160,6 +169,67 @@ def test_an_ambiguous_alias_does_not_poison_the_unambiguous_ones():
     ]
 
     assert build_alias_map(tags) == {"410a": "cmx410"}
+
+
+def test_a_deck_label_yields_to_any_other_name():
+    """NER declares the registry ID or partner code as the synonym of the table's label."""
+    for label, name in [
+        ("8d", "CHEMBL6133834"),
+        ("7a", "SACC-3060"),
+        ("12", "ChemBridge 5102345"),
+        ("Compound 9b", "Bedaquiline"),
+    ]:
+        tags = [_compound(label, name), _compound(name)]
+
+        assert build_alias_map(tags) == {normalize(label): normalize(name)}
+
+
+def test_between_two_real_names_ners_primary_still_wins():
+    tags = [_compound("Bedaquiline", "CHEMBL376140"), _compound("CHEMBL376140")]
+
+    assert build_alias_map(tags) == {"chembl376140": "bedaquiline"}
+
+
+def test_card_takes_the_canonical_name_even_without_a_mention_of_its_own():
+    """The registry ID only ever appeared as '8d's synonym; the card and its row still land."""
+    tags = [_compound("8d", "CHEMBL6133834"), _bio("CC50 of 15.3 µM", "8d", "CC50", "15.3")]
+    alias_map = build_alias_map(tags)
+    merged = merge_compound_aliases(associate_bioactivities(tags, alias_map), alias_map)
+
+    assert merged[0].tag == "CHEMBL6133834"
+    assert merged[0].additional_model_params["synonyms"] == "8d"
+    assert len(merged[0].additional_model_params["bioactivities"]) == 1
+
+
+def test_a_value_repeated_across_assays_is_not_collapsed():
+    """8t reads >20.0 in three of four cytotoxicity assays, and NER types all four CC50."""
+    tags = [
+        _compound("8t", "CHEMBL6153006"),
+        _compound("CHEMBL6153006"),
+        *[_bio("CC50 of >20.0 µM", "8t", "CC50", ">20.0") for _ in range(3)],
+        _bio("CC50 of 11.8 µM", "8t", "CC50", "11.8"),
+    ]
+    alias_map = build_alias_map(tags)
+    merged = merge_compound_aliases(associate_bioactivities(tags, alias_map), alias_map)
+
+    assert len(merged[0].additional_model_params["bioactivities"]) == 4
+
+
+def test_the_assay_rides_along_and_tells_equal_values_apart():
+    """8t reads >20.0 on two slides, in different assays: two measurements, not one."""
+
+    def page(assay: str) -> list[TagMention]:
+        return [_compound("8t"), _bio(">20.0", "8t", "CC50", ">20.0", assay=assay)]
+
+    pages = [
+        (uuid4(), 0, associate_bioactivities(page("HepG2 MTT"))),
+        (uuid4(), 1, associate_bioactivities(page("Vero NR"))),
+    ]
+    activities = aggregate_tag_mentions(pages)[0].additional_model_params["bioactivities"]
+
+    assert [a["assay"] for a in activities] == ["HepG2 MTT", "Vero NR"]
+    unstated = associate_bioactivities(page("None"))[0].additional_model_params
+    assert "assay" not in unstated["bioactivities"][0]
 
 
 def test_a_merged_card_does_not_carry_the_placeholder_forward():
