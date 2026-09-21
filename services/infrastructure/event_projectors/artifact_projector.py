@@ -102,6 +102,9 @@ class ArtifactProjector:
             fields={"tag_mentions": tag_mentions_data},
             tags=tags,
             tracking=tracking,  # type: ignore[arg-type]
+            # Every dictionary type but the two the projections below own, so an
+            # entity type that vanished from the new tags is cleared too.
+            other_entity_types=("author", "date"),
         )
 
     def author_mentions_updated(self, event: object, tracking: object) -> None:

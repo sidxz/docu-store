@@ -14,7 +14,11 @@ from uuid import UUID
 import structlog
 
 from application.dtos.parsed_document import Block, ParsedDocument
-from application.use_cases.page_payload import build_page_payload
+from application.use_cases.page_payload import (
+    artifact_tag_normalized,
+    build_page_payload,
+    filter_names,
+)
 from infrastructure.text_chunkers.block_aware_chunker import (
     chunk_blocks,
     chunk_payload,
@@ -377,6 +381,8 @@ class BatchReEmbedSummariesUseCase:
                             if page.tag_mentions
                             else None
                         ),
+                        artifact_tags=artifact_tag_normalized(artifact) or None,
+                        tag_normalized=filter_names(page.tag_mentions) or None,
                     )
                     page_summary_count += 1
 
@@ -400,6 +406,8 @@ class BatchReEmbedSummariesUseCase:
                     if artifact.tag_mentions
                     else None
                 ),
+                artifact_tags=artifact_tag_normalized(artifact) or None,
+                tag_normalized=filter_names(artifact.tag_mentions) or None,
             )
             artifact_summary_embedded = True
 

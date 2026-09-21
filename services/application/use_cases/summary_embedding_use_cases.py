@@ -10,7 +10,7 @@ from application.ports.embedding_generator import EmbeddingGenerator
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_repository import PageRepository
 from application.ports.summary_vector_store import SummaryVectorStore
-from application.use_cases.page_payload import artifact_tag_normalized
+from application.use_cases.page_payload import artifact_tag_normalized, filter_names
 from domain.exceptions import AggregateNotFoundError
 
 logger = structlog.get_logger()
@@ -81,6 +81,7 @@ class EmbedPageSummaryUseCase:
                     else None
                 ),
                 artifact_tags=artifact_tag_normalized(artifact) or None,
+                tag_normalized=filter_names(page.tag_mentions) or None,
             )
 
             logger.info(
@@ -153,6 +154,7 @@ class EmbedArtifactSummaryUseCase:
                     else None
                 ),
                 artifact_tags=artifact_tag_normalized(artifact) or None,
+                tag_normalized=filter_names(artifact.tag_mentions) or None,
             )
 
             logger.info(

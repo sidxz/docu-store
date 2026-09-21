@@ -5,6 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from eventsourcing.persistence import Tracking
 
 
@@ -99,12 +101,15 @@ class ReadModelMaterializer(Protocol):
         fields: dict[str, Any],
         tags: list[dict[str, str]],
         tracking: Tracking,
+        *,
+        other_entity_types: Sequence[str] | None = None,
     ) -> None:
         """Upsert artifact read model AND replace tag dictionary entries atomically.
 
         Both operations share a single transaction and tracking record,
         preventing the IntegrityError that occurs when they use separate
-        transactions with the same tracking ID.
+        transactions with the same tracking ID. ``other_entity_types``: the write
+        owns every entity type except these; without it, only those in ``tags``.
         """
         ...
 

@@ -9,6 +9,8 @@ import structlog
 from pymongo import MongoClient
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from eventsourcing.persistence import Tracking
     from pymongo.collection import Collection
     from pymongo.database import Database
@@ -226,8 +228,15 @@ class MongoReadModelMaterializer(MongoReadModelTracking):
         fields: dict[str, Any],
         tags: list[dict[str, str]],
         tracking: Tracking,
+        *,
+        other_entity_types: Sequence[str] | None = None,
     ) -> None:
-        """Upsert artifact read model AND replace tag dictionary in one transaction."""
+        """Upsert artifact read model AND replace tag dictionary in one transaction.
+
+        ``other_entity_types``: the write owns every entity type except these, so a
+        type that vanished from ``tags`` is cleared as well. Without it the write
+        owns only the types present in ``tags``.
+        """
         fields["artifact_id"] = artifact_id
         fields["updated_at"] = datetime.now(UTC)
 
@@ -238,7 +247,9 @@ class MongoReadModelMaterializer(MongoReadModelTracking):
                 upsert=True,
                 session=session,
             )
-            self._replace_tags_in_session(artifact_id, tags, session)
+            self._replace_tags_in_session(
+                artifact_id, tags, session, other_entity_types=other_entity_types
+            )
 
         self._run_in_transaction(tracking, _handler)
         logger.info(
@@ -253,6 +264,7 @@ class MongoReadModelMaterializer(MongoReadModelTracking):
         artifact_id: str,
         tags: list[dict[str, str]],
         session: object,
+        other_entity_types: Sequence[str] | None = None,
     ) -> None:
         """Core tag dictionary replacement logic, reusable within any session."""
         # Look up workspace_id from artifact read model
@@ -263,22 +275,25 @@ class MongoReadModelMaterializer(MongoReadModelTracking):
         )
         workspace_id = artifact.get("workspace_id") if artifact else None
 
-        # 1. Pull this artifact from tag entries with matching entity_types
-        # (scoped so that e.g. author updates don't wipe tag_mentions)
-        entity_types_in_batch = list({t["entity_type"] for t in tags}) if tags else []
-        if entity_types_in_batch:
-            self.tag_dictionary.update_many(
-                {
-                    "artifact_ids": artifact_id,
-                    "entity_type": {"$in": entity_types_in_batch},
-                },
-                {"$pull": {"artifact_ids": artifact_id}},
-                session=session,
-            )
+        # 1. Pull this artifact from the entries this write owns. The NER tag write owns
+        # every type but ``other_entity_types``, so a type that vanished from the batch
+        # (a deck whose only accession number was a false positive) is cleared too.
+        # Other writes own the types they carry; an empty batch owns everything.
+        if other_entity_types is not None:
+            owned: dict = {"entity_type": {"$nin": list(other_entity_types)}}
+        elif tags:
+            owned = {"entity_type": {"$in": list({t["entity_type"] for t in tags})}}
         else:
-            # Empty tags = remove this artifact from ALL entries (cleanup)
+            owned = {}
+        pulled = [
+            d["_id"]
+            for d in self.tag_dictionary.find(
+                {"artifact_ids": artifact_id, **owned}, {"_id": 1}, session=session
+            )
+        ]
+        if pulled:
             self.tag_dictionary.update_many(
-                {"artifact_ids": artifact_id},
+                {"_id": {"$in": pulled}},
                 {"$pull": {"artifact_ids": artifact_id}},
                 session=session,
             )
@@ -301,12 +316,11 @@ class MongoReadModelMaterializer(MongoReadModelTracking):
                 session=session,
             )
 
-        # 3. Recompute artifact_count on affected docs
-        recount_filter: dict = (
-            {"artifact_ids": artifact_id} if tags else {"workspace_id": workspace_id}
-        )
+        # 3. Recompute artifact_count on every entry this write touched: the ones the
+        # artifact was pulled from as well as the ones it was added to. Recounting only
+        # the latter left pulled entries with a stale count that step 4 never deleted.
         self.tag_dictionary.update_many(
-            recount_filter,
+            {"$or": [{"_id": {"$in": pulled}}, {"artifact_ids": artifact_id}]},
             [{"$set": {"artifact_count": {"$size": {"$ifNull": ["$artifact_ids", []]}}}}],
             session=session,
         )

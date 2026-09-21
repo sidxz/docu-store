@@ -54,6 +54,7 @@ class SummaryVectorStore(Protocol):
         tags: list[str] | None = None,
         entity_types: list[str] | None = None,
         artifact_tags: list[str] | None = None,
+        tag_normalized: list[str] | None = None,
     ) -> None:
         """Store or update a page summary embedding.
 
@@ -72,6 +73,7 @@ class SummaryVectorStore(Protocol):
         tags: list[str] | None = None,
         entity_types: list[str] | None = None,
         artifact_tags: list[str] | None = None,
+        tag_normalized: list[str] | None = None,
     ) -> None:
         """Store or update an artifact summary embedding.
 
