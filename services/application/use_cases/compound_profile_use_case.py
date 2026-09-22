@@ -51,14 +51,20 @@ class GetCompoundProfileUseCase:
         )
         # CSER labels a structure with what the page prints under it, often the deck's
         # own label ('8l') while the card is named by its registry ID. A label means
-        # nothing outside its deck, so the fallback only looks where this compound is.
+        # nothing outside the deck that used it -- deck B's '12' is deck A's unrelated
+        # compound 12 -- so each name is looked up only in the deck it was read in.
         if not structures and refs:
-            decks = list(dict.fromkeys(r.artifact_id for r in refs))
-            for label in synonyms:
+            lookups = dict.fromkeys(
+                (r.artifact_id, label)
+                for r in refs
+                for label in r.labels
+                if label.lower() != name.lower()
+            )
+            for deck, label in lookups:
                 structures = await self._compounds.get_compounds_by_extracted_id(
                     extracted_id=label,
                     workspace_id=workspace_id,
-                    allowed_artifact_ids=decks,
+                    allowed_artifact_ids=[deck],
                 )
                 if structures:
                     break

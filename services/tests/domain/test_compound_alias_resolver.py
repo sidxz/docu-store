@@ -167,6 +167,20 @@ def test_an_alias_two_compounds_both_claim_merges_nothing():
     assert build_alias_map(tags) == {}
 
 
+def test_a_deck_label_two_compounds_share_merges_nothing():
+    """A stereochemistry table prints one label per row: DECK-PMC7127666 s6 gives '16i' to
+    both (1S,2S) CHEMBL3310931 and (1R,2S) CHEMBL3310945, two compounds with their own
+    values. A contested label is no more document-scoped than any other contested alias,
+    so it merges nothing -- at the cost of leaving one compound written two ways split."""
+    tags = [
+        _compound("CHEMBL3310931", "16i"),
+        _compound("CHEMBL3310945", "16i"),
+        _compound("16i"),
+    ]
+
+    assert build_alias_map(tags) == {}
+
+
 def test_an_ambiguous_alias_does_not_poison_the_unambiguous_ones():
     tags = [
         _compound("CMX410", "hit, 410a"),

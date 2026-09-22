@@ -111,7 +111,11 @@ def build_alias_map(
             edges.append((alias, canonical))
             claimants[alias].add(canonical)
 
-    # An alias two different compounds both claim identifies neither of them.
+    # An alias two different compounds both claim identifies neither of them. This holds
+    # for the deck's own labels too: a stereochemistry table prints one label per row
+    # ('16i' for both (1S,2S) CHEMBL3310931 and (1R,2S) CHEMBL3310945), so trusting a
+    # contested label as document-scoped would fuse two compounds. The cost is a compound
+    # written as two IDs on two slides staying split into a card per name.
     edges = [(alias, canonical) for alias, canonical in edges if len(claimants[alias]) == 1]
     declared: Counter[str] = Counter(canonical for _, canonical in edges)
 

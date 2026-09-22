@@ -121,6 +121,47 @@ def test_profile_acl_filters_out_non_allowed_artifacts():
     assert dto.reference_pages == []
 
 
+def test_profile_never_takes_a_structure_from_a_deck_that_labels_it_otherwise():
+    """Deck B calls CHEMBL6109008 '12'; deck A calls it '8l' and separately draws an
+    unrelated compound as '12'. Pooling both decks' labels and trying each against every
+    deck put deck A's compound 12 on this profile. A label belongs to the deck that used it."""
+    deck_a, deck_b = uuid4(), uuid4()
+
+    class ByDeck:
+        def __init__(self):
+            self.calls = []
+
+        async def get_compounds_by_extracted_id(self, extracted_id, workspace_id, allowed_artifact_ids):
+            decks = list(allowed_artifact_ids or [])
+            self.calls.append((extracted_id, decks))
+            if extracted_id == "12" and deck_a in decks:  # deck A's unrelated compound 12
+                return [SimpleNamespace(canonical_smiles="CCN", smiles="CCN", extracted_id="12")]
+            if extracted_id == "8l" and deck_a in decks:
+                return [SimpleNamespace(canonical_smiles="CCO", smiles="CCO", extracted_id="8l")]
+            if extracted_id == "12" and deck_b in decks:
+                return [SimpleNamespace(canonical_smiles="CCO", smiles="CCO", extracted_id="12")]
+            return []
+
+    store = ByDeck()
+    pages = [
+        _page(uuid4(), 5, deck_a, [_tm("compound_name", "CHEMBL6109008", synonyms="8l")]),
+        _page(uuid4(), 2, deck_b, [_tm("compound_name", "CHEMBL6109008", synonyms="12")]),
+    ]
+    uc = GetCompoundProfileUseCase(
+        activity_query=CompoundActivityQuery(
+            tag_dictionary=FakeTagDict([str(deck_a), str(deck_b)]),
+            page_read_model=FakePages(pages),
+            artifact_read_model=FakeArtifacts(),
+        ),
+        compound_vector_store=store,
+    )
+    dto = asyncio.run(uc.execute("CHEMBL6109008", uuid4(), None))
+
+    assert dto.canonical_smiles == "CCO", "deck A's compound 12 is not this compound"
+    assert ("12", [deck_a]) not in store.calls
+    assert ("12", [deck_a, deck_b]) not in store.calls
+
+
 def test_profile_finds_the_structure_under_a_synonym_in_its_own_deck():
     """The card is CHEMBL6109008; CSER labelled the drawing with the deck's '8l'.
     Every deck has an 8l, so the synonym is only looked up where this compound is."""

@@ -21,7 +21,7 @@ from uuid import UUID
 import structlog
 
 from application.dtos.compound_dtos import BioactivityDTO, CompoundPageRefDTO
-from domain.services.compound_alias_resolver import synonyms_of, union_bioactivities
+from domain.services.compound_alias_resolver import is_alias, synonyms_of, union_bioactivities
 
 if TYPE_CHECKING:
     from application.ports.repositories.artifact_read_models import ArtifactReadModel
@@ -110,6 +110,7 @@ class CompoundActivityQuery:
         lname = name.lower()
         for page in pages:
             page_has = False
+            page_labels: list[str] = []
             for tm in page.tag_mentions:
                 # Match the alias too: an aliased compound merges into one mention
                 # under its canonical name, and callers still ask by either name.
@@ -128,9 +129,12 @@ class CompoundActivityQuery:
                     }
                     rows = params.get("bioactivities") or []
                     activity_lists.append([bio | page_of for bio in rows])
-                    syn = params.get("synonyms")
-                    if isinstance(syn, str) and syn.strip():
-                        synonyms.update(s.strip() for s in syn.split(",") if s.strip())
+                    # Keep each name with the page that used it: a caller looking a label
+                    # up in another deck finds whatever that deck calls '8l'.
+                    for label in [tm.tag, *synonyms_of(tm)]:
+                        if is_alias(label) and label not in page_labels:
+                            page_labels.append(label)
+                    synonyms.update(s.strip() for s in synonyms_of(tm) if is_alias(s))
             if page_has:
                 refs.append(
                     CompoundPageRefDTO(
@@ -138,6 +142,7 @@ class CompoundActivityQuery:
                         page_index=page.index,
                         artifact_id=page.artifact_id,
                         artifact_title=titles.get(str(page.artifact_id)),
+                        labels=page_labels,
                     ),
                 )
         bioactivities = [

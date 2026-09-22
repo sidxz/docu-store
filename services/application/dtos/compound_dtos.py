@@ -27,6 +27,9 @@ class CompoundPageRefDTO(BaseModel):
     page_index: int
     artifact_id: UUID
     artifact_title: str | None = None
+    # Every name this page's card goes by. A label is the deck's own ('8l'), so looking
+    # one up anywhere else finds whatever that deck happens to call 8l.
+    labels: list[str] = []
 
 
 class CompoundProfileDTO(BaseModel):
