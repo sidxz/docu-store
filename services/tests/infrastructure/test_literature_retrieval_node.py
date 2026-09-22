@@ -181,6 +181,45 @@ async def test_results_beyond_the_rerank_cap_are_kept_and_sort_last():
     assert ranked[0].rerank_score > 0.0
 
 
+async def test_abstained_hits_are_kept_and_sort_last():
+    """The reranker abstains with score=None; that must not reach assembly.
+
+    Measured live: 28 of 54 candidates abstained, the bottom-of-list None hit the
+    `:.3f` in the log line and raised, and had it not, every abstain would have
+    fallen back to similarity_score (a hardcoded 1.0) and outranked the 26 the
+    model did score.
+    """
+
+    class _AbstainingReranker:
+        model_name = "fake"
+
+        def rerank(self, query, documents, top_k=None):  # noqa: ANN001, ANN201, ARG002
+            return [
+                RerankResult(
+                    id=d.id,
+                    score=_sigmoid(1.23) if "inhibitor" in d.text else None,
+                    original_rank=i,
+                )
+                for i, d in enumerate(documents)
+            ]
+
+    node = LiteratureRetrievalNode.__new__(LiteratureRetrievalNode)
+    node._reranker = _AbstainingReranker()
+
+    results = [
+        _result("geese", "INHA and clutch length in Zi Geese"),
+        _result("inha", "direct InhA inhibitor against tuberculosis"),
+        _result("preec", "INHA as a biomarker in preeclampsia"),
+    ]
+
+    ranked = await node._rescore("InhA inhibitors", results)
+
+    assert all(r.rerank_score is not None for r in ranked), "None would fall back to 1.0"
+    assert ranked[0].artifact_title == "inha"
+    assert [r.artifact_title for r in ranked[1:]] == ["geese", "preec"], "Europe PMC order"
+    assert all(r.rerank_score == 0.0 for r in ranked[1:])
+
+
 from infrastructure.chat.nodes.agentic_retrieval import AgenticRetrievalNode
 from infrastructure.chat.retrieval_accumulator import RetrievalAccumulator
 from infrastructure.config import settings

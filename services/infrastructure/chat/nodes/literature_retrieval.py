@@ -110,8 +110,14 @@ class LiteratureRetrievalNode(AgenticRetrievalNode):
         scored = await asyncio.to_thread(self._reranker.rerank, question, docs)
         by_index = {int(s.id): s.score for s in scored}
 
+        # The reranker abstains with score=None below its floor. That sentinel
+        # gets the same 0.0 treatment as the over-cap tail below, for the same
+        # reason: a None here falls back to similarity_score, a hardcoded 1.0 on
+        # this surface, which would rank every abstain above every scored hit.
+        # The sort is stable, so abstains keep Europe PMC order behind the
+        # scored ones -- the fallback ordering the reranker documents.
         ranked = [
-            r.model_copy(update={"rerank_score": by_index[i]})
+            r.model_copy(update={"rerank_score": by_index[i] or 0.0})
             for i, r in enumerate(candidates)
             if i in by_index
         ]
