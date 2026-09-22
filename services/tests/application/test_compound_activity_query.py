@@ -143,6 +143,38 @@ def test_collect_target_intersection_narrows_artifacts():
     assert [r.artifact_id for r in refs_t] == [a]
 
 
+def test_collect_keeps_every_document_when_the_target_tags_none_of_them():
+    """Decks spell a target differently: one tags "sEH", another "soluble epoxide
+    hydrolase". Narrowing to the other spelling's decks left none of the compound's, so
+    the tool reported no data for a compound with two rows."""
+    a, other = uuid4(), uuid4()
+    pages = [_page(uuid4(), 1, a, [_tm("compound_name", "CHEMBL3402237",
+                                       bioactivities=[{"value": "320", "unit": "nM", "target": "sEH"}])])]
+    by_type = {"compound_name": [str(a)], "target": [str(other)]}
+    bios, _, refs = asyncio.run(
+        _make(by_type, pages).collect("CHEMBL3402237", uuid4(), None, target="soluble epoxide hydrolase"),
+    )
+    assert [(b.value, b.target) for b in bios] == [("320", "sEH")]
+    assert [r.artifact_id for r in refs] == [a]
+
+
+def test_collect_target_fallback_only_counts_accessible_documents():
+    """Narrowing is decided on what the caller may see: a tagged deck the caller cannot
+    open must not empty the result when an accessible deck holds the compound."""
+    tagged, open_deck = uuid4(), uuid4()
+    pages = [
+        _page(uuid4(), 1, tagged, [_tm("compound_name", "CMX410", bioactivities=[{"assay_type": "MIC", "value": "1"}])]),
+        _page(uuid4(), 2, open_deck, [_tm("compound_name", "CMX410", bioactivities=[{"assay_type": "IC50", "value": "9"}])]),
+    ]
+    by_type = {"compound_name": [str(tagged), str(open_deck)], "target": [str(tagged)]}
+    bios, _, refs = asyncio.run(_make(by_type, pages).collect("CMX410", uuid4(), [open_deck], target="PknB"))
+    assert [b.assay_type for b in bios] == ["IC50"]
+    assert [r.artifact_id for r in refs] == [open_deck]
+    # Fail closed still: no accessible artifacts means nothing, target or not
+    bios, _, refs = asyncio.run(_make(by_type, pages).collect("CMX410", uuid4(), [], target="PknB"))
+    assert (bios, refs) == ([], [])
+
+
 def test_collect_target_gene_name_fallback():
     a, b = uuid4(), uuid4()
     pages = [

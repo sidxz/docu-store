@@ -153,6 +153,40 @@ def test_tool_says_a_target_narrows_documents_not_rows():
     assert "narrows" not in summary
 
 
+class FakeTagDictByType:
+    def __init__(self, by_type):
+        self._by_type = by_type
+
+    async def get_artifact_ids_for_tag(self, tag, entity_type, workspace_id):
+        return self._by_type.get(entity_type, [])
+
+
+def test_tool_says_when_no_document_with_the_compound_is_tagged_with_the_target():
+    """The target matched another deck's spelling ("soluble epoxide hydrolase" vs this
+    deck's "sEH"), so it narrowed nothing. The rows come back, and the note must not claim
+    the documents were narrowed: it says none is tagged, and to read each row's Target."""
+    aid, other = uuid4(), uuid4()
+    pages = [_page(aid, [_tm("compound_name", "CHEMBL3402237", bioactivities=[
+        {"value": "320", "unit": "nM", "target": "sEH"},
+    ])])]
+    activity = CompoundActivityQuery(
+        tag_dictionary=FakeTagDictByType({"compound_name": [str(aid)], "target": [str(other)]}),
+        page_read_model=FakePages(pages),
+        artifact_read_model=FakeArtifacts(),
+    )
+    tool = SearchStructuredBioactivityTool(activity_query=activity, artifact_read_model=None)
+
+    results, summary, _ = asyncio.run(tool.execute(
+        {"compound_name": "CHEMBL3402237", "target_name": "soluble epoxide hydrolase"}, uuid4(), None,
+    ))
+    text = results[0].expanded_text
+    assert "| CHEMBL3402237 | sEH |" in text
+    assert "None of the documents with 'CHEMBL3402237' is tagged 'soluble epoxide hydrolase'" in text
+    assert "narrows" not in text
+    assert "'soluble epoxide hydrolase'" in summary
+    assert "narrows" not in summary
+
+
 def test_tool_no_data_returns_empty_and_message():
     tool = _tool(uuid4(), pages=[])  # tag dict returns an id but no pages match → no refs
     results, summary, events = asyncio.run(

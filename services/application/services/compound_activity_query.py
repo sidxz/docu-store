@@ -35,8 +35,8 @@ class CompoundActivityQuery:
     """Assembles a compound's structured bioactivities, synonyms, and page refs.
 
     ACL-filtered. The optional ``target`` narrows the artifact set to those also
-    tagged with that target/gene name (chat-tool behavior); when ``target`` is
-    None the intersection is skipped (profile behavior).
+    tagged with that target/gene name (chat-tool behavior), unless none of them is;
+    when ``target`` is None the intersection is skipped (profile behavior).
     """
 
     def __init__(
@@ -48,6 +48,17 @@ class CompoundActivityQuery:
         self._tag_dict = tag_dictionary
         self._pages = page_read_model
         self._artifacts = artifact_read_model
+
+    async def documents_tagged(self, target: str, workspace_id: UUID) -> set[str]:
+        """Artifact ids tagged with ``target`` as a target, else as a gene name."""
+        ids = await self._tag_dict.get_artifact_ids_for_tag(
+            target, entity_type="target", workspace_id=workspace_id,
+        )
+        if not ids:
+            ids = await self._tag_dict.get_artifact_ids_for_tag(
+                target, entity_type="gene_name", workspace_id=workspace_id,
+            )
+        return set(ids or [])
 
     async def collect(
         self,
@@ -63,23 +74,17 @@ class CompoundActivityQuery:
             return [], [], []
         matched = set(artifact_ids)
 
-        # Optional target intersection — chat-tool behavior; skipped for profile.
-        if target:
-            target_ids = await self._tag_dict.get_artifact_ids_for_tag(
-                target, entity_type="target", workspace_id=workspace_id,
-            )
-            if not target_ids:
-                # Fallback: try gene_name
-                target_ids = await self._tag_dict.get_artifact_ids_for_tag(
-                    target, entity_type="gene_name", workspace_id=workspace_id,
-                )
-            if target_ids:
-                matched &= set(target_ids)
-
         # Fail closed: an empty allowed list means "no accessible artifacts", not
         # "no filter" — match the `is not None` gate every vector/read store uses.
         if allowed_artifact_ids is not None:
             matched &= {str(a) for a in allowed_artifact_ids}
+
+        # Optional target intersection — chat-tool behavior; skipped for profile. Only
+        # when it leaves a document: decks spell one target differently ("sEH", "soluble
+        # epoxide hydrolase"), so an empty intersection would report no data for a
+        # compound that has rows. Each row names its own target; the tool says which.
+        if target:
+            matched = (matched & await self.documents_tagged(target, workspace_id)) or matched
         if not matched:
             return [], [], []
         matched_uuids = [UUID(a) for a in matched]

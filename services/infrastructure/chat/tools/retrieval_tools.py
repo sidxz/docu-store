@@ -446,13 +446,7 @@ class SearchStructuredBioactivityTool:
         )
 
         if not refs:
-            return (
-                [],
-                f"No accessible documents with compound '{compound}'"
-                + (f" and target '{target}'" if target else "")
-                + ".",
-                [],
-            )
+            return [], f"No accessible documents with compound '{compound}'.", []
 
         def _assay_cell(b: BioactivityDTO) -> str:
             # A table column headed "FP (µM)" names the assay and no endpoint.
@@ -473,13 +467,23 @@ class SearchStructuredBioactivityTool:
         # The target narrows the documents searched, never the rows: a row carries the
         # target and strain NER read, not normalised names, so matching the query to rows
         # by name would drop H37Rv rows from an "Mtb" query. The rows say what each was
-        # measured against instead, and the model reads them.
-        note = (
-            f"\n\nFilter '{target}' narrows which documents are searched, not which rows "
-            "are shown: each row's Target, Strain and Assay say what it was measured against."
-            if target
-            else ""
-        )
+        # measured against instead, and the model reads them. It narrows nothing when no
+        # document holding the compound carries the tag (another deck's spelling, or a name
+        # never tagged as a target), and the note must not say it did.
+        tagged = await self._activity.documents_tagged(target, workspace_id) if target else set()
+        narrowed = any(str(r.artifact_id) in tagged for r in refs)
+        if not target:
+            note = ""
+        elif narrowed:
+            note = (
+                f"\n\nFilter '{target}' narrows which documents are searched, not which rows "
+                "are shown: each row's Target, Strain and Assay say what it was measured against."
+            )
+        else:
+            note = (
+                f"\n\nNone of the documents with '{compound}' is tagged '{target}', so these are "
+                f"all of its rows: check each row's Target, Strain and Assay against '{target}'."
+            )
 
         # One table per document, so each value is cited to the deck it was read in and
         # not to whichever deck came first; the document header names the deck, the Page
@@ -549,7 +553,11 @@ class SearchStructuredBioactivityTool:
             f"Bioactivity search for '{compound}': {len(bios)} data points from {n_docs} documents."
         )
         if target:
-            summary += f" Target '{target}' narrows documents, not rows."
+            summary += (
+                f" Target '{target}' narrows documents, not rows."
+                if narrowed
+                else f" No document with it is tagged '{target}'; all its rows are shown."
+            )
         return results, summary, []
 
 
