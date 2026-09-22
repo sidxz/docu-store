@@ -133,32 +133,35 @@ def chunk_payload(c: BlockChunk) -> dict:
 
 
 def scope_table_entities(
-    candidates: list[tuple[str, str | None]],
+    candidates: list[tuple[str, str | None, list[str]]],
     local_text: str,
 ) -> dict:
     """Scope a table chunk's entity tags to entities that actually appear in the
     table's own local text (caption / section / headers / cells), instead of the
-    page-wide NER union. A candidate is kept only if its surface form occurs in
-    local_text on a word boundary (case-insensitive) — so 'rho' does not match
-    'rhodamine'. Returns {tags, tag_normalized, entity_types}; empty lists when
-    nothing matches (precision over recall: a wrong target tag pollutes chat, a
-    missing one degrades to doc-level + vector match). Pure: no IO, no models.
+    page-wide NER union. A candidate is ``(display tag, entity_type, every lowercased
+    name it goes by)`` and is kept when *any* of those names occurs in local_text on a
+    word boundary (case-insensitive) — so 'rho' does not match 'rhodamine', and a card
+    named CHEMBL6133834 is still found in a table that prints only its deck label '8d'.
+    Every name of a kept candidate lands in tag_normalized, the field filters match.
+    Returns {tags, tag_normalized, entity_types}; empty lists when nothing matches
+    (precision over recall: a wrong target tag pollutes chat, a missing one degrades to
+    doc-level + vector match). Pure: no IO, no models.
     """
     low = local_text.lower()
     tags: list[str] = []
     tag_normalized: list[str] = []
     entity_types: set[str] = set()
     seen: set[str] = set()
-    for tag, entity_type in candidates:
+    for tag, entity_type, names in candidates:
         norm = tag.lower()
         if not norm:
             continue
-        if not re.search(r"\b" + re.escape(norm) + r"\b", low):
+        if not any(n and re.search(r"\b" + re.escape(n) + r"\b", low) for n in names):
             continue
         if norm not in seen:
             seen.add(norm)
             tags.append(tag)
-            tag_normalized.append(norm)
+            tag_normalized.extend(n for n in names if n not in tag_normalized)
         if entity_type:
             entity_types.add(entity_type)
     return {

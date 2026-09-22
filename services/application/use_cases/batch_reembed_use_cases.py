@@ -18,6 +18,7 @@ from application.use_cases.page_payload import (
     artifact_tag_normalized,
     build_page_payload,
     filter_names,
+    table_scope_candidates,
 )
 from infrastructure.text_chunkers.block_aware_chunker import (
     chunk_blocks,
@@ -189,7 +190,7 @@ class BatchReEmbedArtifactPagesUseCase:
                     # union (build_page_payload) so a table isn't matched by an
                     # unrelated target mentioned elsewhere on the page.
                     if page.tag_mentions:
-                        candidates = [(tm.tag, tm.entity_type) for tm in page.tag_mentions]
+                        candidates = table_scope_candidates(page.tag_mentions)
                         for idx, bc in enumerate(bchunks):
                             if bc.is_table:
                                 local = bc.text + " " + " ".join(bc.section_path)

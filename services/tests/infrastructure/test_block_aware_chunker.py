@@ -5,7 +5,7 @@ from infrastructure.text_chunkers.block_aware_chunker import (
 
 
 def test_scope_keeps_local_entity_drops_remote():
-    candidates = [("PptT", "target"), ("Rho", "target"), ("CmpdX", "compound_name")]
+    candidates = [("PptT", "target", ["pptt"]), ("Rho", "target", ["rho"]), ("CmpdX", "compound_name", ["cmpdx"])]
     local = "| Cmpd | IC50 |\n| CmpdX | 5 nM |\n\n*Table 1. PptT inhibition*"
     out = scope_table_entities(candidates, local)
     assert out["tag_normalized"] == ["pptt", "cmpdx"]   # PptT (caption) + CmpdX (cell)
@@ -13,28 +13,40 @@ def test_scope_keeps_local_entity_drops_remote():
     assert out["entity_types"] == ["compound_name", "target"]
 
 
+def test_scope_matches_a_compound_by_the_name_the_table_prints():
+    """The card is named by its registry ID; the table prints the deck label. Matching the
+    display tag alone left the table holding the values with no compound tag at all, and
+    that empty list overrides the page-wide one."""
+    candidates = [("CHEMBL6133834", "compound_name", ["chembl6133834", "8d"])]
+    out = scope_table_entities(candidates, "| Cmpd | IC50 |\n| 8d | 0.5 |")
+    assert out["tags"] == ["CHEMBL6133834"]
+    # Either name finds the table: filters match tag_normalized, never the display tag.
+    assert out["tag_normalized"] == ["chembl6133834", "8d"]
+    assert out["entity_types"] == ["compound_name"]
+
+
 def test_scope_word_boundary_not_substring():
-    out = scope_table_entities([("Rho", "target")], "rhodamine staining only")
+    out = scope_table_entities([("Rho", "target", ["rho"])], "rhodamine staining only")
     assert out["tag_normalized"] == []                   # 'rho' must not match 'rhodamine'
 
 
 def test_scope_section_heading_contributes():
     # local_text = table markdown + " " + " ".join(section_path)
     local = "| Cmpd | IC50 |\n| CmpdX | 5 nM | Rho inhibitors"
-    out = scope_table_entities([("Rho", "target")], local)
+    out = scope_table_entities([("Rho", "target", ["rho"])], local)
     assert out["tag_normalized"] == ["rho"]
 
 
 def test_scope_empty_when_no_local_match():
     out = scope_table_entities(
-        [("PptT", "target"), ("Rho", "target")],
+        [("PptT", "target", ["pptt"]), ("Rho", "target", ["rho"])],
         "| Cmpd | IC50 |\n| CmpdX | 5 nM |",
     )
     assert out == {"tags": [], "tag_normalized": [], "entity_types": []}
 
 
 def test_scope_ignores_blank_candidate():
-    out = scope_table_entities([("", "target")], "anything here")
+    out = scope_table_entities([("", "target", [""])], "anything here")
     assert out["tag_normalized"] == []                   # blank tag never matches
 
 

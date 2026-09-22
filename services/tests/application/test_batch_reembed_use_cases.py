@@ -99,6 +99,46 @@ async def test_batch_reembed_scopes_table_tags():
 
 
 @pytest.mark.asyncio
+async def test_batch_reembed_table_keeps_the_compound_under_every_name():
+    """A table printing only the deck label must still carry its compound. The card is
+    named CHEMBL6133834 now, so matching display tags alone dropped the tag entirely."""
+    artifact_repo, page_repo = MockArtifactRepository(), MockPageRepository()
+    artifact = Artifact.create(
+        source_uri="https://example.com/paper.pdf",
+        source_filename="paper.pdf",
+        artifact_type=ArtifactType.RESEARCH_ARTICLE,
+        mime_type=MimeType.PDF,
+        storage_location="artifacts/x/source.pdf",
+    )
+    page = Page.create(name="P1", artifact_id=artifact.id, index=0)
+    page.update_text_mention(TextMention(text="8d is CHEMBL6133834; InhA assay below."))
+    page.update_tag_mentions([
+        TagMention(tag="CHEMBL6133834", entity_type="compound_name",
+                   additional_model_params={"synonyms": "8d"}),
+        TagMention(tag="InhA", entity_type="target"),
+    ])
+    artifact.add_pages([page.id])
+    artifact_repo.artifacts[artifact.id] = artifact
+    page_repo.pages[page.id] = page
+
+    blocks = [
+        Block(type="table", rows=[["Cmpd", "IC50"], ["8d", "0.5 nM"]],
+              caption="Table 1. InhA inhibition", section_path=["Results"],
+              source_page_index=0),
+    ]
+    vs = MockVectorStore()
+    uc = BatchReEmbedArtifactPagesUseCase(
+        artifact_repository=artifact_repo, page_repository=page_repo,
+        embedding_generator=MockEmbeddingGenerator(), vector_store=vs,
+        text_chunker=MockTextChunker(), blob_store=_IRBlobStore(artifact.id, blocks),
+    )
+    assert (await uc.execute(artifact.id))["status"] == "success"
+    table_meta = next(m for m in vs.upsert_chunk_calls[-1]["chunk_metadata"] if m.get("is_table"))
+    assert "chembl6133834" in table_meta["tag_normalized"]
+    assert "8d" in table_meta["tag_normalized"]
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "source_class",
     [SourceClass.INTERNAL, SourceClass.LITERATURE_OA],

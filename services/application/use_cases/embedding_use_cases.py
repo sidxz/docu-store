@@ -24,7 +24,7 @@ from application.ports.reranker import RerankDocument, Reranker
 from application.ports.sparse_embedding_generator import SparseEmbeddingGenerator
 from application.ports.text_chunker import TextChunker
 from application.ports.vector_store import VectorStore
-from application.use_cases.page_payload import build_page_payload
+from application.use_cases.page_payload import build_page_payload, table_scope_candidates
 from domain.exceptions import AggregateNotFoundError
 from domain.value_objects.embedding_metadata import EmbeddingMetadata, EmbeddingType
 from domain.value_objects.source_class import SourceClass
@@ -210,7 +210,7 @@ class GeneratePageEmbeddingUseCase:
                 # (upsert_metadata below) so a table isn't matched by an unrelated
                 # target mentioned elsewhere on the page.
                 if page.tag_mentions:
-                    candidates = [(tm.tag, tm.entity_type) for tm in page.tag_mentions]
+                    candidates = table_scope_candidates(page.tag_mentions)
                     for idx, bc in enumerate(block_chunks):
                         if bc.is_table:
                             local = bc.text + " " + " ".join(bc.section_path)

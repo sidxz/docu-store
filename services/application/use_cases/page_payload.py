@@ -36,6 +36,17 @@ def filter_names(tag_mentions: Iterable[TagMention] | None) -> list[str]:
     return list(dict.fromkeys(names))
 
 
+def table_scope_candidates(
+    tag_mentions: Iterable[TagMention] | None,
+) -> list[tuple[str, str | None, list[str]]]:
+    """Candidates for ``scope_table_entities``: each tag, its type, and every name it
+    goes by. A table prints the deck label ("8d") while its card is named by the registry
+    ID, so matching the display tag alone left the table holding the values untagged —
+    and a table chunk's tags override the page-wide ones.
+    """
+    return [(tm.tag, tm.entity_type, filter_names([tm])) for tm in tag_mentions or []]
+
+
 def artifact_tag_normalized(artifact: Artifact | None) -> list[str]:
     """Lowercased artifact-level tags: aggregated tags, authors, publication year.
 
