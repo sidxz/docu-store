@@ -69,6 +69,27 @@ def test_collect_dedupes_bioactivities_and_keeps_all_refs():
     assert syn == ["bar", "foo"]
     assert len(refs) == 2  # both pages referenced, bio deduped to one
     assert refs[0].artifact_title == "Deck A"
+    assert bios[0].page_index == 1  # a repeat keeps the page it was first seen on
+
+
+def test_collect_keeps_each_values_strain_and_page():
+    """A value remembers what it was measured against and the slide it came from, so
+    chat can say "EV71" and cite that deck -- not whichever deck came first."""
+    deck_a, deck_b, page_a, page_b = uuid4(), uuid4(), uuid4(), uuid4()
+    ev71 = {"assay_type": "IC50", "value": "13.3", "unit": "µM", "assay": "Vero", "strain": "EV71"}
+    vsv = {"assay_type": "EC50", "value": "17", "unit": "µM", "assay": "HeLa", "strain": "VSV"}
+    q = _make(
+        {"compound_name": [str(deck_a), str(deck_b)]},
+        pages=[
+            _page(page_a, 11, deck_a, [_tm("compound_name", "CHEMBL1643", bioactivities=[ev71])]),
+            _page(page_b, 7, deck_b, [_tm("compound_name", "CHEMBL1643", bioactivities=[vsv])]),
+        ],
+    )
+    bios, _, _ = asyncio.run(q.collect("CHEMBL1643", uuid4(), None))
+    assert [(x.strain, x.artifact_id, x.page_id, x.page_index) for x in bios] == [
+        ("EV71", deck_a, page_a, 11),
+        ("VSV", deck_b, page_b, 7),
+    ]
 
 
 def test_collect_keeps_repeats_within_a_page_and_collapses_them_across_pages():

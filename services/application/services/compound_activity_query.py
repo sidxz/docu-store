@@ -114,7 +114,15 @@ class CompoundActivityQuery:
                 ):
                     page_has = True
                     params = tm.additional_model_params or {}
-                    activity_lists.append(params.get("bioactivities") or [])
+                    # Stamp each row with its page before the union, so the row it keeps
+                    # still says where it was read. The union's key ignores these fields.
+                    page_of = {
+                        "artifact_id": page.artifact_id,
+                        "page_id": page.page_id,
+                        "page_index": page.index,
+                    }
+                    rows = params.get("bioactivities") or []
+                    activity_lists.append([bio | page_of for bio in rows])
                     syn = params.get("synonyms")
                     if isinstance(syn, str) and syn.strip():
                         synonyms.update(s.strip() for s in syn.split(",") if s.strip())
@@ -134,6 +142,10 @@ class CompoundActivityQuery:
                 unit=bio.get("unit") or None,
                 raw_text=bio.get("raw_text") or None,
                 assay=bio.get("assay") or None,
+                strain=bio.get("strain") or None,
+                artifact_id=bio["artifact_id"],
+                page_id=bio["page_id"],
+                page_index=bio["page_index"],
             )
             for bio in union_bioactivities(activity_lists)
         ]

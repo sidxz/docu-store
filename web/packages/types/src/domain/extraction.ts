@@ -78,6 +78,8 @@ export interface Bioactivity {
   raw_text: string;
   /** Assay or cell line the value was measured in ("HepG2 MTT"); absent when NER found none. */
   assay?: string | null;
+  /** Organism or strain it was measured against ("EV71", "H37Rv"); absent when none was stated. */
+  strain?: string | null;
 }
 
 export interface EmbeddingMetadata {

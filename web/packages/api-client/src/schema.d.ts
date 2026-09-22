@@ -548,6 +548,13 @@ export interface paths {
         /**
          * List Conversations
          * @description List conversations for the current user. Pass ``folder_id`` for a folder view.
+         *
+         *     ``surface`` keeps the two chat surfaces apart: Deep Research and Literature
+         *     share a store but not a history, since a question asked of the corpus and one
+         *     asked of the literature are not the same kind of thing to come back to.
+         *     Omitting ``surface`` returns every surface -- that is what a folder view
+         *     wants, since a folder is an explicit bucket the user dragged things into
+         *     and must show everything filed there, not just one surface's slice of it.
          */
         get: operations["list_conversations_chat_get"];
         put?: never;
@@ -881,6 +888,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/literature/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Literature
+         * @description Search Europe PMC. Reads nothing from this workspace and writes nothing.
+         */
+        get: operations["search_literature_literature_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/literature/ingest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ingest Literature
+         * @description Fetch one open-licensed paper into the corpus.
+         *
+         *     Gated exactly as an upload is -- it produces the same artifact and spends the
+         *     same parse, NER, CSER and embedding budget, so it answers to the same quota.
+         *
+         *     Returns:
+         *         201 Created: ingested, parse running
+         *         403 Forbidden: the licence does not permit keeping it
+         *         404 Not Found: no such record, or the feature is off
+         *         409 Conflict: already in this workspace
+         */
+        post: operations["ingest_literature_literature_ingest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pages/{page_id}": {
         parameters: {
             query?: never;
@@ -1008,6 +1064,39 @@ export interface paths {
          * @description Add compound_mentions to an existing page.
          */
         post: operations["update_compound_mentions_pages__page_id__compound_mentions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pages/{page_id}/compounds/analyze-box": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Analyze Compound Box
+         * @description hiledit: read a hand-drawn box pair on the page's CSER render.
+         *
+         *     The annotator draws the boxes; the models read the chemistry. A structure
+         *     box is run through OCSR (DECIMER) for its SMILES, a label box through OCR
+         *     for its printed caption. Either side may come back null — that means the
+         *     model could not read the crop, not that the request failed. Coordinates are
+         *     pixels of the stored CSER render; 404 if that render does not exist.
+         *
+         *     DO NOT "optimise away" the both-boxes-null case: it is a deliberate warm-up
+         *     the client fires when the user opens edit mode. It loads the OCSR (DECIMER)
+         *     and OCR models — ~2 min in a cold process, near-instant once warm — by
+         *     running them over a throwaway blank image, so that cost lands while the user
+         *     is still drawing instead of on their first Analyse. Synchronous on purpose:
+         *     once warm a real call is ~2.3 s, far below workflow overhead.
+         */
+        post: operations["analyze_compound_box_pages__page_id__compounds_analyze_box_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1598,6 +1687,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/user/terms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Terms Status
+         * @description Whether this caller still has to accept the current Terms/Privacy version.
+         */
+        get: operations["get_terms_status_user_terms_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/user/terms/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Terms
+         * @description Record acceptance. The client echoes the version it displayed, so a tab
+         *     left open across a terms change cannot record assent to text never shown.
+         */
+        post: operations["accept_terms_user_terms_accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/user/preferences": {
         parameters: {
             query?: never;
@@ -1717,20 +1847,59 @@ export interface paths {
         };
         /**
          * Get Llm Provider
-         * @description The caller's provider (never the key) plus presets for the settings UI.
+         * @description Every provider the caller has configured (never a key), plus form presets.
          */
         get: operations["get_llm_provider_user_llm_provider_get"];
-        /** Set Llm Provider */
+        /**
+         * Set Llm Provider
+         * @description Add or update one provider. With a key it becomes active; other providers are kept.
+         */
         put: operations["set_llm_provider_user_llm_provider_put"];
         post?: never;
-        /** Delete Llm Provider */
-        delete: operations["delete_llm_provider_user_llm_provider_delete"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/user/llm-provider/test": {
+    "/user/llm-provider/{provider}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Activate Llm Provider
+         * @description Switch which stored provider everything runs on. One click back, too.
+         */
+        post: operations["activate_llm_provider_user_llm_provider__provider__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/user/llm-provider/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Llm Provider */
+        delete: operations["delete_llm_provider_user_llm_provider__provider__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/user/llm-provider/{provider}/test": {
         parameters: {
             query?: never;
             header?: never;
@@ -1741,9 +1910,14 @@ export interface paths {
         put?: never;
         /**
          * Probe Llm Provider
-         * @description Probe the *stored* config — one tiny completion per distinct lane model.
+         * @description Probe one stored provider — active or not, so it can be tried before switching.
+         *
+         *     Models may be overridden per request. Testing is how you find out whether a
+         *     model works, so requiring it to be saved first would have the order backwards:
+         *     you would have to commit to a model to learn it was the wrong one. The key is
+         *     never part of the request; only the stored one is ever used.
          */
-        post: operations["probe_llm_provider_user_llm_provider_test_post"];
+        post: operations["probe_llm_provider_user_llm_provider__provider__test_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1906,6 +2080,15 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AcceptTermsRequest
+         * @description The version the client is agreeing to — echoed back so a stale tab
+         *     cannot silently record acceptance of terms the user never saw.
+         */
+        AcceptTermsRequest: {
+            /** Version */
+            version: string;
+        };
         /** ActiveWorkflow */
         ActiveWorkflow: {
             /** Workflow Type */
@@ -1968,6 +2151,32 @@ export interface components {
             grounding_is_grounded?: boolean | null;
             /** Grounding Confidence */
             grounding_confidence?: number | null;
+        };
+        /**
+         * AnalyzeCompoundBoxRequest
+         * @description Human-drawn boxes to read, in pixels of the page's CSER render.
+         */
+        AnalyzeCompoundBoxRequest: {
+            /**
+             * Structure Bbox
+             * @description [x1, y1, x2, y2] to read a SMILES from; omit to skip OCSR.
+             */
+            structure_bbox?: number[] | null;
+            /**
+             * Label Bbox
+             * @description [x1, y1, x2, y2] to read caption text from; omit to skip OCR.
+             */
+            label_bbox?: number[] | null;
+        };
+        /**
+         * AnalyzeCompoundBoxResponse
+         * @description What the models read. Null means 'not asked' or 'could not read'.
+         */
+        AnalyzeCompoundBoxResponse: {
+            /** Smiles */
+            smiles?: string | null;
+            /** Label Text */
+            label_text?: string | null;
         };
         /**
          * ArtifactBrowseItemDTO
@@ -2195,6 +2404,14 @@ export interface components {
             raw_text?: string | null;
             /** Assay */
             assay?: string | null;
+            /** Strain */
+            strain?: string | null;
+            /** Artifact Id */
+            artifact_id?: string | null;
+            /** Page Id */
+            page_id?: string | null;
+            /** Page Index */
+            page_index?: number | null;
         };
         /** Body_upload_blob_artifacts_upload_post */
         Body_upload_blob_artifacts_upload_post: {
@@ -2255,6 +2472,54 @@ export interface components {
             workflow_ids: string[];
             /** Targets */
             targets?: ("text" | "smiles" | "summaries")[];
+        };
+        /**
+         * ChartSeriesDTO
+         * @description One line, bar group or point cloud. ``points`` are (x, y) pairs.
+         *
+         *     x is a year for the time panels and a category index for the categorical
+         *     ones, so a single shape covers every panel and the renderer needs one
+         *     switch rather than six.
+         */
+        ChartSeriesDTO: {
+            /** Name */
+            name: string;
+            /** Points */
+            points: [
+                number,
+                number
+            ][];
+            /** Labels */
+            labels?: string[] | null;
+        };
+        /**
+         * ChartSpecDTO
+         * @description A chart the tool computed. No value here originates in model output.
+         */
+        ChartSpecDTO: {
+            /**
+             * Panel
+             * @enum {string}
+             */
+            panel: "timeline" | "evidence_mix" | "landmarks" | "stance";
+            /** Title */
+            title: string;
+            /** X Label */
+            x_label: string;
+            /** Y Label */
+            y_label: string;
+            /** Series */
+            series: components["schemas"]["ChartSeriesDTO"][];
+            /** Categories */
+            categories?: string[] | null;
+            /** Partial X */
+            partial_x?: number | null;
+            /** Footnote */
+            footnote?: string | null;
+            /** Notes */
+            notes?: string[] | null;
+            /** Source Query */
+            source_query?: string | null;
         };
         /**
          * ChatFolderDTO
@@ -2332,12 +2597,28 @@ export interface components {
             agent_trace?: components["schemas"]["AgentTraceDTO"] | null;
             token_usage?: components["schemas"]["TokenUsageDTO"] | null;
             query_context?: components["schemas"]["QueryContextDTO"] | null;
+            /** Literature Results */
+            literature_results?: {
+                [key: string]: unknown;
+            }[] | null;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
         };
+        /**
+         * ChatSurface
+         * @description Which chat surface a conversation belongs to.
+         *
+         *     Distinct from the pipeline ``mode``, which is chosen per message and can
+         *     change within a conversation. A conversation's surface is fixed at creation:
+         *     it decides which sidebar the conversation appears in and which corpus its
+         *     questions are answered from, and those are not things a follow-up should be
+         *     able to switch.
+         * @enum {string}
+         */
+        ChatSurface: "research" | "literature";
         /**
          * ChunkHit
          * @description A matching raw text chunk from page_embeddings.
@@ -2698,7 +2979,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "text" | "table" | "molecule" | "citation_list" | "source_card";
+            type: "text" | "table" | "molecule" | "citation_list" | "source_card" | "chart";
             /** Content */
             content?: string | null;
             /** Headers */
@@ -2717,6 +2998,7 @@ export interface components {
             artifact_id?: string | null;
             /** Bioactivities */
             bioactivities?: components["schemas"]["BioactivityDTO"][] | null;
+            chart?: components["schemas"]["ChartSpecDTO"] | null;
         };
         /**
          * ConversationDTO
@@ -2764,6 +3046,8 @@ export interface components {
              * @default false
              */
             is_archived: boolean;
+            /** @default research */
+            surface: components["schemas"]["ChatSurface"];
         };
         /**
          * ConversationDetailDTO
@@ -2811,6 +3095,8 @@ export interface components {
              * @default false
              */
             is_archived: boolean;
+            /** @default research */
+            surface: components["schemas"]["ChatSurface"];
             /** Messages */
             messages?: components["schemas"]["ChatMessageDTO"][];
             /**
@@ -2917,6 +3203,8 @@ export interface components {
         CreateConversationRequest: {
             /** Title */
             title?: string | null;
+            /** @default research */
+            surface: components["schemas"]["ChatSurface"];
         };
         /**
          * CreateFolderRequest
@@ -3164,6 +3452,28 @@ export interface components {
             corrected_at: string;
         };
         /**
+         * IngestLiteratureRequest
+         * @description Identity only. Everything the decision turns on is re-read server-side.
+         */
+        IngestLiteratureRequest: {
+            /**
+             * Source
+             * @description Europe PMC source, e.g. MED, PMC, PPR
+             */
+            source: string;
+            /**
+             * External Id
+             * @description Europe PMC record id
+             */
+            external_id: string;
+            /**
+             * Visibility
+             * @description Private to the requester, or shared with the workspace
+             * @default private
+             */
+            visibility: string;
+        };
+        /**
          * KindUsage
          * @description Aggregated usage for one (member, kind) cell.
          */
@@ -3221,6 +3531,24 @@ export interface components {
             /** Detail */
             detail?: string | null;
         };
+        /**
+         * LLMProviderEntry
+         * @description One configured provider. Exactly one of a caller's entries is ``active``.
+         */
+        LLMProviderEntry: {
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Chat Model */
+            chat_model: string;
+            /** Key Last4 */
+            key_last4: string;
+            /** Active */
+            active: boolean;
+            /** Updated At */
+            updated_at?: string | null;
+        };
         /** LLMProviderPreset */
         LLMProviderPreset: {
             /** Model */
@@ -3248,25 +3576,42 @@ export interface components {
         };
         /**
          * LLMProviderResponse
-         * @description GET /user/llm-provider — the key is write-only; only its last 4 are shown.
+         * @description GET /user/llm-provider — keys are write-only; only their last 4 are shown.
          */
         LLMProviderResponse: {
             /** Enabled */
             enabled: boolean;
             /** Configured */
             configured: boolean;
-            /** Provider */
-            provider?: string | null;
-            /** Key Last4 */
-            key_last4?: string | null;
-            /** Model */
-            model?: string | null;
-            /** Chat Model */
-            chat_model?: string | null;
+            /**
+             * Providers
+             * @default []
+             */
+            providers: components["schemas"]["LLMProviderEntry"][];
             /** Presets */
             presets: {
                 [key: string]: components["schemas"]["LLMProviderPreset"];
             };
+            /**
+             * Suggestions
+             * @default {}
+             */
+            suggestions: {
+                [key: string]: string[];
+            };
+        };
+        /**
+         * LLMProviderTestRequest
+         * @description Optional model overrides for a probe, so the settings form can test what is
+         *     typed rather than what is stored. The key is never sent — it stays in storage.
+         *     Blank or omitted fields resolve exactly as ``PUT`` resolves them, so a green
+         *     test is a statement about the save that would follow it.
+         */
+        LLMProviderTestRequest: {
+            /** Model */
+            model?: string | null;
+            /** Chat Model */
+            chat_model?: string | null;
         };
         /** LLMProviderTestResponse */
         LLMProviderTestResponse: {
@@ -3276,6 +3621,63 @@ export interface components {
             lanes: {
                 [key: string]: components["schemas"]["LLMLaneTestResult"];
             };
+        };
+        /**
+         * LiteratureHitResponse
+         * @description One search result, carrying its own verdict on whether it may be kept.
+         */
+        LiteratureHitResponse: {
+            /** External Id */
+            external_id: string;
+            /** Source */
+            source: string;
+            /** Title */
+            title: string;
+            /** Doi */
+            doi?: string | null;
+            /** Pmid */
+            pmid?: string | null;
+            /** Pmcid */
+            pmcid?: string | null;
+            /** Abstract */
+            abstract?: string | null;
+            /** Journal */
+            journal?: string | null;
+            /** Year */
+            year?: number | null;
+            /** Authors */
+            authors?: string | null;
+            /** Licence */
+            licence?: string | null;
+            /**
+             * Is Open Access
+             * @default false
+             */
+            is_open_access: boolean;
+            /** Url */
+            url: string;
+            /**
+             * Is Ingestable
+             * @description Whether this workspace may take a copy. Decided from the licence.
+             */
+            is_ingestable: boolean;
+            /**
+             * Ingest Blocker
+             * @description Why not, in words meant for a reader. None when ingestable.
+             */
+            ingest_blocker?: string | null;
+            /**
+             * Is Retracted
+             * @default false
+             */
+            is_retracted: boolean;
+            /** Retraction Notice */
+            retraction_notice?: string | null;
+            /**
+             * Cited By Count
+             * @default 0
+             */
+            cited_by_count: number;
         };
         /**
          * MemberTokenUsage
@@ -3562,6 +3964,8 @@ export interface components {
              * @default false
              */
             is_archived: boolean;
+            /** @default research */
+            surface: components["schemas"]["ChatSurface"];
             /** Last Answer Snippet */
             last_answer_snippet?: string | null;
             /** Entities */
@@ -3841,9 +4245,9 @@ export interface components {
             message: string;
             /**
              * Mode
-             * @description Pipeline mode. 'quick' = 4-step, 'thinking' = 5-stage, 'deep_thinking' = thinking + page images. None = server default.
+             * @description Pipeline mode. 'quick' = 4-step, 'thinking' = 5-stage, 'deep_thinking' = thinking + page images, 'literature' = published papers rather than this corpus. None = server default.
              */
-            mode?: ("quick" | "thinking" | "deep_thinking") | null;
+            mode?: ("quick" | "thinking" | "deep_thinking" | "literature") | null;
             /**
              * Reasoning
              * @description Per-lane reasoning override; absent lanes use the server default.
@@ -3851,6 +4255,12 @@ export interface components {
             reasoning?: {
                 [key: string]: "off" | "low" | "medium" | "high";
             } | null;
+            /**
+             * Stats
+             * @description Compute chart panels for this answer. Off by default: each panel costs extra Europe PMC requests, and stance costs a model call.
+             * @default false
+             */
+            stats: boolean;
         };
         /** ServiceStatus */
         ServiceStatus: {
@@ -3948,6 +4358,13 @@ export interface components {
             similarity_score?: number | null;
             /** Citation Index */
             citation_index: number;
+            /**
+             * Source Type
+             * @default document
+             */
+            source_type: string;
+            /** External Url */
+            external_url?: string | null;
         };
         /**
          * StepLatencyStats
@@ -4328,6 +4745,23 @@ export interface components {
             from_cache: boolean;
         };
         /**
+         * TermsStatusDTO
+         * @description Whether this caller still needs to accept, and what they'd be accepting.
+         *
+         *     ``required`` is False on internal/consortium deployments (self-serve off),
+         *     where the gate does not apply at all.
+         */
+        TermsStatusDTO: {
+            /** Required */
+            required: boolean;
+            /** Current Version */
+            current_version: string;
+            /** Accepted Version */
+            accepted_version?: string | null;
+            /** Accepted At */
+            accepted_at?: string | null;
+        };
+        /**
          * TextMention
          * @description Represents text extracted from a page using NLP.
          *
@@ -4467,6 +4901,8 @@ export interface components {
              * @default 0
              */
             total: number;
+            /** Model */
+            model?: string | null;
         };
         /** TokenUsageStatsResponse */
         TokenUsageStatsResponse: {
@@ -4559,6 +4995,8 @@ export interface components {
              * @default 0
              */
             total: number;
+            /** Model */
+            model?: string | null;
             month: components["schemas"]["MonthUsage"];
         };
         /** ValidationError */
@@ -5567,6 +6005,7 @@ export interface operations {
                 limit?: number;
                 is_archived?: boolean;
                 folder_id?: string | null;
+                surface?: components["schemas"]["ChatSurface"] | null;
             };
             header?: never;
             path?: never;
@@ -6160,6 +6599,72 @@ export interface operations {
             };
         };
     };
+    search_literature_literature_search_get: {
+        parameters: {
+            query: {
+                /** @description Europe PMC query */
+                q: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiteratureHitResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ingest_literature_literature_ingest_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IngestLiteratureRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_page_pages__page_id__get: {
         parameters: {
             query?: never;
@@ -6415,6 +6920,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    analyze_compound_box_pages__page_id__compounds_analyze_box_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnalyzeCompoundBoxRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyzeCompoundBoxResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7113,6 +7653,59 @@ export interface operations {
             };
         };
     };
+    get_terms_status_user_terms_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermsStatusDTO"];
+                };
+            };
+        };
+    };
+    accept_terms_user_terms_accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptTermsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermsStatusDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_preferences_user_preferences_get: {
         parameters: {
             query?: never;
@@ -7388,11 +7981,13 @@ export interface operations {
             };
         };
     };
-    delete_llm_provider_user_llm_provider_delete: {
+    activate_llm_provider_user_llm_provider__provider__activate_post: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                provider: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -7404,16 +7999,60 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
-    probe_llm_provider_user_llm_provider_test_post: {
+    delete_llm_provider_user_llm_provider__provider__delete: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                provider: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    probe_llm_provider_user_llm_provider__provider__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["LLMProviderTestRequest"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -7422,6 +8061,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LLMProviderTestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

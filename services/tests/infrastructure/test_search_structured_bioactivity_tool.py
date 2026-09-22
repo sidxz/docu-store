@@ -68,12 +68,75 @@ def test_tool_sets_structured_bioactivities_and_returns_markdown_table():
     assert r.bioactivities is not None
     assert [(b.assay_type, b.value, b.unit) for b in r.bioactivities] == [("MIC", "0.5", "uM")]
 
-    # (a) markdown table preserved — header + a blank Target cell exactly as before
-    assert "| Compound | Target | Assay | Value |" in r.expanded_text
-    assert "| CMX410 |  | MIC | 0.5 uM |" in r.expanded_text
+    # (a) markdown table: the always-blank Target column is gone; the strain and the
+    # page the value was read on (1-based, as the UI numbers pages) take its place
+    assert "| Compound | Strain | Assay | Value | Page |" in r.expanded_text
+    assert "| CMX410 |  | MIC | 0.5 uM | 2 |" in r.expanded_text
 
     # summary string shape preserved
     assert summary == "Bioactivity search for 'CMX410': 1 data points from 1 documents."
+
+
+def test_tool_cites_each_value_to_the_deck_it_was_read_in():
+    """Values from two decks used to share one result, cited to the first deck."""
+    deck_a, deck_b = uuid4(), uuid4()
+    ev71 = {"assay_type": "IC50", "value": "13.3", "unit": "µM", "assay": "Vero", "strain": "EV71"}
+    vsv = {"assay_type": "EC50", "value": "17", "unit": "µM", "assay": "HeLa", "strain": "VSV"}
+    activity = CompoundActivityQuery(
+        tag_dictionary=FakeTagDict([str(deck_a), str(deck_b)]),
+        page_read_model=FakePages([
+            _page(deck_a, [_tm("compound_name", "CHEMBL1643", bioactivities=[ev71])]),
+            _page(deck_b, [_tm("compound_name", "CHEMBL1643", bioactivities=[vsv])]),
+        ]),
+        artifact_read_model=FakeArtifacts(),
+    )
+    tool = SearchStructuredBioactivityTool(activity_query=activity, artifact_read_model=None)
+    results, _, _ = asyncio.run(tool.execute({"compound_name": "CHEMBL1643"}, uuid4(), None))
+
+    assert [r.artifact_id for r in results] == [deck_a, deck_b]
+    assert "| CHEMBL1643 | EV71 | IC50 (Vero) | 13.3 µM | 2 |" in results[0].expanded_text
+    assert "VSV" not in results[0].expanded_text
+    assert "| CHEMBL1643 | VSV | EC50 (HeLa) | 17 µM | 2 |" in results[1].expanded_text
+    # Molecule cards read the first result's list (agentic_retrieval step 1b): every row
+    # rides there, so splitting the table per deck costs the card nothing.
+    assert [b.value for b in results[0].bioactivities] == ["13.3", "17"]
+    assert results[1].bioactivities is None
+
+
+def test_tool_says_a_target_narrows_documents_not_rows():
+    """Asked for ribavirin against RSV, the tool returned every ribavirin value without a
+    word, so a SARS-CoV value was reported as the RSV one."""
+    aid, other = uuid4(), uuid4()
+    pages = [
+        _page(aid, [_tm("compound_name", "ribavirin", bioactivities=[
+            {"assay_type": "EC50", "value": "109.5", "unit": "µM", "assay": "SARS-CoV"},
+        ])]),
+        _page(other, [_tm("compound_name", "ribavirin", bioactivities=[
+            {"assay_type": "IC50", "value": "80", "unit": "nM", "assay": "HEp-2"},
+        ])]),
+    ]
+    activity = CompoundActivityQuery(
+        tag_dictionary=FakeTagDict([str(aid), str(other)]),
+        page_read_model=FakePages(pages),
+        artifact_read_model=FakeArtifacts(),
+    )
+    tool = SearchStructuredBioactivityTool(activity_query=activity, artifact_read_model=None)
+
+    results, summary, _ = asyncio.run(
+        tool.execute({"compound_name": "ribavirin", "target_name": "RSV"}, uuid4(), None),
+    )
+    assert "'RSV' narrows which documents are searched, not which rows" in results[0].expanded_text
+    assert "narrows documents, not rows" in summary
+    # Once, not once per deck: tool output is exempt from the context cap and its budget
+    # is reserved first, so every repeat is paid for out of the evidence it displaces.
+    assert "narrows" not in results[1].expanded_text
+
+    # NER's placeholder is no target at all
+    results, summary, _ = asyncio.run(
+        tool.execute({"compound_name": "ribavirin", "target_name": "None"}, uuid4(), None),
+    )
+    assert "narrows" not in results[0].expanded_text
+    assert "narrows" not in summary
 
 
 def test_tool_no_data_returns_empty_and_message():

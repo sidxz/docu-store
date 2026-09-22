@@ -162,22 +162,24 @@ def build_alias_map(
 def union_bioactivities(activity_lists: Iterable[list[dict]]) -> list[dict]:
     """Union one compound's activity lists, one list per mention, in first-seen order.
 
-    The key includes the assay, so 8t's ">20.0" in HepG2 MTT and in Vero NR are two
-    rows. Rows without one (older extractions, prose that names no assay) can still
-    collide, so a row repeated inside one list is kept as a separate measurement,
-    while the same row in two lists is one fact reported twice (a summary slide, an
-    alias): each key keeps the most copies any single list had.
+    The key includes the assay and the strain, so 8t's ">20.0" in HepG2 MTT and in Vero
+    NR are two rows, as are an MIC against two strains. Rows without them (older
+    extractions, prose that names neither) can still collide, so a row repeated inside
+    one list is kept as a separate measurement, while the same row in two lists is one
+    fact reported twice (a summary slide, an alias): each key keeps the most copies any
+    single list had.
     """
     activities: list[dict] = []
-    kept: Counter[tuple[str, str, str, str]] = Counter()
+    kept: Counter[tuple[str, str, str, str, str]] = Counter()
     for found in activity_lists:
-        seen: Counter[tuple[str, str, str, str]] = Counter()
+        seen: Counter[tuple[str, str, str, str, str]] = Counter()
         for activity in found:
             key = (
                 activity.get("assay_type", ""),
                 activity.get("value", ""),
                 activity.get("unit", ""),
                 activity.get("assay", ""),
+                activity.get("strain", ""),
             )
             seen[key] += 1
             if seen[key] > kept[key]:

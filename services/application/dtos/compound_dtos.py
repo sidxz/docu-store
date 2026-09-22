@@ -11,6 +11,11 @@ class BioactivityDTO(BaseModel):
     unit: str | None = None
     raw_text: str | None = None
     assay: str | None = None
+    strain: str | None = None
+    # The page the value was read on (the first one, when a summary slide repeats it).
+    artifact_id: UUID | None = None
+    page_id: UUID | None = None
+    page_index: int | None = None
 
 
 class CompoundPageRefDTO(BaseModel):

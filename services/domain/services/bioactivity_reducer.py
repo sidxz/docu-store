@@ -80,6 +80,10 @@ def associate_bioactivities(
         assay_type = assay_type if is_alias(assay_type) else ""
         assay = (params.get("assay") or "").strip()
         assay = assay if is_alias(assay) else ""
+        # The organism or strain the value was measured against (EV71, H37Rv, ATCC
+        # 29213) -- NER's slot for it, next to `assay`, which usually holds the cell line.
+        strain = (params.get("strain") or "").strip()
+        strain = strain if is_alias(strain) else ""
         value = (params.get("value") or "").strip()
         # A value needs something to hang on: an endpoint, or the assay it was read in
         # (a column headed "FP (µM)" names the assay and no endpoint). A bare number
@@ -95,6 +99,8 @@ def associate_bioactivities(
         }
         if assay:
             activity["assay"] = assay
+        if strain:
+            activity["strain"] = strain
         # ponytail: structflo-ner strips footnote markers ('0.3*' -> '0.3'), so the
         # footnote's caveat (disputed, single determination, precipitated) is lost.
         # Upgrade: a `note` attribute in structflo-ner holding the resolved footnote

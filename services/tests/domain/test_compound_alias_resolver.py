@@ -41,6 +41,7 @@ def _bio(
     value: str,
     unit: str = "µM",
     assay: str | None = None,
+    strain: str | None = None,
 ):
     return _tm(
         raw,
@@ -51,7 +52,8 @@ def _bio(
             "value": value,
             "unit": unit,
         }
-        | ({"assay": assay} if assay else {}),
+        | ({"assay": assay} if assay else {})
+        | ({"strain": strain} if strain else {}),
     )
 
 
@@ -230,6 +232,24 @@ def test_the_assay_rides_along_and_tells_equal_values_apart():
     assert [a["assay"] for a in activities] == ["HepG2 MTT", "Vero NR"]
     unstated = associate_bioactivities(page("None"))[0].additional_model_params
     assert "assay" not in unstated["bioactivities"][0]
+
+
+def test_the_strain_rides_along_and_tells_equal_values_apart():
+    """CHEMBL126 reads MIC 16 µg/mL against two S. aureus strains: two measurements, and
+    the strain is what says which is which. NER writes it; the reducer used to drop it."""
+
+    def page(strain: str) -> list[TagMention]:
+        return [_compound("CHEMBL126"), _bio("16", "CHEMBL126", "MIC", "16", "µg/mL", strain=strain)]
+
+    pages = [
+        (uuid4(), 0, associate_bioactivities(page("ATCC 29213"))),
+        (uuid4(), 1, associate_bioactivities(page("ATCC 27660"))),
+    ]
+    activities = aggregate_tag_mentions(pages)[0].additional_model_params["bioactivities"]
+
+    assert [a["strain"] for a in activities] == ["ATCC 29213", "ATCC 27660"]
+    unstated = associate_bioactivities(page("None"))[0].additional_model_params
+    assert "strain" not in unstated["bioactivities"][0]
 
 
 def test_a_merged_card_does_not_carry_the_placeholder_forward():
