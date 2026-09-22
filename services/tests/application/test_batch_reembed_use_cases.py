@@ -179,3 +179,51 @@ async def test_batch_reembed_writes_artifact_tags():
 
     assert out["status"] == "success"
     assert vs.upsert_chunk_calls[-1]["metadata"]["artifact_tag_normalized"] == ["mrsa"]
+
+
+@pytest.mark.asyncio
+async def test_batch_reembed_summaries_keeps_artifact_tags_and_every_name():
+    """A summary re-embed recreates its points, so it must lay down what the syncs
+    patch: the artifact-level tags, and the synonyms a question may name the
+    compound by (the card is CHEMBL6109008, the deck calls it 8l).
+    """
+    from unittest.mock import AsyncMock
+
+    from application.use_cases.batch_reembed_use_cases import BatchReEmbedSummariesUseCase
+    from domain.value_objects.summary_candidate import SummaryCandidate
+
+    artifact_repo, page_repo = MockArtifactRepository(), MockPageRepository()
+    artifact = Artifact.create(
+        source_uri="https://example.org/deck.pdf",
+        source_filename="deck.pdf",
+        artifact_type=ArtifactType.RESEARCH_ARTICLE,
+        mime_type=MimeType.PDF,
+        storage_location="artifacts/x/source.pdf",
+        source_class=SourceClass.INTERNAL,
+        licence="cc by",
+    )
+    compound = TagMention(
+        tag="CHEMBL6109008",
+        entity_type="compound_name",
+        additional_model_params={"synonyms": "8l"},
+    )
+    artifact.update_tag_mentions([compound])
+    artifact.update_summary_candidate(SummaryCandidate(summary="Cytotoxicity of 8-series."))
+    page = Page.create(name="P6", artifact_id=artifact.id, index=5)
+    page.update_tag_mentions([compound])
+    page.update_summary_candidate(SummaryCandidate(summary="8l is the one to drop."))
+    artifact.add_pages([page.id])
+    artifact_repo.artifacts[artifact.id] = artifact
+    page_repo.pages[page.id] = page
+
+    store = AsyncMock()
+    uc = BatchReEmbedSummariesUseCase(
+        artifact_repository=artifact_repo, page_repository=page_repo,
+        embedding_generator=MockEmbeddingGenerator(), summary_vector_store=store,
+    )
+    await uc.execute(artifact.id)
+
+    for call in (store.upsert_page_summary_embedding, store.upsert_artifact_summary_embedding):
+        kwargs = call.await_args.kwargs
+        assert kwargs["artifact_tags"] == ["chembl6109008", "8l"]
+        assert kwargs["tag_normalized"] == ["chembl6109008", "8l"]

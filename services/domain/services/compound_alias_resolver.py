@@ -18,7 +18,8 @@ Guards, in order of how much damage they prevent:
   transitively. A hallucinated synonym fusing two analogs silently corrupts SAR,
   which is far worse than leaving a duplicate card on screen.
 - The declaring mention is canonical — NER's own notion of which surface form is
-  primary. Ties break on declaration count, then lexicographically, so the map is
+  primary — unless it is a deck label ('7a', '12') and the group has any other
+  name. Ties break on declaration count, then lexicographically, so the map is
   deterministic for a given page.
 - An alias two different compounds both claim is ambiguous, so it is no evidence
   at all and merges nothing. Without this, one slide where twelve compounds each
@@ -39,6 +40,7 @@ fourth edge source would close that; deferred.
 
 from __future__ import annotations
 
+import re
 from collections import Counter, defaultdict
 from typing import TYPE_CHECKING
 
@@ -46,6 +48,13 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
 
     from domain.value_objects.tag_mention import TagMention
+
+# A deck's own compound label ('7a', '12', 'Compound 9b'), matched against normalized
+# forms. Registry IDs and partner codes (SACC-3060, a ChemBridge number) are open-ended
+# and not ours to enumerate; the labels are, so the rule demotes these instead.
+# ponytail: letter-prefixed series (A12, S3) and primed labels (7a') are not caught;
+# add them here if they turn up as card names.
+_DECK_LABEL = re.compile(r"(?:compound|cmpd|cpd)?\d{1,3}[a-z]?")
 
 
 def normalize(name: str) -> str:
@@ -136,16 +145,48 @@ def build_alias_map(
     for members in groups.values():
         if len(members) < 2:
             continue
-        # Declaration count first: the surface form others were declared against
-        # wins, which is NER's primary. Lexicographic only breaks genuine ties.
-        # ponytail: declarer-wins names a card '91' when it declared its own ChEMBL
-        # ID as the synonym. Prefer a database-ID-shaped member here if the naming
-        # reads wrong on real decks.
-        canonical = min(members, key=lambda n: (-declared[n], n))
+        # A deck label never names the card while the group has any other name:
+        # NER declares the registry ID as the synonym of '8d', and '8d' means nothing
+        # off the page. Then declaration count — the surface form others were
+        # declared against, NER's primary. Lexicographic only breaks genuine ties.
+        canonical = min(
+            members,
+            key=lambda n: (bool(_DECK_LABEL.fullmatch(n)), -declared[n], n),
+        )
         for member in members:
             if member != canonical:
                 alias_map[member] = canonical
     return alias_map
+
+
+def union_bioactivities(activity_lists: Iterable[list[dict]]) -> list[dict]:
+    """Union one compound's activity lists, one list per mention, in first-seen order.
+
+    The key includes what each value was measured in and against -- assay, strain,
+    target, partner drug -- so 8t's ">20.0" in HepG2 MTT and in Vero NR are two rows, as
+    are an MIC against two strains or a Ki against two isoforms. Rows without them (older
+    extractions, prose that names none) can still collide, so a row repeated inside one
+    list is kept as a separate measurement, while the same row in two lists is one fact
+    reported twice (a summary slide, an alias): each key keeps the most copies any single
+    list had.
+    """
+    context = ("assay", "strain", "target", "combination")
+    activities: list[dict] = []
+    kept: Counter[tuple[str, ...]] = Counter()
+    for found in activity_lists:
+        seen: Counter[tuple[str, ...]] = Counter()
+        for activity in found:
+            key = (
+                activity.get("assay_type", ""),
+                activity.get("value", ""),
+                activity.get("unit", ""),
+                *(activity.get(k, "") for k in context),
+            )
+            seen[key] += 1
+            if seen[key] > kept[key]:
+                kept[key] += 1
+                activities.append(activity)
+    return activities
 
 
 def merge_alias_group(mentions: list[TagMention], canonical: str) -> TagMention:
@@ -153,40 +194,33 @@ def merge_alias_group(mentions: list[TagMention], canonical: str) -> TagMention:
 
     ``canonical`` is the normalized surface form the result should carry. Every
     other surface form in the group becomes a synonym; bioactivities are unioned
-    and deduplicated on ``(assay_type, value, unit)``.
+    by ``union_bioactivities``.
     """
     preferred = [m for m in mentions if normalize(m.tag) == canonical] or mentions
     base = max(preferred, key=lambda m: m.confidence if m.confidence is not None else -1.0)
-    base_key = normalize(base.tag)
 
-    activities: list[dict] = []
-    seen: set[tuple[str, str, str]] = set()
+    activity_lists: list[list[dict]] = []
     synonyms: set[str] = set()
 
     for tm in mentions:
-        params = tm.additional_model_params or {}
-        found = params.get("bioactivities")
+        found = (tm.additional_model_params or {}).get("bioactivities")
         if isinstance(found, list):
-            for activity in found:
-                key = (
-                    activity.get("assay_type", ""),
-                    activity.get("value", ""),
-                    activity.get("unit", ""),
-                )
-                if key not in seen:
-                    seen.add(key)
-                    activities.append(activity)
+            activity_lists.append(found)
         synonyms.update(synonyms_of(tm))
         synonyms.add(tm.tag)
 
-    synonyms = {s for s in synonyms if is_alias(s) and normalize(s) != base_key}
+    # The canonical can be a form NER only ever declared as a synonym ('8d' carrying
+    # its registry ID), so the card takes that spelling rather than the mention's.
+    tag = next((s for s in [base.tag, *sorted(synonyms)] if normalize(s) == canonical), base.tag)
+    activities = union_bioactivities(activity_lists)
+    synonyms = {s for s in synonyms if is_alias(s) and normalize(s) != normalize(tag)}
 
     params = dict(base.additional_model_params or {})
     if activities:
         params["bioactivities"] = activities
     if synonyms:
         params["synonyms"] = ", ".join(sorted(synonyms))
-    return base.model_copy(update={"additional_model_params": params})
+    return base.model_copy(update={"tag": tag, "additional_model_params": params})
 
 
 def merge_compound_aliases(

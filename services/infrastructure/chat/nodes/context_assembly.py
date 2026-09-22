@@ -305,9 +305,10 @@ class ContextAssemblyNode:
                 elif r.source_type == "literature":
                     label = f"ABSTRACT ONLY - {artifact_title}"
                 elif r.source_type == "chunk":
-                    label = f"Page {r.page_index}" if r.page_index is not None else "Page"
-                    if r.page_name:
-                        label = f"{r.page_name} (Page {r.page_index})"
+                    # 1-based, as the UI numbers pages: the model names the page the user sees.
+                    page = f"Page {r.page_index + 1}" if r.page_index is not None else "Page"
+                    named = r.page_name and r.page_name != page
+                    label = f"{r.page_name} ({page})" if named else page
                 else:
                     label = f"Summary - {artifact_title}"
 

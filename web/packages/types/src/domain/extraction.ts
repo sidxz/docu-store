@@ -76,6 +76,14 @@ export interface Bioactivity {
   value: string;
   unit: string;
   raw_text: string;
+  /** Assay or cell line the value was measured in ("HepG2 MTT"); absent when NER found none. */
+  assay?: string | null;
+  /** Organism or strain it was measured against ("EV71", "H37Rv"); absent when none was stated. */
+  strain?: string | null;
+  /** Protein it was measured against ("hERG", "hCA XII"); absent when none was stated. */
+  target?: string | null;
+  /** Partner drug dosed alongside ("meropenem"): the value is for the combination, not the compound alone. */
+  combination?: string | null;
 }
 
 export interface EmbeddingMetadata {

@@ -119,3 +119,36 @@ def test_profile_acl_filters_out_non_allowed_artifacts():
     dto = asyncio.run(uc.execute("CMX410", uuid4(), [uuid4()]))
     assert dto.bioactivities == []
     assert dto.reference_pages == []
+
+
+def test_profile_finds_the_structure_under_a_synonym_in_its_own_deck():
+    """The card is CHEMBL6109008; CSER labelled the drawing with the deck's '8l'.
+    Every deck has an 8l, so the synonym is only looked up where this compound is."""
+    aid = uuid4()
+
+    class ByLabel:
+        def __init__(self):
+            self.calls = []
+
+        async def get_compounds_by_extracted_id(self, extracted_id, workspace_id, allowed_artifact_ids):
+            self.calls.append((extracted_id, allowed_artifact_ids))
+            if extracted_id == "8l":
+                return [SimpleNamespace(canonical_smiles="CCO", smiles="CCO", extracted_id="8l")]
+            return []
+
+    store = ByLabel()
+    uc = GetCompoundProfileUseCase(
+        activity_query=CompoundActivityQuery(
+            tag_dictionary=FakeTagDict([str(aid)]),
+            page_read_model=FakePages(
+                [_page(uuid4(), 5, aid, [_tm("compound_name", "CHEMBL6109008", synonyms="8l")])],
+            ),
+            artifact_read_model=FakeArtifacts(),
+        ),
+        compound_vector_store=store,
+    )
+    dto = asyncio.run(uc.execute("CHEMBL6109008", uuid4(), None))
+
+    assert dto.has_structure is True
+    assert dto.extracted_id == "8l"
+    assert store.calls[-1] == ("8l", [aid])

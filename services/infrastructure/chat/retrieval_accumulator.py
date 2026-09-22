@@ -99,9 +99,17 @@ class RetrievalAccumulator:
         return added
 
     def get_all_results(self) -> list[RetrievalResult]:
-        """Return all accumulated results sorted by score (descending)."""
+        """Return all accumulated results, best first.
+
+        A search hit the reranker abstained on sorts behind every scored one, as the
+        reranker documents. Merged across sub-queries, its cosine fallback was compared
+        as if it were a rerank probability, so abstains at 0.75 beat hits the reranker
+        judged 0.4. Its tier is untouched -- ContextAssemblyNode tiers an abstain on its
+        cosine -- so when one is kept, it is kept whole. Replayed on 18 multi-doc turns:
+        two answer slides gained, none lost.
+        """
         results = list(self._results.values())
-        results.sort(key=self._score, reverse=True)
+        results.sort(key=lambda r: (not self._abstained(r), self._score(r)), reverse=True)
         return results
 
     def summary_for_model(self) -> str:
@@ -192,3 +200,17 @@ class RetrievalAccumulator:
     @staticmethod
     def _score(r: RetrievalResult) -> float:
         return r.rerank_score if r.rerank_score is not None else r.similarity_score
+
+    @staticmethod
+    def _abstained(r: RetrievalResult) -> bool:
+        """A document-search chunk the reranker ran on and returned no score for.
+
+        Only those are reranked: fetches, summaries and tool output never carry a rerank
+        score, and with the reranker off nothing does, so none of them is an abstain.
+        """
+        return (
+            settings.reranker_enabled
+            and r.rerank_score is None
+            and r.source_type == "chunk"
+            and r.query_source.startswith("tool:")
+        )

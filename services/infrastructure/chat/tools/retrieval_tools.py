@@ -17,9 +17,11 @@ from application.dtos.chat_dtos import AgentEvent, ContentBlockDTO
 from application.dtos.search_dtos import HierarchicalSearchRequest, SummarySearchRequest
 from application.ports.tool_calling_llm import ToolDefinition
 from application.use_cases.search_use_cases import resolve_artifact_info
+from domain.services.compound_alias_resolver import is_alias
 from infrastructure.chat.models import RetrievalResult
 
 if TYPE_CHECKING:
+    from application.dtos.compound_dtos import BioactivityDTO
     from application.ports.compound_vector_store import CompoundVectorStore
     from application.ports.repositories.artifact_read_models import ArtifactReadModel
     from application.ports.repositories.page_read_models import PageReadModel
@@ -405,9 +407,9 @@ class SearchStructuredBioactivityTool:
 
     Delegates the compound page-walk to the shared ``CompoundActivityQuery``
     (same assembly that feeds ``/compounds/{name}/profile``), then renders the
-    structured bioactivities as the markdown table the LLM already consumes and
-    rides the structured list on ``RetrievalResult.bioactivities`` for the chat
-    molecule block (F3).
+    structured bioactivities as one markdown table per document and rides the
+    structured list on ``RetrievalResult.bioactivities`` for the chat molecule
+    block (F3).
     """
 
     def __init__(
@@ -430,6 +432,8 @@ class SearchStructuredBioactivityTool:
     ) -> ToolResult:
         compound = args.get("compound_name", "")
         target = args.get("target_name")
+        # A model echoing NER's placeholder ("None") is asking for no target at all.
+        target = target if target and is_alias(target) else None
 
         if not compound:
             return [], "No compound name provided.", []
@@ -442,38 +446,70 @@ class SearchStructuredBioactivityTool:
         )
 
         if not refs:
+            return [], f"No accessible documents with compound '{compound}'.", []
+
+        def _assay_cell(b: BioactivityDTO) -> str:
+            # A table column headed "FP (µM)" names the assay and no endpoint.
+            if b.assay_type and b.assay:
+                cell = f"{b.assay_type} ({b.assay})"
+            else:
+                cell = b.assay_type or b.assay or ""
+            # Measured with a partner drug, not the compound alone.
+            return f"{cell}, with {b.combination}" if b.combination else cell
+
+        def _row(b: BioactivityDTO) -> str:
+            page = b.page_index + 1 if b.page_index is not None else ""  # the UI's numbering
             return (
-                [],
-                f"No accessible documents with compound '{compound}'"
-                + (f" and target '{target}'" if target else "")
-                + ".",
-                [],
+                f"| {compound} | {b.target or ''} | {b.strain or ''} | {_assay_cell(b)} | "
+                f"{b.value} {b.unit or ''} | {page} |"
             )
 
-        # Markdown table — same shape the LLM already consumes. The Target cell
-        # stays blank exactly as before (the reducer never writes a per-bio
-        # target, so the old bio_target was always "").
-        bio_target = ""
-        table_rows = [
-            f"| {compound} | {bio_target} | {b.assay_type} | {b.value} {b.unit or ''} |"
-            for b in bios
-        ]
-        if table_rows:
-            header = "| Compound | Target | Assay | Value |"
-            separator = "|----------|--------|-------|-------|"
-            table_text = "\n".join([header, separator, *table_rows[:30]])
+        # The target narrows the documents searched, never the rows: a row carries the
+        # target and strain NER read, not normalised names, so matching the query to rows
+        # by name would drop H37Rv rows from an "Mtb" query. The rows say what each was
+        # measured against instead, and the model reads them. It narrows nothing when no
+        # document holding the compound carries the tag (another deck's spelling, or a name
+        # never tagged as a target), and the note must not say it did.
+        tagged = await self._activity.documents_tagged(target, workspace_id) if target else set()
+        narrowed = any(str(r.artifact_id) in tagged for r in refs)
+        if not target:
+            note = ""
+        elif narrowed:
+            note = (
+                f"\n\nFilter '{target}' narrows which documents are searched, not which rows "
+                "are shown: each row's Target, Strain and Assay say what it was measured against."
+            )
         else:
-            table_text = f"No structured bioactivity data found for {compound}."
+            note = (
+                f"\n\nNone of the documents with '{compound}' is tagged '{target}', so these are "
+                f"all of its rows: check each row's Target, Strain and Assay against '{target}'."
+            )
+
+        # One table per document, so each value is cited to the deck it was read in and
+        # not to whichever deck came first; the document header names the deck, the Page
+        # column the slide. Thirty rows in all, as before: tool output is exempt from the
+        # context cap, so this is the only bound on its size.
+        by_artifact: dict[UUID, list[BioactivityDTO]] = {}
+        for b in bios[:30]:
+            by_artifact.setdefault(b.artifact_id, []).append(b)
+        titles = {r.artifact_id: r.artifact_title for r in refs}
 
         n_docs = len({r.artifact_id for r in refs})
         results: list[RetrievalResult] = []
-        if table_rows:
-            anchor = refs[0]
-            title, authors, pdate = anchor.artifact_title, [], None
+        for i, (artifact_id, rows) in enumerate(by_artifact.items()):
+            lines = [
+                "| Compound | Target | Strain | Assay | Value | Page |",
+                "|----------|--------|--------|-------|-------|------|",
+                *(_row(b) for b in rows),
+            ]
+            # The note once, not per deck: tool output is exempt from the context cap and
+            # its budget is reserved first, so each repeat displaces evidence.
+            table_text = "\n".join(lines) + (note if i == 0 else "")
+            title, authors, pdate = titles.get(artifact_id), [], None
             if self._artifacts:
                 try:
                     art = await self._artifacts.get_artifact_by_id(
-                        anchor.artifact_id,
+                        artifact_id,
                         workspace_id=workspace_id,
                     )
                     if art:
@@ -491,14 +527,14 @@ class SearchStructuredBioactivityTool:
                 except Exception:
                     log.warning(
                         "tool.bioactivity.artifact_lookup_failed",
-                        artifact_id=str(anchor.artifact_id),
+                        artifact_id=str(artifact_id),
                         exc_info=True,
                     )
 
             results.append(
                 RetrievalResult(
                     source_type="chunk",
-                    artifact_id=anchor.artifact_id,
+                    artifact_id=artifact_id,
                     artifact_title=title,
                     authors=authors,
                     presentation_date=pdate,
@@ -507,11 +543,21 @@ class SearchStructuredBioactivityTool:
                     matched_text=table_text[:500],
                     similarity_score=0.9,
                     query_source=f"tool_bioactivity:{compound}",
-                    bioactivities=bios,
+                    # Molecule cards read the first result's list (agentic_retrieval step
+                    # 1b), so it carries every row -- including any past the table's cap.
+                    bioactivities=bios if i == 0 else None,
                 ),
             )
 
-        summary = f"Bioactivity search for '{compound}': {len(table_rows)} data points from {n_docs} documents."
+        summary = (
+            f"Bioactivity search for '{compound}': {len(bios)} data points from {n_docs} documents."
+        )
+        if target:
+            summary += (
+                f" Target '{target}' narrows documents, not rows."
+                if narrowed
+                else f" No document with it is tagged '{target}'; all its rows are shown."
+            )
         return results, summary, []
 
 
@@ -659,7 +705,7 @@ class SearchCompoundStructureTool:
                 f"connectivity. A 2D molecule diagram has been rendered for the user from "
                 f"this SMILES."
             ),
-            f"Source: artifact {anchor.artifact_id}, page {anchor.page_index}",
+            f"Source: artifact {anchor.artifact_id}, page {anchor.page_index + 1}",  # UI's numbering
         ]
         if similar_lines:
             expanded_lines.append(
@@ -861,7 +907,8 @@ def _format_results_for_model(results: list[RetrievalResult], query: str) -> str
         title = r.artifact_title or "Unknown"
         score = r.rerank_score if r.rerank_score is not None else r.similarity_score
         if r.source_type == "chunk":
-            page_info = f"page {r.page_index}" if r.page_index is not None else ""
+            # 1-based, as the UI numbers pages.
+            page_info = f"page {r.page_index + 1}" if r.page_index is not None else ""
             excerpt = r.matched_text[:200].replace("\n", " ")
             lines.append(
                 f"  [{i}] {title} ({page_info}, score={score:.2f})"

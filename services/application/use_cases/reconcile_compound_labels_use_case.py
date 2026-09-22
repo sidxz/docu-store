@@ -8,6 +8,7 @@ from returns.result import Failure, Result, Success
 from application.dtos.errors import AppError
 from application.dtos.reconcile_dtos import LabelChange, ReconcileResultDTO
 from domain.exceptions import AggregateNotFoundError, ConcurrencyError
+from domain.services.compound_alias_resolver import is_alias, synonyms_of
 from domain.services.compound_label_matcher import reconcile_label
 
 if TYPE_CHECKING:
@@ -39,10 +40,13 @@ class ReconcileCompoundLabelsUseCase:
             page = self.page_repository.get_by_id(page_id)
 
             if candidate_names is None:
+                # A card named by its registry ID keeps the deck's own label ('8d') as a
+                # synonym, and that label is what CSER reads off the page.
                 names = [
-                    tm.tag
+                    name
                     for tm in (page.tag_mentions or [])
                     if tm.entity_type == "compound_name" and tm.tag
+                    for name in (tm.tag, *(s for s in synonyms_of(tm) if is_alias(s)))
                 ]
             else:
                 names = candidate_names

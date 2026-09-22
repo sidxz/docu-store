@@ -131,7 +131,7 @@ class RetrievalNode:
             )
             source_texts.append(
                 f"[{idx}] (Document: {hit.artifact_name or 'Unknown'}, "
-                f"Page {hit.page_index})\n{excerpt}",
+                f"Page {hit.page_index + 1})\n{excerpt}",  # 1-based, as the UI numbers pages
             )
             idx += 1
 

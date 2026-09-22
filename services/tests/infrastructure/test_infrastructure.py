@@ -33,6 +33,7 @@ class FakeMaterializer:
         self.add_to_array_calls: list[tuple[str, str, list, object]] = []
         self.pull_from_array_calls: list[tuple[str, str, list, object]] = []
         self.replace_tags_calls: list[tuple[str, list, object]] = []
+        self.replace_tags_scopes: list[tuple[str, ...] | None] = []
 
     def upsert_artifact(self, artifact_id: str, fields: dict, tracking: object) -> None:
         self.upsert_artifact_calls.append((artifact_id, fields, tracking))
@@ -73,9 +74,12 @@ class FakeMaterializer:
         fields: dict,
         tags: list,
         tracking: object,
+        *,
+        other_entity_types: tuple[str, ...] | None = None,
     ) -> None:
         self.upsert_artifact_calls.append((artifact_id, fields, tracking))
         self.replace_tags_calls.append((artifact_id, tags, tracking))
+        self.replace_tags_scopes.append(other_entity_types)
 
 
 def _tracking() -> object:
@@ -230,6 +234,8 @@ class TestEventProjector:
         assert materializer.upsert_artifact_calls[0][1]["title_mention"]["title"] == "Title"
         assert materializer.upsert_artifact_calls[1][1]["summary_candidate"]["summary"] == "Summary"
         assert materializer.upsert_artifact_calls[2][1]["tag_mentions"][0]["tag"] == "chemistry"
+        # The NER write owns every dictionary type but the author and date projections'.
+        assert materializer.replace_tags_scopes == [("author", "date")]
         assert materializer.delete_artifact_calls[0][0] == str(deleted_event.originator_id)
 
     def test_artifact_human_correction_recorded_dotted_path(self) -> None:

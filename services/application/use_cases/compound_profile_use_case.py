@@ -46,14 +46,27 @@ class GetCompoundProfileUseCase:
             workspace_id=workspace_id,
             allowed_artifact_ids=allowed_artifact_ids,
         )
+        bioactivities, synonyms, refs = await self._activity.collect(
+            name, workspace_id, allowed_artifact_ids,
+        )
+        # CSER labels a structure with what the page prints under it, often the deck's
+        # own label ('8l') while the card is named by its registry ID. A label means
+        # nothing outside its deck, so the fallback only looks where this compound is.
+        if not structures and refs:
+            decks = list(dict.fromkeys(r.artifact_id for r in refs))
+            for label in synonyms:
+                structures = await self._compounds.get_compounds_by_extracted_id(
+                    extracted_id=label,
+                    workspace_id=workspace_id,
+                    allowed_artifact_ids=decks,
+                )
+                if structures:
+                    break
+
         canonical_smiles = extracted_id = None
         if structures:
             canonical_smiles = structures[0].canonical_smiles or structures[0].smiles
             extracted_id = structures[0].extracted_id
-
-        bioactivities, synonyms, refs = await self._activity.collect(
-            name, workspace_id, allowed_artifact_ids,
-        )
 
         return CompoundProfileDTO(
             name=name,

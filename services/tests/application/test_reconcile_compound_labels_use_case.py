@@ -132,3 +132,21 @@ def test_dry_run_reports_changes_without_saving():
     assert [(c.before, c.after) for c in dto.changes] == [("CMX41O", "CMX410")]
     assert page.updated_with is None
     assert repo.saved is False
+
+
+def test_reconciles_against_a_deck_label_kept_as_a_synonym():
+    """NER names the card CHEMBL6133834 and keeps the deck's '8d' as its synonym;
+    CSER misread the 8d printed under the drawing as BD."""
+    page = _page_with("BD", None)
+    page.tag_mentions = [
+        TagMention(
+            tag="CHEMBL6133834",
+            entity_type="compound_name",
+            additional_model_params={"synonyms": "8d, None"},
+        ),
+    ]
+    uc = ReconcileCompoundLabelsUseCase(page_repository=FakeRepo(page))
+
+    dto = asyncio.run(uc.execute(page.id)).unwrap()
+
+    assert [(c.before, c.after) for c in dto.changes] == [("BD", "8d")]

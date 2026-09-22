@@ -12,7 +12,7 @@ from application.ports.repositories.artifact_repository import ArtifactRepositor
 from application.ports.repositories.page_repository import PageRepository
 from application.ports.summary_vector_store import SummaryVectorStore
 from application.ports.vector_store import VectorStore
-from application.use_cases.page_payload import artifact_tag_normalized
+from application.use_cases.page_payload import artifact_tag_normalized, filter_names
 from domain.exceptions import AggregateNotFoundError
 
 logger = structlog.get_logger()
@@ -24,7 +24,7 @@ def _build_tag_payload(tag_mentions: list | None) -> dict:
         return {"tags": [], "tag_normalized": [], "entity_types": []}
 
     tags = [tm.tag for tm in tag_mentions]
-    tag_normalized = [tm.tag.lower() for tm in tag_mentions]
+    tag_normalized = filter_names(tag_mentions)
     entity_types = sorted({tm.entity_type for tm in tag_mentions if tm.entity_type})
 
     return {

@@ -12,10 +12,28 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from domain.services.compound_alias_resolver import is_alias, synonyms_of
+
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from domain.aggregates.artifact import Artifact
     from domain.aggregates.page import Page
     from domain.value_objects.source_class import SourceClass
+    from domain.value_objects.tag_mention import TagMention
+
+
+def filter_names(tag_mentions: Iterable[TagMention] | None) -> list[str]:
+    """Lowercased names an entity filter can match: each tag plus every name a compound
+    goes by. The card is named CHEMBL6109008, but a question may ask about "8l", its
+    deck label; filters match this list, never the display tags.
+    """
+    names: list[str] = []
+    for tm in tag_mentions or []:
+        names.append(tm.tag.lower())
+        if tm.entity_type == "compound_name":
+            names.extend(s.lower() for s in synonyms_of(tm) if is_alias(s))
+    return list(dict.fromkeys(names))
 
 
 def artifact_tag_normalized(artifact: Artifact | None) -> list[str]:
@@ -29,7 +47,7 @@ def artifact_tag_normalized(artifact: Artifact | None) -> list[str]:
         return []
     tags: list[str] = []
     if artifact.tag_mentions:
-        tags.extend(tm.tag.lower() for tm in artifact.tag_mentions)
+        tags.extend(filter_names(artifact.tag_mentions))
     if artifact.author_mentions:
         tags.extend(am.name.lower() for am in artifact.author_mentions)
     if artifact.presentation_date and artifact.presentation_date.date:
@@ -68,7 +86,7 @@ def build_page_payload(
 
     if page.tag_mentions:
         payload["tags"] = [tm.tag for tm in page.tag_mentions]
-        payload["tag_normalized"] = [tm.tag.lower() for tm in page.tag_mentions]
+        payload["tag_normalized"] = filter_names(page.tag_mentions)
         ner_types = {tm.entity_type for tm in page.tag_mentions if tm.entity_type}
         payload["entity_types"] = sorted(ner_types)
 

@@ -8,6 +8,7 @@ from domain.services.compound_alias_resolver import (
     build_alias_map,
     is_publishable_alias,
     merge_compound_aliases,
+    normalize,
 )
 from domain.services.tag_mention_aggregator import aggregate_tag_mentions
 from domain.value_objects.tag_mention import TagMention
@@ -33,16 +34,30 @@ def _compound(tag: str, synonyms: str | None = None, confidence: float = 0.9):
     )
 
 
-def _bio(raw: str, compound: str, assay: str, value: str, unit: str = "µM"):
+def _bio(
+    raw: str,
+    compound: str,
+    endpoint: str,
+    value: str,
+    unit: str = "µM",
+    assay: str | None = None,
+    strain: str | None = None,
+    target: str | None = None,
+    combination: str | None = None,
+):
     return _tm(
         raw,
         "bioactivity",
         {
             "compound_name": compound,
-            "assay_type": assay,
+            "assay_type": endpoint,
             "value": value,
             "unit": unit,
-        },
+        }
+        | ({"assay": assay} if assay else {})
+        | ({"strain": strain} if strain else {})
+        | ({"target": target} if target else {})
+        | ({"combination": combination} if combination else {}),
     )
 
 
@@ -162,8 +177,152 @@ def test_an_ambiguous_alias_does_not_poison_the_unambiguous_ones():
     assert build_alias_map(tags) == {"410a": "cmx410"}
 
 
+def test_a_deck_label_yields_to_any_other_name():
+    """NER declares the registry ID or partner code as the synonym of the table's label."""
+    for label, name in [
+        ("8d", "CHEMBL6133834"),
+        ("7a", "SACC-3060"),
+        ("12", "ChemBridge 5102345"),
+        ("Compound 9b", "Bedaquiline"),
+    ]:
+        tags = [_compound(label, name), _compound(name)]
+
+        assert build_alias_map(tags) == {normalize(label): normalize(name)}
+
+
+def test_between_two_real_names_ners_primary_still_wins():
+    tags = [_compound("Bedaquiline", "CHEMBL376140"), _compound("CHEMBL376140")]
+
+    assert build_alias_map(tags) == {"chembl376140": "bedaquiline"}
+
+
+def test_card_takes_the_canonical_name_even_without_a_mention_of_its_own():
+    """The registry ID only ever appeared as '8d's synonym; the card and its row still land."""
+    tags = [_compound("8d", "CHEMBL6133834"), _bio("CC50 of 15.3 µM", "8d", "CC50", "15.3")]
+    alias_map = build_alias_map(tags)
+    merged = merge_compound_aliases(associate_bioactivities(tags, alias_map), alias_map)
+
+    assert merged[0].tag == "CHEMBL6133834"
+    assert merged[0].additional_model_params["synonyms"] == "8d"
+    assert len(merged[0].additional_model_params["bioactivities"]) == 1
+
+
+def test_a_value_repeated_across_assays_is_not_collapsed():
+    """8t reads >20.0 in three of four cytotoxicity assays, and NER types all four CC50."""
+    tags = [
+        _compound("8t", "CHEMBL6153006"),
+        _compound("CHEMBL6153006"),
+        *[_bio("CC50 of >20.0 µM", "8t", "CC50", ">20.0") for _ in range(3)],
+        _bio("CC50 of 11.8 µM", "8t", "CC50", "11.8"),
+    ]
+    alias_map = build_alias_map(tags)
+    merged = merge_compound_aliases(associate_bioactivities(tags, alias_map), alias_map)
+
+    assert len(merged[0].additional_model_params["bioactivities"]) == 4
+
+
+def test_the_assay_rides_along_and_tells_equal_values_apart():
+    """8t reads >20.0 on two slides, in different assays: two measurements, not one."""
+
+    def page(assay: str) -> list[TagMention]:
+        return [_compound("8t"), _bio(">20.0", "8t", "CC50", ">20.0", assay=assay)]
+
+    pages = [
+        (uuid4(), 0, associate_bioactivities(page("HepG2 MTT"))),
+        (uuid4(), 1, associate_bioactivities(page("Vero NR"))),
+    ]
+    activities = aggregate_tag_mentions(pages)[0].additional_model_params["bioactivities"]
+
+    assert [a["assay"] for a in activities] == ["HepG2 MTT", "Vero NR"]
+    unstated = associate_bioactivities(page("None"))[0].additional_model_params
+    assert "assay" not in unstated["bioactivities"][0]
+
+
+def test_the_strain_rides_along_and_tells_equal_values_apart():
+    """CHEMBL126 reads MIC 16 µg/mL against two S. aureus strains: two measurements, and
+    the strain is what says which is which. NER writes it; the reducer used to drop it."""
+
+    def page(strain: str) -> list[TagMention]:
+        return [_compound("CHEMBL126"), _bio("16", "CHEMBL126", "MIC", "16", "µg/mL", strain=strain)]
+
+    pages = [
+        (uuid4(), 0, associate_bioactivities(page("ATCC 29213"))),
+        (uuid4(), 1, associate_bioactivities(page("ATCC 27660"))),
+    ]
+    activities = aggregate_tag_mentions(pages)[0].additional_model_params["bioactivities"]
+
+    assert [a["strain"] for a in activities] == ["ATCC 29213", "ATCC 27660"]
+    unstated = associate_bioactivities(page("None"))[0].additional_model_params
+    assert "strain" not in unstated["bioactivities"][0]
+
+
+def test_the_target_and_the_partner_ride_along_and_tell_equal_values_apart():
+    """structflo-ner 0.7.0 moved protein targets out of `assay` into `target`, and a
+    partner drug dosed alongside into `combination`. Kept apart as `assay` was, or the
+    same Ki against two isoforms, or an MIC with two partners, collapse into one row."""
+
+    def page(**slot: str) -> list[TagMention]:
+        return [_compound("CHEMBL4637053"), _bio("30.4", "CHEMBL4637053", "Ki", "30.4", "nM", **slot)]
+
+    pages = [
+        (uuid4(), 0, associate_bioactivities(page(target="hCA II"))),
+        (uuid4(), 1, associate_bioactivities(page(target="hCA IV"))),
+        (uuid4(), 2, associate_bioactivities(page(combination="meropenem"))),
+        (uuid4(), 3, associate_bioactivities(page(combination="cefazolin"))),
+    ]
+    rows = aggregate_tag_mentions(pages)[0].additional_model_params["bioactivities"]
+
+    assert [(r.get("target"), r.get("combination")) for r in rows] == [
+        ("hCA II", None), ("hCA IV", None), (None, "meropenem"), (None, "cefazolin"),
+    ]
+    unstated = associate_bioactivities(page(target="None", combination="None"))
+    assert {"target", "combination"}.isdisjoint(unstated[0].additional_model_params["bioactivities"][0])
+
+
+def test_a_value_survives_when_its_column_names_only_the_target_strain_or_partner():
+    """A column headed "hERG", "H37Rv" or "meropenem" names what the value was measured
+    against, or with, and no endpoint. Before 0.7.0 that name sat in `assay`, which kept
+    the row; now it sits in `target`, `strain` or `combination`, and they must keep it too.
+    A bare number still says nothing."""
+    tags = [
+        _compound("CHEMBL4591849", "48"),
+        _bio("9.4", "CHEMBL4591849", "None", "9.4", target="hERG"),
+        _bio("0.8", "CHEMBL4591849", "None", "0.8", strain="H37Rv"),
+        _bio("2", "CHEMBL4591849", "None", "2", combination="meropenem"),
+        _bio("32", "CHEMBL4591849", "None", "32"),
+    ]
+    rows = associate_bioactivities(tags, build_alias_map(tags))[0].additional_model_params[
+        "bioactivities"
+    ]
+
+    assert [(r["value"], r.get("target"), r.get("strain"), r.get("combination")) for r in rows] == [
+        ("9.4", "hERG", None, None),
+        ("0.8", None, "H37Rv", None),
+        ("2", None, None, "meropenem"),
+    ]
+
+
 def test_a_merged_card_does_not_carry_the_placeholder_forward():
     tags = [_compound("CHEMBL4443524", "TAM16, None"), _compound("TAM16")]
     alias_map = build_alias_map(tags)
 
     assert merge_compound_aliases(tags, alias_map)[0].additional_model_params["synonyms"] == "TAM16"
+
+
+def test_a_value_survives_without_an_endpoint_when_its_assay_names_one():
+    """A column headed "FP (µM)" states the assay and no endpoint, so NER writes
+    assay_type "None": the measurement is still real. A value with neither is not."""
+    tags = [
+        _compound("CHEMBL4464825", "27"),
+        _bio("2", "CHEMBL4464825", "None", "2", assay="FP"),
+        _bio("1.5", "CHEMBL4464825", "None", "1.5", assay="PPIase"),
+        _bio("9.9", "CHEMBL4464825", "None", "9.9"),
+    ]
+    rows = associate_bioactivities(tags, build_alias_map(tags))[0].additional_model_params[
+        "bioactivities"
+    ]
+
+    assert [(r.get("assay_type", ""), r["value"], r.get("assay")) for r in rows] == [
+        ("", "2", "FP"),
+        ("", "1.5", "PPIase"),
+    ]

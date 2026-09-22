@@ -138,3 +138,45 @@ def test_the_page_fetch_does_not_delete_the_title_the_search_hit_carried():
         # Still the fetch's full text and its own score pair.
         assert kept.expanded_text == FULL_PAGE
         assert kept.rerank_score is None
+
+
+# ── Ordering: a reranker abstain is not a score ──────────────────────────────
+
+
+def _hit(*, rerank=None, sim=0.6, source="tool:q", kind="chunk") -> RetrievalResult:
+    return RetrievalResult(
+        source_type=kind, artifact_id=uuid4(), page_id=uuid4(), page_index=1,
+        expanded_text="t", matched_text="t", similarity_score=sim, rerank_score=rerank,
+        query_source=source,
+    )
+
+
+def _order(*results: RetrievalResult) -> list[RetrievalResult]:
+    acc = RetrievalAccumulator()
+    acc.add_results(list(results), "q")
+    return acc.get_all_results()
+
+
+def test_an_abstained_search_hit_sorts_behind_every_scored_one():
+    """The reranker returns None when it cannot judge a passage and documents that such a
+    hit sorts behind every scored one. Merged across sub-queries, its cosine fallback was
+    compared as if it were a rerank probability: 0.78 cosine beat a 0.4 rerank."""
+    abstain, scored = _hit(rerank=None, sim=0.78), _hit(rerank=0.4)
+    assert _order(abstain, scored) == [scored, abstain]
+
+
+def test_fetches_summaries_and_tool_output_are_never_abstains():
+    """Only a document-search chunk is reranked, so only it can abstain."""
+    fetch = _hit(sim=1.0, source="tool_page_content")
+    summary = _hit(sim=0.7, kind="summary")
+    scored = _hit(rerank=0.4)
+    assert _order(scored, summary, fetch) == [fetch, summary, scored]
+
+
+def test_with_the_reranker_off_nothing_is_an_abstain(monkeypatch):
+    """RERANKER_ENABLED=false (ablations): every hit is unscored, so order stays by score."""
+    from infrastructure.config import settings
+
+    monkeypatch.setattr(settings, "reranker_enabled", False)
+    low, summary, high = _hit(sim=0.6), _hit(sim=0.7, kind="summary"), _hit(sim=0.8)
+    assert _order(low, summary, high) == [high, summary, low]
