@@ -71,7 +71,16 @@ def _require_cloud_allowed(provider: str, settings: Settings) -> None:
 def _ollama_base_url(provider: str, base_url: str | None) -> str | None:
     """Env base URLs are Ollama URLs (LLM_BASE_URL defaults to localhost:11434 and
     CHAT_/NER_ fall back to it) — never hand one to a cloud provider. A cloud
-    base_url (OpenRouter) only ever arrives via UserLLMConfig.
+    base_url reaches docu-store's *own* config only via UserLLMConfig.
+
+    This is not a boundary. Passing no base_url leaves the OpenAI SDK free to read
+    ``OPENAI_BASE_URL`` / ``OPENAI_API_BASE`` from the process env, which reroutes
+    every openai-provider call (chat and the langextract NER lane alike). That is
+    deliberate — an operator who sets the env owns the deployment — but do not
+    build a data-residency control on this function. The control is
+    ``ALLOW_CLOUD_LLM=false``, which admits only ``LOCAL_PROVIDERS`` and so never
+    reaches the OpenAI SDK at all. ``llm.model_builder.build`` logs the effective
+    endpoint host so a redirect is visible.
     """
     return base_url if provider == "ollama" else None
 

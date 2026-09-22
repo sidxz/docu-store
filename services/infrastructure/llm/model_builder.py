@@ -7,7 +7,9 @@ confidential deployments.
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
 
 import structlog
 from langchain.chat_models import init_chat_model
@@ -29,6 +31,19 @@ _PROVIDER_MAP = {
     "anthropic": "anthropic",
     "gemini": "google_genai",
 }
+
+
+def _endpoint_host(provider: str, base_url: str | None) -> str | None:
+    """Host we will actually talk to, for the build log.
+
+    When no base_url is passed for ``openai`` the SDK falls back to the process
+    env, so a deployment can reroute every call without anything in our config
+    saying so. Resolve the same way it does, and log the host only -- a full URL
+    can carry credentials.
+    """
+    if base_url is None and provider == "openai":
+        base_url = os.getenv("OPENAI_BASE_URL") or os.getenv("OPENAI_API_BASE")
+    return urlparse(base_url).hostname if base_url else None
 
 
 def _is_openai_gpt5x(model_name: str) -> bool:
@@ -138,5 +153,6 @@ def build_chat_model(
         model=model_name,
         reasoning=reasoning or "off",
         cloud=not is_local,
+        endpoint_host=_endpoint_host(provider, kwargs.get("base_url")),
     )
     return init_chat_model(**kwargs)

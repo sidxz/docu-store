@@ -127,3 +127,25 @@ def test_unknown_provider_raises(capture) -> None:
         model_builder.build_chat_model(
             provider="grok", model_name="x", temperature=0.1,
         )
+
+
+@pytest.mark.parametrize("env_var", ["OPENAI_BASE_URL", "OPENAI_API_BASE"])
+def test_endpoint_host_resolves_the_env_redirect_the_sdk_would_take(env_var, monkeypatch) -> None:
+    """No base_url for openai means the SDK reads the process env, so the build log
+    must name the host we actually reach -- not nothing.
+    """
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    monkeypatch.delenv("OPENAI_API_BASE", raising=False)
+    assert model_builder._endpoint_host("openai", None) is None
+
+    monkeypatch.setenv(env_var, "https://openrouter.ai/api/v1")
+    assert model_builder._endpoint_host("openai", None) == "openrouter.ai"
+    # An explicit base_url wins, and the env never leaks into another provider.
+    assert model_builder._endpoint_host("openai", "https://gw.internal/v1") == "gw.internal"
+    assert model_builder._endpoint_host("anthropic", None) is None
+
+
+def test_endpoint_host_logs_no_credentials(monkeypatch) -> None:
+    """Host only -- a base URL can carry a key in userinfo or the query string."""
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://user:sk-secret@gw.example/v1?token=sk-abc")
+    assert model_builder._endpoint_host("openai", None) == "gw.example"
