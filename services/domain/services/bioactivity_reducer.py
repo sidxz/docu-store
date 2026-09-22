@@ -12,6 +12,16 @@ from domain.services.compound_alias_resolver import build_alias_map, is_alias, n
 from domain.value_objects.tag_mention import TagMention
 
 
+def _stated(params: dict, key: str) -> str:
+    """The attribute's text, or "" when NER left it unstated.
+
+    structflo-ner up to 0.6.0 wrote a placeholder ("None") for an unstated field; 0.7.0
+    omits it. Rows stored by either version pass through here, so both count as absent.
+    """
+    text = (params.get(key) or "").strip()
+    return text if is_alias(text) else ""
+
+
 def associate_bioactivities(
     tag_mentions: list[TagMention],
     alias_map: dict[str, str] | None = None,
@@ -74,21 +84,17 @@ def associate_bioactivities(
         if idx is None:
             continue
 
-        # NER writes the same null placeholders here as in synonyms ("None") when a
-        # field is not stated, so a placeholder counts as absent.
-        assay_type = (params.get("assay_type") or "").strip()
-        assay_type = assay_type if is_alias(assay_type) else ""
-        assay = (params.get("assay") or "").strip()
-        assay = assay if is_alias(assay) else ""
-        # The organism or strain the value was measured against (EV71, H37Rv, ATCC
-        # 29213) -- NER's slot for it, next to `assay`, which usually holds the cell line.
-        strain = (params.get("strain") or "").strip()
-        strain = strain if is_alias(strain) else ""
+        assay_type = _stated(params, "assay_type")
+        assay = _stated(params, "assay")  # cell line / format / read-out (HepG2 MTT)
+        strain = _stated(params, "strain")  # organism / strain / virus (EV71, H37Rv)
+        target = _stated(params, "target")  # protein measured against (hERG, hCA XII)
+        combination = _stated(params, "combination")  # partner dosed alongside (meropenem)
         value = (params.get("value") or "").strip()
-        # A value needs something to hang on: an endpoint, or the assay it was read in
-        # (a column headed "FP (µM)" names the assay and no endpoint). A bare number
-        # says nothing.
-        if not value or not (assay_type or assay):
+        # A value needs something to hang on: an endpoint, or what it was measured in,
+        # against or with (a column headed "FP (µM)", "hERG", "H37Rv" or "meropenem" names
+        # that and no endpoint -- before 0.7.0 all of them sat in `assay`, which kept the
+        # row). A bare number says nothing.
+        if not value or not (assay_type or assay or target or strain or combination):
             continue
 
         activity: dict = {
@@ -97,10 +103,14 @@ def associate_bioactivities(
             "unit": params.get("unit", ""),
             "raw_text": bio.tag,
         }
-        if assay:
-            activity["assay"] = assay
-        if strain:
-            activity["strain"] = strain
+        for key, text in (
+            ("assay", assay),
+            ("strain", strain),
+            ("target", target),
+            ("combination", combination),
+        ):
+            if text:
+                activity[key] = text
         # ponytail: structflo-ner strips footnote markers ('0.3*' -> '0.3'), so the
         # footnote's caveat (disputed, single determination, precipitated) is lost.
         # Upgrade: a `note` attribute in structflo-ner holding the resolved footnote

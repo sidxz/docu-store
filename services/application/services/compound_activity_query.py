@@ -143,6 +143,8 @@ class CompoundActivityQuery:
                 raw_text=bio.get("raw_text") or None,
                 assay=bio.get("assay") or None,
                 strain=bio.get("strain") or None,
+                target=bio.get("target") or None,
+                combination=bio.get("combination") or None,
                 artifact_id=bio["artifact_id"],
                 page_id=bio["page_id"],
                 page_index=bio["page_index"],

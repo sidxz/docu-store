@@ -457,23 +457,26 @@ class SearchStructuredBioactivityTool:
         def _assay_cell(b: BioactivityDTO) -> str:
             # A table column headed "FP (µM)" names the assay and no endpoint.
             if b.assay_type and b.assay:
-                return f"{b.assay_type} ({b.assay})"
-            return b.assay_type or b.assay or ""
+                cell = f"{b.assay_type} ({b.assay})"
+            else:
+                cell = b.assay_type or b.assay or ""
+            # Measured with a partner drug, not the compound alone.
+            return f"{cell}, with {b.combination}" if b.combination else cell
 
         def _row(b: BioactivityDTO) -> str:
             page = b.page_index + 1 if b.page_index is not None else ""  # the UI's numbering
             return (
-                f"| {compound} | {b.strain or ''} | {_assay_cell(b)} | "
+                f"| {compound} | {b.target or ''} | {b.strain or ''} | {_assay_cell(b)} | "
                 f"{b.value} {b.unit or ''} | {page} |"
             )
 
         # The target narrows the documents searched, never the rows: a row carries the
-        # strain NER read, not a normalised target, so matching an organism to rows by
-        # name would drop H37Rv rows from an "Mtb" query. The rows say what each was
+        # target and strain NER read, not normalised names, so matching the query to rows
+        # by name would drop H37Rv rows from an "Mtb" query. The rows say what each was
         # measured against instead, and the model reads them.
         note = (
             f"\n\nFilter '{target}' narrows which documents are searched, not which rows "
-            "are shown: each row's Strain and Assay say what it was measured against."
+            "are shown: each row's Target, Strain and Assay say what it was measured against."
             if target
             else ""
         )
@@ -491,8 +494,8 @@ class SearchStructuredBioactivityTool:
         results: list[RetrievalResult] = []
         for i, (artifact_id, rows) in enumerate(by_artifact.items()):
             lines = [
-                "| Compound | Strain | Assay | Value | Page |",
-                "|----------|--------|-------|-------|------|",
+                "| Compound | Target | Strain | Assay | Value | Page |",
+                "|----------|--------|--------|-------|-------|------|",
                 *(_row(b) for b in rows),
             ]
             # The note once, not per deck: tool output is exempt from the context cap and

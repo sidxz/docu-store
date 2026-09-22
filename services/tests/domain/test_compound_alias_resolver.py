@@ -42,6 +42,8 @@ def _bio(
     unit: str = "µM",
     assay: str | None = None,
     strain: str | None = None,
+    target: str | None = None,
+    combination: str | None = None,
 ):
     return _tm(
         raw,
@@ -53,7 +55,9 @@ def _bio(
             "unit": unit,
         }
         | ({"assay": assay} if assay else {})
-        | ({"strain": strain} if strain else {}),
+        | ({"strain": strain} if strain else {})
+        | ({"target": target} if target else {})
+        | ({"combination": combination} if combination else {}),
     )
 
 
@@ -250,6 +254,52 @@ def test_the_strain_rides_along_and_tells_equal_values_apart():
     assert [a["strain"] for a in activities] == ["ATCC 29213", "ATCC 27660"]
     unstated = associate_bioactivities(page("None"))[0].additional_model_params
     assert "strain" not in unstated["bioactivities"][0]
+
+
+def test_the_target_and_the_partner_ride_along_and_tell_equal_values_apart():
+    """structflo-ner 0.7.0 moved protein targets out of `assay` into `target`, and a
+    partner drug dosed alongside into `combination`. Kept apart as `assay` was, or the
+    same Ki against two isoforms, or an MIC with two partners, collapse into one row."""
+
+    def page(**slot: str) -> list[TagMention]:
+        return [_compound("CHEMBL4637053"), _bio("30.4", "CHEMBL4637053", "Ki", "30.4", "nM", **slot)]
+
+    pages = [
+        (uuid4(), 0, associate_bioactivities(page(target="hCA II"))),
+        (uuid4(), 1, associate_bioactivities(page(target="hCA IV"))),
+        (uuid4(), 2, associate_bioactivities(page(combination="meropenem"))),
+        (uuid4(), 3, associate_bioactivities(page(combination="cefazolin"))),
+    ]
+    rows = aggregate_tag_mentions(pages)[0].additional_model_params["bioactivities"]
+
+    assert [(r.get("target"), r.get("combination")) for r in rows] == [
+        ("hCA II", None), ("hCA IV", None), (None, "meropenem"), (None, "cefazolin"),
+    ]
+    unstated = associate_bioactivities(page(target="None", combination="None"))
+    assert {"target", "combination"}.isdisjoint(unstated[0].additional_model_params["bioactivities"][0])
+
+
+def test_a_value_survives_when_its_column_names_only_the_target_strain_or_partner():
+    """A column headed "hERG", "H37Rv" or "meropenem" names what the value was measured
+    against, or with, and no endpoint. Before 0.7.0 that name sat in `assay`, which kept
+    the row; now it sits in `target`, `strain` or `combination`, and they must keep it too.
+    A bare number still says nothing."""
+    tags = [
+        _compound("CHEMBL4591849", "48"),
+        _bio("9.4", "CHEMBL4591849", "None", "9.4", target="hERG"),
+        _bio("0.8", "CHEMBL4591849", "None", "0.8", strain="H37Rv"),
+        _bio("2", "CHEMBL4591849", "None", "2", combination="meropenem"),
+        _bio("32", "CHEMBL4591849", "None", "32"),
+    ]
+    rows = associate_bioactivities(tags, build_alias_map(tags))[0].additional_model_params[
+        "bioactivities"
+    ]
+
+    assert [(r["value"], r.get("target"), r.get("strain"), r.get("combination")) for r in rows] == [
+        ("9.4", "hERG", None, None),
+        ("0.8", None, "H37Rv", None),
+        ("2", None, None, "meropenem"),
+    ]
 
 
 def test_a_merged_card_does_not_carry_the_placeholder_forward():

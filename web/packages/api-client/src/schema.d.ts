@@ -2406,6 +2406,10 @@ export interface components {
             assay?: string | null;
             /** Strain */
             strain?: string | null;
+            /** Target */
+            target?: string | null;
+            /** Combination */
+            combination?: string | null;
             /** Artifact Id */
             artifact_id?: string | null;
             /** Page Id */

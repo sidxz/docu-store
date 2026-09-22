@@ -68,10 +68,10 @@ def test_tool_sets_structured_bioactivities_and_returns_markdown_table():
     assert r.bioactivities is not None
     assert [(b.assay_type, b.value, b.unit) for b in r.bioactivities] == [("MIC", "0.5", "uM")]
 
-    # (a) markdown table: the always-blank Target column is gone; the strain and the
-    # page the value was read on (1-based, as the UI numbers pages) take its place
-    assert "| Compound | Strain | Assay | Value | Page |" in r.expanded_text
-    assert "| CMX410 |  | MIC | 0.5 uM | 2 |" in r.expanded_text
+    # (a) markdown table: what each value was measured against (protein target, strain)
+    # and the page it was read on (1-based, as the UI numbers pages)
+    assert "| Compound | Target | Strain | Assay | Value | Page |" in r.expanded_text
+    assert "| CMX410 |  |  | MIC | 0.5 uM | 2 |" in r.expanded_text
 
     # summary string shape preserved
     assert summary == "Bioactivity search for 'CMX410': 1 data points from 1 documents."
@@ -94,13 +94,27 @@ def test_tool_cites_each_value_to_the_deck_it_was_read_in():
     results, _, _ = asyncio.run(tool.execute({"compound_name": "CHEMBL1643"}, uuid4(), None))
 
     assert [r.artifact_id for r in results] == [deck_a, deck_b]
-    assert "| CHEMBL1643 | EV71 | IC50 (Vero) | 13.3 µM | 2 |" in results[0].expanded_text
+    assert "| CHEMBL1643 |  | EV71 | IC50 (Vero) | 13.3 µM | 2 |" in results[0].expanded_text
     assert "VSV" not in results[0].expanded_text
-    assert "| CHEMBL1643 | VSV | EC50 (HeLa) | 17 µM | 2 |" in results[1].expanded_text
+    assert "| CHEMBL1643 |  | VSV | EC50 (HeLa) | 17 µM | 2 |" in results[1].expanded_text
     # Molecule cards read the first result's list (agentic_retrieval step 1b): every row
     # rides there, so splitting the table per deck costs the card nothing.
     assert [b.value for b in results[0].bioactivities] == ["13.3", "17"]
     assert results[1].bioactivities is None
+
+
+def test_tool_shows_the_target_and_the_partner():
+    """0.7.0 files the protein under `target` and a partner drug under `combination`: a
+    Ki against hCA XII, and an MRC measured with meropenem, not the compound alone."""
+    aid = uuid4()
+    pages = [_page(aid, [_tm("compound_name", "13d", bioactivities=[
+        {"assay_type": "Ki", "value": "0.6", "unit": "nM", "target": "hCA XII"},
+        {"assay_type": "MRC", "value": "1", "unit": "µg/mL", "strain": "MRSA", "combination": "meropenem"},
+    ])])]
+    results, _, _ = asyncio.run(_tool(aid, pages).execute({"compound_name": "13d"}, uuid4(), None))
+
+    assert "| 13d | hCA XII |  | Ki | 0.6 nM | 2 |" in results[0].expanded_text
+    assert "| 13d |  | MRSA | MRC, with meropenem | 1 µg/mL | 2 |" in results[0].expanded_text
 
 
 def test_tool_says_a_target_narrows_documents_not_rows():

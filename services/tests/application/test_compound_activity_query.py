@@ -92,6 +92,21 @@ def test_collect_keeps_each_values_strain_and_page():
     ]
 
 
+def test_collect_passes_the_target_and_partner_through():
+    """The protein a value was measured against, and a partner drug dosed alongside."""
+    aid = uuid4()
+    rows = [
+        {"assay_type": "Ki", "value": "0.6", "unit": "nM", "target": "hCA XII"},
+        {"assay_type": "MRC", "value": "1", "unit": "µg/mL", "combination": "meropenem"},
+    ]
+    q = _make(
+        {"compound_name": [str(aid)]},
+        pages=[_page(uuid4(), 3, aid, [_tm("compound_name", "13d", bioactivities=rows)])],
+    )
+    bios, _, _ = asyncio.run(q.collect("13d", uuid4(), None))
+    assert [(x.target, x.combination) for x in bios] == [("hCA XII", None), (None, "meropenem")]
+
+
 def test_collect_keeps_repeats_within_a_page_and_collapses_them_across_pages():
     """One table's three '>20.0' cells are three measurements; a slide repeating one is not."""
     aid = uuid4()
