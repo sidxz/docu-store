@@ -47,7 +47,11 @@ import structlog
 logger = structlog.get_logger()
 
 SEARCH_URL = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
-PDF_URL = "https://europepmc.org/articles/{pmcid}?pdf=render"
+# Europe PMC's ?pdf=render sits behind a Cloudflare bot challenge (403 to any
+# non-browser client since 2026-09), so PDFs come from the PMC Open Access
+# bucket instead. Keys are versioned: {pmcid}.{n}/{pmcid}.{n}.pdf.
+PMC_OA_BUCKET = "https://pmc-oa-opendata.s3.amazonaws.com"
+_PMC_OA_PDF_KEY_RE = re.compile(r"<Key>((PMC\d+)\.(\d+)/\2\.\3\.pdf)</Key>")
 ARTICLE_URL = "https://europepmc.org/article/{source}/{external_id}"
 
 _TIMEOUT_SECONDS = 30.0
@@ -385,13 +389,26 @@ class EuropePmcClient:
             )
             return None
 
-        url = PDF_URL.format(pmcid=hit.pmcid)
         try:
             async with httpx.AsyncClient(
                 timeout=_PDF_TIMEOUT_SECONDS,
                 follow_redirects=True,
             ) as client:
-                response = await client.get(url)
+                listing = await client.get(
+                    PMC_OA_BUCKET,
+                    params={"list-type": "2", "prefix": f"{hit.pmcid}."},
+                )
+                listing.raise_for_status()
+                keys = _PMC_OA_PDF_KEY_RE.findall(listing.text)
+                if not keys:
+                    logger.warning(
+                        "europe_pmc_pdf_not_in_oa_bucket",
+                        external_id=hit.external_id,
+                        pmcid=hit.pmcid,
+                    )
+                    return None
+                latest = max(keys, key=lambda k: int(k[2]))[0]
+                response = await client.get(f"{PMC_OA_BUCKET}/{latest}")
                 response.raise_for_status()
                 body = response.content
         except Exception:

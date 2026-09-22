@@ -333,3 +333,14 @@ def test_a_retraction_is_detected_in_the_lite_pub_type_string():
         },
     )
     assert hit.is_retracted is True
+
+
+def test_oa_bucket_key_regex_matches_only_versioned_pdfs():
+    listing = (
+        "<Key>PMC1.1/PMC1.1.json</Key><Key>PMC1.1/PMC1.1.pdf</Key>"
+        "<Key>PMC1.10/PMC1.10.pdf</Key><Key>PMC1.2/PMC1.2.xml</Key>"
+        "<Key>PMC1.3/PMC9.3.pdf</Key>"
+    )
+    keys = epmc._PMC_OA_PDF_KEY_RE.findall(listing)
+    assert max(keys, key=lambda k: int(k[2]))[0] == "PMC1.10/PMC1.10.pdf"
+    assert len(keys) == 2
