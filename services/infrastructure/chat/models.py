@@ -56,6 +56,10 @@ class GroundingResult(BaseModel):
     supported_claims: list[str] = Field(default_factory=list)
     unsupported_claims: list[str] = Field(default_factory=list)
     verification_summary: str
+    # True only when the model-based check actually ran and parsed. False when
+    # the coverage/query-type gate skipped it, or when it failed and fell back
+    # to is_grounded=True -- so "grounded" alone cannot be read as "verified".
+    llm_verified: bool = False
 
 
 # --- Thinking Mode models ---

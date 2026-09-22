@@ -330,6 +330,9 @@ class ContextAssemblyNode:
                             "literature" if r.source_type == "literature" else "document"
                         ),
                         external_url=r.external_url,
+                        query_source=r.query_source,
+                        vector_score=r.similarity_score,
+                        rerank_score=r.rerank_score,
                     ),
                 )
                 idx += 1

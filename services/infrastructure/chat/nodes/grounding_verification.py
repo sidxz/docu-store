@@ -62,7 +62,7 @@ class GroundingVerificationNode:
                 cleaned = cleaned.strip()
 
             data = json.loads(cleaned)
-            result = GroundingResult(**data)
+            result = GroundingResult(**data).model_copy(update={"llm_verified": True})
             log.info(
                 "chat.grounding.done",
                 is_grounded=result.is_grounded,

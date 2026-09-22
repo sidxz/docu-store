@@ -49,6 +49,7 @@ class AgentEvent(BaseModel):
     # Grounding verification result (emitted as grounding_result event)
     grounding_is_grounded: bool | None = None
     grounding_confidence: float | None = None
+    grounding_llm_verified: bool | None = None
     # Papers found by search_literature (emitted as literature_results event).
     # Carried whole rather than as citations: the cards need the licence and the
     # ingest verdict, which a citation has no business holding.
@@ -87,6 +88,16 @@ class SourceCitationDTO(BaseModel):
     # grounded as one read off a page.
     source_type: str = "document"
     external_url: str | None = None
+    # Which retrieval path produced this citation: "primary"/"sub_query_N"/"hyde"
+    # for similarity search, "tool_*" for a deterministic tool lookup.
+    query_source: str | None = None
+    # similarity_score above is the *effective* score -- the rerank score when
+    # there is one, else the vector score -- because that is what ranked this
+    # citation and what the client shows. These two keep the components apart:
+    # vector_score is always the raw embedding similarity, and rerank_score is
+    # set only when the reranker actually scored this candidate.
+    vector_score: float | None = None
+    rerank_score: float | None = None
 
 
 # --- Content Blocks ---
@@ -199,6 +210,8 @@ class AgentTraceDTO(BaseModel):
     retry_count: int = 0
     grounding_is_grounded: bool | None = None
     grounding_confidence: float | None = None
+    # Did the model-based grounding check run, or did the coverage gate skip it?
+    grounding_llm_verified: bool | None = None
 
 
 # --- Token Usage ---

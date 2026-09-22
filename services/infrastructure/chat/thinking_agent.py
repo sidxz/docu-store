@@ -389,6 +389,7 @@ class ThinkingAgent:
                     type="grounding_result",
                     grounding_is_grounded=grounding.is_grounded,
                     grounding_confidence=grounding.confidence,
+                    grounding_llm_verified=grounding.llm_verified,
                 )
 
                 if _debug:
