@@ -706,6 +706,16 @@ class Settings(BaseSettings):
         validation_alias="CHAT_ENABLE_GROUNDING_VERIFICATION",
         description="Run inline citation/grounding verification and its retry loop.",
     )
+    chat_enable_answer_formatting: bool = Field(
+        default=True,
+        validation_alias="CHAT_ENABLE_ANSWER_FORMATTING",
+        description=(
+            "Run the answer-formatting rewrite that moves the most directly "
+            "responsive passage to the front. Off streams the synthesis draft "
+            "verbatim -- one LLM call fewer, and no rewrite step for a model to "
+            "echo its brief into. Applies to Quick and Thinking alike."
+        ),
+    )
     chat_enable_retrieval: bool = Field(
         default=True,
         validation_alias="CHAT_ENABLE_RETRIEVAL",

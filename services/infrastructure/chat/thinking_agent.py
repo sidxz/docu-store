@@ -437,17 +437,29 @@ class ThinkingAgent:
                 description="Formatting answer...",
             )
             formatted_answer = ""
-            async for token in self._formatting.run(message, draft_answer):
-                formatted_answer += token
-                total_tokens += 1
-                yield AgentEvent(type="token", delta=token)
+            if settings.chat_enable_answer_formatting:
+                async for token in self._formatting.run(message, draft_answer):
+                    formatted_answer += token
+                    total_tokens += 1
+                    yield AgentEvent(type="token", delta=token)
+            else:
+                # The draft is the answer. Still emit it as token deltas -- clients
+                # build the message from those alone. total_tokens is untouched:
+                # no LLM call ran, and the real count comes from the ambient counter.
+                formatted_answer = draft_answer
+                log.info("chat.thinking.formatting_skipped", draft_len=len(draft_answer))
+                yield AgentEvent(type="token", delta=draft_answer)
 
             formatting_ms = int((time.monotonic() - t6) * 1000)
             yield AgentEvent(
                 type="step_completed",
                 step="formatting",
                 status="completed",
-                output=f"Formatted ({formatting_ms}ms)",
+                output=(
+                    f"Formatted ({formatting_ms}ms)"
+                    if settings.chat_enable_answer_formatting
+                    else "Formatting disabled"
+                ),
             )
 
             # Re-extract citations from formatted answer

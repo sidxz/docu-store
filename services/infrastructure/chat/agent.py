@@ -287,17 +287,27 @@ class ChatAgent:
                 description="Formatting answer...",
             )
             formatted_answer = ""
-            async for token in self._formatting.run(message, draft_answer):
-                formatted_answer += token
-                total_tokens += 1
-                yield AgentEvent(type="token", delta=token)
+            if settings.chat_enable_answer_formatting:
+                async for token in self._formatting.run(message, draft_answer):
+                    formatted_answer += token
+                    total_tokens += 1
+                    yield AgentEvent(type="token", delta=token)
+            else:
+                # See ThinkingAgent stage 6 -- same contract, same reasons.
+                formatted_answer = draft_answer
+                log.info("chat.quick.formatting_skipped", draft_len=len(draft_answer))
+                yield AgentEvent(type="token", delta=draft_answer)
 
             formatting_ms = int((time.monotonic() - t5) * 1000)
             yield AgentEvent(
                 type="step_completed",
                 step="formatting",
                 status="completed",
-                output=f"Formatted ({formatting_ms}ms)",
+                output=(
+                    f"Formatted ({formatting_ms}ms)"
+                    if settings.chat_enable_answer_formatting
+                    else "Formatting disabled"
+                ),
             )
 
             # Re-extract citations from formatted answer
