@@ -11,9 +11,9 @@ def _tm(entity_type, tag, bioactivities=None):
     return SimpleNamespace(entity_type=entity_type, tag=tag, additional_model_params=params)
 
 
-def _page(artifact_id, tag_mentions):
+def _page(artifact_id, tag_mentions, index=1):
     return SimpleNamespace(
-        page_id=uuid4(), index=1, artifact_id=artifact_id, tag_mentions=tag_mentions,
+        page_id=uuid4(), index=index, artifact_id=artifact_id, tag_mentions=tag_mentions,
     )
 
 
@@ -101,6 +101,42 @@ def test_tool_cites_each_value_to_the_deck_it_was_read_in():
     # rides there, so splitting the table per deck costs the card nothing.
     assert [b.value for b in results[0].bioactivities] == ["13.3", "17"]
     assert results[1].bioactivities is None
+
+
+def test_tool_names_the_pages_each_decks_rows_were_read_on():
+    """The table spans pages, so the result carries no page_id; page_indexes names them.
+
+    Scored at slide level, a table with no pages reads as 'answered from training data'.
+    """
+    deck_a, deck_b = uuid4(), uuid4()
+    mic = {"assay_type": "MIC", "value": "0.5", "unit": "uM"}
+    ic50 = {"assay_type": "IC50", "value": "9", "unit": "uM"}
+    activity = CompoundActivityQuery(
+        tag_dictionary=FakeTagDict([str(deck_a), str(deck_b)]),
+        page_read_model=FakePages([
+            _page(deck_a, [_tm("compound_name", "CMX410", bioactivities=[mic])], index=4),
+            _page(deck_a, [_tm("compound_name", "CMX410", bioactivities=[ic50])], index=1),
+            # A summary slide repeating page 4's value verbatim: union_bioactivities keeps
+            # one row stamped with the first page it was read on, so page 6 is NOT listed.
+            # A gold set naming every slide that shows a value will see this as a miss.
+            _page(deck_a, [_tm("compound_name", "CMX410", bioactivities=[mic])], index=6),
+            # A *distinct* value, so deck B gets a row at all: union_bioactivities keys on
+            # the measurement and not the document, so deck B repeating deck A's MIC
+            # verbatim would collapse into deck A's row and deck B would go uncited.
+            _page(deck_b, [_tm("compound_name", "CMX410", bioactivities=[
+                {"assay_type": "MIC", "value": "2", "unit": "uM"},
+            ])], index=7),
+        ]),
+        artifact_read_model=FakeArtifacts(),
+    )
+    tool = SearchStructuredBioactivityTool(activity_query=activity, artifact_read_model=None)
+    results, _, _ = asyncio.run(tool.execute({"compound_name": "CMX410"}, uuid4(), None))
+
+    # Ordered, and per deck -- deck B's slide never lands on deck A's citation.
+    assert results[0].page_indexes == [1, 4]
+    assert results[1].page_indexes == [7]
+    # 0-based, where the rendered Page column is 1-based: same row, two numberings.
+    assert "| CMX410 |  |  | MIC | 0.5 uM | 5 |" in results[0].expanded_text
 
 
 def test_tool_shows_the_target_and_the_partner():

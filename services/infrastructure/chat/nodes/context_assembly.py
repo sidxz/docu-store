@@ -333,6 +333,7 @@ class ContextAssemblyNode:
                         query_source=r.query_source,
                         vector_score=r.similarity_score,
                         rerank_score=r.rerank_score,
+                        page_indexes=r.page_indexes,
                     ),
                 )
                 idx += 1

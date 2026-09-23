@@ -541,6 +541,13 @@ class SearchStructuredBioactivityTool:
                     page_name="Bioactivity Data",
                     expanded_text=table_text,
                     matched_text=table_text[:500],
+                    # The table has no one page to cite, so name the slides its rows were
+                    # read on. From `rows`, not `bios`, so each deck's citation gets its
+                    # own slides; 0-based, as page_index is everywhere but the rendered
+                    # Page column.
+                    page_indexes=sorted(
+                        {b.page_index for b in rows if b.page_index is not None},
+                    ),
                     similarity_score=0.9,
                     query_source=f"tool_bioactivity:{compound}",
                     # Molecule cards read the first result's list (agentic_retrieval step

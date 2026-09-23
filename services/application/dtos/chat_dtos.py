@@ -98,6 +98,10 @@ class SourceCitationDTO(BaseModel):
     # set only when the reranker actually scored this candidate.
     vector_score: float | None = None
     rerank_score: float | None = None
+    # A structured bioactivity table spans several pages of one document, so it has no
+    # single page_id to cite. These are the pages its rows were read on -- 0-based, like
+    # page_index above, deduped and ordered. None for every other source type.
+    page_indexes: list[int] | None = None
 
 
 # --- Content Blocks ---

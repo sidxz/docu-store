@@ -132,6 +132,9 @@ class RetrievalResult(BaseModel):
     # Structured bioactivities ride on the synthetic table result from
     # search_structured_bioactivity → feed the chat molecule block (F3).
     bioactivities: list[BioactivityDTO] | None = None
+    # The pages a multi-page result was assembled from, when page_id/page_index cannot
+    # name one: a bioactivity table's rows span its document. 0-based, deduped, ordered.
+    page_indexes: list[int] | None = None
 
 
 class ContextMetadata(BaseModel):
