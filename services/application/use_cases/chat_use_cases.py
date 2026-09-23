@@ -24,6 +24,7 @@ from application.dtos.chat_dtos import (
     ConversationDetailDTO,
     ConversationDTO,
     EntityRefDTO,
+    GroundingPassDTO,
     QueryContextDTO,
     RecentConversationDTO,
     SourceCitationDTO,
@@ -439,7 +440,7 @@ class SendMessageUseCase:
             grounding_is_grounded: bool | None = None
             grounding_confidence: float | None = None
             grounding_llm_verified: bool | None = None
-            grounding_rounds = 0
+            grounding_passes: list[GroundingPassDTO] = []
             query_context: QueryContextDTO | None = None
             literature_results: list[dict] = []
             literature_seen: set[tuple] = set()
@@ -520,9 +521,16 @@ class SendMessageUseCase:
                             grounding_is_grounded = event.grounding_is_grounded
                             grounding_confidence = event.grounding_confidence
                             grounding_llm_verified = event.grounding_llm_verified
-                            # One event per pass of the verify/refine loop, so
-                            # rounds-1 is how often the refinement re-retrieved.
-                            grounding_rounds += 1
+                            # One event per pass of the verify/refine loop. Keep every
+                            # pass, not just the last: a retry that succeeds would
+                            # otherwise erase the verdict that caused it.
+                            grounding_passes.append(
+                                GroundingPassDTO(
+                                    is_grounded=event.grounding_is_grounded,
+                                    confidence=event.grounding_confidence,
+                                    llm_verified=event.grounding_llm_verified,
+                                ),
+                            )
                         elif event.type == "done":
                             final_event = event
                             if event.sources:
@@ -555,10 +563,11 @@ class SendMessageUseCase:
                         thinking_blocks=thinking_blocks,
                         reasoning_content="".join(reasoning_parts) or None,
                         total_duration_ms=final_event.duration_ms if final_event else None,
-                        retry_count=max(grounding_rounds - 1, 0),
+                        retry_count=max(len(grounding_passes) - 1, 0),
                         grounding_is_grounded=grounding_is_grounded,
                         grounding_confidence=grounding_confidence,
                         grounding_llm_verified=grounding_llm_verified,
+                        grounding_passes=grounding_passes,
                     )
 
                     # Build token usage from agent's done event

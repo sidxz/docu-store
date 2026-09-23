@@ -204,6 +204,14 @@ class AgentStepDTO(BaseModel):
     thinking_content: str | None = None  # LLM intermediate reasoning
 
 
+class GroundingPassDTO(BaseModel):
+    """One pass of the verify/refine loop."""
+
+    is_grounded: bool | None = None
+    confidence: float | None = None
+    llm_verified: bool | None = None
+
+
 class AgentTraceDTO(BaseModel):
     """Full execution trace of the agent pipeline."""
 
@@ -216,6 +224,12 @@ class AgentTraceDTO(BaseModel):
     grounding_confidence: float | None = None
     # Did the model-based grounding check run, or did the coverage gate skip it?
     grounding_llm_verified: bool | None = None
+    # Every pass of the verify/refine loop, in order; the three fields above are the
+    # last one. A retry that succeeds used to erase the verdict that caused it: the
+    # answer the verifier rejected was re-retrieved, the broader context closed the
+    # coverage gate, and the trace kept only the gate's default-pass. Empty for a
+    # turn that never verified, and for messages written before this existed.
+    grounding_passes: list[GroundingPassDTO] = Field(default_factory=list)
 
 
 # --- Token Usage ---
