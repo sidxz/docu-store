@@ -14,7 +14,9 @@ FROM python:3.12-slim
 # libgl1-mesa-glx + libglib2.0-0 for opencv (required by DECIMER/OCSR),
 # libreoffice-impress (PPTX) + libreoffice-writer (DOCX) for Office→PDF conversion
 # (ingestion) — same converter, format-specific LibreOffice filters.
+# `upgrade` pulls Debian security fixes the base image hasn't picked up yet.
 RUN apt-get update && \
+    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
       build-essential \
       librdkafka-dev \

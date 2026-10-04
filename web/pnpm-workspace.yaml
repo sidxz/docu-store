@@ -22,3 +22,10 @@ allowBuilds:
 # which blocks Docker builds right after we publish a Duar SDK release).
 minimumReleaseAgeExclude:
   - "@duar-auth/*"
+
+# Security floors for transitive deps whose parents pin a vulnerable range
+# (draft-js: immutable ~3.7.4; replace: minimatch 3.0.5). Same major, so the
+# API those parents call is unchanged. Drop once ketcher-react moves off them.
+overrides:
+  "immutable@<3.8.4": "^3.8.4"
+  "minimatch@<3.1.4": "^3.1.4"

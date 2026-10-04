@@ -10,5 +10,6 @@ def test_container_resolves_compound_profile_use_case():
 def test_compound_profile_route_registered():
     from interfaces.api.main import app
 
-    paths = {r.path for r in app.routes}
+    # Starlette 1.x nests included routers in app.routes; the schema is flat.
+    paths = app.openapi()["paths"]
     assert "/compounds/{name}/profile" in paths

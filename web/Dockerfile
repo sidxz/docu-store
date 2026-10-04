@@ -34,7 +34,10 @@ RUN pnpm --filter portal build
 # ── Stage 2: Runtime ──────────────────────────────────────────
 FROM node:22-alpine
 
-RUN adduser -D -u 1001 nextjs
+# The server runs on node alone; the bundled npm/corepack only carry CVEs.
+RUN adduser -D -u 1001 nextjs \
+ && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+           /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 
 WORKDIR /app
 
