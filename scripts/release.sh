@@ -193,6 +193,12 @@ do_release() {
   read -rp "  Proceed? [Y/n] " yn
   [[ "$yn" =~ ^[Nn]$ ]] && { info "Aborted."; exit 0; }
 
+  # 0. Security gate: never tag over a red scan.
+  info "Trivy scan of $component (lockfile, secrets, image)…"
+  "$REPO_ROOT/scripts/security-scan.sh" "$component" \
+    || { err "Security scan failed; fix the findings above before releasing."; exit 1; }
+  ok "Security scan passed"
+
   # 1. Update version file
   case "$component" in
     services)

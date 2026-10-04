@@ -117,6 +117,8 @@ Use the release helper — it bumps the version file, commits, tags, and pushes 
 ./scripts/release.sh cli patch          # CLI (publishes to npm)
 ```
 
+Before it bumps anything, the helper runs the security gate, `./scripts/security-scan.sh <component>`: Trivy over the component's lockfile and secrets, then over a local build of the image CI would publish. Any fixable HIGH or CRITICAL finding stops the release (`brew install trivy`). Fix the dependency or the base image; never tag over a red scan. Add an id to `.trivyignore`, with the reason, only when the fix can't run here or is a scheduled major. CI's container scan uses the same bar.
+
 ## Deployment
 
 ### Docker Compose (standalone)

@@ -92,9 +92,11 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: docu-store:scan
-          severity: CRITICAL
+          # Same bar as the local release gate (scripts/security-scan.sh).
+          severity: HIGH,CRITICAL
           exit-code: 1
-          # Only fail on CRITICALs that have a fix available — the base image
+          trivyignores: .trivyignore
+          # Only fail on findings that have a fix available — the base image
           # carries unfixable CRITICALs (Mesa/perl/kernel-headers, will_not_fix)
           # that would otherwise keep CI permanently red with no actionable path.
           ignore-unfixed: true

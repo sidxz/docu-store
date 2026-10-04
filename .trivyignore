@@ -1,0 +1,3 @@
+# Trivy findings the release gate (scripts/security-scan.sh) and CI accept.
+# One id per line, each with a comment: why it can't be fixed now and when it will be.
+# Only for a fix that can't run here or a scheduled major; never to get a release out.
