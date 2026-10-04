@@ -48,5 +48,8 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/docu-store:${{ steps.version.outputs.VERSION }}
             ghcr.io/${{ github.repository_owner }}/docu-store:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # The image is pushed anyway, so its layers are the cache (single-stage
+          # Dockerfile: inline covers every layer). Exporting a separate GHA cache
+          # re-uploaded the multi-GB deps layer and took 5-13 min per publish.
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/docu-store:latest
+          cache-to: type=inline

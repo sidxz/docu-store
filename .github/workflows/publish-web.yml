@@ -49,5 +49,8 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/docu-store-web:${{ steps.version.outputs.VERSION }}
             ghcr.io/${{ github.repository_owner }}/docu-store-web:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Own scope: the default one is shared with the services image and the
+          # two evicted each other. Multi-stage build, so GHA (mode=max) keeps
+          # the pnpm-install stage that an inline cache would drop.
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
