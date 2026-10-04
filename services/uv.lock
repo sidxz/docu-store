@@ -1002,7 +1002,7 @@ requires-dist = [
     { name = "cryptography", specifier = ">=44" },
     { name = "dateparser", specifier = ">=1.2.0" },
     { name = "docling", specifier = ">=2.123.0" },
-    { name = "duar-auth", specifier = ">=1.0.0" },
+    { name = "duar-auth", specifier = ">=1.4.1" },
     { name = "einops" },
     { name = "eventsourcing", specifier = ">=9.5.2" },
     { name = "eventsourcing-kurrentdb", specifier = ">=1.2.2" },
@@ -1056,7 +1056,7 @@ dev = [
 
 [[package]]
 name = "duar-auth"
-version = "1.0.0"
+version = "1.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cryptography" },
@@ -1066,9 +1066,9 @@ dependencies = [
     { name = "pyjwt", extra = ["crypto"] },
     { name = "starlette" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/04/ca/9bfb152d869025502640c4bb3f166fcf1748364df9ad8855b6032c803ba7/duar_auth-1.0.0.tar.gz", hash = "sha256:76d1b94046914904cf16ff6b278dc7497b03401c61de4a145075ccc5b4af0a02", size = 35968, upload-time = "2026-08-15T22:18:29.788Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1f/a0/6faa6a8906a06876ea06202e70a78365ed8a56b2ae8da9fa9b6903ee4f93/duar_auth-1.4.1.tar.gz", hash = "sha256:ff05e8c168488091eb95a90475766e34c6233797b510f14eceef44a73bd3f78f", size = 41586, upload-time = "2026-10-04T16:25:18.051Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5e/d5/6804bfbc306bcebc439125b27b91c83e6f42b3a1e171932b465e256a3396/duar_auth-1.0.0-py3-none-any.whl", hash = "sha256:118be7466b2f36bec254ae970d564a1491cf35fc1865982cc8b6515d1a35ef6a", size = 27174, upload-time = "2026-08-15T22:18:28.506Z" },
+    { url = "https://files.pythonhosted.org/packages/b9/d9/8f4ab2a50a5920a733a7fb8eccfd512824ad04ff66c34cc4eaf06bb135d2/duar_auth-1.4.1-py3-none-any.whl", hash = "sha256:1f78b76d3c773087d9b6474ad57d65a50f46d923883a55a27b99f0f484317950", size = 29782, upload-time = "2026-10-04T16:25:16.436Z" },
 ]
 
 [[package]]
@@ -4152,11 +4152,11 @@ wheels = [
 
 [[package]]
 name = "pyjwt"
-version = "2.11.0"
+version = "2.15.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/5c/5a/b46fa56bf322901eee5b0454a34343cdbdae202cd421775a8ee4e42fd519/pyjwt-2.11.0.tar.gz", hash = "sha256:35f95c1f0fbe5d5ba6e43f00271c275f7a1a4db1dab27bf708073b75318ea623", size = 98019, upload-time = "2026-01-30T19:59:55.694Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/43/ea/5194e52748b0da83d71e082d75496eaec6e58f419f5e184786ded517e6a9/pyjwt-2.15.1.tar.gz", hash = "sha256:4f259e80cdfb6b3fc18a7de51fd1ef9ec79652f25019bae68975ca2468a34df8", size = 121252, upload-time = "2026-09-28T18:40:42.598Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6f/01/c26ce75ba460d5cd503da9e13b21a33804d38c2165dec7b716d06b13010c/pyjwt-2.11.0-py3-none-any.whl", hash = "sha256:94a6bde30eb5c8e04fee991062b534071fd1439ef58d2adc9ccb823e7bcd0469", size = 28224, upload-time = "2026-01-30T19:59:54.539Z" },
+    { url = "https://files.pythonhosted.org/packages/50/ca/44de4e75f8aadc457f0634be3b542815078ded46dca30efb960edeecad6e/pyjwt-2.15.1-py3-none-any.whl", hash = "sha256:42d59d631f7768a1028a64c7ff581a9bf7519804daf91fc5b6c56e30eec5e193", size = 33860, upload-time = "2026-09-28T18:40:41.429Z" },
 ]
 
 [package.optional-dependencies]

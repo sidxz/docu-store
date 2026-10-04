@@ -6,7 +6,7 @@ readme = "README.md"
 license = "AGPL-3.0-only"
 requires-python = ">=3.12"
 dependencies = [
-    "duar-auth>=1.0.0",
+    "duar-auth>=1.4.1",
     "confluent-kafka>=2.13.0",
     "dateparser>=1.2.0",
     "eventsourcing>=9.5.2",

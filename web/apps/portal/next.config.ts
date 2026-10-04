@@ -14,7 +14,6 @@ const nextConfig: NextConfig = {
     "@docu-store/api-client",
     "@duar-auth/js",
     "@duar-auth/react",
-    "@duar-auth/nextjs",
     "ketcher-react",
     "ketcher-core",
     "ketcher-standalone",
