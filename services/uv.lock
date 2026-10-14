@@ -1056,7 +1056,7 @@ wheels = [
 
 [[package]]
 name = "docu-store"
-version = "1.6.1"
+version = "1.6.2"
 source = { virtual = "." }
 dependencies = [
     { name = "confluent-kafka" },
@@ -2530,24 +2530,22 @@ wheels = [
 
 [[package]]
 name = "langfuse"
-version = "3.14.5"
+version = "4.17.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "backoff" },
     { name = "httpx" },
-    { name = "openai" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-otlp-proto-http" },
     { name = "opentelemetry-sdk" },
     { name = "packaging" },
     { name = "pydantic" },
-    { name = "requests", version = "2.32.5", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
-    { name = "requests", version = "2.34.2", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
+    { name = "typing-extensions" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ec/6b/7a945e8bc56cbf343b6f6171fd45870b0ea80ea38463b2db8dd5a9dc04a2/langfuse-3.14.5.tar.gz", hash = "sha256:2f543ec1540053d39b08a50ed5992caf1cd54d472a55cb8e5dcf6d4fcb7ff631", size = 235474, upload-time = "2026-02-23T10:42:47.721Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/96/93/30c97995ad3b24c8dfd45ff02d80f491bd5e103fae432a1872db32e16823/langfuse-4.17.0.tar.gz", hash = "sha256:f8cccfc49d9839969e962ffb88ce49cf531a8cbf31507eb99e43668fb5b3b5da", size = 394423, upload-time = "2026-10-05T08:53:34.777Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a3/a1/10f04224542d6a57073c4f339b6763836a0899c98966f1d4ffcf56d2cf61/langfuse-3.14.5-py3-none-any.whl", hash = "sha256:5054b1c705ec69bce2d7077ce7419727ac629159428da013790979ca9cae77d5", size = 421240, upload-time = "2026-02-23T10:42:46.085Z" },
+    { url = "https://files.pythonhosted.org/packages/9b/e0/1eb38746bb1fbb925eb90a1a501abb15c9eaa5ecf1818c94943360fa563e/langfuse-4.17.0-py3-none-any.whl", hash = "sha256:02560e12d715dd24f239c240886ee197b9e62f4a808f06de77193356c56bf57a", size = 708167, upload-time = "2026-10-05T08:53:35.989Z" },
 ]
 
 [[package]]
