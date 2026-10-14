@@ -7,7 +7,7 @@
 #   APP_UMAMI_URL, APP_UMAMI_WEBSITE_ID
 
 # ── Stage 1: Install + Build ──────────────────────────────────
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
@@ -32,7 +32,7 @@ COPY . .
 RUN pnpm --filter portal build
 
 # ── Stage 2: Runtime ──────────────────────────────────────────
-FROM node:22-alpine
+FROM node:26-alpine
 
 # The server runs on node alone; the bundled npm/corepack only carry CVEs.
 RUN adduser -D -u 1001 nextjs \
