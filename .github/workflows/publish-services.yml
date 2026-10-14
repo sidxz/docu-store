@@ -41,7 +41,7 @@ jobs:
             exit 1
           fi
 
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: services/
           push: true

@@ -42,7 +42,7 @@ jobs:
           fi
 
       # No build-args needed — config is loaded at runtime via /api/config
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: web/
           push: true
