@@ -193,7 +193,10 @@ class Settings(BaseSettings):
     embedding_query_prefix: str = Field(
         default="",
         validation_alias="EMBEDDING_QUERY_PREFIX",
-        description="Prefix for query text, for models trained with one (granite uses none).",
+        description=(
+            "Prefix for query text, for models trained with one. Blank uses the model's "
+            "known prefix (nomic-embed-text-v1.5: 'search_query: '); granite uses none."
+        ),
     )
     embedding_document_prefix: str = Field(
         default="",

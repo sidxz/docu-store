@@ -45,3 +45,18 @@ def test_spec_routes_to_a_cached_api_generator() -> None:
 
 async def test_model_info_reports_the_server_model() -> None:
     assert await ScopedEmbeddingGenerator(Server(), 768).get_model_info() == {"model_name": "local"}
+
+
+def test_nomic_gets_its_trained_prefixes_unless_configured() -> None:
+    from infrastructure.embeddings.sentence_transformer_generator import (
+        SentenceTransformerGenerator,
+    )
+
+    nomic = SentenceTransformerGenerator(model_name="nomic-ai/nomic-embed-text-v1.5")
+    assert (nomic.query_prefix, nomic.document_prefix) == ("search_query: ", "search_document: ")
+    custom = SentenceTransformerGenerator(
+        model_name="nomic-ai/nomic-embed-text-v1.5", query_prefix="q: ", document_prefix="d: "
+    )
+    assert (custom.query_prefix, custom.document_prefix) == ("q: ", "d: ")
+    granite = SentenceTransformerGenerator(model_name="ibm-granite/granite-embedding-english-r2")
+    assert (granite.query_prefix, granite.document_prefix) == ("", "")

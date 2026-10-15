@@ -15,6 +15,12 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger()
 
+# Prefixes a model was trained with, used when none are configured, so picking
+# a model is one setting. Granite and most newer models need none.
+KNOWN_PREFIXES: dict[str, tuple[str, str]] = {
+    "nomic-ai/nomic-embed-text-v1.5": ("search_query: ", "search_document: "),
+}
+
 
 class SentenceTransformerGenerator(EmbeddingGenerator):
     """Adapter for generating embeddings using sentence-transformers library.
@@ -46,8 +52,9 @@ class SentenceTransformerGenerator(EmbeddingGenerator):
         """
         self.model_name = model_name
         self.device = self._resolve_device(device)
-        self.query_prefix = query_prefix
-        self.document_prefix = document_prefix
+        known_query, known_document = KNOWN_PREFIXES.get(model_name, ("", ""))
+        self.query_prefix = query_prefix or known_query
+        self.document_prefix = document_prefix or known_document
 
         logger.info(
             "initializing_sentence_transformer",

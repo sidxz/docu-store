@@ -18,13 +18,23 @@ from infrastructure.config import settings
 pytestmark = pytest.mark.integration
 
 
-async def test_text_embedding_model_encodes() -> None:
+# Both supported local models must keep working on every dependency bump: a
+# deployment may pin either (nomic keeps existing vectors valid, granite is the
+# default). The configured model is added in case it is a third one.
+TEXT_MODELS = sorted(
+    {"ibm-granite/granite-embedding-english-r2", "nomic-ai/nomic-embed-text-v1.5"}
+    | ({settings.embedding_model_name} if settings.embedding_model_provider == "sentence-transformers" else set())
+)
+
+
+@pytest.mark.parametrize("model_name", TEXT_MODELS)
+async def test_text_embedding_model_encodes(model_name: str) -> None:
     from infrastructure.embeddings.sentence_transformer_generator import (
         SentenceTransformerGenerator,
     )
 
     generator = SentenceTransformerGenerator(
-        model_name=settings.embedding_model_name,
+        model_name=model_name,
         device=settings.embedding_device,
     )
     embedding = await generator.generate_text_embedding("inference smoke")
