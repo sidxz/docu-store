@@ -2,6 +2,7 @@
 
 import { KeyRound } from "lucide-react";
 
+import { EmbeddingModelCard } from "@/components/settings/EmbeddingModelCard";
 import { LlmProviderForm } from "@/components/settings/LlmProviderForm";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { Card } from "@/components/ui/Card";
@@ -22,14 +23,17 @@ export default function LlmProviderSettingsPage() {
   }
 
   return (
-    <div className="max-w-2xl">
-      <SettingsSectionHeader
-        title="AI Provider"
-        subtitle="Connect your own AI provider for document processing and chat."
-      />
-      <Card>
-        <LlmProviderForm />
-      </Card>
+    <div className="max-w-2xl space-y-6">
+      <div>
+        <SettingsSectionHeader
+          title="AI Provider"
+          subtitle="Connect your own AI provider for document processing and chat."
+        />
+        <Card>
+          <LlmProviderForm />
+        </Card>
+      </div>
+      <EmbeddingModelCard />
     </div>
   );
 }
