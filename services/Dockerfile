@@ -8,7 +8,7 @@
 #   llm-worker:       .venv/bin/python -m infrastructure.temporal.llm_worker
 #   plugin-consumer:  .venv/bin/python -m infrastructure.plugins.plugin_consumer
 
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 # System deps: librdkafka for confluent-kafka, poppler for pdf2image, wget for healthcheck,
 # libgl1-mesa-glx + libglib2.0-0 for opencv (required by DECIMER/OCSR),
