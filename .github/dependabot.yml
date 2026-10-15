@@ -12,6 +12,10 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      # torch minors change the bundled CUDA generation; the image and the
+      # GPU hosts are on CUDA 12.
+      - dependency-name: "torch"
+        update-types: ["version-update:semver-minor"]
 
   - package-ecosystem: npm
     directory: /web
