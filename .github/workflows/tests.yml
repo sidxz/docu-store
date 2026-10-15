@@ -58,6 +58,14 @@ jobs:
         # --frozen ensures we install exactly what's in uv.lock
         run: cd services && uv sync --frozen --dev
 
+      - name: Cache Hugging Face models
+        # The inference smoke test loads the real embedding and reranker
+        # models (~1 GB); cache them so the job stays fast.
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-models-${{ hashFiles('services/infrastructure/config.py') }}
+
       - name: Run tests
         env:
           DUAR_SERVICE_KEY: test-dummy-key
