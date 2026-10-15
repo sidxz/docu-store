@@ -48,7 +48,7 @@ dependencies = [
     # which nomic-embed-text's remote code still calls (every embed/search
     # call raised). >=5.10 carries the CVE-2026-9856 fix. Lift the cap when
     # the text embedding model no longer depends on nomic remote code.
-    "transformers>=5.10,<5.17",
+    "transformers>=5.10,<5.20",
     "uvicorn>=0.40.0",
     "einops",
     "langchain-openai>=1.3.3",
@@ -61,7 +61,7 @@ dependencies = [
     # EXCEPT cuda_nvcc, so XLA dies with "libdevice not found" and CSER silently
     # returns 0 compounds. Linux/x86_64 only, matching the other nvidia-*-cu12
     # wheels (absent on macOS where TF has no CUDA). See XLA_FLAGS in Dockerfile.
-    "nvidia-cuda-nvcc-cu12>=12.8,<12.9; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "nvidia-cuda-nvcc-cu12>=12.8,<12.10; sys_platform == 'linux' and platform_machine == 'x86_64'",
     "cryptography>=44",
 ]
 
