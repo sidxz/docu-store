@@ -11,6 +11,11 @@ from application.use_cases.summary_embedding_use_cases import (
     EmbedArtifactSummaryUseCase,
     EmbedPageSummaryUseCase,
 )
+from domain.exceptions import LLMError
+from infrastructure.temporal.activities.errors import (
+    llm_error_to_application_error,
+    raise_unless_benign_embedding_failure,
+)
 
 logger = structlog.get_logger()
 
@@ -27,6 +32,14 @@ def create_embed_page_summary_activity(
         try:
             page_uuid = UUID(page_id)
             result = await use_case.execute(page_id=page_uuid)
+        except LLMError as e:
+            logger.error(  # noqa: TRY400 -- expected/typed failure, no traceback needed
+                "embed_page_summary_activity.llm_error",
+                page_id=page_id,
+                error=str(e),
+                retryable=e.retryable,
+            )
+            raise llm_error_to_application_error(e) from e
         except Exception as e:
             logger.exception(
                 "embed_page_summary_activity.exception",
@@ -46,10 +59,7 @@ def create_embed_page_summary_activity(
                 error_code=error.category,
                 error_message=error.message,
             )
-            if error.category == "concurrency":
-                msg = f"Concurrency conflict (will retry): {error.message}"
-                raise RuntimeError(msg)
-            # validation / not_found are non-retryable — return status dict
+            raise_unless_benign_embedding_failure(error)
             return {
                 "status": "failed",
                 "page_id": page_id,
@@ -72,6 +82,14 @@ def create_embed_artifact_summary_activity(
         try:
             artifact_uuid = UUID(artifact_id)
             result = await use_case.execute(artifact_id=artifact_uuid)
+        except LLMError as e:
+            logger.error(  # noqa: TRY400 -- expected/typed failure, no traceback needed
+                "embed_artifact_summary_activity.llm_error",
+                artifact_id=artifact_id,
+                error=str(e),
+                retryable=e.retryable,
+            )
+            raise llm_error_to_application_error(e) from e
         except Exception as e:
             logger.exception(
                 "embed_artifact_summary_activity.exception",
@@ -91,9 +109,7 @@ def create_embed_artifact_summary_activity(
                 error_code=error.category,
                 error_message=error.message,
             )
-            if error.category == "concurrency":
-                msg = f"Concurrency conflict (will retry): {error.message}"
-                raise RuntimeError(msg)
+            raise_unless_benign_embedding_failure(error)
             return {
                 "status": "failed",
                 "artifact_id": artifact_id,

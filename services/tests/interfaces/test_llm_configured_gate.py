@@ -159,3 +159,34 @@ def test_create_428_before_use_case_runs() -> None:
         assert resp.status_code == 428
     finally:
         app.dependency_overrides.clear()
+
+
+class _EmbeddingStore:
+    async def get(self, workspace_id):
+        from application.ports.workspace_embedding_config import WorkspaceEmbeddingConfig
+
+        return WorkspaceEmbeddingConfig(model="openai/text-embedding-3-small")
+
+
+class _NoKeys(FakeStore):
+    async def get(self, workspace_id, user_id):
+        return None
+
+    async def get_config(self, workspace_id, user_id, provider):
+        return None
+
+
+def test_workspace_embedding_model_without_key_is_428_even_with_server_llm() -> None:
+    store = _NoKeys(ENTRY)
+    client = _client(store, _settings(key="sk-server"))
+    container = app.dependency_overrides[get_container]()
+    scope = UserLLMScope(store, enabled=True, embedding_store=_EmbeddingStore())
+    app.dependency_overrides[get_container] = lambda: FakeContainer(
+        {**container._mapping, UserLLMScope: scope},
+    )
+    try:
+        resp = _send(client)
+        assert resp.status_code == 428
+        assert "OpenAI or OpenRouter" in resp.json()["detail"]
+    finally:
+        app.dependency_overrides.clear()

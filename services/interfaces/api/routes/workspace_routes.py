@@ -181,3 +181,141 @@ async def export_cser_training_data(
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# ── Embedding model (self-serve) ────────────────────────────────────────────
+
+
+class EmbeddingModelOption(BaseModel):
+    id: str
+    label: str
+    providers: list[str]  # BYO-LLM provider ids whose key can serve it
+
+
+class WorkspaceEmbeddingResponse(BaseModel):
+    enabled: bool  # per-workspace models exist only in self-serve
+    model: str  # "local" or an option id
+    server_model: str  # what "local" runs
+    has_documents: bool  # changing the model then re-embeds every document
+    usable: bool  # the caller holds a key that can serve ``model``
+    detail: str | None = None  # why not, when not
+    options: list[EmbeddingModelOption]
+
+
+class WorkspaceEmbeddingBody(BaseModel):
+    model: str
+    # Required to change the model of a workspace that already has documents:
+    # every one of them is re-embedded (with its uploader's key).
+    reembed: bool = False
+
+
+class WorkspaceEmbeddingUpdate(BaseModel):
+    model: str
+    reembed_workflows: int
+
+
+async def _current_embedding_model(container: Container, workspace_id: UUID) -> str:
+    from application.ports.workspace_embedding_config import WorkspaceEmbeddingConfigStore
+    from application.services.embedding_models import LOCAL_EMBEDDING_MODEL
+
+    config = await container[WorkspaceEmbeddingConfigStore].get(workspace_id)
+    return config.model if config else LOCAL_EMBEDDING_MODEL
+
+
+@router.get("/embedding", status_code=status.HTTP_200_OK)
+async def get_workspace_embedding(
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> WorkspaceEmbeddingResponse:
+    """The workspace's embedding model and whether the caller can use it."""
+    from application.ports.embedding_generator import EmbeddingGenerator
+    from application.services.embedding_models import EMBEDDING_MODELS, LOCAL_EMBEDDING_MODEL
+    from application.services.llm_scope import UserLLMScope
+    from infrastructure.config import Settings
+
+    enabled = container[Settings].user_llm_keys_enabled
+    model = (
+        await _current_embedding_model(container, auth.workspace_id)
+        if enabled
+        else LOCAL_EMBEDDING_MODEL
+    )
+    spec = (
+        await container[UserLLMScope].spec_for_model(model, auth.workspace_id, auth.user_id)
+        if enabled
+        else None
+    )
+    info = await container[EmbeddingGenerator].get_model_info()
+    docs = await container[ArtifactReadModel].list_artifacts(
+        workspace_id=auth.workspace_id, limit=1
+    )
+    return WorkspaceEmbeddingResponse(
+        enabled=enabled,
+        model=model,
+        server_model=str(info.get("model_name", "")),
+        has_documents=bool(docs),
+        usable=spec is None or spec.missing_key_message is None,
+        detail=spec.missing_key_message if spec else None,
+        options=[
+            EmbeddingModelOption(id=key, label=preset.label, providers=list(preset.providers))
+            for key, preset in EMBEDDING_MODELS.items()
+        ],
+    )
+
+
+@router.put("/embedding", status_code=status.HTTP_200_OK)
+async def set_workspace_embedding(
+    body: WorkspaceEmbeddingBody,
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> WorkspaceEmbeddingUpdate:
+    """Change the workspace's embedding model (admin). Re-embeds existing documents."""
+    from application.ports.workspace_embedding_config import WorkspaceEmbeddingConfigStore
+    from application.services.embedding_models import EMBEDDING_MODELS, LOCAL_EMBEDDING_MODEL
+    from application.services.llm_scope import UserLLMScope
+    from application.workflow_use_cases.trigger_bulk_reembed_use_case import (
+        TriggerBulkReEmbedUseCase,
+    )
+    from infrastructure.config import Settings
+
+    _require_admin(auth)
+    if not container[Settings].user_llm_keys_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This DocuStore uses one embedding model for every workspace.",
+        )
+    if body.model != LOCAL_EMBEDDING_MODEL and body.model not in EMBEDDING_MODELS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"Unknown embedding model '{body.model}'.",
+        )
+    if body.model == await _current_embedding_model(container, auth.workspace_id):
+        return WorkspaceEmbeddingUpdate(model=body.model, reembed_workflows=0)
+
+    has_documents = bool(
+        await container[ArtifactReadModel].list_artifacts(workspace_id=auth.workspace_id, limit=1)
+    )
+    if has_documents and not body.reembed:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Changing the embedding model re-embeds every document in this workspace.",
+        )
+    # The admin must be able to use what they pick — searching needs it right away.
+    spec = await container[UserLLMScope].spec_for_model(
+        body.model, auth.workspace_id, auth.user_id
+    )
+    if spec is not None and spec.missing_key_message:
+        raise HTTPException(
+            status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+            detail=spec.missing_key_message,
+        )
+
+    await container[WorkspaceEmbeddingConfigStore].set(
+        auth.workspace_id, body.model, updated_by=auth.user_id
+    )
+    triggered = 0
+    if has_documents:
+        result = await container[TriggerBulkReEmbedUseCase].execute(
+            workspace_id=auth.workspace_id, targets=["text", "summaries"]
+        )
+        triggered = result.triggered
+    return WorkspaceEmbeddingUpdate(model=body.model, reembed_workflows=triggered)

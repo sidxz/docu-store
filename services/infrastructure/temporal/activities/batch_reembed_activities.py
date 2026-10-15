@@ -7,6 +7,8 @@ import structlog
 from temporalio import activity
 
 from application.use_cases.batch_reembed_use_cases import BatchReEmbedArtifactPagesUseCase
+from domain.exceptions import LLMError
+from infrastructure.temporal.activities.errors import llm_error_to_application_error
 
 logger = structlog.get_logger()
 
@@ -22,6 +24,14 @@ def create_batch_reembed_artifact_pages_activity(
 
         try:
             result = await use_case.execute(artifact_id=UUID(artifact_id))
+        except LLMError as e:
+            logger.error(  # noqa: TRY400 -- expected/typed failure, no traceback needed
+                "batch_reembed_activity_llm_error",
+                artifact_id=artifact_id,
+                error=str(e),
+                retryable=e.retryable,
+            )
+            raise llm_error_to_application_error(e) from e
         except Exception as e:
             logger.exception(
                 "batch_reembed_activity_exception",

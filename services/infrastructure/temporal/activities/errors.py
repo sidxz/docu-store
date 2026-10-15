@@ -24,6 +24,16 @@ def llm_error_to_application_error(exc: LLMError) -> ApplicationError:
     return ApplicationError(str(exc), type=type(exc).__name__, non_retryable=not exc.retryable)
 
 
+# Embedding outcomes that mean "nothing to embed" (a blank page, a deleted
+# artifact) — common in slide decks, so they stay a completed activity.
+_BENIGN_EMBEDDING_CATEGORIES = frozenset({"not_found", "validation"})
+
+
+def raise_unless_benign_embedding_failure(error: AppError) -> None:
+    if error.category not in _BENIGN_EMBEDDING_CATEGORIES:
+        raise failure_to_application_error(error)
+
+
 def failure_to_application_error(error: AppError) -> ApplicationError:
     return ApplicationError(
         error.message,

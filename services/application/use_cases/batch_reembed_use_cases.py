@@ -14,6 +14,7 @@ from uuid import UUID
 import structlog
 
 from application.dtos.parsed_document import Block, ParsedDocument
+from application.services.llm_scope import owner_scope
 from application.use_cases.page_payload import (
     artifact_tag_normalized,
     build_page_payload,
@@ -35,6 +36,7 @@ if TYPE_CHECKING:
     from application.ports.summary_vector_store import SummaryVectorStore
     from application.ports.text_chunker import TextChunker
     from application.ports.vector_store import VectorStore
+    from application.services.llm_scope import UserLLMScope
     from domain.aggregates.artifact import Artifact
     from domain.aggregates.page import Page
 
@@ -60,6 +62,7 @@ class BatchReEmbedArtifactPagesUseCase:
         vector_store: VectorStore,
         text_chunker: TextChunker,
         blob_store: BlobStore | None = None,
+        llm_scope: UserLLMScope | None = None,
     ) -> None:
         self.artifact_repository = artifact_repository
         self.page_repository = page_repository
@@ -67,6 +70,7 @@ class BatchReEmbedArtifactPagesUseCase:
         self.vector_store = vector_store
         self.text_chunker = text_chunker
         self.blob_store = blob_store
+        self.llm_scope = llm_scope
 
     @staticmethod
     def _build_chunk_context(
@@ -113,7 +117,12 @@ class BatchReEmbedArtifactPagesUseCase:
         logger.info("batch_reembed_start", artifact_id=str(artifact_id))
 
         artifact = self.artifact_repository.get_by_id(artifact_id)
+        # One scope for the whole artifact: the uploader's workspace model + key.
+        async with owner_scope(self.llm_scope, artifact):
+            return await self._reembed(artifact)
 
+    async def _reembed(self, artifact: Artifact) -> dict:
+        artifact_id = artifact.id
         if not artifact.pages:
             logger.info("batch_reembed_no_pages", artifact_id=str(artifact_id))
             return {"status": "skipped", "reason": "no_pages", "page_count": 0}
@@ -179,7 +188,8 @@ class BatchReEmbedArtifactPagesUseCase:
             chunk_metadata: list[dict] | None = None
             if page_blocks:
                 bchunks = [
-                    bc for bc in chunk_blocks(page_blocks, max_chars=_settings.chunk_size)
+                    bc
+                    for bc in chunk_blocks(page_blocks, max_chars=_settings.chunk_size)
                     if bc.text.strip()
                 ]
                 if bchunks:
@@ -198,7 +208,9 @@ class BatchReEmbedArtifactPagesUseCase:
                                     scope_table_entities(candidates, local),
                                 )
                 else:
-                    raw_texts = [c.text for c in self.text_chunker.chunk_text(page.text_mention.text)]
+                    raw_texts = [
+                        c.text for c in self.text_chunker.chunk_text(page.text_mention.text)
+                    ]
             else:
                 raw_texts = [c.text for c in self.text_chunker.chunk_text(page.text_mention.text)]
 
@@ -341,16 +353,23 @@ class BatchReEmbedSummariesUseCase:
         page_repository: PageRepository,
         embedding_generator: EmbeddingGenerator,
         summary_vector_store: SummaryVectorStore,
+        llm_scope: UserLLMScope | None = None,
     ) -> None:
         self.artifact_repository = artifact_repository
         self.page_repository = page_repository
         self.embedding_generator = embedding_generator
         self.summary_vector_store = summary_vector_store
+        self.llm_scope = llm_scope
 
     async def execute(self, artifact_id: UUID) -> dict:
         logger.info("batch_reembed_summaries_start", artifact_id=str(artifact_id))
 
         artifact = self.artifact_repository.get_by_id(artifact_id)
+        async with owner_scope(self.llm_scope, artifact):
+            return await self._reembed(artifact)
+
+    async def _reembed(self, artifact: Artifact) -> dict:
+        artifact_id = artifact.id
         artifact_title = artifact.title_mention.title if artifact.title_mention else None
 
         page_summary_count = 0

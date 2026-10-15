@@ -42,6 +42,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # Duar is slow/down (the SDK ctor-actions path would be fatal).
         await register_service_actions(duar)
 
+        stale_vectors = 0  # vectors left over from a previous embedding model
+
         # Initialize Qdrant collections on startup
         try:
             from infrastructure.di.container import create_container
@@ -53,6 +55,25 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             vector_store = container[VectorStore]
             await vector_store.ensure_collection_exists()
             logger.info("qdrant_page_collection_initialized")
+
+            # A changed EMBEDDING_MODEL_NAME leaves the stored vectors in the old
+            # model's space: queries still return results, just meaningless ones.
+            from application.ports.embedding_generator import EmbeddingGenerator
+            from application.services.embedding_models import EMBEDDING_MODELS
+
+            server_model = str(
+                (await container[EmbeddingGenerator].get_model_info()).get("model_name")
+            )
+            stale_vectors = await vector_store.count_vectors_not_from(
+                [server_model, *EMBEDDING_MODELS]
+            )
+            if stale_vectors:
+                logger.error(
+                    "embedding_model_mismatch",
+                    stale_vectors=stale_vectors,
+                    model=server_model,
+                    action="Re-embed documents (Settings → Status) or restore EMBEDDING_MODEL_NAME",
+                )
 
             from application.ports.compound_vector_store import CompoundVectorStore
 
@@ -170,6 +191,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                     device=str(info.get("device", "unknown")),
                     model_name=str(info.get("model_name", "unknown")),
                     inference_ok=True,
+                    error=f"{stale_vectors} stored vectors come from a different embedding "
+                    "model; re-embed documents"
+                    if stale_vectors
+                    else None,
                 )
 
             async def _check_chemberta() -> ModelStatus:

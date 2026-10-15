@@ -37,6 +37,12 @@ def _map_app_error_to_http_exception(error: AppError) -> HTTPException:  # noqa:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=error.message,
         )
+    if error.category == "not_configured":
+        # No key can serve this workspace's embedding model (self-serve).
+        return HTTPException(
+            status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+            detail=error.message,
+        )
     if error.category == "conflict":
         # Distinct from "concurrency": nothing raced, the thing simply already
         # exists. Same status, but the two should not be read as one another.
@@ -188,16 +194,28 @@ async def ensure_llm_configured(auth: RequestAuth, container: Container) -> None
     """Pre-flight BYO-key gate (chat send + upload/create).
 
     Raises 428 before any blob write or event when this caller has no LLM to
-    bill. No-op when USER_LLM_KEYS_ENABLED is off or the env defaults can serve
-    the call. 428, not 409 — the chat client treats 409 on send as "a run is
+    bill, or no key for the workspace's embedding model. No-op when
+    USER_LLM_KEYS_ENABLED is off; the LLM half is skipped when the env defaults
+    can serve the call. 428, not 409 — the chat client treats 409 on send as "a run is
     already active → reattach".
     """
     from application.ports.user_llm_config import UserLLMConfigStore
+    from application.services.llm_scope import UserLLMScope
     from infrastructure.config import Settings
     from infrastructure.llm.factory import server_llm_available
 
     settings = container[Settings]
-    if not settings.user_llm_keys_enabled or server_llm_available(settings):
+    if not settings.user_llm_keys_enabled:
+        return
+    # A workspace that embeds over an API needs one of the caller's keys to
+    # serve that model — for its uploads and for every chat retrieval.
+    embedding = await container[UserLLMScope].embedding_spec(auth.workspace_id, auth.user_id)
+    if embedding is not None and embedding.missing_key_message:
+        raise HTTPException(
+            status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+            detail=embedding.missing_key_message,
+        )
+    if server_llm_available(settings):
         return
     store = container[UserLLMConfigStore]
     if await store.get_entry(auth.workspace_id, auth.user_id) is not None:

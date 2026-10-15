@@ -30,7 +30,7 @@ class SentenceTransformerGenerator(EmbeddingGenerator):
 
     def __init__(
         self,
-        model_name: str = "nomic-ai/nomic-embed-text-v1.5",
+        model_name: str = "ibm-granite/granite-embedding-english-r2",
         device: Literal["cpu", "cuda", "mps"] = "cpu",
         query_prefix: str = "",
         document_prefix: str = "",
@@ -40,8 +40,8 @@ class SentenceTransformerGenerator(EmbeddingGenerator):
         Args:
             model_name: HuggingFace model name or path
             device: Device to run the model on (cpu, cuda, or mps for Apple Silicon)
-            query_prefix: Prefix prepended to query text (e.g. "search_query: " for nomic)
-            document_prefix: Prefix prepended to document text (e.g. "search_document: " for nomic)
+            query_prefix: Prefix prepended to query text, for models trained with one
+            document_prefix: Prefix prepended to document text, for models trained with one
 
         """
         self.model_name = model_name
@@ -84,12 +84,20 @@ class SentenceTransformerGenerator(EmbeddingGenerator):
             )  # heavy import — deferred until first use
 
             logger.info("loading_sentence_transformer_model", model_name=self.model_name)
+            # sentence-transformers keeps a checkpoint's saved dtype; bf16/fp16
+            # weights run ~12x slower on CPU than fp32. No trust_remote_code:
+            # only architectures transformers ships natively are loaded.
+            model_kwargs = None
+            if self.device == "cpu":
+                import torch
+
+                model_kwargs = {"torch_dtype": torch.float32}
             self._model = SentenceTransformer(
                 self.model_name,
                 device=self.device,
-                trust_remote_code=True,
+                model_kwargs=model_kwargs,
             )
-            self._dimensions = self._model.get_sentence_embedding_dimension()
+            self._dimensions = self._model.get_embedding_dimension()
             logger.info(
                 "model_loaded",
                 model_name=self.model_name,
@@ -122,7 +130,7 @@ class SentenceTransformerGenerator(EmbeddingGenerator):
 
         logger.debug("generating_embedding", text_length=len(text))
 
-        # Apply query prefix (e.g. "search_query: " for nomic asymmetric retrieval)
+        # Asymmetric retrieval models expect a query-side prefix
         prefixed_text = self.query_prefix + text if self.query_prefix else text
         vector = self._model.encode(prefixed_text, convert_to_tensor=False).tolist()
 
@@ -175,7 +183,7 @@ class SentenceTransformerGenerator(EmbeddingGenerator):
 
         logger.debug("generating_batch_embeddings", count=len(texts))
 
-        # Apply document prefix for asymmetric retrieval models (e.g. nomic)
+        # Asymmetric retrieval models expect a document-side prefix
         if self.document_prefix:
             texts = [self.document_prefix + t for t in texts]
 

@@ -94,3 +94,55 @@ async def test_success_payloads_unchanged() -> None:
     assert await create_aggregate_artifact_tags_activity(_UseCase(Success(payload)))(ONE_ID[0]) == payload
     payload = {"status": "success", "artifact_id": TWO_IDS[0], "author_count": 1}
     assert await create_extract_document_metadata_activity(_UseCase(Success(payload)))(*TWO_IDS) == payload
+
+
+# ── Embedding activities: a provider failure or an internal error must fail the
+# workflow; "nothing to embed" (blank page, deleted artifact) stays completed.
+
+from infrastructure.temporal.activities.batch_reembed_activities import (  # noqa: E402
+    create_batch_reembed_artifact_pages_activity,
+)
+from infrastructure.temporal.activities.batch_reembed_summaries_activities import (  # noqa: E402
+    create_batch_reembed_summaries_activity,
+)
+from infrastructure.temporal.activities.embedding_activities import (  # noqa: E402
+    create_generate_page_embedding_activity,
+)
+from infrastructure.temporal.activities.summary_embedding_activities import (  # noqa: E402
+    create_embed_artifact_summary_activity,
+    create_embed_page_summary_activity,
+)
+
+EMBEDDING_FACTORIES = [
+    create_generate_page_embedding_activity,
+    create_embed_page_summary_activity,
+    create_embed_artifact_summary_activity,
+]
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [*EMBEDDING_FACTORIES, create_batch_reembed_artifact_pages_activity,
+     create_batch_reembed_summaries_activity],
+)
+async def test_embedding_provider_errors_fail_the_workflow(factory) -> None:
+    with pytest.raises(ApplicationError) as info:
+        await factory(_UseCase(LLMNotConfiguredError("no key")))(ONE_ID[0])
+    assert info.value.non_retryable is True
+    assert info.value.type == "LLMNotConfiguredError"
+
+
+@pytest.mark.parametrize("factory", EMBEDDING_FACTORIES)
+@pytest.mark.parametrize("category", ["internal_error", "concurrency"])
+async def test_embedding_failures_raise_for_retry(factory, category) -> None:
+    with pytest.raises(ApplicationError) as info:
+        await factory(_UseCase(Failure(AppError(category, "msg"))))(ONE_ID[0])
+    assert info.value.non_retryable is False
+
+
+@pytest.mark.parametrize("factory", EMBEDDING_FACTORIES)
+@pytest.mark.parametrize("category", ["validation", "not_found"])
+async def test_nothing_to_embed_stays_completed(factory, category) -> None:
+    out = await factory(_UseCase(Failure(AppError(category, "blank page"))))(ONE_ID[0])
+    assert out["status"] == "failed"
+    assert out["error_code"] == category

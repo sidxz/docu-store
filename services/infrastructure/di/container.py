@@ -33,6 +33,7 @@ from application.ports.user_llm_config import NullUserLLMConfigStore, UserLLMCon
 from application.ports.vector_store import VectorStore
 from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.ports.workflow_status_cache import WorkflowStatusCache
+from application.ports.workspace_embedding_config import WorkspaceEmbeddingConfigStore
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
 from application.services.compound_activity_query import CompoundActivityQuery
 from application.services.llm_scope import UserLLMScope
@@ -163,7 +164,12 @@ from infrastructure.chat.run_registry import ChatRunRegistry
 from infrastructure.chemistry.rdkit_smiles_validator import RdkitSmilesValidator
 from infrastructure.config import Settings, settings
 from infrastructure.cser.cser_pipeline_service import CserPipelineService
+from infrastructure.embeddings.api_embedding_generator import (
+    ApiEmbeddingGenerator,
+    env_embedding_spec,
+)
 from infrastructure.embeddings.chemberta_generator import ChemBertaEmbeddingGenerator
+from infrastructure.embeddings.scoped_embedding_generator import ScopedEmbeddingGenerator
 from infrastructure.embeddings.sentence_transformer_generator import SentenceTransformerGenerator
 from infrastructure.embeddings.tfidf_sparse_generator import TfidfSparseGenerator
 from infrastructure.event_projectors.event_projector import EventProjector
@@ -422,14 +428,26 @@ def create_container() -> Container:
     # Register SMILES Validator
     container[SmilesValidator] = lambda _: RdkitSmilesValidator()
 
-    # Embedding Generator (singleton — model loaded once, reused across requests)
-    embedding_generator_instance = SentenceTransformerGenerator(
-        model_name=settings.embedding_model_name,
-        device=settings.embedding_device,
-        query_prefix=settings.embedding_query_prefix,
-        document_prefix=settings.embedding_document_prefix,
+    # Embedding Generator (singleton — model loaded once, reused across requests).
+    # The server model is local unless EMBEDDING_MODEL_PROVIDER names an API.
+    # Self-serve (USER_LLM_KEYS_ENABLED) wraps it: each workspace picks its model.
+    server_embedding: EmbeddingGenerator
+    if settings.embedding_model_provider == "sentence-transformers":
+        server_embedding = SentenceTransformerGenerator(
+            model_name=settings.embedding_model_name,
+            device=settings.embedding_device,
+            query_prefix=settings.embedding_query_prefix,
+            document_prefix=settings.embedding_document_prefix,
+        )
+    else:
+        server_embedding = ApiEmbeddingGenerator(
+            env_embedding_spec(settings), settings.embedding_dimensions
+        )
+    container[EmbeddingGenerator] = (
+        ScopedEmbeddingGenerator(server_embedding, settings.embedding_dimensions)
+        if settings.user_llm_keys_enabled
+        else server_embedding
     )
-    container[EmbeddingGenerator] = embedding_generator_instance
 
     # Vector Store (text embeddings — page chunks)
     vector_store_instance = QdrantStore(
@@ -528,6 +546,7 @@ def create_container() -> Container:
         sparse_embedding_generator=c[SparseEmbeddingGenerator],
         artifact_repository=c[ArtifactRepository],
         blob_store=c[BlobStore],
+        llm_scope=c[UserLLMScope],
     )
 
     container[SearchSimilarPagesUseCase] = lambda c: SearchSimilarPagesUseCase(
@@ -718,6 +737,9 @@ def create_container() -> Container:
         from infrastructure.read_repositories.mongo_user_llm_provider_store import (
             MongoUserLLMProviderStore,
         )
+        from infrastructure.read_repositories.mongo_workspace_embedding_store import (
+            MongoWorkspaceEmbeddingStore,
+        )
 
         container[UserLLMConfigStore] = lambda c: MongoUserLLMProviderStore(
             client=c[AsyncIOMotorClient],
@@ -725,9 +747,14 @@ def create_container() -> Container:
             collection_name=settings.mongo_user_llm_providers_collection,
             fernet=user_keys_fernet,
         )
+        container[WorkspaceEmbeddingConfigStore] = lambda c: MongoWorkspaceEmbeddingStore(
+            client=c[AsyncIOMotorClient],
+            db_name=settings.mongo_db,
+        )
     container[UserLLMScope] = lambda c: UserLLMScope(
         c[UserLLMConfigStore],
         enabled=settings.user_llm_keys_enabled,
+        embedding_store=c[WorkspaceEmbeddingConfigStore] if user_keys_fernet else None,
     )
 
     # Summarization Use Cases
@@ -779,6 +806,7 @@ def create_container() -> Container:
         vector_store=c[VectorStore],
         text_chunker=c[TextChunker],
         blob_store=c[BlobStore],
+        llm_scope=c[UserLLMScope],
     )
     container[BatchReEmbedSmilesUseCase] = lambda c: BatchReEmbedSmilesUseCase(
         artifact_repository=c[ArtifactRepository],
@@ -791,6 +819,7 @@ def create_container() -> Container:
         page_repository=c[PageRepository],
         embedding_generator=c[EmbeddingGenerator],
         summary_vector_store=c[SummaryVectorStore],
+        llm_scope=c[UserLLMScope],
     )
     container[TriggerBatchReEmbedUseCase] = lambda c: TriggerBatchReEmbedUseCase(
         workflow_orchestrator=c[WorkflowOrchestrator],
@@ -855,11 +884,13 @@ def create_container() -> Container:
         artifact_repository=c[ArtifactRepository],
         embedding_generator=c[EmbeddingGenerator],
         summary_vector_store=c[SummaryVectorStore],
+        llm_scope=c[UserLLMScope],
     )
     container[EmbedArtifactSummaryUseCase] = lambda c: EmbedArtifactSummaryUseCase(
         artifact_repository=c[ArtifactRepository],
         embedding_generator=c[EmbeddingGenerator],
         summary_vector_store=c[SummaryVectorStore],
+        llm_scope=c[UserLLMScope],
     )
     container[TriggerPageSummaryEmbeddingUseCase] = lambda c: TriggerPageSummaryEmbeddingUseCase(
         workflow_orchestrator=c[WorkflowOrchestrator],

@@ -6,6 +6,11 @@ from returns.result import Success
 from temporalio import activity
 
 from application.use_cases.embedding_use_cases import GeneratePageEmbeddingUseCase
+from domain.exceptions import LLMError
+from infrastructure.temporal.activities.errors import (
+    llm_error_to_application_error,
+    raise_unless_benign_embedding_failure,
+)
 
 logger = structlog.get_logger()
 
@@ -62,6 +67,14 @@ def create_generate_page_embedding_activity(
                 force_regenerate=True,
                 skip_sparse=skip_sparse,
             )
+        except LLMError as e:
+            logger.error(  # noqa: TRY400 -- expected/typed failure, no traceback needed
+                "generate_page_embedding_activity_llm_error",
+                page_id=page_id,
+                error=str(e),
+                retryable=e.retryable,
+            )
+            raise llm_error_to_application_error(e) from e
         except Exception as e:
             logger.exception(
                 "generate_page_embedding_activity_exception",
@@ -92,6 +105,7 @@ def create_generate_page_embedding_activity(
                 error_code=error.category,
                 error_message=error.message,
             )
+            raise_unless_benign_embedding_failure(error)
             return {
                 "status": "failed",
                 "page_id": page_id,

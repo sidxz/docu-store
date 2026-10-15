@@ -20,6 +20,7 @@ from application.dtos.search_dtos import (
 )
 from application.ports.reranker import RerankDocument
 from application.use_cases.embedding_use_cases import build_chunk_context
+from domain.exceptions import LLMNotConfiguredError
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -223,7 +224,6 @@ class SearchSummariesUseCase:
                     ),
                 )
 
-            model_info = await self.embedding_generator.get_model_info()
 
             logger.info("search_summaries_success", results_count=len(result_dtos))
 
@@ -232,10 +232,12 @@ class SearchSummariesUseCase:
                     query=request.query_text,
                     results=result_dtos,
                     total_results=len(result_dtos),
-                    model_used=str(model_info.get("model_name", "unknown")),
+                    model_used=query_embedding.model_name,
                 ),
             )
 
+        except LLMNotConfiguredError as e:
+            return Failure(AppError("not_configured", str(e)))
         except Exception as e:
             logger.exception(
                 "search_summaries_failed",
@@ -337,7 +339,6 @@ class HierarchicalSearchUseCase:
                     keep_full_rerank_pool,
                 )
 
-            model_info = await self.embedding_generator.get_model_info()
 
             logger.info(
                 "hierarchical_search_success",
@@ -352,11 +353,13 @@ class HierarchicalSearchUseCase:
                     chunk_hits=chunk_hits,
                     total_summary_hits=len(summary_hits),
                     total_chunk_hits=len(chunk_hits),
-                    model_used=str(model_info.get("model_name", "unknown")),
+                    model_used=query_embedding.model_name,
                     chunk_rerank_info=chunk_rerank_info,
                 ),
             )
 
+        except LLMNotConfiguredError as e:
+            return Failure(AppError("not_configured", str(e)))
         except Exception as e:
             logger.exception(
                 "hierarchical_search_failed",

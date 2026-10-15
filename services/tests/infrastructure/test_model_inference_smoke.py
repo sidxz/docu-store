@@ -1,7 +1,7 @@
 """Every configured ML model must load AND run one inference.
 
 Loading alone proves nothing: transformers 5.17 removed a method that the
-nomic embedding model's remote code still calls, so the model loaded, the
+previous embedding model's remote code still called, so the model loaded, the
 status page showed it as healthy, and the first encode call in production
 raised. Nothing else in the suite touches a real model, so this is the one
 check that fails when a dependency bump breaks inference.
@@ -27,7 +27,7 @@ async def test_text_embedding_model_encodes() -> None:
         model_name=settings.embedding_model_name,
         device=settings.embedding_device,
     )
-    embedding = await generator.generate_text_embedding("search_document: inference smoke")
+    embedding = await generator.generate_text_embedding("inference smoke")
     assert embedding.dimensions > 0
     assert len(embedding.vector) == embedding.dimensions
 

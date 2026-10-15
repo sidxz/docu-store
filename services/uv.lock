@@ -963,7 +963,6 @@ dependencies = [
     { name = "dateparser" },
     { name = "docling" },
     { name = "duar-auth" },
-    { name = "einops" },
     { name = "eventsourcing" },
     { name = "eventsourcing-kurrentdb" },
     { name = "fastapi" },
@@ -1021,7 +1020,6 @@ requires-dist = [
     { name = "dateparser", specifier = ">=1.2.0" },
     { name = "docling", specifier = ">=2.123.0" },
     { name = "duar-auth", specifier = ">=1.4.1" },
-    { name = "einops" },
     { name = "eventsourcing", specifier = ">=9.5.2" },
     { name = "eventsourcing-kurrentdb", specifier = ">=1.2.2" },
     { name = "fastapi", specifier = ">=0.128.0" },
@@ -1058,7 +1056,7 @@ requires-dist = [
     { name = "structlog", specifier = ">=25.5.0" },
     { name = "temporalio", specifier = ">=1.3.0" },
     { name = "torch", specifier = ">=2.5.0" },
-    { name = "transformers", specifier = ">=5.10,<5.17" },
+    { name = "transformers", specifier = ">=5.10" },
     { name = "uvicorn", specifier = ">=0.40.0" },
 ]
 
@@ -1122,15 +1120,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/bc/0f/811c73e9e579361b202b1e8205fff114ee7f9a738489247207c9141266f3/efficientnet-1.1.1.tar.gz", hash = "sha256:a92e7715453f6043942d9c8d995464e8d319494f08d1d458600abbd5c43544bb", size = 15984, upload-time = "2020-09-15T16:26:01.845Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/53/97/84f88e581d6ac86dcf1ab347c497c4c568c38784e3a2bd659b96912ab793/efficientnet-1.1.1-py3-none-any.whl", hash = "sha256:6967fcdaab2074f96228f684dad0628febe622a59181b4a28aaca1251f1b8784", size = 18420, upload-time = "2020-09-15T16:26:00.362Z" },
-]
-
-[[package]]
-name = "einops"
-version = "0.8.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/2c/77/850bef8d72ffb9219f0b1aac23fbc1bf7d038ee6ea666f331fa273031aa2/einops-0.8.2.tar.gz", hash = "sha256:609da665570e5e265e27283aab09e7f279ade90c4f01bcfca111f3d3e13f2827", size = 56261, upload-time = "2026-01-26T04:13:17.638Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2a/09/f8d8f8f31e4483c10a906437b4ce31bdf3d6d417b73fe33f1a8b59e34228/einops-0.8.2-py3-none-any.whl", hash = "sha256:54058201ac7087911181bfec4af6091bb59380360f069276601256a76af08193", size = 65638, upload-time = "2026-01-26T04:13:18.546Z" },
 ]
 
 [[package]]
@@ -5888,7 +5877,7 @@ wheels = [
 
 [[package]]
 name = "transformers"
-version = "5.16.1"
+version = "5.20.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "huggingface-hub" },
@@ -5901,9 +5890,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ad/2e/ba418680ab901dae269360bb8642485eae04f1af91ee2ebb8bd6f3607305/transformers-5.16.1.tar.gz", hash = "sha256:17b0eac726ddc55e84ac58946063e0c6d37fd000c456b581f050ea0f4e822869", size = 9650542, upload-time = "2026-08-26T14:48:58.789Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/c1/b0365332622b6f609dbb5387d2cd07672286c1840c810a5a80539cb45fd2/transformers-5.20.0.tar.gz", hash = "sha256:d82335f354755ff4dc557fa4080472192d2f19349d59b97e05ab981f4177c679", size = 10213550, upload-time = "2026-10-15T18:01:05.438Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0d/4d/ee3728674c0bbc637bb4af88ccf0be697f92e4e90b55f5dc110c44d61b61/transformers-5.16.1-py3-none-any.whl", hash = "sha256:2f2d5b98a5ad3718713653734298fa620754ed683702a635ebb587df3ed29c7e", size = 12080592, upload-time = "2026-08-26T14:48:55.083Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/3c/4ba88b706fee225aa71b147f51a753622405980a816b76d7e199a57f1804/transformers-5.20.0-py3-none-any.whl", hash = "sha256:5f4afd201f9ae5118b006513a0f647962b531de5592043e558a66d326378685b", size = 12826514, upload-time = "2026-10-15T18:01:01.296Z" },
 ]
 
 [[package]]

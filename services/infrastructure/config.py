@@ -156,32 +156,49 @@ class Settings(BaseSettings):
     )
 
     # Embeddings
-    embedding_model_provider: Literal["sentence-transformers", "openai"] = Field(
-        default="sentence-transformers",
-        validation_alias="EMBEDDING_MODEL_PROVIDER",
+    embedding_model_provider: Literal["sentence-transformers", "openai", "gemini", "openrouter"] = (
+        Field(
+            default="sentence-transformers",
+            validation_alias="EMBEDDING_MODEL_PROVIDER",
+            description=(
+                "sentence-transformers runs EMBEDDING_MODEL_NAME locally; the others call "
+                "that model over the provider's API at EMBEDDING_DIMENSIONS dimensions."
+            ),
+        )
+    )
+    embedding_api_key: str | None = Field(
+        default=None,
+        validation_alias="EMBEDDING_API_KEY",
+        description="API embedding key. Falls back to OPENAI_API_KEY / GOOGLE_API_KEY.",
+    )
+    embedding_base_url: str | None = Field(
+        default=None,
+        validation_alias="EMBEDDING_BASE_URL",
+        description="OpenAI-compatible endpoint for provider=openai (e.g. an Azure AI Foundry v1 URL).",
     )
     embedding_model_name: str = Field(
-        default="nomic-ai/nomic-embed-text-v1.5",
+        default="ibm-granite/granite-embedding-english-r2",
         validation_alias="EMBEDDING_MODEL_NAME",
+        description="Changing it requires re-embedding every document.",
     )
     embedding_dimensions: int = Field(
         default=768,
         validation_alias="EMBEDDING_DIMENSIONS",
-        description="Vector dimensionality (768 for nomic, 384 for MiniLM)",
+        description="Vector dimensionality of the Qdrant text/summary collections.",
     )
     embedding_device: Literal["cpu", "cuda", "mps"] = Field(
         default="cpu",
         validation_alias="EMBEDDING_DEVICE",
     )
     embedding_query_prefix: str = Field(
-        default="search_query: ",
+        default="",
         validation_alias="EMBEDDING_QUERY_PREFIX",
-        description="Prefix for query text (nomic requires 'search_query: ')",
+        description="Prefix for query text, for models trained with one (granite uses none).",
     )
     embedding_document_prefix: str = Field(
-        default="search_document: ",
+        default="",
         validation_alias="EMBEDDING_DOCUMENT_PREFIX",
-        description="Prefix for document text (nomic requires 'search_document: ')",
+        description="Prefix for document text, for models trained with one.",
     )
 
     # SMILES / ChemBERTa embeddings

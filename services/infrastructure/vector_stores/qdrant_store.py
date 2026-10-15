@@ -42,7 +42,7 @@ class QdrantStore(VectorStore):
         url: str = "http://localhost:6333",
         api_key: str | None = None,
         collection_name: str = "page_embeddings",
-        vector_size: int = 768,  # Default for nomic-embed-text-v1.5
+        vector_size: int = 768,
     ) -> None:
         """Initialize Qdrant client.
 
@@ -806,6 +806,19 @@ class QdrantStore(VectorStore):
                 limit=limit,
             )
             return results
+
+    async def count_vectors_not_from(self, model_names: list[str]) -> int:
+        client = await self._get_client()
+        result = await client.count(
+            collection_name=self.collection_name,
+            count_filter=models.Filter(
+                must_not=[
+                    models.FieldCondition(key="model_name", match=models.MatchAny(any=model_names))
+                ],
+            ),
+            exact=True,
+        )
+        return result.count
 
     async def get_collection_info(self) -> dict:
         """Get information about the collection.

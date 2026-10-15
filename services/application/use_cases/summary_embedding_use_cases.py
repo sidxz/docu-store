@@ -10,8 +10,9 @@ from application.ports.embedding_generator import EmbeddingGenerator
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_repository import PageRepository
 from application.ports.summary_vector_store import SummaryVectorStore
+from application.services.llm_scope import UserLLMScope, owner_scope
 from application.use_cases.page_payload import artifact_tag_normalized, filter_names
-from domain.exceptions import AggregateNotFoundError
+from domain.exceptions import AggregateNotFoundError, LLMError
 
 logger = structlog.get_logger()
 
@@ -31,11 +32,13 @@ class EmbedPageSummaryUseCase:
         artifact_repository: ArtifactRepository,
         embedding_generator: EmbeddingGenerator,
         summary_vector_store: SummaryVectorStore,
+        llm_scope: UserLLMScope | None = None,
     ) -> None:
         self.page_repository = page_repository
         self.artifact_repository = artifact_repository
         self.embedding_generator = embedding_generator
         self.summary_vector_store = summary_vector_store
+        self.llm_scope = llm_scope
 
     async def execute(self, page_id: UUID) -> Result[dict, AppError]:
         """Embed the page summary and store it in the summary_embeddings collection.
@@ -64,7 +67,10 @@ class EmbedPageSummaryUseCase:
             except AggregateNotFoundError:
                 pass  # Title is optional — embed without it
 
-            embedding = await self.embedding_generator.generate_text_embedding(text=summary_text)
+            async with owner_scope(self.llm_scope, page):
+                embedding = await self.embedding_generator.generate_text_embedding(
+                    text=summary_text
+                )
 
             await self.summary_vector_store.upsert_page_summary_embedding(
                 page_id=page_id,
@@ -95,6 +101,8 @@ class EmbedPageSummaryUseCase:
         except AggregateNotFoundError as e:
             logger.warning("embed_page_summary_not_found", page_id=str(page_id), error=str(e))
             return Failure(AppError("not_found", str(e)))
+        except LLMError:
+            raise  # typed provider failure: the activity decides retry vs fail
         except Exception as e:
             logger.exception("embed_page_summary_failed", page_id=str(page_id), error=str(e))
             return Failure(AppError("internal_error", f"Failed to embed page summary: {e!s}"))
@@ -112,10 +120,12 @@ class EmbedArtifactSummaryUseCase:
         artifact_repository: ArtifactRepository,
         embedding_generator: EmbeddingGenerator,
         summary_vector_store: SummaryVectorStore,
+        llm_scope: UserLLMScope | None = None,
     ) -> None:
         self.artifact_repository = artifact_repository
         self.embedding_generator = embedding_generator
         self.summary_vector_store = summary_vector_store
+        self.llm_scope = llm_scope
 
     async def execute(self, artifact_id: UUID) -> Result[dict, AppError]:
         """Embed the artifact summary and store it in the summary_embeddings collection.
@@ -138,7 +148,10 @@ class EmbedArtifactSummaryUseCase:
             artifact_title = artifact.title_mention.title if artifact.title_mention else None
             page_count = len(artifact.pages)
 
-            embedding = await self.embedding_generator.generate_text_embedding(text=summary_text)
+            async with owner_scope(self.llm_scope, artifact):
+                embedding = await self.embedding_generator.generate_text_embedding(
+                    text=summary_text
+                )
 
             await self.summary_vector_store.upsert_artifact_summary_embedding(
                 artifact_id=artifact_id,
@@ -171,6 +184,8 @@ class EmbedArtifactSummaryUseCase:
                 error=str(e),
             )
             return Failure(AppError("not_found", str(e)))
+        except LLMError:
+            raise  # typed provider failure: the activity decides retry vs fail
         except Exception as e:
             logger.exception(
                 "embed_artifact_summary_failed",

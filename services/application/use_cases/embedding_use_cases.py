@@ -24,8 +24,9 @@ from application.ports.reranker import RerankDocument, Reranker
 from application.ports.sparse_embedding_generator import SparseEmbeddingGenerator
 from application.ports.text_chunker import TextChunker
 from application.ports.vector_store import VectorStore
+from application.services.llm_scope import UserLLMScope, owner_scope
 from application.use_cases.page_payload import build_page_payload, table_scope_candidates
-from domain.exceptions import AggregateNotFoundError
+from domain.exceptions import AggregateNotFoundError, LLMError, LLMNotConfiguredError
 from domain.value_objects.embedding_metadata import EmbeddingMetadata, EmbeddingType
 from domain.value_objects.source_class import SourceClass
 from infrastructure.text_chunkers.block_aware_chunker import (
@@ -121,6 +122,7 @@ class GeneratePageEmbeddingUseCase:
         sparse_embedding_generator: SparseEmbeddingGenerator | None = None,
         artifact_repository: ArtifactRepository | None = None,
         blob_store: BlobStore | None = None,
+        llm_scope: UserLLMScope | None = None,
     ) -> None:
         self.page_repository = page_repository
         self.embedding_generator = embedding_generator
@@ -129,6 +131,7 @@ class GeneratePageEmbeddingUseCase:
         self.sparse_embedding_generator = sparse_embedding_generator
         self.artifact_repository = artifact_repository
         self.blob_store = blob_store
+        self.llm_scope = llm_scope
 
     def _load_page_blocks(self, artifact_id: UUID, page_index: int) -> list[Block] | None:
         if self.blob_store is None:
@@ -276,10 +279,12 @@ class GeneratePageEmbeddingUseCase:
             else:
                 contextual_texts = raw_chunk_texts
 
-            # Generate dense embeddings on contextual texts
-            embeddings = await self.embedding_generator.generate_batch_embeddings(
-                texts=contextual_texts,
-            )
+            # Generate dense embeddings on contextual texts (the uploader's
+            # workspace model and key, when the workspace embeds over an API)
+            async with owner_scope(self.llm_scope, page):
+                embeddings = await self.embedding_generator.generate_batch_embeddings(
+                    texts=contextual_texts,
+                )
 
             # 5b. Generate sparse embeddings on raw texts (exact-term matching)
             # Skip when only the dense contextual prefix changed (e.g. re-embed after summary)
@@ -351,6 +356,8 @@ class GeneratePageEmbeddingUseCase:
         except AggregateNotFoundError as e:
             logger.warning("page_not_found", page_id=str(page_id), error=str(e))
             return Failure(AppError("not_found", f"Page not found: {e!s}"))
+        except LLMError:
+            raise  # typed provider failure: the activity decides retry vs fail
         except Exception as e:
             logger.exception(
                 "generate_page_embedding_failed",
@@ -453,7 +460,9 @@ class SearchSimilarPagesUseCase:
 
             # 2b. Rerank with cross-encoder if available
             rerank_info = None
-            rerank_scores: dict[str, tuple[float | None, int | None]] = {}  # page_id → (score, original_rank)
+            rerank_scores: dict[
+                str, tuple[float | None, int | None]
+            ] = {}  # page_id → (score, original_rank)
 
             if self.reranker and search_results:
                 rerank_docs = []
@@ -577,7 +586,6 @@ class SearchSimilarPagesUseCase:
                 )
                 result_dtos.append(result_dto)
 
-            model_info = await self.embedding_generator.get_model_info()
 
             logger.info(
                 "search_similar_pages_success",
@@ -590,11 +598,13 @@ class SearchSimilarPagesUseCase:
                     query=request.query_text,
                     results=result_dtos,
                     total_results=len(result_dtos),
-                    model_used=str(model_info.get("model_name", "unknown")),
+                    model_used=query_embedding.model_name,
                     rerank_info=rerank_info,
                 ),
             )
 
+        except LLMNotConfiguredError as e:
+            return Failure(AppError("not_configured", str(e)))
         except Exception as e:
             logger.exception(
                 "search_similar_pages_failed",
