@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
+import { appPath } from "./base-path";
 
 export interface AppConfig {
   apiUrl: string;
@@ -13,6 +14,7 @@ export interface AppConfig {
   googleClientId: string;
   githubClientId: string;
   entraIdClientId: string;
+  entraIdTenantId: string;
   umamiUrl: string;
   umamiWebsiteId: string;
 }
@@ -26,6 +28,7 @@ const defaultConfig: AppConfig = {
   googleClientId: "",
   githubClientId: "",
   entraIdClientId: "",
+  entraIdTenantId: "",
   umamiUrl: "",
   umamiWebsiteId: "",
 };
@@ -56,8 +59,13 @@ export function useAppConfig(): AppConfig {
  * (dev without Docker), then to defaults.
  */
 export async function fetchAppConfig(): Promise<AppConfig> {
+  if (process.env.NODE_ENV === "production") {
+    const res = await fetch(appPath("/api/config"), { cache: "no-store" });
+    if (!res.ok) throw new Error(`Failed to load app configuration (${res.status}).`);
+    return await res.json();
+  }
   try {
-    const res = await fetch("/api/config");
+    const res = await fetch(appPath("/api/config"));
     if (res.ok) return await res.json();
   } catch {
     // Server not reachable (SSR, tests) — fall through to env vars
@@ -78,6 +86,9 @@ export async function fetchAppConfig(): Promise<AppConfig> {
     entraIdClientId:
       process.env.NEXT_PUBLIC_ENTRA_ID_CLIENT_ID ??
       defaultConfig.entraIdClientId,
+    entraIdTenantId:
+      process.env.NEXT_PUBLIC_ENTRA_ID_TENANT_ID ??
+      defaultConfig.entraIdTenantId,
     umamiUrl: process.env.NEXT_PUBLIC_UMAMI_URL ?? defaultConfig.umamiUrl,
     umamiWebsiteId:
       process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID ?? defaultConfig.umamiWebsiteId,

@@ -8,6 +8,7 @@ import type { MonthTokenUsage } from "@docu-store/types";
 
 import { useSession } from "@/lib/auth";
 import { forgetWorkspace } from "@/lib/workspace-memory";
+import { appPath } from "@/lib/base-path";
 import { useBreadcrumbs } from "@/hooks/use-breadcrumbs";
 import { useUserTokenUsage } from "@/hooks/use-usage";
 import { useThemeStore } from "@/lib/stores/theme-store";
@@ -46,7 +47,7 @@ export function Topbar() {
 
   const handleLogout = () => {
     logout();
-    window.location.href = "/login";
+    window.location.href = appPath("/login");
   };
 
   // First crumb renders leftmost (workspace-level nav item); the rest follow

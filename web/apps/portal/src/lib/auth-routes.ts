@@ -1,3 +1,5 @@
+import { routePath } from "./base-path";
+
 /**
  * Whether AuthzProvider's silent (prompt=none) re-auth should run for a route.
  *
@@ -15,4 +17,14 @@ export function shouldAutoReauth(pathname: string | null): boolean {
   return !AUTH_FLOW_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
+}
+
+export function workspaceReturnPath(returnTo: string | null | undefined, workspaceSlug: string): string {
+  const home = `/${workspaceSlug}`;
+  const route = returnTo ? routePath(returnTo) : null;
+  const pathname = route?.split(/[?#]/, 1)[0];
+  return route && (
+    pathname === home || pathname?.startsWith(`${home}/`)
+    || pathname === "/onboarding" || pathname?.startsWith("/onboarding/")
+  ) ? route : home;
 }

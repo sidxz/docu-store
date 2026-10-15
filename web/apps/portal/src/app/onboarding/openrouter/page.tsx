@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 import { AuthShell } from "@/components/auth/AuthShell";
 import { AuthGuardWrapper } from "@/components/providers/AuthGuardWrapper";
@@ -34,16 +35,15 @@ function Exchange() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    const dest = takeOpenRouterReturnTo();
-    setReturnTo(dest);
-    const code = params.get("code");
-    if (!code) {
-      clearOpenRouterVerifier();
-      setError("OpenRouter returned no authorization code.");
-      return;
-    }
     (async () => {
       try {
+        const dest = takeOpenRouterReturnTo();
+        setReturnTo(dest);
+        const code = params.get("code");
+        if (!code) {
+          clearOpenRouterVerifier();
+          throw new Error("OpenRouter returned no authorization code.");
+        }
         const key = await exchangeOpenRouterCode(code);
         await save({ provider: "openrouter", api_key: key });
         router.replace(dest);
@@ -61,9 +61,9 @@ function Exchange() {
             <p className="mb-3 text-sm" style={{ color: "#b91c1c" }}>
               {error}
             </p>
-            <a href={returnTo} className="text-sm underline" style={{ color: "#2563eb" }}>
+            <Link href={returnTo} className="text-sm underline" style={{ color: "#2563eb" }}>
               Back
-            </a>
+            </Link>
           </>
         ) : (
           <>

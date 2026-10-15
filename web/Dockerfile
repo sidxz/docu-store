@@ -1,10 +1,11 @@
-# docu-store frontend — Next.js standalone (universal image)
+# docu-store frontend — Next.js standalone (runtime configuration)
 #
 # Configuration is loaded at RUNTIME via /api/config endpoint,
 # not baked at build time. Set APP_* env vars in docker-compose:
 #   APP_API_URL, APP_URL, APP_DUAR_URL, APP_SELF_SERVE_ENABLED,
 #   APP_GOOGLE_CLIENT_ID, APP_GITHUB_CLIENT_ID,
 #   APP_UMAMI_URL, APP_UMAMI_WEBSITE_ID
+# NEXT_PUBLIC_BASE_PATH is the optional build-time mount; APP_* remain runtime.
 
 # ── Stage 1: Install + Build ──────────────────────────────────
 FROM node:22-alpine AS builder
@@ -28,6 +29,9 @@ RUN pnpm install --frozen-lockfile
 
 # Source code
 COPY . .
+
+ARG NEXT_PUBLIC_BASE_PATH=""
+ENV NEXT_PUBLIC_BASE_PATH=$NEXT_PUBLIC_BASE_PATH
 
 RUN pnpm --filter portal build
 
@@ -53,7 +57,10 @@ EXPOSE 15000
 ENV PORT=15000
 ENV HOSTNAME=0.0.0.0
 
+ARG NEXT_PUBLIC_BASE_PATH=""
+ENV NEXT_PUBLIC_BASE_PATH=$NEXT_PUBLIC_BASE_PATH
+
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://localhost:15000/api/health || exit 1
+  CMD wget -qO- "http://localhost:15000${NEXT_PUBLIC_BASE_PATH}/api/health" || exit 1
 
 CMD ["node", "apps/portal/server.js"]

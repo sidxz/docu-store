@@ -17,7 +17,8 @@ export function GET() {
     googleClientId: process.env.APP_GOOGLE_CLIENT_ID ?? "",
     githubClientId: process.env.APP_GITHUB_CLIENT_ID ?? "",
     entraIdClientId: process.env.APP_ENTRA_ID_CLIENT_ID ?? "",
+    entraIdTenantId: process.env.APP_ENTRA_ID_TENANT_ID ?? "",
     umamiUrl: process.env.APP_UMAMI_URL ?? "",
     umamiWebsiteId: process.env.APP_UMAMI_WEBSITE_ID ?? "",
-  });
+  }, { headers: { "Cache-Control": "no-store" } });
 }

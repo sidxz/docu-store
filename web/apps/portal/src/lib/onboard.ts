@@ -1,3 +1,5 @@
+import { appPath } from "./base-path";
+
 /**
  * Duar-hosted self-serve onboarding links.
  * Contract: identity-service docs/guide/self-serve.md — `return_to` must be an
@@ -6,7 +8,7 @@
  * /authz/resolve, so it is in `allowed_origins` by construction.
  */
 function returnTo(): string {
-  return `${window.location.origin}/login`;
+  return `${window.location.origin}${appPath("/login")}`;
 }
 
 export function onboardUrl(duarUrl: string): string {

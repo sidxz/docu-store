@@ -19,7 +19,7 @@ const btnBase =
 
 export default function LoginPage() {
   const { login, isAuthenticated, isLoading } = useAuthz();
-  const { googleClientId, githubClientId, entraIdClientId, duarUrl, selfServeEnabled } =
+  const { googleClientId, githubClientId, entraIdClientId, entraIdTenantId, duarUrl, selfServeEnabled } =
     useAppConfig();
   const router = useRouter();
 
@@ -156,10 +156,11 @@ export default function LoginPage() {
                 Continue with GitHub
               </button>
 
-              {/* Entra ID (disabled) */}
+              {/* Entra ID */}
               <button
-                disabled={!entraIdClientId}
-                className={`${btnBase} cursor-not-allowed border border-[#e2e8f0] bg-white text-[#94a3b8] opacity-60`}
+                disabled={!entraIdClientId || !entraIdTenantId}
+                onClick={() => login("entra_id")}
+                className={`${btnBase} cursor-pointer border border-[#0f172a] bg-white text-[#0f172a] hover:bg-[#f1f5f9]`}
                 style={{ animation: "auth-enter 0.5s ease-out 0.3s both" }}
               >
                 <MicrosoftIcon />

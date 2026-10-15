@@ -77,3 +77,6 @@ services/design_docs/LITERATURE_STATS_DESIGN.md
 
 # Claude Code local config (settings, skills, scheduled tasks)
 .claude/
+
+# Environment-specific deployment notes; keep local, do not commit
+/web/PATH_DEPLOYMENT.md

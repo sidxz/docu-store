@@ -10,11 +10,17 @@
  * Request body (from DuarAuthz.selectWorkspace):
  *   { idp_token, provider, workspace_id, nonce? }
  * Env (server-side, read at request time):
- *   APP_DUAR_URL          — Duar base URL
+ *   APP_DUAR_URL          — Duar base URL (also the browser-facing discovery URL)
+ *   APP_DUAR_INTERNAL_URL — optional server-only Duar URL for this mint call (e.g. the
+ *                           in-cluster service); falls back to APP_DUAR_URL
  *   APP_DUAR_SERVICE_KEY  — a "docu-store" service key (never exposed to the browser)
  */
 export async function POST(request: Request) {
-  const duarUrl = (process.env.APP_DUAR_URL ?? "http://localhost:9003").replace(/\/+$/, "");
+  const duarUrl = (
+    process.env.APP_DUAR_INTERNAL_URL ||
+    process.env.APP_DUAR_URL ||
+    "http://localhost:9003"
+  ).replace(/\/+$/, "");
   const serviceKey = process.env.APP_DUAR_SERVICE_KEY;
 
   if (!serviceKey) {
@@ -31,15 +37,23 @@ export async function POST(request: Request) {
     return Response.json({ detail: "Invalid JSON body" }, { status: 400 });
   }
 
-  const upstream = await fetch(`${duarUrl}/authz/resolve`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Service-Key": serviceKey,
-    },
-    body: JSON.stringify(body),
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(`${duarUrl}/authz/resolve`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Service-Key": serviceKey,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    return Response.json(
+      { detail: "Identity service unreachable from the mint endpoint." },
+      { status: 502, headers: { "Cache-Control": "no-store" } },
+    );
+  }
 
   const data = await upstream.json().catch(() => ({}));
-  return Response.json(data, { status: upstream.status });
+  return Response.json(data, { status: upstream.status, headers: { "Cache-Control": "no-store" } });
 }

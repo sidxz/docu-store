@@ -7,6 +7,7 @@
  * The key is then PUT to our API (provider=openrouter) and never kept here.
  */
 import { deriveCodeChallenge, generateCodeVerifier } from "@duar-auth/js";
+import { appPath, routePath } from "./base-path";
 
 const VERIFIER_KEY = "ds-openrouter-verifier";
 const RETURN_KEY = "ds-openrouter-return";
@@ -17,9 +18,11 @@ export async function startOpenRouterAuth(returnTo: string): Promise<void> {
   const verifier = generateCodeVerifier();
   const challenge = await deriveCodeChallenge(verifier);
   sessionStorage.setItem(VERIFIER_KEY, verifier);
-  sessionStorage.setItem(RETURN_KEY, returnTo);
+  const route = routePath(returnTo);
+  if (!route) throw new Error("Invalid OpenRouter return path.");
+  sessionStorage.setItem(RETURN_KEY, route);
   const url = new URL("https://openrouter.ai/auth");
-  url.searchParams.set("callback_url", `${window.location.origin}${OPENROUTER_CALLBACK_PATH}`);
+  url.searchParams.set("callback_url", `${window.location.origin}${appPath(OPENROUTER_CALLBACK_PATH)}`);
   url.searchParams.set("code_challenge", challenge);
   url.searchParams.set("code_challenge_method", "S256");
   window.location.assign(url.toString());
@@ -36,13 +39,11 @@ export function clearOpenRouterVerifier(): void {
 
 /** Where to go after the exchange (read once, then cleared). */
 export function takeOpenRouterReturnTo(): string {
-  try {
-    const v = sessionStorage.getItem(RETURN_KEY) ?? "/";
-    sessionStorage.removeItem(RETURN_KEY);
-    return v;
-  } catch {
-    return "/";
-  }
+  const value = sessionStorage.getItem(RETURN_KEY) ?? "/";
+  sessionStorage.removeItem(RETURN_KEY);
+  const route = routePath(value);
+  if (!route) throw new Error("Invalid OpenRouter return path.");
+  return route;
 }
 
 export async function exchangeOpenRouterCode(code: string): Promise<string> {

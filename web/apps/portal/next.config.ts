@@ -4,6 +4,7 @@ import { readFileSync } from "fs";
 const pkg = JSON.parse(readFileSync("./package.json", "utf8"));
 
 const nextConfig: NextConfig = {
+  basePath: process.env.NEXT_PUBLIC_BASE_PATH ?? "",
   env: {
     APP_VERSION: pkg.version,
   },

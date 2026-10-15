@@ -1,11 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { AuthzCallback } from "@duar-auth/react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { forgetWorkspace } from "@/lib/workspace-memory";
 import { useAppConfig } from "@/lib/app-config";
 import { onboardUrl } from "@/lib/onboard";
+import { workspaceReturnPath } from "@/lib/auth-routes";
 import { LogoMark } from "@/components/ui/LogoMark";
 import { WorkspaceSelector } from "./workspace-selector";
 
@@ -27,14 +29,7 @@ export default function AuthCallbackPage() {
         // are workspace-agnostic (the authz token carries the workspace) and
         // are honored too — e.g. the OpenRouter PKCE callback's returnTo after
         // a silent re-auth.
-        const home = `/${user.workspaceSlug}`;
-        const onboarding =
-          returnTo === "/onboarding" || returnTo?.startsWith("/onboarding/");
-        const dest =
-          returnTo === home || returnTo?.startsWith(`${home}/`) || onboarding
-            ? (returnTo ?? home)
-            : home;
-        router.replace(dest);
+        router.replace(workspaceReturnPath(returnTo, user.workspaceSlug));
       }}
       onError={() => {
         // A failed auto-entry must not loop — forget the remembered workspace
@@ -92,13 +87,13 @@ export default function AuthCallbackPage() {
                   {error.message}
                 </p>
               )}
-              <a
+              <Link
                 href="/login"
                 className="mt-4 block text-sm transition-colors hover:underline"
                 style={{ color: "#64748b" }}
               >
                 Back to login
-              </a>
+              </Link>
             </div>
           </AuthShell>
         );

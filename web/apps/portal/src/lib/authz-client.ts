@@ -5,6 +5,7 @@ import {
 } from "@duar-auth/js";
 import type { IdpConfig } from "@duar-auth/js";
 import type { AppConfig } from "./app-config";
+import { appPath } from "./base-path";
 
 /** Lazy singleton — avoids localStorage access during SSR/prerendering. */
 let _client: DuarAuthz | null = null;
@@ -27,6 +28,11 @@ export function getAuthzClient(config?: AppConfig): DuarAuthz {
       config?.githubClientId ||
       process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID ||
       "";
+    const entraIdClientId = config?.entraIdClientId || process.env.NEXT_PUBLIC_ENTRA_ID_CLIENT_ID || "";
+    const entraIdTenantId = config?.entraIdTenantId || process.env.NEXT_PUBLIC_ENTRA_ID_TENANT_ID || "";
+    if (Boolean(entraIdClientId) !== Boolean(entraIdTenantId)) {
+      throw new Error("Entra login requires both client ID and tenant ID.");
+    }
 
     const githubIdpConfig: IdpConfig = {
       clientId: githubClientId,
@@ -40,7 +46,8 @@ export function getAuthzClient(config?: AppConfig): DuarAuthz {
       // Required since Duar 0.11.0: the browser no longer mints authz tokens
       // directly. It POSTs to this same-origin route, which forwards to Duar's
       // /authz/resolve with the service key. See app/api/auth/mint/route.ts.
-      mintEndpoint: "/api/auth/mint",
+      mintEndpoint: appPath("/api/auth/mint"),
+      redirectUri: `${window.location.origin}${appPath("/auth/callback")}`,
       storage: new AuthzLocalStorageStore(),
       // Refresh the authz token shortly before it expires so an active session
       // never lapses. (Defaults are true/30 in 0.13.x; set explicitly on this
@@ -51,6 +58,9 @@ export function getAuthzClient(config?: AppConfig): DuarAuthz {
       idps: {
         google: IdpConfigs.google(googleClientId),
         github: githubIdpConfig,
+        ...(entraIdClientId && entraIdTenantId
+          ? { entra_id: IdpConfigs.entraId(entraIdClientId, entraIdTenantId) }
+          : {}),
       },
     });
   }

@@ -25,7 +25,7 @@ function loadRDKit(): Promise<RDKitModule> {
     // locateFile tells the Emscripten loader where to find RDKit_minimal.wasm.
     // The WASM file is copied to the Next.js public/ directory at install time.
     const mod = await initRDKitModule({
-      locateFile: (file) => `/${file}`,
+      locateFile: (file) => `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/${file}`,
     });
     rdkitInstance = mod;
     return mod;

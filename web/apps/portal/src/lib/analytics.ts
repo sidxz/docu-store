@@ -1,3 +1,5 @@
+import { routePath } from "./base-path";
+
 /**
  * Low-level analytics helpers.
  * Works in any JS context (React hooks, Zustand stores, plain callbacks).
@@ -5,7 +7,7 @@
 
 function getWorkspace(): string {
   if (typeof window === "undefined") return "unknown";
-  const segments = window.location.pathname.split("/").filter(Boolean);
+  const segments = (routePath(window.location.pathname) ?? "").split("/").filter(Boolean);
   return segments[0] ?? "unknown";
 }
 
