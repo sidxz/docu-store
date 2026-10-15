@@ -14,21 +14,21 @@
   },
   "peerDependencies": {
     "next": "^16.3.8",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
   },
   "devDependencies": {
     "@docu-store/tsconfig": "workspace:*",
     "@docu-store/types": "workspace:*",
-    "@types/react": "^19.0.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "@types/react": "^19.3.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "typescript": "^5.9.3"
   },
   "dependencies": {
     "@rdkit/rdkit": "2025.3.4-1.0.0",
-    "ketcher-core": "^3.10.0",
-    "ketcher-react": "^3.10.0",
-    "ketcher-standalone": "^3.10.0"
+    "ketcher-core": "^3.18.0",
+    "ketcher-react": "^3.18.0",
+    "ketcher-standalone": "^3.18.0"
   }
 }
