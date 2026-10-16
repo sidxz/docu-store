@@ -144,6 +144,7 @@ async def delete_page(
     auth: Annotated[RequestAuth, Depends(get_auth)],
 ) -> None:
     """Delete a page."""
+    await require_action(auth, "artifacts:delete")
     page = await require_workspace_page(page_id, auth, container)
     await require_page_permission(page, auth, "edit")
     use_case = container[DeletePageUseCase]

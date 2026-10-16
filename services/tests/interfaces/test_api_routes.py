@@ -22,7 +22,11 @@ from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.repositories.user_preferences_store import UserPreferencesStore
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
 from application.services.llm_scope import UserLLMScope
-from application.use_cases.artifact_use_cases import CreateArtifactUseCase
+from application.use_cases.artifact_use_cases import (
+    CreateArtifactUseCase,
+    DeleteArtifactUseCase,
+    RemovePagesUseCase,
+)
 from application.use_cases.literature_use_cases import SearchLiteratureUseCase
 from application.use_cases.correct_metadata_use_cases import (
     CorrectArtifactMetadataUseCase,
@@ -740,3 +744,71 @@ class TestLiteratureRoutes:
             json={"source": "MED", "external_id": "41591406", "visibility": "public"},
         )
         assert response.status_code == 422
+
+
+class TestDeleteActionGate:
+    """Deleting a document, or pages of one, needs the artifacts:delete action
+    (admins and owners bypass), on top of edit permission on the artifact."""
+
+    @staticmethod
+    def _artifact_read_model(artifact_id: UUID) -> FakeArtifactReadModel:
+        return FakeArtifactReadModel(
+            {
+                artifact_id: ArtifactResponse(
+                    artifact_id=artifact_id,
+                    source_filename="paper.pdf",
+                    artifact_type=ArtifactType.RESEARCH_ARTICLE,
+                    mime_type=MimeType.PDF,
+                    storage_location="/storage/paper.pdf",
+                ),
+            },
+        )
+
+    @staticmethod
+    def _page_read_model(page_id: UUID) -> FakePageReadModel:
+        return FakePageReadModel(
+            {
+                page_id: PageResponse(
+                    page_id=page_id,
+                    artifact_id=uuid4(),
+                    name="Page",
+                    index=0,
+                    compound_mentions=[],
+                    tag_mentions=[],
+                ),
+            },
+        )
+
+    def _requests(self, make_client, auth: FakeAuth):  # noqa: ANN202
+        artifact_id, page_id = uuid4(), uuid4()
+        read_model = self._artifact_read_model(artifact_id)
+        client = make_client(
+            {
+                ArtifactReadModel: read_model,
+                PageReadModel: self._page_read_model(page_id),
+                DeleteArtifactUseCase: FakeUseCase(Success(None)),
+                RemovePagesUseCase: FakeUseCase(Success(read_model._artifacts[artifact_id])),
+                DeletePageUseCase: FakeUseCase(Success(None)),
+            },
+            auth=auth,
+        )
+        return [
+            client.delete(f"/artifacts/{artifact_id}"),
+            client.request("DELETE", f"/artifacts/{artifact_id}/pages", json=[str(uuid4())]),
+            client.delete(f"/pages/{page_id}"),
+        ]
+
+    def test_denied_without_the_delete_action(self, make_client) -> None:
+        responses = self._requests(make_client, FakeAuth(role="editor", actions=set()))
+        assert [r.status_code for r in responses] == [403, 403, 403]
+        assert all("artifacts:delete" in r.json()["detail"] for r in responses)
+
+    def test_allowed_with_the_delete_action(self, make_client) -> None:
+        responses = self._requests(
+            make_client, FakeAuth(role="editor", actions={"artifacts:delete"})
+        )
+        assert all(r.status_code < 300 for r in responses), [r.status_code for r in responses]
+
+    def test_admin_bypasses_the_delete_action_check(self, make_client) -> None:
+        responses = self._requests(make_client, FakeAuth(role="admin", actions=set()))
+        assert all(r.status_code < 300 for r in responses), [r.status_code for r in responses]

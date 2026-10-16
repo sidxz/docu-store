@@ -181,6 +181,7 @@ async def remove_pages(
     auth: Annotated[RequestAuth, Depends(get_auth)],
 ) -> ArtifactResponse:
     """Remove pages from an artifact."""
+    await require_action(auth, "artifacts:delete")
     await require_workspace_artifact(artifact_id, auth, container)
     await require_artifact_permission(artifact_id, auth, "edit")
     use_case = container[RemovePagesUseCase]
@@ -230,6 +231,7 @@ async def delete_artifact(
     auth: Annotated[RequestAuth, Depends(get_auth)],
 ) -> None:
     """Delete an artifact and all its associated pages."""
+    await require_action(auth, "artifacts:delete")
     await require_workspace_artifact(artifact_id, auth, container)
     await require_artifact_permission(artifact_id, auth, "edit")
     use_case = container[DeleteArtifactUseCase]

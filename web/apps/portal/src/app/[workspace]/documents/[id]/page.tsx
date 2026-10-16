@@ -4,7 +4,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { FileText, ArrowLeft, Lock, Users, Loader2, AlertCircle, CheckCircle2, Trash2 } from "lucide-react";
-import { useAuthzHasRole } from "@duar-auth/react";
+import { useAuthzHasAction, useAuthzHasRole } from "@duar-auth/react";
 
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -67,6 +67,8 @@ export default function ArtifactDetailPage() {
   const confirm = useConfirm();
   const rerunMutation = useRerunArtifactWorkflow(id);
   const canEdit = useAuthzHasRole("editor");
+  // Server gate: the artifacts:delete action (admins and owners bypass it).
+  const canDelete = useAuthzHasAction("artifacts:delete") || useAuthzHasRole("admin");
 
   // Record document open for activity tracking (fire-and-forget)
   useEffect(() => {
@@ -168,29 +170,31 @@ export default function ArtifactDetailPage() {
               artifactId={id}
               isOwnerOrAdmin={isOwnerOrAdmin}
             />
-            <Button
-              variant="destructive"
-              disabled={deleteMutation.isPending}
-              onClick={async () => {
-                if (
-                  await confirm({
-                    title: "Delete document?",
-                    description: `Delete "${title}" and all its pages? This can't be undone.`,
-                    confirmLabel: "Delete",
-                    destructive: true,
-                  })
-                ) {
-                  handleDelete();
-                }
-              }}
-            >
-              {deleteMutation.isPending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Trash2 className="size-4" />
-              )}
-              Delete
-            </Button>
+            {canDelete && (
+              <Button
+                variant="destructive"
+                disabled={deleteMutation.isPending}
+                onClick={async () => {
+                  if (
+                    await confirm({
+                      title: "Delete document?",
+                      description: `Delete "${title}" and all its pages? This can't be undone.`,
+                      confirmLabel: "Delete",
+                      destructive: true,
+                    })
+                  ) {
+                    handleDelete();
+                  }
+                }}
+              >
+                {deleteMutation.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Trash2 className="size-4" />
+                )}
+                Delete
+              </Button>
+            )}
           </div>
         }
       />
