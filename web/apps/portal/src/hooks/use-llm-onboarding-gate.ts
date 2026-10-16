@@ -25,7 +25,8 @@ function skipped(): boolean {
 }
 
 /**
- * First-run gate: BYO-LLM mode on + no provider for this user → /onboarding.
+ * First-run gate: BYO-LLM mode on + workspace has no provider + caller is an
+ * admin (the only role that can connect one) → /onboarding.
  * Fails open when the status query errors (data undefined). The onboarding
  * routes themselves are exempt so the PKCE callback can finish.
  */
@@ -35,7 +36,7 @@ export function useLlmOnboardingGate(): void {
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!data?.enabled || data.configured) return;
+    if (!data?.enabled || data.configured || !data.can_manage) return;
     if (pathname === "/onboarding" || pathname.startsWith("/onboarding/") || skipped()) return;
     router.replace("/onboarding");
   }, [data, pathname, router]);

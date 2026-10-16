@@ -89,9 +89,9 @@ class Settings(BaseSettings):
         default="token_limits",
         validation_alias="MONGO_TOKEN_LIMITS_COLLECTION",
     )
-    mongo_user_llm_providers_collection: str = Field(
-        default="user_llm_providers",
-        validation_alias="MONGO_USER_LLM_PROVIDERS_COLLECTION",
+    mongo_workspace_llm_providers_collection: str = Field(
+        default="workspace_llm_providers",
+        validation_alias="MONGO_WORKSPACE_LLM_PROVIDERS_COLLECTION",
     )
 
     # Blob Storage
@@ -326,16 +326,16 @@ class Settings(BaseSettings):
         default=False,
         validation_alias="USER_LLM_KEYS_ENABLED",
         description=(
-            "When True, LLM calls first look up the caller's own provider config "
-            "(UserLLMConfigStore) before falling back to the env LLM_* defaults. "
-            "Public/BYO-LLM deployments set this; the default keeps today's behavior."
+            "When True (self-serve), each workspace runs on the LLM keys its admins "
+            "connect (UserLLMConfigStore) before falling back to the env LLM_* defaults, "
+            "and may pick its own embedding model. The default keeps env-keyed behavior."
         ),
     )
     user_llm_keys_secret: str | None = Field(
         default=None,
         validation_alias="USER_LLM_KEYS_SECRET",
         description=(
-            "Fernet key that encrypts per-user LLM API keys at rest. Required when "
+            "Fernet key that encrypts workspace LLM API keys at rest. Required when "
             "USER_LLM_KEYS_ENABLED=true. Generate: python -c 'from cryptography.fernet "
             "import Fernet; print(Fernet.generate_key().decode())'"
         ),

@@ -42,7 +42,7 @@ from interfaces.api.routes.helpers import (
     require_literature_enabled,
 )
 from interfaces.api.routes.helpers import get_allowed_artifact_ids as _get_allowed_artifact_ids
-from interfaces.dependencies import get_auth, get_container, llm_user_scope
+from interfaces.dependencies import get_auth, get_container, workspace_llm_scope
 
 logger = structlog.get_logger()
 
@@ -256,7 +256,7 @@ async def set_conversation_folder(
 @router.post(
     "/{conversation_id}/messages",
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(llm_user_scope)],
+    dependencies=[Depends(workspace_llm_scope)],
 )
 async def send_message(
     conversation_id: UUID,

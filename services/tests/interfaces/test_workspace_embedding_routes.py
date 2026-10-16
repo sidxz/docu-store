@@ -41,10 +41,10 @@ class LLMStore:
     def __init__(self, keys: dict[str, str]) -> None:
         self.keys = keys
 
-    async def get_entry(self, workspace_id, user_id):
+    async def get_entry(self, workspace_id):
         return None
 
-    async def get_config(self, workspace_id, user_id, provider):
+    async def get_config(self, workspace_id, provider):
         key = self.keys.get(provider)
         return UserLLMConfig(provider="openai", api_key=key) if key else None
 

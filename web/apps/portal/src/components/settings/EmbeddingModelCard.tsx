@@ -51,7 +51,7 @@ export function EmbeddingModelCard() {
         title: "Re-embed every document?",
         description:
           "Searches compare against vectors from one model, so every document in this " +
-          "workspace is embedded again with the new one, each with its uploader's key. " +
+          "workspace is embedded again with the new one, on this workspace's key. " +
           "Search results are incomplete until that finishes.",
         confirmLabel: "Change and re-embed",
       }))
@@ -68,8 +68,8 @@ export function EmbeddingModelCard() {
     <Card>
       <CardHeader title="Search embeddings" />
       <p className="text-sm text-text-muted">
-        The model that turns this workspace&apos;s documents and searches into vectors. Every
-        member searches with it, using their own key.
+        The model that turns this workspace&apos;s documents and searches into vectors, run on
+        the keys above.
       </p>
 
       {isAdmin ? (
@@ -97,8 +97,8 @@ export function EmbeddingModelCard() {
 
       {selectedOption && (
         <p className="mt-2 text-xs text-text-muted">
-          Works with an {selectedOption.providers.map((p) => PROVIDER_LABEL[p] ?? p).join(" or ")}{" "}
-          key.
+          Needs a key from{" "}
+          {selectedOption.providers.map((p) => PROVIDER_LABEL[p] ?? p).join(" or ")} above.
         </p>
       )}
       {!data.usable && data.detail && (

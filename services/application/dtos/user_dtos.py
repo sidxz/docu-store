@@ -82,7 +82,7 @@ _Model = Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)
 
 
 class LLMProviderRequest(BaseModel):
-    """PUT /user/llm-provider. Blank models fall back to the provider preset;
+    """PUT /workspace/llm-provider. Blank models fall back to the provider preset;
     omit ``api_key`` to change models only (the stored key is kept).
     """
 
@@ -98,7 +98,10 @@ class LLMProviderPreset(BaseModel):
 
 
 class LLMProviderEntry(BaseModel):
-    """One configured provider. Exactly one of a caller's entries is ``active``."""
+    """One configured provider. Exactly one of a workspace's entries is ``active``.
+
+    ``key_last4`` is blank for non-admins.
+    """
 
     provider: str
     model: str
@@ -109,11 +112,13 @@ class LLMProviderEntry(BaseModel):
 
 
 class LLMProviderResponse(BaseModel):
-    """GET /user/llm-provider — keys are write-only; only their last 4 are shown."""
+    """GET /workspace/llm-provider — keys are write-only; admins see their last 4."""
 
     enabled: bool
     # An active provider exists, i.e. there is an LLM to bill and to run with.
     configured: bool
+    # The caller is a workspace admin: the only role that may connect or change keys.
+    can_manage: bool = False
     providers: list[LLMProviderEntry] = []
     presets: dict[str, LLMProviderPreset]
     # Model names to offer per provider — a hint for the form, not a contract:

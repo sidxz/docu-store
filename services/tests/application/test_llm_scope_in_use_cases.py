@@ -1,4 +1,4 @@
-"""Ingestion use cases resolve the uploader's LLM config around their LLM calls
+"""Ingestion use cases resolve the workspace's LLM config around their LLM calls
 and let typed LLM errors escape (the activity decides retry vs. fail)."""
 
 from __future__ import annotations
@@ -36,10 +36,10 @@ CFG = UserLLMConfig(provider="openai", api_key="k")
 
 class _Store:
     def __init__(self) -> None:
-        self.calls: list[tuple[UUID, UUID]] = []
+        self.calls: list[UUID] = []
 
-    async def get(self, workspace_id: UUID, user_id: UUID) -> UserLLMConfig | None:
-        self.calls.append((workspace_id, user_id))
+    async def get(self, workspace_id: UUID) -> UserLLMConfig | None:
+        self.calls.append(workspace_id)
         return CFG
 
 
@@ -92,7 +92,7 @@ async def test_summarize_page_resolves_owner_config_around_llm_calls() -> None:
     store, llm = _Store(), _SeeingLLM()
     uc, page = _page_use_case(llm, UserLLMScope(store, enabled=True))
     await uc.execute(page.id)
-    assert store.calls == [(WS, OWNER)]
+    assert store.calls == [WS]
     assert llm.seen == [CFG]
     assert get_user_config() is None
 
@@ -103,7 +103,7 @@ async def test_summarize_page_lets_llm_errors_escape_and_resets_scope(exc) -> No
     uc, page = _page_use_case(MockLLMClient(raise_on_call=exc), UserLLMScope(store, enabled=True))
     with pytest.raises(type(exc)):
         await uc.execute(page.id)
-    assert store.calls == [(WS, OWNER)]
+    assert store.calls == [WS]
     assert get_user_config() is None  # scope reset even though the LLM raised
 
 
@@ -133,7 +133,7 @@ async def test_summarize_artifact_resolves_owner_config() -> None:
     store, llm = _Store(), _SeeingLLM()
     uc, artifact = _artifact_use_case(llm, UserLLMScope(store, enabled=True))
     await uc.execute(artifact.id)
-    assert store.calls == [(WS, OWNER)]
+    assert store.calls == [WS]
     assert llm.seen and all(s is CFG for s in llm.seen)
 
 
@@ -170,7 +170,7 @@ async def test_extract_page_entities_resolves_owner_config_and_propagates() -> N
     store, ner = _Store(), _NER()
     uc, page = _ner_use_case(ner, UserLLMScope(store, enabled=True))
     await uc.execute(page.id)
-    assert store.calls == [(WS, OWNER)]
+    assert store.calls == [WS]
     assert ner.seen == [CFG]
 
     uc, page = _ner_use_case(_NER(LLMNotConfiguredError("no key")))

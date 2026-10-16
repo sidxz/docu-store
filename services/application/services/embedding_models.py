@@ -89,8 +89,8 @@ def missing_key_spec(model: str) -> EmbeddingSpec:
         )
     names = " or ".join(_PROVIDER_LABELS[p] for p in preset.providers)
     message = (
-        f"This workspace searches with {preset.label}. "
-        f"Connect a {names} key under Settings → AI Provider."
+        f"This workspace searches with {preset.label}, which needs a key from {names}. "
+        "A workspace admin can connect one under Settings → AI Provider."
     )
     first = next(iter(preset.providers))
     return EmbeddingSpec(

@@ -113,9 +113,9 @@ def _store(coll: _FakeColl | None = None) -> tuple[MongoUserLLMProviderStore, _F
 
 async def test_set_then_get_entry_exposes_only_last4() -> None:
     store, coll = _store()
-    ws, user = uuid4(), uuid4()
-    await store.set(ws, user, provider="openrouter", api_key=KEY, model="m", chat_model="c")
-    entry = await store.get_entry(ws, user)
+    ws = uuid4()
+    await store.set(ws, provider="openrouter", api_key=KEY, model="m", chat_model="c")
+    entry = await store.get_entry(ws)
     assert entry.provider == "openrouter"
     assert (entry.model, entry.chat_model, entry.key_last4) == ("m", "c", "1234")
     assert entry.active is True  # the first provider added is the one that runs
@@ -125,9 +125,9 @@ async def test_set_then_get_entry_exposes_only_last4() -> None:
 
 async def test_get_decrypts_and_maps_openrouter_to_openai_plus_base_url() -> None:
     store, _ = _store()
-    ws, user = uuid4(), uuid4()
-    await store.set(ws, user, provider="openrouter", api_key=KEY, model="m", chat_model="c")
-    cfg = await store.get(ws, user)
+    ws = uuid4()
+    await store.set(ws, provider="openrouter", api_key=KEY, model="m", chat_model="c")
+    cfg = await store.get(ws)
     assert cfg is not None
     assert cfg.provider == "openai"
     assert cfg.base_url == OPENROUTER_BASE_URL
@@ -138,36 +138,36 @@ async def test_get_decrypts_and_maps_openrouter_to_openai_plus_base_url() -> Non
 
 async def test_get_for_direct_provider_has_no_base_url() -> None:
     store, _ = _store()
-    ws, user = uuid4(), uuid4()
-    await store.set(ws, user, provider="gemini", api_key=KEY, model="m", chat_model="c")
-    cfg = await store.get(ws, user)
+    ws = uuid4()
+    await store.set(ws, provider="gemini", api_key=KEY, model="m", chat_model="c")
+    cfg = await store.get(ws)
     assert cfg is not None and cfg.provider == "gemini" and cfg.base_url is None
 
 
 async def test_missing_row_is_none_everywhere() -> None:
     store, _ = _store()
-    assert await store.get(uuid4(), uuid4()) is None
-    assert await store.get_entry(uuid4(), uuid4()) is None
+    assert await store.get(uuid4()) is None
+    assert await store.get_entry(uuid4()) is None
 
 
 async def test_update_models_keeps_key_and_reports_missing_row() -> None:
     store, _ = _store()
-    ws, user = uuid4(), uuid4()
-    assert await store.update_models(ws, user, provider="openai", model="x", chat_model="y") is False
-    await store.set(ws, user, provider="openai", api_key=KEY, model="m", chat_model="c")
-    assert await store.update_models(ws, user, provider="openai", model="x", chat_model="y") is True
-    entry = await store.get_entry(ws, user)
+    ws = uuid4()
+    assert await store.update_models(ws, provider="openai", model="x", chat_model="y") is False
+    await store.set(ws, provider="openai", api_key=KEY, model="m", chat_model="c")
+    assert await store.update_models(ws, provider="openai", model="x", chat_model="y") is True
+    entry = await store.get_entry(ws)
     assert (entry.model, entry.chat_model, entry.key_last4) == ("x", "y", "1234")
-    assert (await store.get(ws, user)).api_key == KEY
+    assert (await store.get(ws)).api_key == KEY
 
 
 async def test_delete_removes_row() -> None:
     store, _ = _store()
-    ws, user = uuid4(), uuid4()
-    await store.set(ws, user, provider="openai", api_key=KEY, model="m", chat_model="c")
-    assert await store.delete(ws, user, "openai") is True
-    assert await store.get_entry(ws, user) is None
-    assert await store.delete(ws, user, "openai") is False
+    ws = uuid4()
+    await store.set(ws, provider="openai", api_key=KEY, model="m", chat_model="c")
+    assert await store.delete(ws, "openai") is True
+    assert await store.get_entry(ws) is None
+    assert await store.delete(ws, "openai") is False
 
 
 class _RaceyColl(_FakeColl):
@@ -186,57 +186,44 @@ class _RaceyColl(_FakeColl):
 
 async def test_set_retries_once_on_duplicate_key_race() -> None:
     store, coll = _store(_RaceyColl())
-    ws, user = uuid4(), uuid4()
-    await store.set(ws, user, provider="openai", api_key=KEY, model="m", chat_model="c")
+    ws = uuid4()
+    await store.set(ws, provider="openai", api_key=KEY, model="m", chat_model="c")
     assert coll.calls == 2
-    assert (await store.get_entry(ws, user)).key_last4 == "1234"
+    assert (await store.get_entry(ws)).key_last4 == "1234"
 
 
 async def test_undecryptable_row_resolves_to_none_but_entry_survives() -> None:
     store, coll = _store()
-    ws, user = uuid4(), uuid4()
-    await store.set(ws, user, provider="openai", api_key=KEY, model="m", chat_model="c")
+    ws = uuid4()
+    await store.set(ws, provider="openai", api_key=KEY, model="m", chat_model="c")
     store._fernet = Fernet(Fernet.generate_key())  # secret rotated without re-keying
-    assert await store.get(ws, user) is None
-    assert (await store.get_entry(ws, user)).key_last4 == "1234"
+    assert await store.get(ws) is None
+    assert (await store.get_entry(ws)).key_last4 == "1234"
 
 
 async def test_unresolvable_provider_resolves_to_none_but_entry_survives() -> None:
     store, coll = _store()
-    ws, user = uuid4(), uuid4()
-    await store.set(ws, user, provider="openai", api_key=KEY, model="m", chat_model="c")
+    ws = uuid4()
+    await store.set(ws, provider="openai", api_key=KEY, model="m", chat_model="c")
     coll.docs[0]["provider"] = "azure"  # not in PRESETS
-    assert await store.get(ws, user) is None
-    assert (await store.get_entry(ws, user)).provider == "azure"
+    assert await store.get(ws) is None
+    assert (await store.get_entry(ws)).provider == "azure"
 
 
-async def test_ensure_indexes_creates_the_unique_ws_user_provider_index() -> None:
+async def test_ensure_indexes_creates_the_unique_ws_provider_index() -> None:
     store, coll = _store()
     await store.ensure_indexes()
     keys, kw = coll.indexes[0]
-    assert keys == [("workspace_id", 1), ("user_id", 1), ("provider", 1)]
+    assert keys == [("workspace_id", 1), ("provider", 1)]
     assert kw["unique"] is True
 
 
-async def test_ensure_indexes_retires_the_single_slot_index() -> None:
-    """The old unique (ws, user) index does not merely mislabel a registry — it
-    rejects the second provider a user adds."""
-    store, coll = _store()
-    coll.indexes.append(([("workspace_id", 1), ("user_id", 1)], {"name": "idx_user_llm_ws_user"}))
-
-    await store.ensure_indexes()
-
-    assert coll.dropped == ["idx_user_llm_ws_user"]
-
-
-async def test_ensure_indexes_adopts_rows_written_before_the_registry() -> None:
-    """get() reads active-only, so a pre-registry row without the field would vanish."""
-    store, coll = _store()
-    coll.docs.append({"workspace_id": "w", "user_id": "u", "provider": "openai"})
-
-    await store.ensure_indexes()
-
-    assert coll.docs[0]["active"] is True
+async def test_workspaces_never_see_each_others_keys() -> None:
+    store, _ = _store()
+    ours, theirs = uuid4(), uuid4()
+    await store.set(ours, provider="openai", api_key=KEY, model="m", chat_model="c")
+    assert await store.get(theirs) is None
+    assert await store.list_entries(theirs) == []
 
 
 # ── A registry: adding a provider never disturbs another provider's key ──
@@ -244,58 +231,58 @@ async def test_ensure_indexes_adopts_rows_written_before_the_registry() -> None:
 
 async def test_adding_a_second_provider_keeps_the_first_and_takes_over_active() -> None:
     store, _ = _store()
-    ws, user = uuid4(), uuid4()
-    await store.set(ws, user, provider="openai", api_key=KEY, model="m", chat_model="c")
+    ws = uuid4()
+    await store.set(ws, provider="openai", api_key=KEY, model="m", chat_model="c")
 
-    await store.set(ws, user, provider="openrouter", api_key="second-key-9999", model="m2", chat_model="c2")
+    await store.set(ws, provider="openrouter", api_key="second-key-9999", model="m2", chat_model="c2")
 
-    entries = {e.provider: e for e in await store.list_entries(ws, user)}
+    entries = {e.provider: e for e in await store.list_entries(ws)}
     assert set(entries) == {"openai", "openrouter"}
     assert entries["openrouter"].active and not entries["openai"].active
     # The evicted provider keeps its key: switching back costs one click, not a re-paste.
-    assert (await store.get_config(ws, user, "openai")).api_key == KEY
+    assert (await store.get_config(ws, "openai")).api_key == KEY
 
 
 async def test_activate_switches_which_config_resolves() -> None:
     store, _ = _store()
-    ws, user = uuid4(), uuid4()
-    await store.set(ws, user, provider="openai", api_key=KEY, model="m", chat_model="c")
-    await store.set(ws, user, provider="gemini", api_key="gem-key-4321", model="g", chat_model="g")
-    assert (await store.get(ws, user)).model == "g"
+    ws = uuid4()
+    await store.set(ws, provider="openai", api_key=KEY, model="m", chat_model="c")
+    await store.set(ws, provider="gemini", api_key="gem-key-4321", model="g", chat_model="g")
+    assert (await store.get(ws)).model == "g"
 
-    assert await store.activate(ws, user, "openai") is True
+    assert await store.activate(ws, "openai") is True
 
-    assert (await store.get(ws, user)).model == "m"
-    assert await store.activate(ws, user, "openrouter") is False  # never stored
+    assert (await store.get(ws)).model == "m"
+    assert await store.activate(ws, "openrouter") is False  # never stored
 
 
 async def test_deleting_the_active_provider_leaves_the_rest_stored_but_nothing_running() -> None:
     store, _ = _store()
-    ws, user = uuid4(), uuid4()
-    await store.set(ws, user, provider="openai", api_key=KEY, model="m", chat_model="c")
-    await store.set(ws, user, provider="gemini", api_key="gem-key-4321", model="g", chat_model="g")
+    ws = uuid4()
+    await store.set(ws, provider="openai", api_key=KEY, model="m", chat_model="c")
+    await store.set(ws, provider="gemini", api_key="gem-key-4321", model="g", chat_model="g")
 
-    await store.delete(ws, user, "gemini")
+    await store.delete(ws, "gemini")
 
-    assert await store.get(ws, user) is None
-    assert await store.get_entry(ws, user) is None
-    assert [e.provider for e in await store.list_entries(ws, user)] == ["openai"]
+    assert await store.get(ws) is None
+    assert await store.get_entry(ws) is None
+    assert [e.provider for e in await store.list_entries(ws)] == ["openai"]
 
 
 async def test_get_config_reads_an_inactive_provider_so_it_can_be_tested_first() -> None:
     store, _ = _store()
-    ws, user = uuid4(), uuid4()
-    await store.set(ws, user, provider="openai", api_key=KEY, model="m", chat_model="c")
-    await store.set(ws, user, provider="gemini", api_key="gem-key-4321", model="g", chat_model="g")
+    ws = uuid4()
+    await store.set(ws, provider="openai", api_key=KEY, model="m", chat_model="c")
+    await store.set(ws, provider="gemini", api_key="gem-key-4321", model="g", chat_model="g")
 
-    cfg = await store.get_config(ws, user, "openai")
+    cfg = await store.get_config(ws, "openai")
 
     assert cfg is not None and cfg.api_key == KEY and cfg.model == "m"
 
 
 def test_entry_doc_and_back() -> None:
     fernet = Fernet(Fernet.generate_key())
-    doc = _entry_doc(uuid4(), uuid4(), provider="openai", api_key=KEY, model="m", chat_model="c", fernet=fernet)
+    doc = _entry_doc(uuid4(), provider="openai", api_key=KEY, model="m", chat_model="c", fernet=fernet)
     assert doc["api_key_enc"] != KEY and KEY not in doc["api_key_enc"]
     assert fernet.decrypt(doc["api_key_enc"].encode()).decode() == KEY
     assert _doc_to_entry(doc).key_last4 == "1234"

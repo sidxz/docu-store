@@ -4,7 +4,7 @@ import asyncio
 from uuid import UUID, uuid4
 
 from application.ports.user_llm_config import UserLLMConfig
-from application.services.llm_scope import UserLLMScope, owner_scope
+from application.services.llm_scope import UserLLMScope, workspace_scope
 from domain.aggregates.artifact import Artifact
 from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.mime_type import MimeType
@@ -16,10 +16,10 @@ CFG = UserLLMConfig(provider="openai", api_key="k")
 class FakeStore:
     def __init__(self, config: UserLLMConfig | None = CFG) -> None:
         self.config = config
-        self.calls: list[tuple[UUID, UUID]] = []
+        self.calls: list[UUID] = []
 
-    async def get(self, workspace_id: UUID, user_id: UUID) -> UserLLMConfig | None:
-        self.calls.append((workspace_id, user_id))
+    async def get(self, workspace_id: UUID) -> UserLLMConfig | None:
+        self.calls.append(workspace_id)
         return self.config
 
 
@@ -32,39 +32,40 @@ def _artifact(ws: UUID, owner: UUID) -> Artifact:
 
 async def test_enabled_sets_config_for_the_block_and_resets() -> None:
     store = FakeStore()
-    ws, user = uuid4(), uuid4()
-    async with UserLLMScope(store, enabled=True).for_user(ws, user) as cfg:
+    ws = uuid4()
+    async with UserLLMScope(store, enabled=True).for_workspace(ws) as cfg:
         assert cfg is CFG
         assert get_user_config() is CFG
     assert get_user_config() is None
-    assert store.calls == [(ws, user)]
+    assert store.calls == [ws]
 
 
 async def test_disabled_never_touches_store() -> None:
     store = FakeStore()
-    async with UserLLMScope(store, enabled=False).for_user(uuid4(), uuid4()) as cfg:
+    async with UserLLMScope(store, enabled=False).for_workspace(uuid4()) as cfg:
         assert cfg is None
         assert get_user_config() is None
     assert store.calls == []
 
 
-async def test_missing_identity_skips_lookup() -> None:
+async def test_missing_workspace_skips_lookup() -> None:
     store = FakeStore()
-    async with UserLLMScope(store, enabled=True).for_user(uuid4(), None):
+    async with UserLLMScope(store, enabled=True).for_workspace(None):
         assert get_user_config() is None
     assert store.calls == []
 
 
-async def test_for_owner_uses_artifact_identity() -> None:
-    ws, owner = uuid4(), uuid4()
+async def test_workspace_scope_uses_the_aggregates_workspace_not_its_uploader() -> None:
+    ws = uuid4()
     store = FakeStore()
-    async with UserLLMScope(store, enabled=True).for_owner(_artifact(ws, owner)):
+    scope = UserLLMScope(store, enabled=True)
+    async with workspace_scope(scope, _artifact(ws, uuid4())):
         assert get_user_config() is CFG
-    assert store.calls == [(ws, owner)]
+    assert store.calls == [ws]
 
 
-async def test_owner_scope_without_scope_is_noop() -> None:
-    async with owner_scope(None, _artifact(uuid4(), uuid4())):
+async def test_workspace_scope_without_scope_is_noop() -> None:
+    async with workspace_scope(None, _artifact(uuid4(), uuid4())):
         assert get_user_config() is None
 
 
@@ -72,7 +73,7 @@ async def test_config_reaches_task_created_inside_scope() -> None:
     async def read() -> UserLLMConfig | None:
         return get_user_config()
 
-    async with UserLLMScope(FakeStore(), enabled=True).for_user(uuid4(), uuid4()):
+    async with UserLLMScope(FakeStore(), enabled=True).for_workspace(uuid4()):
         task = asyncio.create_task(read())
     assert await task is CFG
 
@@ -93,14 +94,14 @@ async def test_null_store_is_empty_and_refuses_writes() -> None:
     import pytest
 
     store = NullUserLLMConfigStore()
-    ws, user = uuid4(), uuid4()
-    assert await store.get(ws, user) is None
-    assert await store.get_entry(ws, user) is None
-    assert await store.list_entries(ws, user) == []
-    assert await store.get_config(ws, user, "openai") is None
-    assert await store.update_models(ws, user, provider="openai", model="m", chat_model="c") is False
-    assert await store.activate(ws, user, "openai") is False
-    assert await store.delete(ws, user, "openai") is False
+    ws = uuid4()
+    assert await store.get(ws) is None
+    assert await store.get_entry(ws) is None
+    assert await store.list_entries(ws) == []
+    assert await store.get_config(ws, "openai") is None
+    assert await store.update_models(ws, provider="openai", model="m", chat_model="c") is False
+    assert await store.activate(ws, "openai") is False
+    assert await store.delete(ws, "openai") is False
     await store.ensure_indexes()  # no-op
     with pytest.raises(RuntimeError, match="USER_LLM_KEYS_ENABLED"):
-        await store.set(ws, user, provider="openai", api_key="k", model="m", chat_model="c")
+        await store.set(ws, provider="openai", api_key="k", model="m", chat_model="c")

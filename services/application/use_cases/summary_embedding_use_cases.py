@@ -10,7 +10,7 @@ from application.ports.embedding_generator import EmbeddingGenerator
 from application.ports.repositories.artifact_repository import ArtifactRepository
 from application.ports.repositories.page_repository import PageRepository
 from application.ports.summary_vector_store import SummaryVectorStore
-from application.services.llm_scope import UserLLMScope, owner_scope
+from application.services.llm_scope import UserLLMScope, workspace_scope
 from application.use_cases.page_payload import artifact_tag_normalized, filter_names
 from domain.exceptions import AggregateNotFoundError, LLMError
 
@@ -67,7 +67,7 @@ class EmbedPageSummaryUseCase:
             except AggregateNotFoundError:
                 pass  # Title is optional — embed without it
 
-            async with owner_scope(self.llm_scope, page):
+            async with workspace_scope(self.llm_scope, page):
                 embedding = await self.embedding_generator.generate_text_embedding(
                     text=summary_text
                 )
@@ -148,7 +148,7 @@ class EmbedArtifactSummaryUseCase:
             artifact_title = artifact.title_mention.title if artifact.title_mention else None
             page_count = len(artifact.pages)
 
-            async with owner_scope(self.llm_scope, artifact):
+            async with workspace_scope(self.llm_scope, artifact):
                 embedding = await self.embedding_generator.generate_text_embedding(
                     text=summary_text
                 )

@@ -11,7 +11,7 @@ from returns.result import Failure, Result, Success
 
 from application.dtos.errors import AppError
 from application.services.aggregate_commit import commit
-from application.services.llm_scope import owner_scope
+from application.services.llm_scope import workspace_scope
 from application.services.usage_recording import ingestion_counter, record_ingestion_usage
 from application.use_cases.storage_keys import render_pdf_key
 from domain.value_objects.author_mention import AuthorMention
@@ -208,7 +208,7 @@ class ExtractDocumentMetadataUseCase:
             persisted: set[str] = set()
             if not raw.is_complete and first_page_text:
                 persisted = await self._persist(raw, artifact, now, self._ready_fields(raw, now))
-                async with owner_scope(self.llm_scope, artifact):
+                async with workspace_scope(self.llm_scope, artifact):
                     await self._apply_llm_fallback(raw, first_page_text, artifact)
 
             # Filename date fallback — many files contain dates in their name

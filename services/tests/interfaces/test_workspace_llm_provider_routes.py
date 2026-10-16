@@ -1,4 +1,4 @@
-"""/user/llm-provider — a registry of providers with one active, not a single slot."""
+"""/workspace/llm-provider — a workspace registry of providers with one active; admins write."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from infrastructure.config import Settings
 from infrastructure.llm import openrouter_catalog
 from infrastructure.llm.provider_probe import NerProbe
 from interfaces.api.main import app
-from interfaces.api.routes import user_routes
+from interfaces.api.routes import workspace_routes
 from interfaces.dependencies import get_auth, get_container
 from tests.conftest import strip_authz_middleware
 from tests.fakes.fake_auth import FakeAuth
@@ -60,31 +60,31 @@ class FakeStore:
     def _active(self) -> UserLLMProviderEntry | None:
         return next((e for e in self.entries if e.active), None)
 
-    async def get(self, workspace_id, user_id):
+    async def get(self, workspace_id):
         active = self._active()
         return self.configs.get(active.provider) if active else None
 
-    async def get_config(self, workspace_id, user_id, provider):
+    async def get_config(self, workspace_id, provider):
         return self.configs.get(provider)
 
-    async def get_entry(self, workspace_id, user_id):
+    async def get_entry(self, workspace_id):
         return self._active()
 
-    async def list_entries(self, workspace_id, user_id):
+    async def list_entries(self, workspace_id):
         return list(self.entries)
 
-    async def set(self, workspace_id, user_id, **kw):
+    async def set(self, workspace_id, **kw):
         self.set_calls.append(kw)
 
-    async def update_models(self, workspace_id, user_id, **kw):
+    async def update_models(self, workspace_id, **kw):
         self.update_calls.append(kw)
         return any(e.provider == kw["provider"] for e in self.entries)
 
-    async def activate(self, workspace_id, user_id, provider):
+    async def activate(self, workspace_id, provider):
         self.activated.append(provider)
         return True
 
-    async def delete(self, workspace_id, user_id, provider):
+    async def delete(self, workspace_id, provider):
         self.deleted.append(provider)
         return True
 
@@ -97,7 +97,7 @@ class FakeContainer:
         return self._mapping[key]
 
 
-def _client(store: FakeStore, *, enabled: bool = True) -> TestClient:
+def _client(store: FakeStore, *, enabled: bool = True, role: str = "admin") -> TestClient:
     strip_authz_middleware(app)
     app.dependency_overrides[get_container] = lambda: FakeContainer(
         {
@@ -105,7 +105,7 @@ def _client(store: FakeStore, *, enabled: bool = True) -> TestClient:
             UserLLMConfigStore: store,
         },
     )
-    app.dependency_overrides[get_auth] = lambda: FakeAuth(role="viewer", user_id=uuid4(), workspace_id=uuid4())
+    app.dependency_overrides[get_auth] = lambda: FakeAuth(role=role, user_id=uuid4(), workspace_id=uuid4())
     return TestClient(app)
 
 
@@ -128,7 +128,7 @@ def _stub_ner(monkeypatch: pytest.MonkeyPatch, probe: NerProbe) -> list[UserLLMC
         seen.append(cfg)
         return probe
 
-    monkeypatch.setattr(user_routes, "probe_ner_support", fake)
+    monkeypatch.setattr(workspace_routes, "probe_ner_support", fake)
     return seen
 
 
@@ -151,7 +151,7 @@ def _offline_catalog(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_get_flag_off_reports_disabled_with_presets() -> None:
-    resp = _client(FakeStore(), enabled=False).get("/user/llm-provider")
+    resp = _client(FakeStore(), enabled=False).get("/workspace/llm-provider")
     assert resp.status_code == 200
     body = resp.json()
     assert body["enabled"] is False and body["configured"] is False
@@ -162,7 +162,7 @@ def test_get_flag_off_reports_disabled_with_presets() -> None:
 
 def test_get_suggests_models_for_the_two_direct_providers_only() -> None:
     """OpenRouter's own users pick their own model; the field is free text regardless."""
-    body = _client(FakeStore(), enabled=False).get("/user/llm-provider").json()
+    body = _client(FakeStore(), enabled=False).get("/workspace/llm-provider").json()
 
     assert body["suggestions"] == {
         "openrouter": [],
@@ -173,7 +173,7 @@ def test_get_suggests_models_for_the_two_direct_providers_only() -> None:
 
 def test_get_lists_every_provider_and_marks_the_active_one() -> None:
     store = FakeStore(ROUTER, OPENAI, configs={"openrouter": ROUTER_CFG, "openai": OPENAI_CFG})
-    resp = _client(store).get("/user/llm-provider")
+    resp = _client(store).get("/workspace/llm-provider")
     body = resp.json()
 
     assert body["configured"] is True
@@ -189,7 +189,7 @@ def test_configured_is_false_when_nothing_is_active() -> None:
     """Deleting the active provider leaves the others stored but nothing running."""
     inactive = _entry("openai", "gpt-5.6-luna", "gpt-5.6-luna", "5678", active=False)
 
-    body = _client(FakeStore(inactive)).get("/user/llm-provider").json()
+    body = _client(FakeStore(inactive)).get("/workspace/llm-provider").json()
 
     assert body["configured"] is False
     assert len(body["providers"]) == 1
@@ -201,7 +201,7 @@ def test_configured_is_false_when_nothing_is_active() -> None:
 def test_put_fills_blank_models_from_preset_and_strips() -> None:
     store = FakeStore()
     resp = _client(store).put(
-        "/user/llm-provider",
+        "/workspace/llm-provider",
         json={"provider": "gemini", "api_key": f"  {KEY}  ", "model": "  ", "chat_model": "gemini-2.5-pro"},
     )
     assert resp.status_code == 204
@@ -214,7 +214,7 @@ def test_adding_a_second_provider_leaves_the_first_alone() -> None:
     """The bug this registry exists for: connecting OpenRouter used to erase the OpenAI key."""
     store = FakeStore(OPENAI, configs={"openai": OPENAI_CFG})
 
-    resp = _client(store).put("/user/llm-provider", json={"provider": "openrouter", "api_key": KEY})
+    resp = _client(store).put("/workspace/llm-provider", json={"provider": "openrouter", "api_key": KEY})
 
     assert resp.status_code == 204
     assert store.set_calls[0]["provider"] == "openrouter"
@@ -224,7 +224,7 @@ def test_adding_a_second_provider_leaves_the_first_alone() -> None:
 def test_put_without_key_updates_that_providers_models_only() -> None:
     store = FakeStore(ROUTER, OPENAI, configs={"openrouter": ROUTER_CFG, "openai": OPENAI_CFG})
     resp = _client(store).put(
-        "/user/llm-provider", json={"provider": "openai", "model": "x", "chat_model": "y"}
+        "/workspace/llm-provider", json={"provider": "openai", "model": "x", "chat_model": "y"}
     )
     assert resp.status_code == 204
     assert store.update_calls == [{"provider": "openai", "model": "x", "chat_model": "y"}]
@@ -233,7 +233,7 @@ def test_put_without_key_updates_that_providers_models_only() -> None:
 
 def test_put_without_key_fills_blanks_from_the_named_providers_preset() -> None:
     store = FakeStore(OPENAI, configs={"openai": OPENAI_CFG})
-    resp = _client(store).put("/user/llm-provider", json={"provider": "openai", "model": ""})
+    resp = _client(store).put("/workspace/llm-provider", json={"provider": "openai", "model": ""})
     assert resp.status_code == 204
     assert store.update_calls == [
         {"provider": "openai", "model": "gpt-5-mini", "chat_model": "gpt-5"}
@@ -241,23 +241,23 @@ def test_put_without_key_fills_blanks_from_the_named_providers_preset() -> None:
 
 
 def test_put_without_key_and_without_that_provider_is_404() -> None:
-    resp = _client(FakeStore()).put("/user/llm-provider", json={"provider": "openrouter", "model": "x"})
+    resp = _client(FakeStore()).put("/workspace/llm-provider", json={"provider": "openrouter", "model": "x"})
     assert resp.status_code == 404
 
 
 def test_put_rejects_unknown_provider_and_short_key() -> None:
-    assert _client(FakeStore()).put("/user/llm-provider", json={"provider": "azure", "api_key": KEY}).status_code == 422
-    resp = _client(FakeStore()).put("/user/llm-provider", json={"provider": "openai", "api_key": "abc1234"})
+    assert _client(FakeStore()).put("/workspace/llm-provider", json={"provider": "azure", "api_key": KEY}).status_code == 422
+    resp = _client(FakeStore()).put("/workspace/llm-provider", json={"provider": "openai", "api_key": "abc1234"})
     assert resp.status_code == 422
     assert "abc1234" not in resp.text
 
 
 def test_writes_are_404_when_flag_off() -> None:
     c = _client(FakeStore(), enabled=False)
-    assert c.put("/user/llm-provider", json={"provider": "openai", "api_key": KEY}).status_code == 404
-    assert c.delete("/user/llm-provider/openai").status_code == 404
-    assert c.post("/user/llm-provider/openai/test").status_code == 404
-    assert c.post("/user/llm-provider/openai/activate").status_code == 404
+    assert c.put("/workspace/llm-provider", json={"provider": "openai", "api_key": KEY}).status_code == 404
+    assert c.delete("/workspace/llm-provider/openai").status_code == 404
+    assert c.post("/workspace/llm-provider/openai/test").status_code == 404
+    assert c.post("/workspace/llm-provider/openai/activate").status_code == 404
 
 
 # ── Activate / delete / test, each addressing one provider ──
@@ -266,7 +266,7 @@ def test_writes_are_404_when_flag_off() -> None:
 def test_activate_switches_which_provider_runs() -> None:
     store = FakeStore(ROUTER, OPENAI, configs={"openrouter": ROUTER_CFG, "openai": OPENAI_CFG})
 
-    assert _client(store).post("/user/llm-provider/openai/activate").status_code == 204
+    assert _client(store).post("/workspace/llm-provider/openai/activate").status_code == 204
     assert store.activated == ["openai"]
 
 
@@ -276,7 +276,7 @@ def test_activate_refuses_a_provider_that_cannot_run_entity_extraction(
     _stub_ner(monkeypatch, NerProbe(ok=False, detail="json_schema unsupported", refused=True))
     store = FakeStore(ROUTER, OPENAI, configs={"openrouter": ROUTER_CFG, "openai": OPENAI_CFG})
 
-    resp = _client(store).post("/user/llm-provider/openai/activate")
+    resp = _client(store).post("/workspace/llm-provider/openai/activate")
 
     assert resp.status_code == 422
     assert "entity extraction" in resp.json()["detail"]
@@ -285,18 +285,18 @@ def test_activate_refuses_a_provider_that_cannot_run_entity_extraction(
 
 def test_activate_404s_for_a_provider_with_no_stored_key() -> None:
     store = FakeStore(ROUTER, configs={"openrouter": ROUTER_CFG})
-    assert _client(store).post("/user/llm-provider/gemini/activate").status_code == 404
-    assert _client(store).post("/user/llm-provider/azure/activate").status_code == 404
+    assert _client(store).post("/workspace/llm-provider/gemini/activate").status_code == 404
+    assert _client(store).post("/workspace/llm-provider/azure/activate").status_code == 404
 
 
 def test_delete_removes_only_the_named_provider() -> None:
     store = FakeStore(ROUTER, OPENAI, configs={"openrouter": ROUTER_CFG, "openai": OPENAI_CFG})
-    assert _client(store).delete("/user/llm-provider/openrouter").status_code == 204
+    assert _client(store).delete("/workspace/llm-provider/openrouter").status_code == 204
     assert store.deleted == ["openrouter"]
 
 
 def test_test_endpoint_404_without_that_provider() -> None:
-    assert _client(FakeStore()).post("/user/llm-provider/openai/test").status_code == 404
+    assert _client(FakeStore()).post("/workspace/llm-provider/openai/test").status_code == 404
 
 
 def test_an_inactive_provider_can_be_tested_before_switching_to_it(
@@ -309,10 +309,10 @@ def test_an_inactive_provider_can_be_tested_before_switching_to_it(
         seen["cfg"], seen["allow_cloud"] = cfg, allow_cloud
         return {"batch": (True, None), "chat": (False, "The provider rejected the key (401).")}
 
-    monkeypatch.setattr(user_routes, "probe_user_llm_config", fake_probe)
+    monkeypatch.setattr(workspace_routes, "probe_user_llm_config", fake_probe)
     store = FakeStore(ROUTER, OPENAI, configs={"openrouter": ROUTER_CFG, "openai": OPENAI_CFG})
 
-    resp = _client(store).post("/user/llm-provider/openai/test")
+    resp = _client(store).post("/workspace/llm-provider/openai/test")
 
     assert resp.status_code == 200
     assert resp.json() == {
@@ -338,11 +338,11 @@ def test_test_probes_the_models_in_the_request_not_the_stored_ones(
         seen["cfg"] = cfg
         return {"batch": (True, None)}
 
-    monkeypatch.setattr(user_routes, "probe_user_llm_config", fake_probe)
+    monkeypatch.setattr(workspace_routes, "probe_user_llm_config", fake_probe)
     store = FakeStore(ROUTER, configs={"openrouter": ROUTER_CFG})
 
     resp = _client(store).post(
-        "/user/llm-provider/openrouter/test",
+        "/workspace/llm-provider/openrouter/test",
         json={"model": "typed/but-not-saved", "chat_model": "typed/chat"},
     )
 
@@ -360,10 +360,10 @@ def test_blank_overrides_resolve_the_way_a_save_would(monkeypatch: pytest.Monkey
         seen["cfg"] = cfg
         return {"batch": (True, None)}
 
-    monkeypatch.setattr(user_routes, "probe_user_llm_config", fake_probe)
+    monkeypatch.setattr(workspace_routes, "probe_user_llm_config", fake_probe)
     store = FakeStore(ROUTER, configs={"openrouter": ROUTER_CFG})
 
-    _client(store).post("/user/llm-provider/openrouter/test", json={"model": "", "chat_model": ""})
+    _client(store).post("/workspace/llm-provider/openrouter/test", json={"model": "", "chat_model": ""})
 
     assert seen["cfg"].model == "openai/gpt-5-mini"  # the openrouter preset
     assert seen["cfg"].chat_model == "openai/gpt-5"
@@ -375,7 +375,7 @@ def test_blank_overrides_resolve_the_way_a_save_would(monkeypatch: pytest.Monkey
 def test_put_with_a_key_is_gated_because_it_activates(monkeypatch: pytest.MonkeyPatch) -> None:
     _stub_ner(monkeypatch, NerProbe(ok=False, detail="json_schema unsupported", refused=True))
     store = FakeStore()
-    resp = _client(store).put("/user/llm-provider", json={"provider": "openrouter", "api_key": KEY})
+    resp = _client(store).put("/workspace/llm-provider", json={"provider": "openrouter", "api_key": KEY})
 
     assert resp.status_code == 422
     assert store.set_calls == []  # nothing reached storage
@@ -387,7 +387,7 @@ def test_put_still_saves_when_the_probe_only_failed_transiently(
     """A provider outage must not stop someone configuring their way out of it."""
     _stub_ner(monkeypatch, NerProbe(ok=False, detail="rate limited", refused=False))
     store = FakeStore()
-    resp = _client(store).put("/user/llm-provider", json={"provider": "openrouter", "api_key": KEY})
+    resp = _client(store).put("/workspace/llm-provider", json={"provider": "openrouter", "api_key": KEY})
 
     assert resp.status_code == 204
     assert len(store.set_calls) == 1
@@ -396,7 +396,7 @@ def test_put_still_saves_when_the_probe_only_failed_transiently(
 def test_put_probes_the_config_it_is_about_to_write(monkeypatch: pytest.MonkeyPatch) -> None:
     seen = _stub_ner(monkeypatch, NerProbe(ok=True))
     _client(FakeStore()).put(
-        "/user/llm-provider",
+        "/workspace/llm-provider",
         json={"provider": "openrouter", "api_key": KEY, "model": "some/model"},
     )
 
@@ -413,7 +413,7 @@ def test_a_model_change_on_the_active_provider_is_gated(monkeypatch: pytest.Monk
     store = FakeStore(ROUTER, configs={"openrouter": ROUTER_CFG})
 
     resp = _client(store).put(
-        "/user/llm-provider", json={"provider": "openrouter", "model": "worse/model"},
+        "/workspace/llm-provider", json={"provider": "openrouter", "model": "worse/model"},
     )
 
     assert resp.status_code == 422
@@ -429,7 +429,7 @@ def test_a_model_change_on_an_inactive_provider_is_not_gated(
     store = FakeStore(ROUTER, OPENAI, configs={"openrouter": ROUTER_CFG, "openai": OPENAI_CFG})
 
     resp = _client(store).put(
-        "/user/llm-provider", json={"provider": "openai", "model": "anything"},
+        "/workspace/llm-provider", json={"provider": "openai", "model": "anything"},
     )
 
     assert resp.status_code == 204
@@ -437,3 +437,26 @@ def test_a_model_change_on_an_inactive_provider_is_not_gated(
     assert store.update_calls == [
         {"provider": "openai", "model": "anything", "chat_model": "gpt-5"}
     ]
+
+
+# ── Members read, admins write: the workspace runs on the keys its admins connect ──
+
+
+def test_members_see_the_setup_but_not_the_key_and_cannot_manage() -> None:
+    body = _client(FakeStore(ROUTER, OPENAI), role="editor").get("/workspace/llm-provider").json()
+    assert body["configured"] is True
+    assert body["can_manage"] is False
+    assert {e["key_last4"] for e in body["providers"]} == {""}
+    admin = _client(FakeStore(ROUTER), role="admin").get("/workspace/llm-provider").json()
+    assert admin["can_manage"] is True
+    assert admin["providers"][0]["key_last4"] == "1234"
+
+
+def test_every_write_and_the_probe_are_admin_only() -> None:
+    store = FakeStore(ROUTER, OPENAI, configs={"openrouter": ROUTER_CFG, "openai": OPENAI_CFG})
+    c = _client(store, role="editor")
+    assert c.put("/workspace/llm-provider", json={"provider": "openai", "api_key": KEY}).status_code == 403
+    assert c.post("/workspace/llm-provider/openai/activate").status_code == 403
+    assert c.delete("/workspace/llm-provider/openai").status_code == 403
+    assert c.post("/workspace/llm-provider/openai/test").status_code == 403
+    assert (store.set_calls, store.activated, store.deleted) == ([], [], [])

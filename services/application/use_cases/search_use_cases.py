@@ -224,7 +224,6 @@ class SearchSummariesUseCase:
                     ),
                 )
 
-
             logger.info("search_summaries_success", results_count=len(result_dtos))
 
             return Success(
@@ -338,7 +337,6 @@ class HierarchicalSearchUseCase:
                     text_preview_chars,
                     keep_full_rerank_pool,
                 )
-
 
             logger.info(
                 "hierarchical_search_success",

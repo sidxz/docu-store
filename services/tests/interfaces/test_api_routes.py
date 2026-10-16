@@ -47,7 +47,7 @@ class _NullLLMScope:
     """Enough of UserLLMScope for a route that never reaches its body."""
 
     @contextlib.asynccontextmanager
-    async def for_user(self, workspace_id, user_id):  # noqa: ANN001, ANN201, ARG002
+    async def for_workspace(self, workspace_id):  # noqa: ANN001, ANN201, ARG002
         yield
 
 

@@ -25,12 +25,12 @@ def get_container() -> Container:
     return create_container()
 
 
-async def llm_user_scope(
+async def workspace_llm_scope(
     auth: Annotated[RequestAuth, Depends(get_auth)],
     container: Annotated[Container, Depends(get_container)],
 ) -> AsyncIterator[None]:
-    """Resolve the caller's LLM config for this request — and for the chat run it
-    spawns (``registry.start`` → ``create_task`` copies this context).
+    """Resolve the workspace's LLM + embedding config for this request — and for
+    the chat run it spawns (``registry.start`` → ``create_task`` copies this context).
 
     Must stay an *async* dependency: sync ones run in a threadpool and the
     contextvar never reaches the endpoint. Not middleware: BaseHTTPMiddleware
@@ -38,5 +38,5 @@ async def llm_user_scope(
     """
     from application.services.llm_scope import UserLLMScope
 
-    async with container[UserLLMScope].for_user(auth.workspace_id, auth.user_id):
+    async with container[UserLLMScope].for_workspace(auth.workspace_id):
         yield

@@ -1,10 +1,17 @@
-"""Per-user LLM provider configuration (BYO key).
+"""Workspace LLM provider configuration (BYO key, self-serve).
 
-A user may keep one entry per provider and one of them is *active* — the config
-every ingestion, chat and NER call resolves to. Switching is therefore additive:
-connecting a second provider never destroys the credential of the first, so a
-provider that turns out not to work costs one click to back out of rather than
-a key you may no longer have.
+A workspace's admins connect its providers; every member's ingestion, chat, NER
+and embedding calls run on them (per-user token limits cap what each member can
+spend). "User" in these names means user-supplied, as opposed to the server's
+env keys. One key per workspace also means one model per workspace: documents
+are tagged and embedded consistently, and a re-embed never depends on whoever
+uploaded a document still having a working key.
+
+A workspace may keep one entry per provider and one of them is *active* — the
+config every call resolves to. Switching is therefore additive: connecting a
+second provider never destroys the credential of the first, so a provider that
+turns out not to work costs one click to back out of rather than a key you may
+no longer have.
 """
 
 from __future__ import annotations
@@ -39,35 +46,32 @@ class UserLLMProviderEntry:
 
 
 class UserLLMConfigStore(Protocol):
-    async def get(self, workspace_id: UUID, user_id: UUID) -> UserLLMConfig | None:
+    async def get(self, workspace_id: UUID) -> UserLLMConfig | None:
         """Resolver path: the *active* config, decrypted, with the effective provider/base_url."""
         ...
 
     async def get_config(
         self,
         workspace_id: UUID,
-        user_id: UUID,
         provider: str,
     ) -> UserLLMConfig | None:
         """One stored provider, active or not — so the UI can test before switching."""
         ...
 
-    async def get_entry(self, workspace_id: UUID, user_id: UUID) -> UserLLMProviderEntry | None:
+    async def get_entry(self, workspace_id: UUID) -> UserLLMProviderEntry | None:
         """The active entry, or None when nothing is active — i.e. "has a usable LLM"."""
         ...
 
     async def list_entries(
         self,
         workspace_id: UUID,
-        user_id: UUID,
     ) -> list[UserLLMProviderEntry]:
-        """Everything the caller has configured, newest first."""
+        """Everything the workspace has configured, newest first."""
         ...
 
     async def set(
         self,
         workspace_id: UUID,
-        user_id: UUID,
         *,
         provider: str,
         api_key: str,
@@ -80,7 +84,6 @@ class UserLLMConfigStore(Protocol):
     async def update_models(
         self,
         workspace_id: UUID,
-        user_id: UUID,
         *,
         provider: str,
         model: str,
@@ -89,11 +92,11 @@ class UserLLMConfigStore(Protocol):
         """Change one entry's lane models, keeping its key. False when it does not exist."""
         ...
 
-    async def activate(self, workspace_id: UUID, user_id: UUID, provider: str) -> bool:
+    async def activate(self, workspace_id: UUID, provider: str) -> bool:
         """Make a stored provider the active one. False when it does not exist."""
         ...
 
-    async def delete(self, workspace_id: UUID, user_id: UUID, provider: str) -> bool:
+    async def delete(self, workspace_id: UUID, provider: str) -> bool:
         """Forget one provider. Deleting the active one leaves nothing active."""
         ...
 
@@ -101,33 +104,30 @@ class UserLLMConfigStore(Protocol):
 
 
 class NullUserLLMConfigStore:
-    """No per-user config anywhere (today's deployments)."""
+    """No workspace config anywhere (env-keyed deployments)."""
 
-    async def get(self, workspace_id: UUID, user_id: UUID) -> UserLLMConfig | None:
+    async def get(self, workspace_id: UUID) -> UserLLMConfig | None:
         return None
 
     async def get_config(
         self,
         workspace_id: UUID,
-        user_id: UUID,
         provider: str,
     ) -> UserLLMConfig | None:
         return None
 
-    async def get_entry(self, workspace_id: UUID, user_id: UUID) -> UserLLMProviderEntry | None:
+    async def get_entry(self, workspace_id: UUID) -> UserLLMProviderEntry | None:
         return None
 
     async def list_entries(
         self,
         workspace_id: UUID,
-        user_id: UUID,
     ) -> list[UserLLMProviderEntry]:
         return []
 
     async def set(
         self,
         workspace_id: UUID,
-        user_id: UUID,
         *,
         provider: str,
         api_key: str,
@@ -140,7 +140,6 @@ class NullUserLLMConfigStore:
     async def update_models(
         self,
         workspace_id: UUID,
-        user_id: UUID,
         *,
         provider: str,
         model: str,
@@ -148,10 +147,10 @@ class NullUserLLMConfigStore:
     ) -> bool:
         return False
 
-    async def activate(self, workspace_id: UUID, user_id: UUID, provider: str) -> bool:
+    async def activate(self, workspace_id: UUID, provider: str) -> bool:
         return False
 
-    async def delete(self, workspace_id: UUID, user_id: UUID, provider: str) -> bool:
+    async def delete(self, workspace_id: UUID, provider: str) -> bool:
         return False
 
     async def ensure_indexes(self) -> None:

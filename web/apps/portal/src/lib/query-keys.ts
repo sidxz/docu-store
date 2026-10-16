@@ -80,7 +80,6 @@ export const queryKeys = {
   user: {
     all: ["user"] as const,
     preferences: () => [...queryKeys.user.all, "preferences"] as const,
-    llmProvider: () => [...queryKeys.user.all, "llm-provider"] as const,
     terms: () => [...queryKeys.user.all, "terms"] as const,
     activity: {
       searches: () => [...queryKeys.user.all, "activity", "searches"] as const,
@@ -119,5 +118,6 @@ export const queryKeys = {
     members: () => [...queryKeys.workspace.all, "members"] as const,
     tokenLimits: () => [...queryKeys.workspace.all, "token-limits"] as const,
     embedding: () => [...queryKeys.workspace.all, "embedding"] as const,
+    llmProvider: () => [...queryKeys.workspace.all, "llm-provider"] as const,
   },
 };

@@ -188,15 +188,17 @@ async def ensure_within_quota(auth: RequestAuth, container: Container) -> None:
 LLM_NOT_CONFIGURED_DETAIL = (
     "Add an LLM provider in Settings → AI Provider before uploading or chatting."
 )
+LLM_NOT_CONFIGURED_MEMBER_DETAIL = (
+    "This workspace has no AI provider yet. Ask a workspace admin to connect one."
+)
 
 
 async def ensure_llm_configured(auth: RequestAuth, container: Container) -> None:
     """Pre-flight BYO-key gate (chat send + upload/create).
 
-    Raises 428 before any blob write or event when this caller has no LLM to
-    bill, or no key for the workspace's embedding model. No-op when
-    USER_LLM_KEYS_ENABLED is off; the LLM half is skipped when the env defaults
-    can serve the call. 428, not 409 — the chat client treats 409 on send as "a run is
+    Raises 428 before any blob write or event when the workspace has no LLM to
+    bill, or no key for its embedding model. No-op when USER_LLM_KEYS_ENABLED is
+    off; the LLM half is skipped when the env defaults can serve the call. 428, not 409 — the chat client treats 409 on send as "a run is
     already active → reattach".
     """
     from application.ports.user_llm_config import UserLLMConfigStore
@@ -207,9 +209,9 @@ async def ensure_llm_configured(auth: RequestAuth, container: Container) -> None
     settings = container[Settings]
     if not settings.user_llm_keys_enabled:
         return
-    # A workspace that embeds over an API needs one of the caller's keys to
-    # serve that model — for its uploads and for every chat retrieval.
-    embedding = await container[UserLLMScope].embedding_spec(auth.workspace_id, auth.user_id)
+    # A workspace that embeds over an API needs one of its keys to serve that
+    # model — for its uploads and for every chat retrieval.
+    embedding = await container[UserLLMScope].embedding_spec(auth.workspace_id)
     if embedding is not None and embedding.missing_key_message:
         raise HTTPException(
             status_code=status.HTTP_428_PRECONDITION_REQUIRED,
@@ -218,11 +220,11 @@ async def ensure_llm_configured(auth: RequestAuth, container: Container) -> None
     if server_llm_available(settings):
         return
     store = container[UserLLMConfigStore]
-    if await store.get_entry(auth.workspace_id, auth.user_id) is not None:
+    if await store.get_entry(auth.workspace_id) is not None:
         return
     raise HTTPException(
         status_code=status.HTTP_428_PRECONDITION_REQUIRED,
-        detail=LLM_NOT_CONFIGURED_DETAIL,
+        detail=LLM_NOT_CONFIGURED_DETAIL if auth.is_admin else LLM_NOT_CONFIGURED_MEMBER_DETAIL,
     )
 
 

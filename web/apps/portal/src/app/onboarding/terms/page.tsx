@@ -58,12 +58,12 @@ function Terms() {
             </span>
             <span>
               <strong style={{ color: "#0f172a" }}>
-                Your documents are sent to an AI provider that you have configured.
+                Your documents are sent to the AI provider your workspace has configured.
               </strong>{" "}
-              On DocuStore Cloud you connect your own AI provider, such as OpenRouter or
-              OpenAI, and that connection remains your responsibility. When you chat or run
-              enrichment, excerpts of your documents are sent to the provider you connected,
-              and their terms govern how they handle that content. Please do not upload
+              On DocuStore Cloud each workspace&apos;s admins connect its AI provider, such as
+              OpenRouter or OpenAI, and that connection remains their responsibility. When you
+              chat or run enrichment, excerpts of your documents are sent to that provider, and
+              their terms govern how they handle that content. Please do not upload
               patient data, confidential material, or anything you are not licensed to
               share.
             </span>

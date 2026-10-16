@@ -729,8 +729,8 @@ def create_container() -> Container:
     container[LLMClientPort] = lambda _: create_llm_client(settings)
     container[PromptRepositoryPort] = lambda _: create_prompt_repository(settings)
 
-    # Per-user LLM config (BYO key). USER_LLM_KEYS_ENABLED=false keeps every
-    # call on the env defaults via the Null store.
+    # Workspace LLM config (BYO key, set by workspace admins). USER_LLM_KEYS_ENABLED
+    # =false keeps every call on the env defaults via the Null store.
     if user_keys_fernet is None:
         container[UserLLMConfigStore] = lambda _: NullUserLLMConfigStore()
     else:
@@ -744,7 +744,7 @@ def create_container() -> Container:
         container[UserLLMConfigStore] = lambda c: MongoUserLLMProviderStore(
             client=c[AsyncIOMotorClient],
             db_name=settings.mongo_db,
-            collection_name=settings.mongo_user_llm_providers_collection,
+            collection_name=settings.mongo_workspace_llm_providers_collection,
             fernet=user_keys_fernet,
         )
         container[WorkspaceEmbeddingConfigStore] = lambda c: MongoWorkspaceEmbeddingStore(

@@ -2,9 +2,8 @@
 
 Every vector in a workspace must come from one model, and a query must be
 embedded by that same model — so the model is a workspace setting, resolved by
-``UserLLMScope`` into a contextvar together with the caller's key. ``None``
-there means "the server model"; a spec means an API model through the caller's
-own key. Reached without any scope it raises rather than guess: the server model
+``UserLLMScope`` into a contextvar together with the workspace's key. ``None``
+there means "the server model"; a spec means an API model through that key. Reached without any scope it raises rather than guess: the server model
 would silently embed into the wrong space.
 """
 
@@ -33,7 +32,7 @@ class ScopedEmbeddingGenerator:
     def _target(self) -> EmbeddingGenerator:
         spec = llm_context.get_embedding_spec()
         if spec is llm_context.NOT_SCOPED:
-            msg = "Text embedding outside a workspace scope (UserLLMScope.for_user/for_owner)."
+            msg = "Text embedding outside a workspace scope (UserLLMScope.for_workspace)."
             raise RuntimeError(msg)
         if spec is None:
             return self._server

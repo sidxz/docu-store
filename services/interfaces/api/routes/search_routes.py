@@ -34,14 +34,14 @@ from interfaces.api.routes.helpers import (
 from interfaces.api.routes.helpers import (
     require_workspace_page,
 )
-from interfaces.dependencies import get_auth, get_container, llm_user_scope
+from interfaces.dependencies import get_auth, get_container, workspace_llm_scope
 
 logger = structlog.get_logger()
 
 router = APIRouter(prefix="/search", tags=["search"])
 
 
-@router.post("/pages", status_code=status.HTTP_200_OK, dependencies=[Depends(llm_user_scope)])
+@router.post("/pages", status_code=status.HTTP_200_OK, dependencies=[Depends(workspace_llm_scope)])
 @handle_use_case_errors
 async def search_pages(
     request: SearchRequest,
@@ -196,7 +196,9 @@ async def search_compounds(
     return result
 
 
-@router.post("/summaries", status_code=status.HTTP_200_OK, dependencies=[Depends(llm_user_scope)])
+@router.post(
+    "/summaries", status_code=status.HTTP_200_OK, dependencies=[Depends(workspace_llm_scope)]
+)
 @handle_use_case_errors
 async def search_summaries(
     request: SummarySearchRequest,
@@ -248,7 +250,7 @@ async def search_summaries(
 
 
 @router.post(
-    "/hierarchical", status_code=status.HTTP_200_OK, dependencies=[Depends(llm_user_scope)]
+    "/hierarchical", status_code=status.HTTP_200_OK, dependencies=[Depends(workspace_llm_scope)]
 )
 async def hierarchical_search(
     request: HierarchicalSearchRequest,

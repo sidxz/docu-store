@@ -51,4 +51,4 @@ async def test_propagates_into_task_created_inside_scope() -> None:
 
 
 async def test_null_store_returns_none() -> None:
-    assert await NullUserLLMConfigStore().get(uuid4(), uuid4()) is None
+    assert await NullUserLLMConfigStore().get(uuid4()) is None

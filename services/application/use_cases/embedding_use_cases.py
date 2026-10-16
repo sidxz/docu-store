@@ -24,7 +24,7 @@ from application.ports.reranker import RerankDocument, Reranker
 from application.ports.sparse_embedding_generator import SparseEmbeddingGenerator
 from application.ports.text_chunker import TextChunker
 from application.ports.vector_store import VectorStore
-from application.services.llm_scope import UserLLMScope, owner_scope
+from application.services.llm_scope import UserLLMScope, workspace_scope
 from application.use_cases.page_payload import build_page_payload, table_scope_candidates
 from domain.exceptions import AggregateNotFoundError, LLMError, LLMNotConfiguredError
 from domain.value_objects.embedding_metadata import EmbeddingMetadata, EmbeddingType
@@ -279,9 +279,9 @@ class GeneratePageEmbeddingUseCase:
             else:
                 contextual_texts = raw_chunk_texts
 
-            # Generate dense embeddings on contextual texts (the uploader's
-            # workspace model and key, when the workspace embeds over an API)
-            async with owner_scope(self.llm_scope, page):
+            # Generate dense embeddings on contextual texts (the workspace's
+            # model and key, when it embeds over an API)
+            async with workspace_scope(self.llm_scope, page):
                 embeddings = await self.embedding_generator.generate_batch_embeddings(
                     texts=contextual_texts,
                 )
@@ -585,7 +585,6 @@ class SearchSimilarPagesUseCase:
                     artifact_details=artifact_details,
                 )
                 result_dtos.append(result_dto)
-
 
             logger.info(
                 "search_similar_pages_success",

@@ -23,7 +23,10 @@ from domain.value_objects.mime_type import MimeType
 from infrastructure.chat.run_registry import ChatRunRegistry
 from infrastructure.config import Settings
 from interfaces.api.main import app
-from interfaces.api.routes.helpers import LLM_NOT_CONFIGURED_DETAIL
+from interfaces.api.routes.helpers import (
+    LLM_NOT_CONFIGURED_DETAIL,
+    LLM_NOT_CONFIGURED_MEMBER_DETAIL,
+)
 from interfaces.dependencies import get_auth, get_container
 from tests.conftest import strip_authz_middleware
 from tests.fakes.fake_auth import FakeAuth
@@ -36,7 +39,7 @@ class FakeStore:
         self.entry = entry
         self.calls = 0
 
-    async def get_entry(self, workspace_id, user_id):
+    async def get_entry(self, workspace_id):
         self.calls += 1
         return self.entry
 
@@ -71,7 +74,7 @@ def _settings(*, enabled: bool = True, provider: str = "openai", key: str | None
     )
 
 
-def _client(store: FakeStore, settings) -> TestClient:
+def _client(store: FakeStore, settings, *, role: str = "editor") -> TestClient:
     strip_authz_middleware(app)
     app.dependency_overrides[get_container] = lambda: FakeContainer(
         {
@@ -84,7 +87,7 @@ def _client(store: FakeStore, settings) -> TestClient:
         },
     )
     app.dependency_overrides[get_auth] = lambda: FakeAuth(
-        role="editor", user_id=uuid4(), workspace_id=uuid4(),
+        role=role, user_id=uuid4(), workspace_id=uuid4(),
     )
     return TestClient(app)
 
@@ -93,13 +96,15 @@ def _send(client: TestClient):
     return client.post(f"/chat/{uuid4()}/messages", json={"message": "hi"})
 
 
-def test_chat_send_428_without_provider() -> None:
+def test_chat_send_428_without_provider_tells_a_member_to_ask_an_admin() -> None:
     store = FakeStore()
     try:
         resp = _send(_client(store, _settings()))
         assert resp.status_code == 428
-        assert resp.json()["detail"] == LLM_NOT_CONFIGURED_DETAIL
+        assert resp.json()["detail"] == LLM_NOT_CONFIGURED_MEMBER_DETAIL
         assert store.calls == 1
+        resp = _send(_client(store, _settings(), role="admin"))
+        assert resp.json()["detail"] == LLM_NOT_CONFIGURED_DETAIL
     finally:
         app.dependency_overrides.clear()
 
@@ -141,7 +146,7 @@ def test_upload_428_before_saga_runs() -> None:
             data={"artifact_type": "RESEARCH_ARTICLE"},
         )
         assert resp.status_code == 428
-        assert resp.json()["detail"] == LLM_NOT_CONFIGURED_DETAIL
+        assert resp.json()["detail"] == LLM_NOT_CONFIGURED_MEMBER_DETAIL
     finally:
         app.dependency_overrides.clear()
 
@@ -169,10 +174,10 @@ class _EmbeddingStore:
 
 
 class _NoKeys(FakeStore):
-    async def get(self, workspace_id, user_id):
+    async def get(self, workspace_id):
         return None
 
-    async def get_config(self, workspace_id, user_id, provider):
+    async def get_config(self, workspace_id, provider):
         return None
 
 

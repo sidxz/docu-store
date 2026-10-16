@@ -26,9 +26,11 @@ function Onboarding() {
   const provider = useLlmProvider();
   const home = workspace.slug ? `/${workspace.slug}` : "/";
 
-  // Not a BYO deployment → nothing to onboard.
+  // Not a BYO deployment, or not an admin (only admins connect keys) → nothing to onboard.
   useEffect(() => {
-    if (provider.data && !provider.data.enabled) router.replace(home);
+    if (provider.data && (!provider.data.enabled || !provider.data.can_manage)) {
+      router.replace(home);
+    }
   }, [provider.data, home, router]);
 
   return (
@@ -39,11 +41,12 @@ function Onboarding() {
       >
         <div className="mb-6 flex items-center gap-3" style={{ color: "#0f172a" }}>
           <LogoMark className="h-8 w-8" />
-          <h1 className="text-xl font-medium">Connect your AI provider</h1>
+          <h1 className="text-xl font-medium">Connect your workspace&apos;s AI provider</h1>
         </div>
         <p className="mb-6 text-sm" style={{ color: "#475569" }}>
-          Connect an AI provider to upload documents and chat with them. AI usage is billed
-          directly by your provider.
+          Connect an AI provider to upload documents and chat with them. Everyone in this
+          workspace runs on this key, billed directly by your provider; you can cap each
+          member&apos;s monthly usage under Settings → Token Settings.
         </p>
         <LlmProviderForm onConfigured={() => router.replace(home)} />
         {provider.data?.configured ? (

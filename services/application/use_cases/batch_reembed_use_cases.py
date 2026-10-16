@@ -14,7 +14,7 @@ from uuid import UUID
 import structlog
 
 from application.dtos.parsed_document import Block, ParsedDocument
-from application.services.llm_scope import owner_scope
+from application.services.llm_scope import workspace_scope
 from application.use_cases.page_payload import (
     artifact_tag_normalized,
     build_page_payload,
@@ -117,8 +117,8 @@ class BatchReEmbedArtifactPagesUseCase:
         logger.info("batch_reembed_start", artifact_id=str(artifact_id))
 
         artifact = self.artifact_repository.get_by_id(artifact_id)
-        # One scope for the whole artifact: the uploader's workspace model + key.
-        async with owner_scope(self.llm_scope, artifact):
+        # One scope for the whole artifact: the workspace's embedding model + key.
+        async with workspace_scope(self.llm_scope, artifact):
             return await self._reembed(artifact)
 
     async def _reembed(self, artifact: Artifact) -> dict:
@@ -365,7 +365,7 @@ class BatchReEmbedSummariesUseCase:
         logger.info("batch_reembed_summaries_start", artifact_id=str(artifact_id))
 
         artifact = self.artifact_repository.get_by_id(artifact_id)
-        async with owner_scope(self.llm_scope, artifact):
+        async with workspace_scope(self.llm_scope, artifact):
             return await self._reembed(artifact)
 
     async def _reembed(self, artifact: Artifact) -> dict:

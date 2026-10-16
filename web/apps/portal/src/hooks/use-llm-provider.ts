@@ -22,11 +22,14 @@ export interface LlmProviderEntry {
   updated_at: string | null;
 }
 
-/** GET /user/llm-provider — keys are write-only; only `key_last4` comes back. */
+/** GET /workspace/llm-provider — the workspace's providers. Keys are write-only;
+ *  admins see `key_last4`, members get it blank. */
 export interface LlmProviderStatus {
   enabled: boolean;
   /** An active provider exists — i.e. there is something to run on. */
   configured: boolean;
+  /** The caller is a workspace admin: only admins connect or change keys. */
+  can_manage: boolean;
   providers: LlmProviderEntry[];
   presets: Record<LlmProviderId, LlmProviderPreset>;
   /** Model names to offer per provider — a hint, not a contract. Empty for
@@ -54,8 +57,8 @@ export interface LlmProviderTestResult {
 
 export function useLlmProvider() {
   return useQuery({
-    queryKey: queryKeys.user.llmProvider(),
-    queryFn: () => authFetchJson<LlmProviderStatus>("/user/llm-provider"),
+    queryKey: queryKeys.workspace.llmProvider(),
+    queryFn: () => authFetchJson<LlmProviderStatus>("/workspace/llm-provider"),
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
@@ -63,14 +66,18 @@ export function useLlmProvider() {
 
 function useInvalidateProvider() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: queryKeys.user.llmProvider() });
+  return () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.workspace.llmProvider() });
+    // Which keys exist decides whether the workspace's embedding model is usable.
+    queryClient.invalidateQueries({ queryKey: queryKeys.workspace.embedding() });
+  };
 }
 
 export function useSaveLlmProvider() {
   const invalidate = useInvalidateProvider();
   return useMutation({
     mutationFn: (input: LlmProviderInput) =>
-      authFetchJson<void>("/user/llm-provider", {
+      authFetchJson<void>("/workspace/llm-provider", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
@@ -83,7 +90,7 @@ export function useDeleteLlmProvider() {
   const invalidate = useInvalidateProvider();
   return useMutation({
     mutationFn: (provider: LlmProviderId) =>
-      authFetchJson<void>(`/user/llm-provider/${provider}`, { method: "DELETE" }),
+      authFetchJson<void>(`/workspace/llm-provider/${provider}`, { method: "DELETE" }),
     onSuccess: invalidate,
   });
 }
@@ -93,7 +100,7 @@ export function useActivateLlmProvider() {
   const invalidate = useInvalidateProvider();
   return useMutation({
     mutationFn: (provider: LlmProviderId) =>
-      authFetchJson<void>(`/user/llm-provider/${provider}/activate`, { method: "POST" }),
+      authFetchJson<void>(`/workspace/llm-provider/${provider}/activate`, { method: "POST" }),
     onSuccess: invalidate,
   });
 }
@@ -114,7 +121,7 @@ export function useTestLlmProvider() {
       model?: string;
       chat_model?: string;
     }) =>
-      authFetchJson<LlmProviderTestResult>(`/user/llm-provider/${provider}/test`, {
+      authFetchJson<LlmProviderTestResult>(`/workspace/llm-provider/${provider}/test`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(models),

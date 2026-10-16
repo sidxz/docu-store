@@ -10,7 +10,7 @@ from returns.result import Failure, Result, Success
 
 from application.dtos.errors import AppError
 from application.services.aggregate_commit import commit
-from application.services.llm_scope import owner_scope
+from application.services.llm_scope import workspace_scope
 from domain.services.bioactivity_reducer import associate_bioactivities
 from domain.services.compound_alias_resolver import build_alias_map, merge_compound_aliases
 from domain.value_objects.tag_mention import TagMention
@@ -70,7 +70,7 @@ class ExtractPageEntitiesUseCase:
                 text_len=len(page.text_mention.text),
             )
 
-            async with owner_scope(self.llm_scope, artifact):
+            async with workspace_scope(self.llm_scope, artifact):
                 raw_entities = await self.ner_extractor.extract(page.text_mention.text)
 
             tag_mentions = [

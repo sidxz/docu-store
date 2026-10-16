@@ -65,9 +65,9 @@ def test_user_llm_keys_secret_defaults_to_none(monkeypatch: pytest.MonkeyPatch) 
     assert s.user_llm_keys_secret is None
 
 
-def test_user_llm_providers_collection_default(monkeypatch: pytest.MonkeyPatch) -> None:
-    s = _isolated_settings(monkeypatch, "MONGO_USER_LLM_PROVIDERS_COLLECTION")
-    assert s.mongo_user_llm_providers_collection == "user_llm_providers"
+def test_workspace_llm_providers_collection_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    s = _isolated_settings(monkeypatch, "MONGO_WORKSPACE_LLM_PROVIDERS_COLLECTION")
+    assert s.mongo_workspace_llm_providers_collection == "workspace_llm_providers"
 
 
 def test_flag_on_without_secret_fails_settings_construction(monkeypatch: pytest.MonkeyPatch) -> None:
