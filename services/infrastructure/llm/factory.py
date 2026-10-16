@@ -55,7 +55,7 @@ def _resolve_api_key(provider: str, settings: Settings) -> str | None:
 def server_llm_available(settings: Settings) -> bool:
     """Can the env defaults serve a call? A local provider, or a cloud one with a key.
 
-    Used by the API's BYO-key gate: a user without their own key is only
+    Used by the API's BYO-key gate: a workspace without its own key is only
     blocked when there is nothing to fall back to (public/fail-closed mode).
     """
     provider = settings.llm_provider

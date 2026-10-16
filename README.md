@@ -241,6 +241,23 @@ CHAT_LLM_MODEL_NAME=gpt-4o
 CHAT_LLM_API_KEY=sk-...
 ```
 
+#### Embedding Model
+
+Text embeddings run locally on CPU by default (`ibm-granite/granite-embedding-english-r2`, 768 dims). `nomic-ai/nomic-embed-text-v1.5` (the previous default) is also supported; keep it to avoid re-embedding an existing deployment. API models are an option too:
+
+```env
+EMBEDDING_MODEL_NAME=ibm-granite/granite-embedding-english-r2
+# EMBEDDING_MODEL_PROVIDER=openai          # sentence-transformers (default) | openai | gemini | openrouter
+# EMBEDDING_API_KEY=...                    # falls back to OPENAI_API_KEY / GOOGLE_API_KEY
+# EMBEDDING_BASE_URL=...                   # provider=openai: any OpenAI-compatible endpoint (e.g. Azure AI Foundry)
+```
+
+Changing the model requires re-embedding: **Settings → Status → Re-embed Documents** in each workspace. The Status page flags vectors left over from another model. Details: [Embedding Models](https://docustore.io/docs/integration/embeddings).
+
+#### Workspace Keys (self-serve)
+
+`USER_LLM_KEYS_ENABLED=true` lets each workspace run on the AI provider keys its admins connect (Settings → AI Provider), including an optional per-workspace embedding model. Keys are encrypted with `USER_LLM_KEYS_SECRET` (comma-separated to rotate: `NEW,OLD`, restart, then `NEW`). Details: [LLM Providers](https://docustore.io/docs/integration/llm-providers#workspace-keys-self-serve).
+
 #### Observability (optional)
 
 ```env
