@@ -233,16 +233,16 @@ class DocuStoreApplication(Application):
 
 
 def _fernet_for_user_keys(settings: Settings):
-    """The Fernet for per-user LLM keys, or None when the feature is off.
+    """The Fernet keys for workspace LLM keys, or None when the feature is off.
 
     A missing/invalid secret with the flag on is a deployment error — surface
     it at boot, not on the first user's first upload.
     """
     if not settings.user_llm_keys_enabled:
         return None
-    from infrastructure.read_repositories.mongo_user_llm_provider_store import user_llm_fernet
+    from infrastructure.read_repositories.mongo_user_llm_provider_store import user_llm_keys
 
-    return user_llm_fernet(settings.user_llm_keys_secret)
+    return user_llm_keys(settings.user_llm_keys_secret)
 
 
 def create_container() -> Container:
@@ -745,7 +745,7 @@ def create_container() -> Container:
             client=c[AsyncIOMotorClient],
             db_name=settings.mongo_db,
             collection_name=settings.mongo_workspace_llm_providers_collection,
-            fernet=user_keys_fernet,
+            keys=user_keys_fernet,
         )
         container[WorkspaceEmbeddingConfigStore] = lambda c: MongoWorkspaceEmbeddingStore(
             client=c[AsyncIOMotorClient],

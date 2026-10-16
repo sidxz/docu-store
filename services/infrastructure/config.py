@@ -335,7 +335,8 @@ class Settings(BaseSettings):
         default=None,
         validation_alias="USER_LLM_KEYS_SECRET",
         description=(
-            "Fernet key that encrypts workspace LLM API keys at rest. Required when "
+            "Fernet key(s) that encrypt workspace LLM API keys at rest, comma-separated: "
+            "the first encrypts, all decrypt (put a new key first to rotate). Required when "
             "USER_LLM_KEYS_ENABLED=true. Generate: python -c 'from cryptography.fernet "
             "import Fernet; print(Fernet.generate_key().decode())'"
         ),
@@ -348,25 +349,15 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _require_user_llm_keys_secret(self) -> "Settings":
-        """USER_LLM_KEYS_ENABLED=true needs a Fernet key; fail every process at import,
-        where the API lifespan's best-effort try/except cannot swallow it.
+        """USER_LLM_KEYS_ENABLED=true needs valid Fernet key(s); fail every process at
+        import, where the API lifespan's best-effort try/except cannot swallow it.
         """
-        if not self.user_llm_keys_enabled:
-            return self
-        from cryptography.fernet import Fernet
+        if self.user_llm_keys_enabled:
+            from infrastructure.read_repositories.mongo_user_llm_provider_store import (
+                user_llm_keys,
+            )
 
-        hint = (
-            "python -c 'from cryptography.fernet import Fernet; "
-            "print(Fernet.generate_key().decode())'"
-        )
-        if not self.user_llm_keys_secret:
-            msg = f"USER_LLM_KEYS_SECRET is required when USER_LLM_KEYS_ENABLED=true. Generate one: {hint}"
-            raise ValueError(msg)
-        try:
-            Fernet(self.user_llm_keys_secret)
-        except ValueError as exc:
-            msg = f"USER_LLM_KEYS_SECRET is not a valid Fernet key. Generate one: {hint}"
-            raise ValueError(msg) from exc
+            user_llm_keys(self.user_llm_keys_secret)  # raises with a generate hint
         return self
 
     # LLM (shared infrastructure — used by summarization and future features)

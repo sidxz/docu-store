@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 import structlog
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import DuplicateKeyError
 
@@ -29,8 +29,13 @@ _GENERATE_HINT = (
 )
 
 
-def user_llm_fernet(secret: str | None) -> Fernet:
-    """The Fernet for USER_LLM_KEYS_SECRET, or a clear configuration error."""
+def user_llm_keys(secret: str | None) -> list[Fernet]:
+    """USER_LLM_KEYS_SECRET as Fernet keys, or a clear configuration error.
+
+    The secret may list several comma-separated keys: the first encrypts, every
+    one decrypts. To rotate, put a new key first and restart the API (startup
+    re-encrypts rows still under an old key), then remove the old key.
+    """
     if not secret:
         msg = (
             "USER_LLM_KEYS_SECRET is required when USER_LLM_KEYS_ENABLED=true. "
@@ -38,9 +43,12 @@ def user_llm_fernet(secret: str | None) -> Fernet:
         )
         raise ValueError(msg)
     try:
-        return Fernet(secret)
+        return [Fernet(key.strip()) for key in secret.split(",")]
     except ValueError as exc:
-        msg = f"USER_LLM_KEYS_SECRET is not a valid Fernet key. Generate one: {_GENERATE_HINT}"
+        msg = (
+            "USER_LLM_KEYS_SECRET must be one or more comma-separated Fernet keys. "
+            f"Generate one: {_GENERATE_HINT}"
+        )
         raise ValueError(msg) from exc
 
 
@@ -65,7 +73,7 @@ def _entry_doc(
     api_key: str,
     model: str,
     chat_model: str,
-    fernet: Fernet,
+    fernet: MultiFernet,
 ) -> dict:
     return {
         **_query(workspace_id, provider),
@@ -89,7 +97,7 @@ def _doc_to_entry(doc: dict) -> UserLLMProviderEntry:
     )
 
 
-def _doc_to_config(doc: dict, fernet: Fernet) -> UserLLMConfig:
+def _doc_to_config(doc: dict, fernet: MultiFernet) -> UserLLMConfig:
     preset = PRESETS[doc["provider"]]
     return UserLLMConfig(
         provider=preset.provider,
@@ -109,10 +117,15 @@ class MongoUserLLMProviderStore:
         db_name: str,
         collection_name: str = "workspace_llm_providers",
         *,
-        fernet: Fernet,
+        keys: list[Fernet],
     ) -> None:
         self._coll = client[db_name][collection_name]
-        self._fernet = fernet
+        self._use_keys(keys)
+
+    def _use_keys(self, keys: list[Fernet]) -> None:
+        self._fernet = MultiFernet(keys)  # encrypts with keys[0], decrypts with any
+        self._current = keys[0]
+        self._retired_keys = len(keys) > 1
 
     async def get(self, workspace_id: UUID) -> UserLLMConfig | None:
         return await self._config(_query(workspace_id, active=True), workspace_id)
@@ -223,3 +236,29 @@ class MongoUserLLMProviderStore:
             name="idx_workspace_llm_ws_provider",
         )
         log.info("workspace_llm_providers.indexes_created")
+        if self._retired_keys:
+            await self._reencrypt_under_current_key()
+
+    async def _reencrypt_under_current_key(self) -> None:
+        """Move rows still under a retired key to the current one, so the next
+        deploy can drop the retired key without losing any workspace's key.
+        """
+        moved = 0
+        projection = {"workspace_id": 1, "provider": 1, "api_key_enc": 1}
+        async for doc in self._coll.find({}, projection):
+            token = doc["api_key_enc"].encode()
+            try:
+                self._current.decrypt(token)
+                continue  # already current
+            except InvalidToken:
+                pass
+            try:
+                rotated = self._fernet.rotate(token)
+            except InvalidToken:
+                continue  # no configured key reads it; get() reports it as unresolvable
+            await self._coll.update_one(
+                {"workspace_id": doc["workspace_id"], "provider": doc["provider"]},
+                {"$set": {"api_key_enc": rotated.decode()}},
+            )
+            moved += 1
+        log.info("workspace_llm_providers.reencrypted", count=moved)

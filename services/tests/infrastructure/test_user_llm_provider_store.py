@@ -6,7 +6,7 @@ import json
 from uuid import uuid4
 
 import pytest
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, MultiFernet
 from pymongo.errors import DuplicateKeyError
 
 from application.ports.user_llm_config import UserLLMProviderEntry
@@ -15,7 +15,7 @@ from infrastructure.read_repositories.mongo_user_llm_provider_store import (
     MongoUserLLMProviderStore,
     _doc_to_entry,
     _entry_doc,
-    user_llm_fernet,
+    user_llm_keys,
 )
 
 KEY = "not-a-real-key-abcdef1234"
@@ -49,7 +49,7 @@ class _FakeColl:
         found = self._all(q)
         return found[0] if found else None
 
-    def find(self, q: dict) -> _FakeCursor:
+    def find(self, q: dict, projection: dict | None = None) -> _FakeCursor:
         return _FakeCursor(self._all(q))
 
     async def replace_one(self, q: dict, doc: dict, upsert: bool = False) -> None:
@@ -103,11 +103,13 @@ class _FakeCursor:
             yield doc
 
 
-def _store(coll: _FakeColl | None = None) -> tuple[MongoUserLLMProviderStore, _FakeColl]:
+def _store(
+    coll: _FakeColl | None = None, keys: list[Fernet] | None = None
+) -> tuple[MongoUserLLMProviderStore, _FakeColl]:
     coll = coll or _FakeColl()
     store = object.__new__(MongoUserLLMProviderStore)
     store._coll = coll
-    store._fernet = Fernet(Fernet.generate_key())
+    store._use_keys(keys or [Fernet(Fernet.generate_key())])
     return store, coll
 
 
@@ -196,7 +198,7 @@ async def test_undecryptable_row_resolves_to_none_but_entry_survives() -> None:
     store, coll = _store()
     ws = uuid4()
     await store.set(ws, provider="openai", api_key=KEY, model="m", chat_model="c")
-    store._fernet = Fernet(Fernet.generate_key())  # secret rotated without re-keying
+    store._use_keys([Fernet(Fernet.generate_key())])  # secret replaced, old key not kept
     assert await store.get(ws) is None
     assert (await store.get_entry(ws)).key_last4 == "1234"
 
@@ -281,7 +283,7 @@ async def test_get_config_reads_an_inactive_provider_so_it_can_be_tested_first()
 
 
 def test_entry_doc_and_back() -> None:
-    fernet = Fernet(Fernet.generate_key())
+    fernet = MultiFernet([Fernet(Fernet.generate_key())])
     doc = _entry_doc(uuid4(), provider="openai", api_key=KEY, model="m", chat_model="c", fernet=fernet)
     assert doc["api_key_enc"] != KEY and KEY not in doc["api_key_enc"]
     assert fernet.decrypt(doc["api_key_enc"].encode()).decode() == KEY
@@ -289,9 +291,62 @@ def test_entry_doc_and_back() -> None:
     assert doc["updated_at"] is not None
 
 
-def test_user_llm_fernet_requires_a_valid_secret() -> None:
+def test_user_llm_keys_requires_valid_secrets() -> None:
     with pytest.raises(ValueError, match="USER_LLM_KEYS_SECRET"):
-        user_llm_fernet(None)
+        user_llm_keys(None)
     with pytest.raises(ValueError, match="USER_LLM_KEYS_SECRET"):
-        user_llm_fernet("not-a-fernet-key")
-    assert isinstance(user_llm_fernet(Fernet.generate_key().decode()), Fernet)
+        user_llm_keys("not-a-fernet-key")
+    good = Fernet.generate_key().decode()
+    with pytest.raises(ValueError, match="USER_LLM_KEYS_SECRET"):
+        user_llm_keys(f"{good},not-a-fernet-key")  # every listed key must be valid
+    assert len(user_llm_keys(good)) == 1
+    assert len(user_llm_keys(f" {good} , {Fernet.generate_key().decode()} ")) == 2
+
+
+# ── Rotation: put a new key first, restart, drop the old one ──
+
+
+async def test_rows_under_a_retired_key_still_resolve() -> None:
+    old, new = Fernet(Fernet.generate_key()), Fernet(Fernet.generate_key())
+    store, coll = _store(keys=[old])
+    ws = uuid4()
+    await store.set(ws, provider="openai", api_key=KEY, model="m", chat_model="c")
+
+    store._use_keys([new, old])
+
+    assert (await store.get(ws)).api_key == KEY
+
+
+async def test_startup_reencrypts_retired_key_rows_so_the_old_key_can_be_dropped() -> None:
+    old, new = Fernet(Fernet.generate_key()), Fernet(Fernet.generate_key())
+    store, coll = _store(keys=[old])
+    ws = uuid4()
+    await store.set(ws, provider="openai", api_key=KEY, model="m", chat_model="c")
+
+    store._use_keys([new, old])
+    await store.ensure_indexes()
+    store._use_keys([new])  # next deploy: old key removed
+
+    assert (await store.get(ws)).api_key == KEY
+
+
+async def test_startup_leaves_current_key_rows_untouched() -> None:
+    old, new = Fernet(Fernet.generate_key()), Fernet(Fernet.generate_key())
+    store, coll = _store(keys=[new, old])
+    await store.set(uuid4(), provider="openai", api_key=KEY, model="m", chat_model="c")
+    before = coll.docs[0]["api_key_enc"]
+
+    await store.ensure_indexes()
+
+    assert coll.docs[0]["api_key_enc"] == before
+
+
+async def test_startup_skips_rows_no_configured_key_can_read() -> None:
+    store, coll = _store(keys=[Fernet(Fernet.generate_key())])
+    await store.set(uuid4(), provider="openai", api_key=KEY, model="m", chat_model="c")
+    lost = coll.docs[0]["api_key_enc"]
+
+    store._use_keys([Fernet(Fernet.generate_key()), Fernet(Fernet.generate_key())])
+    await store.ensure_indexes()  # must not raise
+
+    assert coll.docs[0]["api_key_enc"] == lost

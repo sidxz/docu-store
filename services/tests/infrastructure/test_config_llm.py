@@ -77,7 +77,7 @@ def test_flag_on_without_secret_fails_settings_construction(monkeypatch: pytest.
     # var name) is a valid init kwarg, not the snake_case field name.
     with pytest.raises(ValueError, match="USER_LLM_KEYS_SECRET"):
         Settings(_env_file=None, USER_LLM_KEYS_ENABLED=True, USER_LLM_KEYS_SECRET=None)
-    with pytest.raises(ValueError, match="not a valid Fernet key"):
+    with pytest.raises(ValueError, match="comma-separated Fernet keys"):
         Settings(_env_file=None, USER_LLM_KEYS_ENABLED=True, USER_LLM_KEYS_SECRET="nope")
 
 
@@ -88,6 +88,9 @@ def test_flag_on_with_valid_secret_constructs(monkeypatch: pytest.MonkeyPatch) -
         monkeypatch.delenv(name, raising=False)
     s = Settings(_env_file=None, USER_LLM_KEYS_ENABLED=True, USER_LLM_KEYS_SECRET=Fernet.generate_key().decode())
     assert s.user_llm_keys_enabled is True
+    # Mid-rotation: new key first, old key still listed.
+    two = f"{Fernet.generate_key().decode()},{Fernet.generate_key().decode()}"
+    assert Settings(_env_file=None, USER_LLM_KEYS_ENABLED=True, USER_LLM_KEYS_SECRET=two).user_llm_keys_secret == two
 
 
 def test_flag_off_needs_no_secret(monkeypatch: pytest.MonkeyPatch) -> None:
