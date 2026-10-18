@@ -1,7 +1,7 @@
 """Workspace routes.
 
-Duar member/group proxies, admin token limits, and the workspace's BYO LLM
-providers and embedding model (self-serve).
+Duar member/group proxies, admin token limits, chat settings, and the
+workspace's BYO LLM providers and embedding model (self-serve).
 """
 
 import asyncio
@@ -32,8 +32,13 @@ from application.ports.repositories.artifact_read_models import ArtifactReadMode
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.token_limit_store import TokenLimitStore
 from application.ports.user_llm_config import UserLLMConfig, UserLLMConfigStore
-from application.services.llm_providers import PRESETS
+from application.ports.workspace_chat_settings import WorkspaceChatSettingsStore
+from application.services.llm_providers import PRESETS, ProviderPreset
 from application.use_cases.cser_export_use_case import build_cser_export_zip
+from application.workflow_use_cases.workspace_reembed_use_case import (
+    ReEmbedProgress,
+    WorkspaceReEmbedUseCase,
+)
 from infrastructure.config import Settings
 from infrastructure.llm.provider_probe import probe_ner_support, probe_user_llm_config
 from interfaces.api.routes.helpers import get_allowed_artifact_ids, require_action
@@ -161,6 +166,41 @@ async def _source_filenames_by_artifact_id(
     }
 
 
+class WorkspaceChatSettingsResponse(BaseModel):
+    answer_formatting: bool = Field(description="Whether chat answers get the formatting pass")
+    can_manage: bool
+
+
+class WorkspaceChatSettingsRequest(BaseModel):
+    answer_formatting: bool
+
+
+@router.get("/chat-settings", status_code=status.HTTP_200_OK)
+async def get_chat_settings(
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> WorkspaceChatSettingsResponse:
+    """The workspace's chat settings, falling back to the server defaults."""
+    on = await container[WorkspaceChatSettingsStore].get_answer_formatting(auth.workspace_id)
+    return WorkspaceChatSettingsResponse(
+        answer_formatting=container[Settings].chat_enable_answer_formatting if on is None else on,
+        can_manage=auth.is_admin,
+    )
+
+
+@router.put("/chat-settings", status_code=status.HTTP_204_NO_CONTENT)
+async def set_chat_settings(
+    body: WorkspaceChatSettingsRequest,
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> None:
+    """Switch answer formatting for the whole workspace (admin only)."""
+    _require_admin(auth)
+    await container[WorkspaceChatSettingsStore].set_answer_formatting(
+        auth.workspace_id, body.answer_formatting, updated_by=auth.user_id
+    )
+
+
 @router.get("/cser-training-export")
 async def export_cser_training_data(
     container: Annotated[Container, Depends(get_container)],
@@ -218,6 +258,7 @@ class WorkspaceEmbeddingResponse(BaseModel):
     usable: bool  # the workspace holds a key that can serve ``model``
     detail: str | None = None  # why not, when not
     options: list[EmbeddingModelOption]
+    reembed: ReEmbedProgress | None = None  # self-serve only
 
 
 class WorkspaceEmbeddingBody(BaseModel):
@@ -238,6 +279,23 @@ async def _current_embedding_model(container: Container, workspace_id: UUID) -> 
 
     config = await container[WorkspaceEmbeddingConfigStore].get(workspace_id)
     return config.model if config else LOCAL_EMBEDDING_MODEL
+
+
+async def _vector_model_name(container: Container, model: str) -> str:
+    """The ``model_name`` that ``model``'s vectors carry in Qdrant."""
+    from application.ports.embedding_generator import EmbeddingGenerator
+    from application.services.embedding_models import LOCAL_EMBEDDING_MODEL
+
+    if model != LOCAL_EMBEDDING_MODEL:
+        return model
+    return str((await container[EmbeddingGenerator].get_model_info()).get("model_name", ""))
+
+
+async def _reembed_progress(container: Container, workspace_id: UUID) -> ReEmbedProgress:
+    model = await _current_embedding_model(container, workspace_id)
+    return await container[WorkspaceReEmbedUseCase].progress(
+        workspace_id, await _vector_model_name(container, model)
+    )
 
 
 @router.get("/embedding", status_code=status.HTTP_200_OK)
@@ -274,6 +332,7 @@ async def get_workspace_embedding(
             EmbeddingModelOption(id=key, label=preset.label, providers=list(preset.providers))
             for key, preset in EMBEDDING_MODELS.items()
         ],
+        reembed=await _reembed_progress(container, auth.workspace_id) if enabled else None,
     )
 
 
@@ -313,6 +372,11 @@ async def set_workspace_embedding(
             status_code=status.HTTP_409_CONFLICT,
             detail="Changing the embedding model re-embeds every document in this workspace.",
         )
+    if has_documents and (await _reembed_progress(container, auth.workspace_id)).state == "running":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Wait for the current re-embed to finish before changing the model again.",
+        )
     # The workspace must hold a key for what is picked — searching needs it right
     # away, and the re-embed below runs on it.
     spec = await container[UserLLMScope].spec_for_model(body.model, auth.workspace_id)
@@ -334,19 +398,58 @@ async def set_workspace_embedding(
     return WorkspaceEmbeddingUpdate(model=body.model, reembed_workflows=triggered)
 
 
+@router.post("/embedding/reembed", status_code=status.HTTP_200_OK)
+async def resume_workspace_reembed(
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> WorkspaceEmbeddingUpdate:
+    """Re-embed the documents still holding vectors from another model (admin).
+
+    Retries a failed re-embed, or finishes one that stopped, without redoing
+    the documents already on the workspace's model.
+    """
+    _require_admin(auth)
+    _require_user_keys(container)
+    model = await _current_embedding_model(container, auth.workspace_id)
+    started = await container[WorkspaceReEmbedUseCase].resume(
+        auth.workspace_id, await _vector_model_name(container, model)
+    )
+    return WorkspaceEmbeddingUpdate(model=model, reembed_workflows=started)
+
+
 # ── BYO LLM provider ─────────────────────────────────────────────────────────
 
 
-def _presets_dto() -> dict[str, LLMProviderPreset]:
+def _offered(settings: Settings) -> dict[str, ProviderPreset]:
+    """Providers a workspace may add or switch to; TAMU AI only where the deployment opts in."""
+    return {pid: p for pid, p in PRESETS.items() if pid != "tamu" or settings.tamu_ai_enabled}
+
+
+def _presets_dto(settings: Settings) -> dict[str, LLMProviderPreset]:
     return {
-        pid: LLMProviderPreset(model=p.model, chat_model=p.chat_model) for pid, p in PRESETS.items()
+        pid: LLMProviderPreset(model=p.model, chat_model=p.chat_model)
+        for pid, p in _offered(settings).items()
     }
 
 
-async def _suggestions_dto() -> dict[str, list[str]]:
+async def _suggestions_dto(settings: Settings) -> dict[str, list[str]]:
     from infrastructure.llm.openrouter_catalog import suggested_models
 
-    return {pid: list(await suggested_models(pid)) for pid in PRESETS}
+    return {
+        pid: list(p.models or await suggested_models(pid)) for pid, p in _offered(settings).items()
+    }
+
+
+def _chosen_models(provider: str, model: str | None, chat_model: str | None) -> tuple[str, str]:
+    """Blank → the preset's default; a provider with a fixed model list allows nothing else."""
+    preset = PRESETS[provider]
+    picked = (model or preset.model, chat_model or preset.chat_model)
+    if preset.models and not set(picked) <= set(preset.models):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"{provider} offers only these models: {', '.join(preset.models)}.",
+        )
+    return picked
 
 
 def _require_user_keys(container: Container) -> Settings:
@@ -359,8 +462,8 @@ def _require_user_keys(container: Container) -> Settings:
     return settings
 
 
-def _known_provider(provider: str) -> str:
-    if provider not in PRESETS:
+def _known_provider(provider: str, presets: dict[str, ProviderPreset] = PRESETS) -> str:
+    if provider not in presets:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown provider {provider!r}."
         )
@@ -396,8 +499,8 @@ async def get_llm_provider(
             )
             for e in entries
         ],
-        presets=_presets_dto(),
-        suggestions=await _suggestions_dto(),
+        presets=_presets_dto(settings),
+        suggestions=await _suggestions_dto(settings),
     )
 
 
@@ -439,9 +542,8 @@ async def set_llm_provider(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="api_key must be between 8 and 512 characters.",
         )
-    preset = PRESETS[body.provider]
-    model = body.model or preset.model
-    chat_model = body.chat_model or preset.chat_model
+    preset = PRESETS[_known_provider(body.provider, _offered(settings))]
+    model, chat_model = _chosen_models(body.provider, body.model, body.chat_model)
 
     if api_key is None:
         stored = await store.get_config(auth.workspace_id, body.provider)
@@ -498,7 +600,7 @@ async def activate_llm_provider(
     _require_admin(auth)
     settings = _require_user_keys(container)
     store = container[UserLLMConfigStore]
-    cfg = await store.get_config(auth.workspace_id, _known_provider(provider))
+    cfg = await store.get_config(auth.workspace_id, _known_provider(provider, _offered(settings)))
     if cfg is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"No {provider} key stored."
@@ -536,19 +638,15 @@ async def probe_llm_provider(
     _require_admin(auth)
     settings = _require_user_keys(container)
     cfg = await container[UserLLMConfigStore].get_config(
-        auth.workspace_id, _known_provider(provider)
+        auth.workspace_id, _known_provider(provider, _offered(settings))
     )
     if cfg is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"No {provider} key stored."
         )
     if body is not None:
-        preset = PRESETS[provider]
-        cfg = replace(
-            cfg,
-            model=body.model or preset.model,
-            chat_model=body.chat_model or preset.chat_model,
-        )
+        model, chat_model = _chosen_models(provider, body.model, body.chat_model)
+        cfg = replace(cfg, model=model, chat_model=chat_model)
     results = await probe_user_llm_config(cfg, allow_cloud=settings.allow_cloud_llm)
     lanes = {
         lane: LLMLaneTestResult(ok=ok, detail=detail) for lane, (ok, detail) in results.items()

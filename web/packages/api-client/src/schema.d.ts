@@ -3570,7 +3570,7 @@ export interface components {
              * Provider
              * @enum {string}
              */
-            provider: "openrouter" | "openai" | "gemini";
+            provider: "openrouter" | "openai" | "gemini" | "tamu";
             /** Api Key */
             api_key?: string | null;
             /** Model */

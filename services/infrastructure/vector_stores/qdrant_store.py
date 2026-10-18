@@ -27,7 +27,56 @@ _PAYLOAD_INDEXES: tuple[tuple[str, models.PayloadSchemaType], ...] = (
     ("source_class", models.PayloadSchemaType.KEYWORD),
     ("is_table", models.PayloadSchemaType.BOOL),
     ("is_figure", models.PayloadSchemaType.BOOL),
+    ("model_name", models.PayloadSchemaType.KEYWORD),
 )
+
+
+def _from_model(model_name: str) -> models.FieldCondition:
+    return models.FieldCondition(key="model_name", match=models.MatchValue(value=model_name))
+
+
+def same_model(query_filter: models.Filter | None, model_name: str) -> models.Filter:
+    """``query_filter`` narrowed to vectors from the query's own model.
+
+    While a workspace re-embeds onto a new model, its other vectors are in a
+    different space: a query scores them, but meaninglessly.
+    """
+    must = list(query_filter.must or []) if query_filter else []
+    return models.Filter(must=[*must, _from_model(model_name)])
+
+
+def _in_workspace(workspace_id: UUID) -> models.FieldCondition:
+    return models.FieldCondition(
+        key="workspace_id", match=models.MatchValue(value=str(workspace_id))
+    )
+
+
+async def count_in_workspace(
+    client: AsyncQdrantClient, collection_name: str, workspace_id: UUID
+) -> int:
+    result = await client.count(
+        collection_name=collection_name,
+        count_filter=models.Filter(must=[_in_workspace(workspace_id)]),
+        exact=True,
+    )
+    return result.count
+
+
+async def stale_vectors(
+    client: AsyncQdrantClient, collection_name: str, workspace_id: UUID, model_name: str
+) -> tuple[int, dict[str, int]]:
+    """(vectors in the workspace, artifact_id -> how many are from another model)."""
+    total = await count_in_workspace(client, collection_name, workspace_id)
+    stale = await client.facet(
+        collection_name=collection_name,
+        key="artifact_id",
+        facet_filter=models.Filter(
+            must=[_in_workspace(workspace_id)], must_not=[_from_model(model_name)]
+        ),
+        limit=100_000,
+        exact=True,
+    )
+    return total, {str(hit.value): hit.count for hit in stale.hits}
 
 
 class QdrantStore(VectorStore):
@@ -544,7 +593,7 @@ class QdrantStore(VectorStore):
                 collection_name=self.collection_name,
                 query=query_embedding.vector,
                 using="dense",
-                query_filter=query_filter,
+                query_filter=same_model(query_filter, query_embedding.model_name),
                 limit=limit,
                 score_threshold=score_threshold,
                 with_payload=True,
@@ -617,7 +666,7 @@ class QdrantStore(VectorStore):
                 group_by="page_id",
                 group_size=group_size,
                 limit=limit,
-                query_filter=query_filter,
+                query_filter=same_model(query_filter, query_embedding.model_name),
                 score_threshold=score_threshold,
                 with_payload=True,
             )
@@ -693,7 +742,7 @@ class QdrantStore(VectorStore):
                         query=dense_query.vector,
                         using="dense",
                         limit=prefetch_limit,
-                        filter=query_filter,
+                        filter=same_model(query_filter, dense_query.model_name),
                     ),
                     models.Prefetch(
                         query=models.SparseVector(
@@ -765,7 +814,7 @@ class QdrantStore(VectorStore):
                         query=dense_query.vector,
                         using="dense",
                         limit=prefetch_limit,
-                        filter=query_filter,
+                        filter=same_model(query_filter, dense_query.model_name),
                     ),
                     models.Prefetch(
                         query=models.SparseVector(
@@ -819,6 +868,16 @@ class QdrantStore(VectorStore):
             exact=True,
         )
         return result.count
+
+    async def stale_vectors(self, workspace_id: UUID, model_name: str) -> tuple[int, dict[str, int]]:
+        return await stale_vectors(
+            await self._get_client(), self.collection_name, workspace_id, model_name
+        )
+
+    async def count_vectors(self, workspace_id: UUID) -> int:
+        return await count_in_workspace(
+            await self._get_client(), self.collection_name, workspace_id
+        )
 
     async def get_collection_info(self) -> dict:
         """Get information about the collection.

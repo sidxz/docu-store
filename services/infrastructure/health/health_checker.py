@@ -23,12 +23,15 @@ from application.dtos.health_dtos import (
 from infrastructure.health.gpu_info import get_gpu_info, get_system_info
 
 if TYPE_CHECKING:
+    from uuid import UUID
+
     from motor.motor_asyncio import AsyncIOMotorClient
 
     from application.ports.compound_vector_store import CompoundVectorStore
     from application.ports.embedding_generator import EmbeddingGenerator
     from application.ports.reranker import Reranker
     from application.ports.summary_vector_store import SummaryVectorStore
+    from application.ports.user_llm_config import UserLLMConfigStore
     from application.ports.vector_store import VectorStore
     from application.ports.worker_heartbeat_store import WorkerHeartbeatStore
     from infrastructure.config import Settings
@@ -63,6 +66,7 @@ class InfrastructureHealthChecker:
         reranker: Reranker | None,
         heartbeat_store: WorkerHeartbeatStore,
         settings: Settings,
+        llm_store: UserLLMConfigStore | None = None,
     ) -> None:
         self._mongo = mongo_client
         self._vector_store = vector_store
@@ -73,12 +77,13 @@ class InfrastructureHealthChecker:
         self._reranker = reranker
         self._heartbeat_store = heartbeat_store
         self._settings = settings
+        self._llm_store = llm_store
 
     # ------------------------------------------------------------------
     # Port implementation
     # ------------------------------------------------------------------
 
-    async def run_checks(self) -> DetailedHealthResponse:
+    async def run_checks(self, workspace_id: UUID | None = None) -> DetailedHealthResponse:
         """Run all health checks concurrently and return a consolidated report."""
         now = datetime.now(tz=UTC)
 
@@ -87,7 +92,7 @@ class InfrastructureHealthChecker:
         config_summary = self._get_config_summary()
 
         service_results, model_results, workers = await asyncio.gather(
-            self._check_all_services(),
+            self._check_all_services(workspace_id),
             self._check_all_models(),
             self._heartbeat_store.get_all_workers(),
         )
@@ -136,14 +141,14 @@ class InfrastructureHealthChecker:
     # Service checks
     # ------------------------------------------------------------------
 
-    async def _check_all_services(self) -> list[ServiceStatus]:
+    async def _check_all_services(self, workspace_id: UUID | None) -> list[ServiceStatus]:
         s = self._settings
         checks: list[asyncio.Task[ServiceStatus]] = [
             _timed_check("MongoDB", self._check_mongodb()),
             _timed_check("EventStoreDB", self._check_eventstoredb()),
             _timed_check("Qdrant", self._check_qdrant()),
             _timed_check("Temporal", self._check_temporal()),
-            _timed_check("LLM Service", self._check_llm()),
+            _timed_check("LLM Service", self._check_llm(workspace_id)),
             _timed_check("Duar", self._check_duar()),
             _timed_check("Langfuse", self._check_langfuse()),
             _timed_check("Blob Storage", self._check_blob_storage()),
@@ -255,10 +260,29 @@ class InfrastructureHealthChecker:
         details = await asyncio.to_thread(_sync_check)
         return ServiceStatus(name="Kafka", status="healthy", details=details)
 
-    async def _check_llm(self) -> ServiceStatus:
+    async def _check_llm(self, workspace_id: UUID | None) -> ServiceStatus:
         import httpx
 
         s = self._settings
+        if s.user_llm_keys_enabled and self._llm_store is not None:
+            # Each workspace runs on its own provider; the server's LLM_* is unused.
+            entry = await self._llm_store.get_entry(workspace_id) if workspace_id else None
+            return ServiceStatus(
+                name="LLM Service",
+                status="healthy" if entry else "degraded",
+                details={
+                    "provider": entry.provider,
+                    "configured_model": entry.model,
+                    "chat_model": entry.chat_model,
+                    "api_key_set": True,
+                    "key_source": "workspace",
+                }
+                if entry
+                else {"key_source": "workspace"},
+                error=None
+                if entry
+                else "No AI provider connected: add one under Settings → AI Provider",
+            )
         if s.llm_provider == "ollama":
             url = f"{s.llm_base_url}/api/tags"
             async with httpx.AsyncClient(timeout=_CHECK_TIMEOUT) as client:

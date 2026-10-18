@@ -47,7 +47,6 @@ class PipelineStatsResponse(BaseModel):
 class CollectionStats(BaseModel):
     collection_name: str
     points_count: int
-    indexed_vectors_count: int
     status: str
 
 

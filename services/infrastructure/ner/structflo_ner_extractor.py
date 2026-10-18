@@ -44,6 +44,26 @@ LANGEXTRACT_PROVIDERS: frozenset[str] = frozenset({"ollama", "openai", "gemini"}
 BASE_URL_PROVIDERS: frozenset[str] = frozenset({"ollama", "openai"})
 
 
+
+def send_stream_false() -> None:
+    """Make langextract's OpenAI requests say ``"stream": false`` explicitly.
+
+    langextract leaves ``stream`` out of chat/completions. OpenAI reads that as
+    false; TAMU AI (Open WebUI) streams instead, and the SDK then hands langextract
+    a raw SSE string. Sending the default is a no-op everywhere else. Idempotent.
+    """
+    from langextract.providers.openai import OpenAILanguageModel
+
+    build = OpenAILanguageModel._build_chat_completions_params
+    if getattr(build, "sends_stream_false", False):
+        return
+
+    def with_stream_false(self, prompt: str, config: dict) -> dict:
+        return {**build(self, prompt, config), "stream": False}
+
+    with_stream_false.sends_stream_false = True  # type: ignore[attr-defined]
+    OpenAILanguageModel._build_chat_completions_params = with_stream_false
+
 class StructfloNERExtractor(NERExtractorPort):
     """Runs fast + LLM NER and merges results.
 
@@ -120,6 +140,7 @@ class StructfloNERExtractor(NERExtractorPort):
         if provider != "ollama" and not api_key:
             msg = f"No API key for NER provider {provider!r} — add one in your LLM settings."
             raise LLMNotConfiguredError(msg)
+        send_stream_false()
         return NERExtractor(
             model_id=model_id,
             provider=provider,

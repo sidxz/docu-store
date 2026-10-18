@@ -7,6 +7,7 @@ import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/Card";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import {
   LOCAL_EMBEDDING_MODEL,
+  useResumeReembed,
   useSetWorkspaceEmbedding,
   useWorkspaceEmbedding,
 } from "@/hooks/use-workspace-embedding";
@@ -32,6 +34,7 @@ const PROVIDER_LABEL: Record<string, string> = {
 export function EmbeddingModelCard() {
   const { data } = useWorkspaceEmbedding();
   const save = useSetWorkspaceEmbedding();
+  const resume = useResumeReembed();
   const isAdmin = useAuthzHasRole("admin");
   const confirm = useConfirm();
   const [choice, setChoice] = useState<string | null>(null);
@@ -43,6 +46,8 @@ export function EmbeddingModelCard() {
     id === LOCAL_EMBEDDING_MODEL ? builtIn : (data.options.find((o) => o.id === id)?.label ?? id);
   const selected = choice ?? data.model;
   const selectedOption = data.options.find((o) => o.id === selected);
+  const reembed = data.reembed;
+  const running = reembed?.state === "running";
 
   const onSave = async () => {
     if (
@@ -87,7 +92,11 @@ export function EmbeddingModelCard() {
               ))}
             </SelectContent>
           </Select>
-          <Button size="sm" disabled={selected === data.model || save.isPending} onClick={onSave}>
+          <Button
+            size="sm"
+            disabled={selected === data.model || save.isPending || running}
+            onClick={onSave}
+          >
             {data.has_documents ? "Save and re-embed" : "Save"}
           </Button>
         </div>
@@ -111,8 +120,44 @@ export function EmbeddingModelCard() {
           <AlertDescription>{getErrorMessage(save.error)}</AlertDescription>
         </Alert>
       )}
-      {save.data && save.data.reembed_workflows > 0 && (
-        <p className="mt-2 text-xs text-text-muted">Re-embedding started.</p>
+      {running && (
+        <div className="mt-3 space-y-1.5">
+          <p className="text-xs text-text-muted">
+            Re-embedding documents: {reembed.done.toLocaleString()} of{" "}
+            {reembed.total.toLocaleString()} vectors done. Search covers the finished ones.
+          </p>
+          <Progress value={reembed.total ? (reembed.done / reembed.total) * 100 : 0} />
+        </div>
+      )}
+      {reembed?.state === "failed" && (
+        <Alert variant="destructive" className="mt-3">
+          <AlertDescription>
+            <p>
+              Re-embedding stopped with {(reembed.total - reembed.done).toLocaleString()} of{" "}
+              {reembed.total.toLocaleString()} vectors still on a previous model. Search skips
+              them until they are re-embedded.
+            </p>
+            {reembed.error && <p className="mt-1 font-mono text-xs">{reembed.error}</p>}
+            {isAdmin ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-2"
+                disabled={resume.isPending}
+                onClick={() => resume.mutate()}
+              >
+                Retry
+              </Button>
+            ) : (
+              <p className="mt-1">Ask a workspace admin to retry.</p>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+      {resume.isError && (
+        <Alert variant="destructive" className="mt-3">
+          <AlertDescription>{getErrorMessage(resume.error)}</AlertDescription>
+        </Alert>
       )}
     </Card>
   );

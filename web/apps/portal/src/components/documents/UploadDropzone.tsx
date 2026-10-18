@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ACCEPT, MAX_FILE_SIZE } from "@/hooks/use-document-uploader";
 
-export function UploadDropzone({ onFiles, onReject, disabled }: { onFiles: (files: File[]) => void; onReject?: (count: number) => void; disabled?: boolean }) {
+export function UploadDropzone({ title = "Drag files or a folder here", onFiles, onReject, disabled }: { title?: string; onFiles: (files: File[]) => void; onReject?: (count: number) => void; disabled?: boolean }) {
   const folderRef = useRef<HTMLInputElement>(null);
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop: (accepted) => accepted.length && onFiles(accepted),
@@ -46,8 +46,8 @@ export function UploadDropzone({ onFiles, onReject, disabled }: { onFiles: (file
       <div className="mb-3 flex size-12 items-center justify-center rounded-xl bg-accent-light">
         <UploadCloud className="size-6 text-accent-text" />
       </div>
-      <p className="text-sm font-medium text-text-primary">Drag files or a folder here</p>
-      <p className="mt-1 text-xs text-text-muted">PDF, PPT, PPTX, DOC, DOCX · up to 100 MB each</p>
+      <p className="text-sm font-medium text-text-primary">{title}</p>
+      <p className="mt-1 text-xs text-text-muted">PDF, PPTX, DOCX · up to 100 MB each</p>
       <div className="mt-4 flex gap-2">
         <Button type="button" variant="outline" size="sm" onClick={open} disabled={disabled}>
           <FilePlus2 className="size-4" />Browse files

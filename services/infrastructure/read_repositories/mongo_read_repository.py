@@ -38,6 +38,11 @@ ENTITY_TYPE_DISPLAY_NAMES: dict[str, str] = {
 }
 
 
+# Year and month are sliced off the ISO string rather than parsed with $toDate,
+# which DocumentDB rejects for microsecond timestamps ("…23.258782Z").
+_PRESENTATION_DATE = {"$toString": "$presentation_date.date"}
+
+
 class MongoReadRepository(
     PageReadModel,
     ArtifactReadModel,
@@ -350,6 +355,27 @@ class MongoReadRepository(
 
         raw_stats = await self.tag_dictionary.aggregate(pipeline).to_list(100)
 
+        # Count tags the way _get_tag_folders lists them. The dictionary also holds
+        # merged compound aliases (searchable, not folders) and ignores visibility.
+        folder_counts = {
+            d["_id"]: d["n"]
+            for d in await self.artifacts.aggregate(
+                [
+                    {"$match": self._browse_base_match(workspace_id, allowed_artifact_ids)},
+                    {"$unwind": "$tag_mentions"},
+                    {
+                        "$group": {
+                            "_id": {
+                                "et": "$tag_mentions.entity_type",
+                                "tag": {"$toLower": "$tag_mentions.tag"},
+                            },
+                        },
+                    },
+                    {"$group": {"_id": "$_id.et", "n": {"$sum": 1}}},
+                ],
+            ).to_list(100)
+        }
+
         categories: dict[str, TagCategoryDTO] = {}
         for item in raw_stats:
             et = item["entity_type"]
@@ -357,7 +383,10 @@ class MongoReadRepository(
                 entity_type=et,
                 display_name=ENTITY_TYPE_DISPLAY_NAMES.get(et, et.replace("_", " ").title()),
                 artifact_count=item["artifact_count"],
-                distinct_count=item["distinct_count"],
+                # author and date folders come from their own fields, as the dictionary does
+                distinct_count=item["distinct_count"]
+                if et in ("author", "date")
+                else folder_counts.get(et, 0),
             )
 
         # Inject sticky categories (always present even if count 0)
@@ -517,14 +546,14 @@ class MongoReadRepository(
                 {"$match": match_stage},
                 {
                     "$group": {
-                        "_id": {"$year": {"$toDate": "$presentation_date.date"}},
+                        "_id": {"$substrCP": [_PRESENTATION_DATE, 0, 4]},
                         "artifact_ids": {"$addToSet": "$artifact_id"},
                     },
                 },
                 {
                     "$project": {
-                        "tag_value": {"$toString": "$_id"},
-                        "display_name": {"$toString": "$_id"},
+                        "tag_value": "$_id",
+                        "display_name": "$_id",
                         "artifact_count": {"$size": "$artifact_ids"},
                     },
                 },
@@ -568,7 +597,7 @@ class MongoReadRepository(
             {"$match": match_stage},
             {
                 "$group": {
-                    "_id": {"$month": {"$toDate": "$presentation_date.date"}},
+                    "_id": {"$toInt": {"$substrCP": [_PRESENTATION_DATE, 5, 2]}},
                     "artifact_ids": {"$addToSet": "$artifact_id"},
                 },
             },

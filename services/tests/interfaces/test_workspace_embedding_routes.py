@@ -17,6 +17,10 @@ from application.ports.workspace_embedding_config import (
 )
 from application.services.llm_scope import UserLLMScope
 from application.workflow_use_cases.trigger_bulk_reembed_use_case import TriggerBulkReEmbedUseCase
+from application.workflow_use_cases.workspace_reembed_use_case import (
+    ReEmbedProgress,
+    WorkspaceReEmbedUseCase,
+)
 from infrastructure.config import Settings
 from interfaces.api.main import app
 from interfaces.dependencies import get_auth, get_container
@@ -66,6 +70,20 @@ class BulkReEmbed:
         return BulkWorkflowResponse(triggered=4, workflow_ids=[], targets=targets)
 
 
+class ReEmbed:
+    def __init__(self) -> None:
+        self.state = "done"
+        self.models: list[str] = []
+
+    async def progress(self, workspace_id, model_name):
+        self.models.append(model_name)
+        return ReEmbedProgress(state=self.state, total=10, done=4)
+
+    async def resume(self, workspace_id, model_name):
+        self.models.append(model_name)
+        return 3
+
+
 class Generator:
     async def get_model_info(self):
         return {"model_name": "ibm-granite/granite-embedding-english-r2"}
@@ -76,19 +94,22 @@ class FakeContainer(dict):
 
 
 def _client(*, enabled=True, docs=0, keys=None, role="admin"):
-    store, bulk = EmbeddingStore(), BulkReEmbed()
+    store, bulk, reembed = EmbeddingStore(), BulkReEmbed(), ReEmbed()
     container = FakeContainer({
         Settings: SimpleNamespace(user_llm_keys_enabled=enabled),
         WorkspaceEmbeddingConfigStore: store,
         UserLLMScope: UserLLMScope(LLMStore(keys or {}), enabled=True, embedding_store=store),
         ArtifactReadModel: ReadModel(docs),
         TriggerBulkReEmbedUseCase: bulk,
+        WorkspaceReEmbedUseCase: reembed,
         EmbeddingGenerator: Generator(),
     })
     strip_authz_middleware(app)
     app.dependency_overrides[get_container] = lambda: container
     app.dependency_overrides[get_auth] = lambda: FakeAuth(role=role, user_id=uuid4(), workspace_id=uuid4())
-    return TestClient(app), store, bulk
+    client = TestClient(app)
+    client.reembed = reembed
+    return client, store, bulk
 
 
 def _put(client, **body):
@@ -167,5 +188,45 @@ def test_put_is_refused_when_flag_off() -> None:
     try:
         client, _, _ = _client(enabled=False, keys={"openai": "k"})
         assert _put(client, model=MODEL).status_code == 409
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_get_reports_reembed_progress_against_the_vectors_model_name() -> None:
+    try:
+        client, store, _ = _client(keys={"openai": "k"})
+        client.reembed.state = "running"
+        body = client.get("/workspace/embedding").json()
+        assert body["reembed"] == {"state": "running", "total": 10, "done": 4, "error": None}
+        store.model = MODEL
+        client.get("/workspace/embedding")
+        # "local" is checked against the server model's name, an API model by its id
+        assert client.reembed.models == ["ibm-granite/granite-embedding-english-r2", MODEL]
+        client, _, _ = _client(enabled=False)
+        assert client.get("/workspace/embedding").json()["reembed"] is None
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_put_is_refused_while_a_reembed_runs() -> None:
+    try:
+        client, store, bulk = _client(docs=3, keys={"openai": "k"})
+        client.reembed.state = "running"
+        assert _put(client, model=MODEL, reembed=True).status_code == 409
+        assert store.model is None
+        assert bulk.calls == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_resume_is_admin_only_and_self_serve_only() -> None:
+    try:
+        client, _, _ = _client(role="editor")
+        assert client.post("/workspace/embedding/reembed").status_code == 403
+        client, _, _ = _client(enabled=False)
+        assert client.post("/workspace/embedding/reembed").status_code == 404
+        client, _, _ = _client()
+        resp = client.post("/workspace/embedding/reembed")
+        assert resp.json() == {"model": "local", "reembed_workflows": 3}
     finally:
         app.dependency_overrides.clear()

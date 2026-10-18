@@ -122,6 +122,10 @@ class CompoundVectorStore(Protocol):
         """
         ...
 
+    async def count_vectors(self, workspace_id: UUID) -> int:
+        """Vectors belonging to the workspace."""
+        ...
+
     async def get_compound_collection_info(self) -> dict:
         """Get stats for the compound collection."""
         ...

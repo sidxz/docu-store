@@ -217,8 +217,16 @@ class VectorStore(Protocol):
         """
         ...
 
+    async def stale_vectors(self, workspace_id: UUID, model_name: str) -> tuple[int, dict[str, int]]:
+        """(vectors in the workspace, artifact_id -> how many are not from ``model_name``)."""
+        ...
+
     async def count_vectors_not_from(self, model_names: list[str]) -> int:
         """Vectors whose ``model_name`` is none of these — left over from a model change."""
+        ...
+
+    async def count_vectors(self, workspace_id: UUID) -> int:
+        """Vectors belonging to the workspace."""
         ...
 
     async def get_collection_info(self) -> dict:

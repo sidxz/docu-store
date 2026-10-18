@@ -13,6 +13,7 @@ interface PdfEmbedProps {
 export function PdfEmbed({ artifactId, pageNumber }: PdfEmbedProps) {
   const { blobUrl, error } = useAuthBlobUrl(
     `${API_URL}/artifacts/${artifactId}/pdf`,
+    "application/pdf",
   );
 
   if (error) {

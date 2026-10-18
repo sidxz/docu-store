@@ -157,3 +157,17 @@ async def test_registry_identifiers_survive_the_fast_type_filter():
     assert ("CHEMBL5077530", "compound_name") in found
     assert ("SACC-3060", "compound_name") in found
     assert ("Rv3790", "accession_number") in found
+
+
+def test_langextract_openai_requests_say_stream_false() -> None:
+    """TAMU AI (Open WebUI) streams unless told not to; langextract omits the field."""
+    from langextract.providers.openai import OpenAILanguageModel
+
+    from infrastructure.ner.structflo_ner_extractor import send_stream_false
+
+    send_stream_false()
+    send_stream_false()  # idempotent
+    model = OpenAILanguageModel(model_id="protected.gpt-5.6-luna", api_key="not-a-key")
+    params = model._build_chat_completions_params("hi", {})
+    assert params["stream"] is False
+    assert params["model"] == "protected.gpt-5.6-luna"

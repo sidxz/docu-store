@@ -331,6 +331,14 @@ class Settings(BaseSettings):
             "and may pick its own embedding model. The default keeps env-keyed behavior."
         ),
     )
+    tamu_ai_enabled: bool = Field(
+        default=False,
+        validation_alias="TAMU_AI_ENABLED",
+        description=(
+            "Offer TAMU AI (Texas A&M's AI Chat API) as a workspace LLM provider. "
+            "Only Texas A&M members can get a key, so it is off unless a deployment opts in."
+        ),
+    )
     user_llm_keys_secret: str | None = Field(
         default=None,
         validation_alias="USER_LLM_KEYS_SECRET",
@@ -790,6 +798,11 @@ class Settings(BaseSettings):
     slow_request_threshold_ms: int = Field(
         default=1000,
         validation_alias="SLOW_REQUEST_THRESHOLD_MS",
+    )
+    max_upload_mb: int = Field(
+        default=100,
+        validation_alias="MAX_UPLOAD_MB",
+        description="Largest accepted request body (uploads included), in MiB.",
     )
 
     # Prompt management

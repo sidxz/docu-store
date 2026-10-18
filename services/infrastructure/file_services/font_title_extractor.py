@@ -13,9 +13,11 @@ from typing import TYPE_CHECKING
 import structlog
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
 from application.ports.title_extractor import TitleCandidate
+from infrastructure.file_services.subprocess_parse import run_in_subprocess
 
 logger = structlog.get_logger()
 
@@ -40,16 +42,59 @@ class _FontSpan:
     is_bold: bool
 
 
+def _font_spans(pdf_path: str, page_index: int) -> list[_FontSpan]:
+    """Extract text spans with font metadata from a PDF page using PyMuPDF."""
+    import fitz
+
+    doc = fitz.open(pdf_path, filetype="pdf")
+    try:
+        if page_index >= len(doc):
+            return []
+
+        page = doc[page_index]
+        page_dict = page.get_text("dict")
+
+        spans: list[_FontSpan] = []
+        for block in page_dict.get("blocks", []):
+            if block.get("type") != 0:  # text blocks only
+                continue
+            for line in block.get("lines", []):
+                for span in line.get("spans", []):
+                    text = span.get("text", "").strip()
+                    if not text:
+                        continue
+                    size = span.get("size", 0.0)
+                    if size < _MIN_FONT_SIZE:
+                        continue
+                    # PyMuPDF flags: bit 4 = bold (value 16)
+                    flags = span.get("flags", 0)
+                    is_bold = bool(flags & (1 << 4))
+                    spans.append(_FontSpan(text=text, font_size=size, is_bold=is_bold))
+
+        return spans
+    finally:
+        doc.close()
+
+
 class FontTitleExtractor:
     """Infrastructure adapter: extracts titles from PDFs via font-size heuristic.
 
-    Implements TitleExtractorPort.
+    Implements TitleExtractorPort. MuPDF is native code reading an untrusted
+    file, so it runs in a killable child, never in the worker itself.
     """
+
+    def __init__(
+        self,
+        spans_fn: Callable[[str, int], list[_FontSpan]] = _font_spans,
+        timeout_s: float = 60,
+    ) -> None:
+        self.spans_fn = spans_fn
+        self.timeout_s = timeout_s
 
     def extract_title(self, pdf_path: Path, page_index: int = 0) -> TitleCandidate | None:
         """Extract title from a PDF page using font-size analysis."""
         try:
-            spans = self._extract_font_spans(pdf_path, page_index)
+            spans = run_in_subprocess(self.spans_fn, (str(pdf_path), page_index), self.timeout_s)
         except Exception:
             logger.exception(
                 "font_title_extractor.pdf_read_failed",
@@ -62,40 +107,6 @@ class FontTitleExtractor:
             return None
 
         return self._find_title(spans)
-
-    @staticmethod
-    def _extract_font_spans(pdf_path: Path, page_index: int) -> list[_FontSpan]:
-        """Extract text spans with font metadata from a PDF page using PyMuPDF."""
-        import fitz
-
-        doc = fitz.open(str(pdf_path))
-        try:
-            if page_index >= len(doc):
-                return []
-
-            page = doc[page_index]
-            page_dict = page.get_text("dict")
-
-            spans: list[_FontSpan] = []
-            for block in page_dict.get("blocks", []):
-                if block.get("type") != 0:  # text blocks only
-                    continue
-                for line in block.get("lines", []):
-                    for span in line.get("spans", []):
-                        text = span.get("text", "").strip()
-                        if not text:
-                            continue
-                        size = span.get("size", 0.0)
-                        if size < _MIN_FONT_SIZE:
-                            continue
-                        # PyMuPDF flags: bit 4 = bold (value 16)
-                        flags = span.get("flags", 0)
-                        is_bold = bool(flags & (1 << 4))
-                        spans.append(_FontSpan(text=text, font_size=size, is_bold=is_bold))
-
-            return spans
-        finally:
-            doc.close()
 
     @staticmethod
     def _find_title(spans: list[_FontSpan]) -> TitleCandidate | None:

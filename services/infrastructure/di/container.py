@@ -33,6 +33,7 @@ from application.ports.user_llm_config import NullUserLLMConfigStore, UserLLMCon
 from application.ports.vector_store import VectorStore
 from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.ports.workflow_status_cache import WorkflowStatusCache
+from application.ports.workspace_chat_settings import WorkspaceChatSettingsStore
 from application.ports.workspace_embedding_config import WorkspaceEmbeddingConfigStore
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
 from application.services.compound_activity_query import CompoundActivityQuery
@@ -757,6 +758,15 @@ def create_container() -> Container:
         embedding_store=c[WorkspaceEmbeddingConfigStore] if user_keys_fernet else None,
     )
 
+    from infrastructure.read_repositories.mongo_workspace_chat_settings_store import (
+        MongoWorkspaceChatSettingsStore,
+    )
+
+    container[WorkspaceChatSettingsStore] = lambda c: MongoWorkspaceChatSettingsStore(
+        client=c[AsyncIOMotorClient],
+        db_name=settings.mongo_db,
+    )
+
     # Summarization Use Cases
     container[SummarizePageUseCase] = lambda c: SummarizePageUseCase(
         page_repository=c[PageRepository],
@@ -835,6 +845,16 @@ def create_container() -> Container:
         workflow_orchestrator=c[WorkflowOrchestrator],
     )
 
+    from application.workflow_use_cases.workspace_reembed_use_case import (
+        WorkspaceReEmbedUseCase,
+    )
+
+    container[WorkspaceReEmbedUseCase] = lambda c: WorkspaceReEmbedUseCase(
+        vector_store=c[VectorStore],
+        summary_vector_store=c[SummaryVectorStore],
+        workflow_orchestrator=c[WorkflowOrchestrator],
+    )
+
     from application.workflow_use_cases.trigger_bulk_reprocess_compounds_use_case import (
         TriggerBulkReprocessCompoundsUseCase,
     )
@@ -873,6 +893,7 @@ def create_container() -> Container:
         reranker=c[Reranker],
         heartbeat_store=c[WorkerHeartbeatStore],
         settings=settings,
+        llm_store=c[UserLLMConfigStore],
     )
     container[GetSystemHealthUseCase] = lambda c: GetSystemHealthUseCase(
         health_checker=c[SystemHealthChecker],

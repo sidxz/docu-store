@@ -12,6 +12,15 @@ export interface EmbeddingModelOption {
   providers: string[];
 }
 
+/** How many of the workspace's vectors are on its current model. */
+export interface ReEmbedProgress {
+  state: "done" | "running" | "failed";
+  total: number;
+  done: number;
+  /** Why it failed, while Temporal still remembers. */
+  error: string | null;
+}
+
 /** GET /workspace/embedding — self-serve only (`enabled`). */
 export interface WorkspaceEmbedding {
   enabled: boolean;
@@ -24,6 +33,7 @@ export interface WorkspaceEmbedding {
   usable: boolean;
   detail: string | null;
   options: EmbeddingModelOption[];
+  reembed: ReEmbedProgress | null;
 }
 
 export const LOCAL_EMBEDDING_MODEL = "local";
@@ -34,6 +44,7 @@ export function useWorkspaceEmbedding() {
     queryFn: () => authFetchJson<WorkspaceEmbedding>("/workspace/embedding"),
     staleTime: 5 * 60 * 1000,
     retry: 1,
+    refetchInterval: (query) => (query.state.data?.reembed?.state === "running" ? 3000 : false),
   });
 }
 
@@ -45,6 +56,18 @@ export function useSetWorkspaceEmbedding() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.workspace.embedding() }),
+  });
+}
+
+/** Re-embed the documents still on another model — retry or finish a re-embed. */
+export function useResumeReembed() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      authFetchJson<{ model: string; reembed_workflows: number }>("/workspace/embedding/reembed", {
+        method: "POST",
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.workspace.embedding() }),
   });

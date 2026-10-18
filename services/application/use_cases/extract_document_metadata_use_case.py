@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
@@ -164,9 +165,12 @@ class ExtractDocumentMetadataUseCase:
 
                     pages_tried += 1
 
-                    # Font-based title extraction (fast, ~1ms)
+                    # Font-based title extraction. It may run a child process
+                    # (seconds), so keep it off the event loop Temporal polls on.
                     if not raw.has_title:
-                        candidate = self.title_extractor.extract_title(pdf_path, page.index)
+                        candidate = await asyncio.to_thread(
+                            self.title_extractor.extract_title, pdf_path, page.index
+                        )
                         if candidate:
                             raw.title = candidate.title
                             raw.title_confidence = candidate.confidence

@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authFetchJson } from "@/lib/auth-fetch";
 import { queryKeys } from "@/lib/query-keys";
 
-export type LlmProviderId = "openrouter" | "openai" | "gemini";
+export type LlmProviderId = "openrouter" | "openai" | "gemini" | "tamu";
 
 export interface LlmProviderPreset {
   model: string;
@@ -31,7 +31,8 @@ export interface LlmProviderStatus {
   /** The caller is a workspace admin: only admins connect or change keys. */
   can_manage: boolean;
   providers: LlmProviderEntry[];
-  presets: Record<LlmProviderId, LlmProviderPreset>;
+  /** Only the providers this deployment offers (TAMU AI is opt-in). */
+  presets: Partial<Record<LlmProviderId, LlmProviderPreset>>;
   /** Model names to offer per provider — a hint, not a contract. Empty for
    *  OpenRouter, and absent altogether from a backend older than this field. */
   suggestions?: Record<LlmProviderId, string[]>;

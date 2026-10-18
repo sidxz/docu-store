@@ -13,6 +13,7 @@ const PROVIDER_LABEL: Record<string, string> = {
   openai: "OpenAI",
   gemini: "Gemini",
   openrouter: "OpenRouter",
+  tamu: "TAMU AI",
 };
 
 /** Members see what the workspace runs on; only admins connect or change keys. */

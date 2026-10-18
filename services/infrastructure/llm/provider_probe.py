@@ -137,8 +137,12 @@ async def probe_ner_support(cfg: UserLLMConfig, *, allow_cloud: bool) -> NerProb
         from structflo.ner import NERExtractor
         from structflo.ner.profiles import CHEMISTRY
 
-        from infrastructure.ner.structflo_ner_extractor import BASE_URL_PROVIDERS
+        from infrastructure.ner.structflo_ner_extractor import (
+            BASE_URL_PROVIDERS,
+            send_stream_false,
+        )
 
+        send_stream_false()
         extractor = NERExtractor(
             model_id=cfg.model,
             provider=cfg.provider,

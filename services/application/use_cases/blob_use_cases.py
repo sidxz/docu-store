@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import BinaryIO
 from uuid import uuid4
 
@@ -7,14 +6,13 @@ from returns.result import Failure, Result, Success
 from application.dtos.blob_dtos import UploadBlobRequest, UploadBlobResponse
 from application.dtos.errors import AppError
 from application.ports.blob_store import BlobStore, StoredBlob
+from application.use_cases.upload_validation import detect_document_type
 from domain.exceptions import ValidationError
 from domain.value_objects.mime_type import MimeType
 
-# ponytail: mirrors the parser registry in di/container.py. Office formats are
-# converted to PDF in the async parse workflow; add here as parsers land.
-SUPPORTED_UPLOAD_MIME_TYPES = frozenset(
-    {MimeType.PDF.value, MimeType.PPTX.value, MimeType.DOCX.value}
-)
+# Mirrors the parser registry in di/container.py. Office formats are converted
+# to PDF in the async parse workflow; add here as parsers land.
+_EXTENSIONS = {MimeType.PDF: ".pdf", MimeType.PPTX: ".pptx", MimeType.DOCX: ".docx"}
 
 
 class UploadBlobUseCase:
@@ -32,23 +30,16 @@ class UploadBlobUseCase:
         cmd: UploadBlobRequest,
     ) -> Result[UploadBlobResponse, AppError]:
         try:
-            # Check MIME type is supported for artifact creation
-            if cmd.mime_type not in SUPPORTED_UPLOAD_MIME_TYPES:
-                return Failure(
-                    AppError(
-                        "validation",
-                        f"Unsupported MIME type for artifact creation: {cmd.mime_type}",
-                    ),
-                )
+            # The bytes decide the type; the client's Content-Type and filename don't.
+            mime_type = detect_document_type(stream)
 
             artifact_id = uuid4()
-            extension = Path(cmd.filename).suffix if cmd.filename else ""
-            storage_key = f"artifacts/{artifact_id}/source{extension}"
+            storage_key = f"artifacts/{artifact_id}/source{_EXTENSIONS[mime_type]}"
 
             stored: StoredBlob = self.blob_store.put_stream(
                 storage_key,
                 stream,
-                mime_type=cmd.mime_type,
+                mime_type=mime_type.value,
             )
 
             result = UploadBlobResponse(

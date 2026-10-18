@@ -5,6 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from uuid import UUID
+
     from application.dtos.health_dtos import DetailedHealthResponse
     from application.ports.system_health_checker import SystemHealthChecker
 
@@ -19,5 +21,5 @@ class GetSystemHealthUseCase:
     def __init__(self, health_checker: SystemHealthChecker) -> None:
         self._health_checker = health_checker
 
-    async def execute(self) -> DetailedHealthResponse:
-        return await self._health_checker.run_checks()
+    async def execute(self, workspace_id: UUID | None = None) -> DetailedHealthResponse:
+        return await self._health_checker.run_checks(workspace_id)

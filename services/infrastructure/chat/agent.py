@@ -12,6 +12,7 @@ import structlog
 from application.dtos.chat_dtos import AgentEvent
 from infrastructure.chat.utils import CITATION_RE, extract_cited_indices
 from infrastructure.config import settings
+from infrastructure.llm.answer_formatting_context import answer_formatting_enabled
 from infrastructure.llm.token_counter import get_active_counter
 
 if TYPE_CHECKING:
@@ -287,7 +288,8 @@ class ChatAgent:
                 description="Formatting answer...",
             )
             formatted_answer = ""
-            if settings.chat_enable_answer_formatting:
+            formatting_on = answer_formatting_enabled()
+            if formatting_on:
                 async for token in self._formatting.run(message, draft_answer):
                     formatted_answer += token
                     total_tokens += 1
@@ -304,9 +306,7 @@ class ChatAgent:
                 step="formatting",
                 status="completed",
                 output=(
-                    f"Formatted ({formatting_ms}ms)"
-                    if settings.chat_enable_answer_formatting
-                    else "Formatting disabled"
+                    f"Formatted ({formatting_ms}ms)" if formatting_on else "Formatting disabled"
                 ),
             )
 

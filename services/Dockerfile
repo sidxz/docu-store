@@ -53,6 +53,13 @@ COPY domain/ domain/
 COPY infrastructure/ infrastructure/
 COPY interfaces/ interfaces/
 
+# Fail the build on a LibreOffice older than the October 2026 security batch
+# (DSA-6543-1); base trixie lags trixie-security. Kept late so it never
+# invalidates the cached dependency layers above.
+RUN v="$(dpkg-query -W -f='${Version}' libreoffice-core)" && \
+    dpkg --compare-versions "$v" ge "4:25.2.3-2+deb13u8" || \
+    { echo "libreoffice-core $v predates DSA-6543-1" >&2; exit 1; }
+
 # Non-root user (UID 1000 — standard for k8s SecurityContext)
 RUN useradd -r -u 1000 -m docustore
 USER docustore

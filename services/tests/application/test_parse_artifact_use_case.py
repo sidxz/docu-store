@@ -42,7 +42,7 @@ class RecordingConverter:
     def __init__(self):
         self.calls = []
 
-    def convert_to_pdf(self, source_storage_key, dest_storage_key):
+    def convert_to_pdf(self, source_storage_key, dest_storage_key, mime_type):
         self.calls.append((source_storage_key, dest_storage_key))
 
 

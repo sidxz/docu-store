@@ -46,7 +46,6 @@ interface PipelineStatsResponse {
 interface CollectionStats {
   collection_name: string;
   points_count: number;
-  indexed_vectors_count: number;
   status: string;
 }
 

@@ -21,6 +21,7 @@ from application.dtos.chat_dtos import (
     RecentConversationDTO,
 )
 from application.dtos.usage_dtos import UserTokenUsageResponse
+from application.ports.workspace_chat_settings import WorkspaceChatSettingsStore
 from application.use_cases.chat_folder_use_cases import SetConversationFolderUseCase
 from application.use_cases.chat_use_cases import (
     CreateConversationUseCase,
@@ -286,6 +287,10 @@ async def send_message(
     await ensure_within_quota(auth, container)
     allowed_artifact_ids = await _get_allowed_artifact_ids(auth)
 
+    answer_formatting = await container[WorkspaceChatSettingsStore].get_answer_formatting(
+        auth.workspace_id,
+    )
+
     use_case = container[SendMessageUseCase]
     registry = container[ChatRunRegistry]
     try:
@@ -302,6 +307,7 @@ async def send_message(
                 mode=request.mode,
                 reasoning=request.reasoning,
                 stats=request.stats,
+                answer_formatting=answer_formatting,
             ),
         )
     except RunAlreadyActiveError:

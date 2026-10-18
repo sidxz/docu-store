@@ -97,11 +97,15 @@ class FakeContainer:
         return self._mapping[key]
 
 
-def _client(store: FakeStore, *, enabled: bool = True, role: str = "admin") -> TestClient:
+def _client(
+    store: FakeStore, *, enabled: bool = True, role: str = "admin", tamu: bool = False
+) -> TestClient:
     strip_authz_middleware(app)
     app.dependency_overrides[get_container] = lambda: FakeContainer(
         {
-            Settings: SimpleNamespace(user_llm_keys_enabled=enabled, allow_cloud_llm=True),
+            Settings: SimpleNamespace(
+                user_llm_keys_enabled=enabled, allow_cloud_llm=True, tamu_ai_enabled=tamu
+            ),
             UserLLMConfigStore: store,
         },
     )
@@ -460,3 +464,33 @@ def test_every_write_and_the_probe_are_admin_only() -> None:
     assert c.delete("/workspace/llm-provider/openai").status_code == 403
     assert c.post("/workspace/llm-provider/openai/test").status_code == 403
     assert (store.set_calls, store.activated, store.deleted) == ([], [], [])
+
+
+# ── TAMU AI: a deployment opt-in with a fixed model list ──
+
+LUNA, SOL = "protected.gpt-5.6-luna", "protected.gpt-5.6-sol"
+
+
+def test_tamu_is_offered_only_where_the_deployment_turns_it_on() -> None:
+    body = _client(FakeStore()).get("/workspace/llm-provider").json()
+    assert "tamu" not in body["presets"]
+    resp = _client(FakeStore()).put("/workspace/llm-provider", json={"provider": "tamu", "api_key": KEY})
+    assert resp.status_code == 404
+
+    body = _client(FakeStore(), tamu=True).get("/workspace/llm-provider").json()
+    assert body["presets"]["tamu"] == {"model": LUNA, "chat_model": LUNA}
+    assert body["suggestions"]["tamu"] == [LUNA, SOL]
+
+
+def test_tamu_saves_luna_or_sol_and_nothing_else(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen = _stub_ner(monkeypatch, NerProbe(ok=True))
+    store = FakeStore()
+    c = _client(store, tamu=True)
+
+    assert c.put("/workspace/llm-provider", json={"provider": "tamu", "api_key": KEY, "chat_model": SOL}).status_code == 204
+    assert store.set_calls == [{"provider": "tamu", "api_key": KEY, "model": LUNA, "chat_model": SOL}]
+    assert seen[0].base_url == "https://chat-api.tamu.ai/openai" and seen[0].provider == "openai"
+
+    resp = c.put("/workspace/llm-provider", json={"provider": "tamu", "api_key": KEY, "model": "protected.gpt-5"})
+    assert resp.status_code == 422
+    assert len(store.set_calls) == 1

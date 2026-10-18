@@ -11,6 +11,7 @@ from returns.result import Failure, Success
 from application.dtos.chat_dtos import AgentEvent
 from application.dtos.errors import AppError
 from application.ports.user_llm_config import NullUserLLMConfigStore
+from application.ports.workspace_chat_settings import WorkspaceChatSettingsStore
 from application.services.llm_scope import UserLLMScope
 from application.use_cases.chat_use_cases import SendMessageUseCase
 from application.use_cases.token_limit_use_cases import CheckTokenQuotaUseCase
@@ -20,6 +21,7 @@ from interfaces.api.main import app
 from interfaces.dependencies import get_auth, get_container
 from tests.conftest import strip_authz_middleware
 from tests.fakes.fake_auth import FakeAuth
+from tests.fakes.fake_chat_settings import UnsetChatSettings
 
 DETAIL = "Monthly token limit reached: 150 of 100 tokens used. Resets on the 1st (UTC)."
 OVER_LIMIT = Failure(AppError("rate_limited", DETAIL))
@@ -55,6 +57,7 @@ def _client(*, quota: FakeQuota, role: str = "editor") -> TestClient:
             Settings: SimpleNamespace(user_llm_keys_enabled=False, self_serve_enabled=False),
             CheckTokenQuotaUseCase: quota,
             SendMessageUseCase: FakeSendUseCase(),
+            WorkspaceChatSettingsStore: UnsetChatSettings(),
             ChatRunRegistry: ChatRunRegistry(),
             UserLLMScope: UserLLMScope(NullUserLLMConfigStore(), enabled=False),
         },

@@ -341,6 +341,38 @@ class TestArtifactRoutes:
         assert blob.get_keys == [derived]
         assert all("source.pptx" not in k for k in blob.exists_keys)
 
+    def test_stream_pdf_encodes_any_filename_per_rfc6266(self, make_client) -> None:
+        artifact_id = uuid4()
+        read_model = FakeArtifactReadModel(
+            {
+                artifact_id: ArtifactResponse(
+                    artifact_id=artifact_id,
+                    source_filename='Résumé "final"\r\nX-Evil: 1.pdf',
+                    artifact_type=ArtifactType.RESEARCH_ARTICLE,
+                    mime_type=MimeType.PDF,
+                    storage_location=f"artifacts/{artifact_id}/source.pdf",
+                    workspace_id=None,
+                ),
+            },
+        )
+
+        class Blob:
+            def exists(self, key: str) -> bool:
+                return True
+
+            def get_bytes(self, key: str) -> bytes:
+                return b"%PDF-1.4 fake"
+
+        client = make_client({ArtifactReadModel: read_model, BlobStore: Blob()})
+
+        response = client.get(f"/artifacts/{artifact_id}/pdf")
+
+        assert response.status_code == 200
+        assert response.headers["content-disposition"] == (
+            "inline; filename*=utf-8''R%C3%A9sum%C3%A9%20%22final%22%0D%0AX-Evil%3A%201.pdf"
+        )
+        assert "x-evil" not in response.headers
+
 
 class TestArtifactMetadataCorrection:
     """hiledit: PATCH /artifacts/{id}/metadata, gated on artifacts:hiledit."""

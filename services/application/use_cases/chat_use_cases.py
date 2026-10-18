@@ -375,10 +375,12 @@ class SendMessageUseCase:
         mode: Literal["quick", "thinking", "deep_thinking", "literature"] | None = None,
         reasoning: dict[str, str] | None = None,
         stats: bool = False,
+        answer_formatting: bool | None = None,
     ) -> AsyncGenerator[AgentEvent, None]:
-        from infrastructure.llm import reasoning_context, stats_context
+        from infrastructure.llm import answer_formatting_context, reasoning_context, stats_context
 
         _reasoning_token = reasoning_context.set_reasoning_override(reasoning)
+        _formatting_token = answer_formatting_context.set_answer_formatting(answer_formatting)
         # Stats is a literature-surface feature; the flag is ignored elsewhere
         # (a shared client toggle must not leak charts into other surfaces).
         _stats_token = stats_context.set_stats_enabled(stats and mode == "literature")
@@ -604,6 +606,7 @@ class SendMessageUseCase:
                 )
         finally:
             reasoning_context.reset_reasoning_override(_reasoning_token)
+            answer_formatting_context.reset_answer_formatting(_formatting_token)
             stats_context.reset_stats_enabled(_stats_token)
             stats_context.restore_panel_budget(_panel_token)
             stats_context.restore_searched_queries(_searched_token)

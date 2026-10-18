@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import structlog
-from temporalio.client import Client
+from temporalio.client import Client, WorkflowFailureError
 from temporalio.service import RPCError
 
 if TYPE_CHECKING:
@@ -538,6 +538,23 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         """Describe arbitrary workflows (name -> id)."""
         await self._ensure_client()
         return await self._query_workflow_statuses(workflow_ids)
+
+    async def get_workflow_failure(self, workflow_id: str) -> str | None:
+        """Why a closed workflow failed (its innermost error message), else None.
+
+        Only call it for a closed workflow: ``result()`` waits on a running one.
+        """
+        await self._ensure_client()
+        try:
+            await self._client.get_workflow_handle(workflow_id).result(follow_runs=False)
+        except WorkflowFailureError as e:
+            error: BaseException = e
+            while error.__cause__ is not None:
+                error = error.__cause__
+            return getattr(error, "message", None) or str(error)
+        except Exception:
+            logger.warning("failed_to_fetch_workflow_failure", workflow_id=workflow_id)
+        return None
 
     async def get_artifact_pipeline_statuses(
         self,

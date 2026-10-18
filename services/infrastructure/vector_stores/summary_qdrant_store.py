@@ -20,6 +20,11 @@ from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from application.ports.summary_vector_store import SummarySearchResult, SummaryVectorStore
 from domain.value_objects.text_embedding import TextEmbedding
+from infrastructure.vector_stores.qdrant_store import (
+    count_in_workspace,
+    same_model,
+    stale_vectors,
+)
 
 logger = structlog.get_logger()
 
@@ -358,7 +363,7 @@ class SummaryQdrantStore(SummaryVectorStore):
             search_result = await client.query_points(
                 collection_name=self.collection_name,
                 query=query_embedding.vector,
-                query_filter=query_filter,
+                query_filter=same_model(query_filter, query_embedding.model_name),
                 limit=limit,
                 score_threshold=score_threshold,
                 with_payload=True,
@@ -389,6 +394,16 @@ class SummaryQdrantStore(SummaryVectorStore):
                 has_artifact_filter=artifact_id_filter is not None,
             )
             return results
+
+    async def stale_vectors(self, workspace_id: UUID, model_name: str) -> tuple[int, dict[str, int]]:
+        return await stale_vectors(
+            await self._get_client(), self.collection_name, workspace_id, model_name
+        )
+
+    async def count_vectors(self, workspace_id: UUID) -> int:
+        return await count_in_workspace(
+            await self._get_client(), self.collection_name, workspace_id
+        )
 
     async def get_collection_info(self) -> dict:
         client = await self._get_client()

@@ -9,6 +9,7 @@ from qdrant_client.models import Distance, PointStruct, VectorParams
 from application.ports.compound_vector_store import CompoundSearchResult, CompoundVectorStore
 from domain.services.compound_label_matcher import CONFUSABLE_GROUPS
 from domain.value_objects.text_embedding import TextEmbedding
+from infrastructure.vector_stores.qdrant_store import count_in_workspace
 
 logger = structlog.get_logger()
 
@@ -521,6 +522,11 @@ class CompoundQdrantStore(CompoundVectorStore):
                 ),
             )
         return results, len(scroll_result)
+
+    async def count_vectors(self, workspace_id: UUID) -> int:
+        return await count_in_workspace(
+            await self._get_client(), self.collection_name, workspace_id
+        )
 
     async def get_compound_collection_info(self) -> dict:
         """Return basic stats about the compound collection."""

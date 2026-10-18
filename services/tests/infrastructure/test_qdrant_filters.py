@@ -133,3 +133,11 @@ def test_page_any_mode_stays_page_only():
     )
     assert not any(isinstance(c, models.Filter) for c in flt.must)
     assert "tag_normalized" in _keys(flt)
+
+
+def test_same_model_keeps_the_filter_and_adds_the_model():
+    from infrastructure.vector_stores.qdrant_store import same_model
+
+    store = QdrantStore(collection_name="t")
+    flt = same_model(store._build_filter(workspace_id=uuid4(), block_types=["table"]), "m")
+    assert _keys(flt) == ["workspace_id", "block_type", "model_name"]
