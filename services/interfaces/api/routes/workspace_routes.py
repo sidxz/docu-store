@@ -35,6 +35,10 @@ from application.ports.user_llm_config import UserLLMConfig, UserLLMConfigStore
 from application.ports.workspace_chat_settings import WorkspaceChatSettingsStore
 from application.services.llm_providers import PRESETS, ProviderPreset
 from application.use_cases.cser_export_use_case import build_cser_export_zip
+from application.workflow_use_cases.workspace_reembed_use_case import (
+    ReEmbedProgress,
+    WorkspaceReEmbedUseCase,
+)
 from infrastructure.config import Settings
 from infrastructure.llm.provider_probe import probe_ner_support, probe_user_llm_config
 from interfaces.api.routes.helpers import get_allowed_artifact_ids, require_action
@@ -254,6 +258,7 @@ class WorkspaceEmbeddingResponse(BaseModel):
     usable: bool  # the workspace holds a key that can serve ``model``
     detail: str | None = None  # why not, when not
     options: list[EmbeddingModelOption]
+    reembed: ReEmbedProgress | None = None  # self-serve only
 
 
 class WorkspaceEmbeddingBody(BaseModel):
@@ -274,6 +279,23 @@ async def _current_embedding_model(container: Container, workspace_id: UUID) -> 
 
     config = await container[WorkspaceEmbeddingConfigStore].get(workspace_id)
     return config.model if config else LOCAL_EMBEDDING_MODEL
+
+
+async def _vector_model_name(container: Container, model: str) -> str:
+    """The ``model_name`` that ``model``'s vectors carry in Qdrant."""
+    from application.ports.embedding_generator import EmbeddingGenerator
+    from application.services.embedding_models import LOCAL_EMBEDDING_MODEL
+
+    if model != LOCAL_EMBEDDING_MODEL:
+        return model
+    return str((await container[EmbeddingGenerator].get_model_info()).get("model_name", ""))
+
+
+async def _reembed_progress(container: Container, workspace_id: UUID) -> ReEmbedProgress:
+    model = await _current_embedding_model(container, workspace_id)
+    return await container[WorkspaceReEmbedUseCase].progress(
+        workspace_id, await _vector_model_name(container, model)
+    )
 
 
 @router.get("/embedding", status_code=status.HTTP_200_OK)
@@ -310,6 +332,7 @@ async def get_workspace_embedding(
             EmbeddingModelOption(id=key, label=preset.label, providers=list(preset.providers))
             for key, preset in EMBEDDING_MODELS.items()
         ],
+        reembed=await _reembed_progress(container, auth.workspace_id) if enabled else None,
     )
 
 
@@ -349,6 +372,11 @@ async def set_workspace_embedding(
             status_code=status.HTTP_409_CONFLICT,
             detail="Changing the embedding model re-embeds every document in this workspace.",
         )
+    if has_documents and (await _reembed_progress(container, auth.workspace_id)).state == "running":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Wait for the current re-embed to finish before changing the model again.",
+        )
     # The workspace must hold a key for what is picked — searching needs it right
     # away, and the re-embed below runs on it.
     spec = await container[UserLLMScope].spec_for_model(body.model, auth.workspace_id)
@@ -368,6 +396,25 @@ async def set_workspace_embedding(
         )
         triggered = result.triggered
     return WorkspaceEmbeddingUpdate(model=body.model, reembed_workflows=triggered)
+
+
+@router.post("/embedding/reembed", status_code=status.HTTP_200_OK)
+async def resume_workspace_reembed(
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> WorkspaceEmbeddingUpdate:
+    """Re-embed the documents still holding vectors from another model (admin).
+
+    Retries a failed re-embed, or finishes one that stopped, without redoing
+    the documents already on the workspace's model.
+    """
+    _require_admin(auth)
+    _require_user_keys(container)
+    model = await _current_embedding_model(container, auth.workspace_id)
+    started = await container[WorkspaceReEmbedUseCase].resume(
+        auth.workspace_id, await _vector_model_name(container, model)
+    )
+    return WorkspaceEmbeddingUpdate(model=model, reembed_workflows=started)
 
 
 # ── BYO LLM provider ─────────────────────────────────────────────────────────

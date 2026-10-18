@@ -281,6 +281,11 @@ class WorkflowOrchestrator(Protocol):
         ...
 
     @abstractmethod
+    async def get_workflow_failure(self, workflow_id: str) -> str | None:
+        """Why a closed workflow failed (its innermost error message), else None."""
+        ...
+
+    @abstractmethod
     async def get_artifact_pipeline_statuses(
         self,
         artifact_id: UUID,

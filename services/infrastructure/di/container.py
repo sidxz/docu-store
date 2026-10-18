@@ -845,6 +845,16 @@ def create_container() -> Container:
         workflow_orchestrator=c[WorkflowOrchestrator],
     )
 
+    from application.workflow_use_cases.workspace_reembed_use_case import (
+        WorkspaceReEmbedUseCase,
+    )
+
+    container[WorkspaceReEmbedUseCase] = lambda c: WorkspaceReEmbedUseCase(
+        vector_store=c[VectorStore],
+        summary_vector_store=c[SummaryVectorStore],
+        workflow_orchestrator=c[WorkflowOrchestrator],
+    )
+
     from application.workflow_use_cases.trigger_bulk_reprocess_compounds_use_case import (
         TriggerBulkReprocessCompoundsUseCase,
     )
