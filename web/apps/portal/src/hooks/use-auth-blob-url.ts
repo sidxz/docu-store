@@ -6,8 +6,12 @@ import { getAuthzClient } from "@/lib/authz-client";
 /**
  * Fetches a URL with auth headers and returns an object URL for use in
  * <iframe src> / <img src> where the browser can't attach custom headers.
+ *
+ * Pass `type` for anything shown in an <iframe>: a blob: URL runs with the app's
+ * origin and none of the API's response headers, so the type must be forced —
+ * never taken from the response — or an upload could render as same-origin HTML.
  */
-export function useAuthBlobUrl(url: string) {
+export function useAuthBlobUrl(url: string, type?: string) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
 
@@ -26,7 +30,7 @@ export function useAuthBlobUrl(url: string) {
       })
       .then((blob) => {
         if (controller.signal.aborted) return;
-        revoke = URL.createObjectURL(blob);
+        revoke = URL.createObjectURL(type ? new Blob([blob], { type }) : blob);
         setBlobUrl(revoke);
       })
       .catch((err) => {
@@ -38,7 +42,7 @@ export function useAuthBlobUrl(url: string) {
       controller.abort();
       if (revoke) URL.revokeObjectURL(revoke);
     };
-  }, [url]);
+  }, [url, type]);
 
   return { blobUrl, error };
 }

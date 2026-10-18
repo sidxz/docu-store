@@ -2,6 +2,7 @@ from collections.abc import Container
 from io import BytesIO
 from pathlib import PurePosixPath
 from typing import Annotated
+from urllib.parse import quote
 from uuid import UUID
 
 from duar_auth import RequestAuth
@@ -399,7 +400,9 @@ async def stream_artifact_pdf(
         BytesIO(pdf_bytes),
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'inline; filename="{filename}"',
+            # RFC 6266: the name is user input; percent-encoding keeps quotes,
+            # CR/LF and non-Latin-1 characters out of the header.
+            "Content-Disposition": f"inline; filename*=utf-8''{quote(filename)}",
         },
     )
 

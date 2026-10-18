@@ -38,6 +38,28 @@ _LABEL_MAP: dict[str, str] = {
 
 _THUMB_MAX = 400  # px, longest edge
 
+# Pages are rendered at images_scale (4x), so page size is a memory budget.
+# A0 is the largest page a real upload needs (posters).
+_MAX_PAGES = 2000
+_MAX_PAGE_AREA = 2384 * 3370 * 1.1  # A0 in pt², plus slack
+
+
+def check_pdf_limits(path) -> None:
+    """Refuse PDFs that would exhaust memory or that can't be read anyway."""
+    import fitz
+
+    with fitz.open(str(path), filetype="pdf") as doc:  # never MuPDF's other parsers
+        if doc.needs_pass:
+            msg = "PDF is password-protected"
+            raise ValueError(msg)
+        if doc.page_count > _MAX_PAGES:
+            msg = f"PDF has {doc.page_count} pages; the limit is {_MAX_PAGES}"
+            raise ValueError(msg)
+        for page in doc:
+            if page.rect.width * page.rect.height > _MAX_PAGE_AREA:
+                msg = f"PDF page {page.number + 1} is larger than A0"
+                raise ValueError(msg)
+
 
 def _dataframe_to_rows(df) -> list[list[str]]:
     """Convert a pandas DataFrame to list[list[str]] rows (header + body).
@@ -82,6 +104,8 @@ class DoclingParser(DocumentParser):
             # stored page PNGs feed chat page-references and VLM summarization.
             opts.images_scale = 4.0
             self._converter = DocumentConverter(
+                # Only the PDF backend may run: uploads are PDFs or rendered to one.
+                allowed_formats=[InputFormat.PDF],
                 format_options={
                     # Explicit classic backend. docling 2.123 made the threaded
                     # docling-parse backend the default; on this stack it returned
@@ -102,6 +126,7 @@ class DoclingParser(DocumentParser):
 
     def parse_path(self, path) -> ParseResult:
         """Parse a local file — no blob store involved (subprocess child entry)."""
+        check_pdf_limits(path)
         conv = self._get_converter().convert(str(path))
         dl_doc = conv.document
 

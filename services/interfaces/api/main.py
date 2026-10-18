@@ -265,6 +265,11 @@ def create_app() -> FastAPI:
 
     app.add_middleware(TimingMiddleware)
 
+    # Body cap — inside CORS so the browser can read the 413.
+    from interfaces.api.middleware.body_size_limit import BodySizeLimitMiddleware
+
+    app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_upload_mb * 2**20)
+
     # Duar auth middleware — protects all routes except excluded paths
     # NOTE: Starlette middleware is LIFO — last added runs first.
     # Duar must be added BEFORE CORS so that CORS runs first and adds

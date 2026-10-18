@@ -13,8 +13,6 @@ const UPLOAD_CONCURRENCY = 4;
 export const ACCEPT: Record<string, string[]> = {
   "application/pdf": [".pdf"],
   "application/vnd.openxmlformats-officedocument.presentationml.presentation": [".pptx"],
-  "application/vnd.ms-powerpoint": [".ppt"],
-  "application/msword": [".doc"],
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
 };
 export const MAX_FILE_SIZE = 100_000_000;

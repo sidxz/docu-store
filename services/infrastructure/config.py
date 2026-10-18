@@ -791,6 +791,11 @@ class Settings(BaseSettings):
         default=1000,
         validation_alias="SLOW_REQUEST_THRESHOLD_MS",
     )
+    max_upload_mb: int = Field(
+        default=100,
+        validation_alias="MAX_UPLOAD_MB",
+        description="Largest accepted request body (uploads included), in MiB.",
+    )
 
     # Prompt management
     prompt_repository_type: Literal["langfuse", "yaml"] = Field(

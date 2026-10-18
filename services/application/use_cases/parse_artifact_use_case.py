@@ -68,7 +68,10 @@ class ParseArtifactUseCase:
         render_key = render_pdf_key(artifact)
         if artifact.mime_type != MimeType.PDF:
             await asyncio.to_thread(
-                self.office_converter.convert_to_pdf, artifact.storage_location, render_key
+                self.office_converter.convert_to_pdf,
+                artifact.storage_location,
+                render_key,
+                artifact.mime_type,
             )
 
         parsed = await asyncio.to_thread(parser.parse, render_key)
