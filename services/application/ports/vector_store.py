@@ -225,6 +225,10 @@ class VectorStore(Protocol):
         """Vectors whose ``model_name`` is none of these — left over from a model change."""
         ...
 
+    async def count_vectors(self, workspace_id: UUID) -> int:
+        """Vectors belonging to the workspace."""
+        ...
+
     async def get_collection_info(self) -> dict:
         """Get information about the vector collection.
 

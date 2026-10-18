@@ -432,9 +432,6 @@ export default function StatsPage() {
                       <th className="pb-2 pr-4 text-right text-xs font-semibold uppercase tracking-wider text-text-muted">
                         Points
                       </th>
-                      <th className="pb-2 pr-4 text-right text-xs font-semibold uppercase tracking-wider text-text-muted">
-                        Vectors
-                      </th>
                       <th className="pb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
                         Status
                       </th>
@@ -448,9 +445,6 @@ export default function StatsPage() {
                         </td>
                         <td className="py-2.5 pr-4 text-right font-mono tabular-nums text-text-secondary">
                           {fmtNumber(c.points_count)}
-                        </td>
-                        <td className="py-2.5 pr-4 text-right font-mono tabular-nums text-text-secondary">
-                          {fmtNumber(c.indexed_vectors_count)}
                         </td>
                         <td className="py-2.5">
                           <Badge variant={c.status === "green" ? "success" : "warning"}>

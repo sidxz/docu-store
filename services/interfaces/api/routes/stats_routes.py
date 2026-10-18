@@ -3,6 +3,7 @@
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
+from uuid import UUID
 
 import structlog
 from duar_auth import RequestAuth
@@ -41,11 +42,23 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/stats", tags=["stats"])
 
 
+async def _workspace_entity_ids(container: Container, workspace_id: UUID) -> set[str]:
+    """The workspace's artifact and page ids: every pipeline workflow id ends in one."""
+    from motor.motor_asyncio import AsyncIOMotorClient as _MongoClient
+
+    db = container[_MongoClient][settings.mongo_db]
+    in_workspace = {"workspace_id": str(workspace_id)}
+    artifact_ids = await db[settings.mongo_artifacts_collection].distinct("artifact_id", in_workspace)
+    page_ids = await db[settings.mongo_pages_collection].distinct("page_id", in_workspace)
+    return {*artifact_ids, *page_ids}
+
+
 @router.get("/workflows", status_code=status.HTTP_200_OK)
 async def get_workflow_stats(
+    container: Annotated[Container, Depends(get_container)],
     auth: Annotated[RequestAuth, Depends(get_auth)],
 ) -> WorkflowStatsResponse:
-    """Get Temporal workflow execution statistics (admin only)."""
+    """Get Temporal workflow execution statistics for this workspace (admin only)."""
     if not auth.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -55,11 +68,18 @@ async def get_workflow_stats(
     logger.info("workflow_stats_requested")
 
     client = await Client.connect(settings.temporal_address)
+    # Temporal holds every workspace's workflows and doesn't know which is whose.
+    # ponytail: lists them all and filters here; a workspace search attribute on
+    # each workflow would let Temporal filter if the server's history grows large.
+    entity_ids = await _workspace_entity_ids(container, auth.workspace_id)
+
+    def ours(workflow_id: str) -> bool:
+        return workflow_id[-36:] in entity_ids
 
     # --- Completed workflows: group by type, compute duration stats ---
     durations_by_type: dict[str, list[float]] = defaultdict(list)
     async for wf in client.list_workflows('ExecutionStatus = "Completed"'):
-        if wf.workflow_type and wf.start_time and wf.close_time:
+        if ours(wf.id) and wf.workflow_type and wf.start_time and wf.close_time:
             duration = (wf.close_time - wf.start_time).total_seconds()
             durations_by_type[wf.workflow_type].append(duration)
 
@@ -82,7 +102,7 @@ async def get_workflow_stats(
     # --- Running workflows: count by type ---
     active_counts: dict[str, int] = defaultdict(int)
     async for wf in client.list_workflows('ExecutionStatus = "Running"'):
-        if wf.workflow_type:
+        if ours(wf.id) and wf.workflow_type:
             active_counts[wf.workflow_type] += 1
 
     active = [
@@ -93,6 +113,8 @@ async def get_workflow_stats(
     # --- Failed workflows: last 10 (sorted client-side, no ORDER BY in query) ---
     all_failures: list[FailedWorkflow] = []
     async for wf in client.list_workflows('ExecutionStatus = "Failed"'):
+        if not ours(wf.id):
+            continue
         failure_message: str | None = None
         try:
             handle = client.get_workflow_handle(wf.id)
@@ -289,14 +311,18 @@ async def get_vector_stats(
     compound_info = await compound_store.get_compound_collection_info()
     summary_info = await summary_store.get_collection_info()
 
+    # Collections are shared by every workspace: count only this one's points.
     collections = [
         CollectionStats(
             collection_name=info.get("collection_name", info.get("name", "unknown")),
-            points_count=info.get("points_count", 0),
-            indexed_vectors_count=info.get("indexed_vectors_count", 0),
+            points_count=await store.count_vectors(auth.workspace_id),
             status=info.get("status", "unknown"),
         )
-        for info in [page_info, compound_info, summary_info]
+        for info, store in [
+            (page_info, vector_store),
+            (compound_info, compound_store),
+            (summary_info, summary_store),
+        ]
     ]
 
     embedding_model = await generator.get_model_info()
