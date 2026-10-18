@@ -37,6 +37,7 @@ export function CategoryBar({
             key={cat.entity_type}
             onClick={() => onSelect(cat.entity_type)}
             onMouseEnter={() => onHover?.(cat.entity_type)}
+            title={`${cat.distinct_count} ${cat.display_name.toLowerCase()} tags across ${cat.artifact_count} document${cat.artifact_count === 1 ? "" : "s"}`}
             className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all duration-150 ${
               isActive
                 ? "border-primary bg-primary text-white shadow-ds-sm"
@@ -51,7 +52,7 @@ export function CategoryBar({
                   : "text-text-muted"
               }`}
             >
-              {cat.artifact_count}
+              {cat.distinct_count}
             </span>
           </button>
         );
