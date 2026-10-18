@@ -171,6 +171,31 @@ def extract_model_from_llm_result(result: object) -> str | None:
     return None
 
 
+def _served_by(result: object) -> str | None:
+    """``Provider / model`` for what answered: the workspace's provider when it
+    has one (TAMU AI reports a bare model id), else the vendor LangChain names.
+    """
+    from application.services.llm_providers import served_by
+    from infrastructure.llm.llm_context import get_user_config
+
+    name = extract_model_from_llm_result(result)
+    if not name:
+        return None
+    cfg = get_user_config()
+    if cfg is not None:
+        return served_by(cfg.provider, cfg.base_url, name)
+    vendor = next(
+        (
+            (getattr(gen.message, "response_metadata", None) or {}).get("model_provider")
+            for gens in getattr(result, "generations", None) or []
+            for gen in gens
+            if getattr(gen, "message", None) is not None
+        ),
+        None,
+    )
+    return served_by(vendor, None, name)
+
+
 class TokenCountingCallbackHandler(AsyncCallbackHandler):
     """Feeds every LLM call's usage into the active ``TokenCounter``.
 
@@ -184,7 +209,7 @@ class TokenCountingCallbackHandler(AsyncCallbackHandler):
     async def on_llm_end(self, response: object, **kwargs: object) -> None:
         prompt, completion = extract_usage_from_llm_result(response)
         if prompt or completion:
-            record_usage(prompt, completion, extract_model_from_llm_result(response))
+            record_usage(prompt, completion, _served_by(response))
 
 
 # Stateless (reads the contextvar) — one shared instance is safe across requests.

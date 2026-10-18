@@ -32,7 +32,7 @@ from application.ports.repositories.artifact_read_models import ArtifactReadMode
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.token_limit_store import TokenLimitStore
 from application.ports.user_llm_config import UserLLMConfig, UserLLMConfigStore
-from application.services.llm_providers import PRESETS
+from application.services.llm_providers import PRESETS, ProviderPreset
 from application.use_cases.cser_export_use_case import build_cser_export_zip
 from infrastructure.config import Settings
 from infrastructure.llm.provider_probe import probe_ner_support, probe_user_llm_config
@@ -337,16 +337,36 @@ async def set_workspace_embedding(
 # ── BYO LLM provider ─────────────────────────────────────────────────────────
 
 
-def _presets_dto() -> dict[str, LLMProviderPreset]:
+def _offered(settings: Settings) -> dict[str, ProviderPreset]:
+    """Providers a workspace may add or switch to; TAMU AI only where the deployment opts in."""
+    return {pid: p for pid, p in PRESETS.items() if pid != "tamu" or settings.tamu_ai_enabled}
+
+
+def _presets_dto(settings: Settings) -> dict[str, LLMProviderPreset]:
     return {
-        pid: LLMProviderPreset(model=p.model, chat_model=p.chat_model) for pid, p in PRESETS.items()
+        pid: LLMProviderPreset(model=p.model, chat_model=p.chat_model)
+        for pid, p in _offered(settings).items()
     }
 
 
-async def _suggestions_dto() -> dict[str, list[str]]:
+async def _suggestions_dto(settings: Settings) -> dict[str, list[str]]:
     from infrastructure.llm.openrouter_catalog import suggested_models
 
-    return {pid: list(await suggested_models(pid)) for pid in PRESETS}
+    return {
+        pid: list(p.models or await suggested_models(pid)) for pid, p in _offered(settings).items()
+    }
+
+
+def _chosen_models(provider: str, model: str | None, chat_model: str | None) -> tuple[str, str]:
+    """Blank → the preset's default; a provider with a fixed model list allows nothing else."""
+    preset = PRESETS[provider]
+    picked = (model or preset.model, chat_model or preset.chat_model)
+    if preset.models and not set(picked) <= set(preset.models):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"{provider} offers only these models: {', '.join(preset.models)}.",
+        )
+    return picked
 
 
 def _require_user_keys(container: Container) -> Settings:
@@ -359,8 +379,8 @@ def _require_user_keys(container: Container) -> Settings:
     return settings
 
 
-def _known_provider(provider: str) -> str:
-    if provider not in PRESETS:
+def _known_provider(provider: str, presets: dict[str, ProviderPreset] = PRESETS) -> str:
+    if provider not in presets:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown provider {provider!r}."
         )
@@ -396,8 +416,8 @@ async def get_llm_provider(
             )
             for e in entries
         ],
-        presets=_presets_dto(),
-        suggestions=await _suggestions_dto(),
+        presets=_presets_dto(settings),
+        suggestions=await _suggestions_dto(settings),
     )
 
 
@@ -439,9 +459,8 @@ async def set_llm_provider(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="api_key must be between 8 and 512 characters.",
         )
-    preset = PRESETS[body.provider]
-    model = body.model or preset.model
-    chat_model = body.chat_model or preset.chat_model
+    preset = PRESETS[_known_provider(body.provider, _offered(settings))]
+    model, chat_model = _chosen_models(body.provider, body.model, body.chat_model)
 
     if api_key is None:
         stored = await store.get_config(auth.workspace_id, body.provider)
@@ -498,7 +517,7 @@ async def activate_llm_provider(
     _require_admin(auth)
     settings = _require_user_keys(container)
     store = container[UserLLMConfigStore]
-    cfg = await store.get_config(auth.workspace_id, _known_provider(provider))
+    cfg = await store.get_config(auth.workspace_id, _known_provider(provider, _offered(settings)))
     if cfg is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"No {provider} key stored."
@@ -536,19 +555,15 @@ async def probe_llm_provider(
     _require_admin(auth)
     settings = _require_user_keys(container)
     cfg = await container[UserLLMConfigStore].get_config(
-        auth.workspace_id, _known_provider(provider)
+        auth.workspace_id, _known_provider(provider, _offered(settings))
     )
     if cfg is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"No {provider} key stored."
         )
     if body is not None:
-        preset = PRESETS[provider]
-        cfg = replace(
-            cfg,
-            model=body.model or preset.model,
-            chat_model=body.chat_model or preset.chat_model,
-        )
+        model, chat_model = _chosen_models(provider, body.model, body.chat_model)
+        cfg = replace(cfg, model=model, chat_model=chat_model)
     results = await probe_user_llm_config(cfg, allow_cloud=settings.allow_cloud_llm)
     lanes = {
         lane: LLMLaneTestResult(ok=ok, detail=detail) for lane, (ok, detail) in results.items()

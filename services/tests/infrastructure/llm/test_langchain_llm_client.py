@@ -267,10 +267,18 @@ async def test_get_model_info_reflects_user_config() -> None:
     from infrastructure.llm import llm_context
 
     client = LangChainLLMClient(provider="ollama", model_name="gemma4:31b")
-    assert await client.get_model_info() == {"provider": "ollama", "model_name": "gemma4:31b"}
+    assert await client.get_model_info() == {
+        "provider": "ollama",
+        "model_name": "gemma4:31b",
+        "base_url": "",
+    }
     tok = llm_context.set_user_config(UserLLMConfig(provider="openai", api_key="k", model="gpt-5-mini"))
     try:
-        assert await client.get_model_info() == {"provider": "openai", "model_name": "gpt-5-mini"}
+        assert await client.get_model_info() == {
+            "provider": "openai",
+            "model_name": "gpt-5-mini",
+            "base_url": "",
+        }
     finally:
         llm_context.reset_user_config(tok)
 

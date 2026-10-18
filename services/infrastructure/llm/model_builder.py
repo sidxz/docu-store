@@ -47,8 +47,9 @@ def _endpoint_host(provider: str, base_url: str | None) -> str | None:
 
 
 def _is_openai_gpt5x(model_name: str) -> bool:
-    """gpt-5.1 and later (dotted minor version) — accepts an OpenRouter slug too."""
-    return model_name.lower().rsplit("/", 1)[-1].startswith("gpt-5.")
+    """gpt-5.1 and later (dotted minor version), as an OpenRouter slug or TAMU id too."""
+    name = model_name.lower().rsplit("/", 1)[-1].removeprefix("protected.")
+    return name.startswith("gpt-5.")
 
 
 def _reasoning_kwargs(provider: str, reasoning: str | None, model_name: str) -> dict[str, Any]:

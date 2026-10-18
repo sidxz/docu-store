@@ -210,4 +210,8 @@ class LangChainLLMClient:
 
     async def get_model_info(self) -> dict[str, str]:
         spec = effective_spec(self._spec, self._lane)
-        return {"provider": spec.provider, "model_name": spec.model_name}
+        return {
+            "provider": spec.provider,
+            "model_name": spec.model_name,
+            "base_url": spec.base_url or "",
+        }

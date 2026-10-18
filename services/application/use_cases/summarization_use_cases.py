@@ -11,6 +11,7 @@ from application.dtos.errors import AppError
 from application.mappers.artifact_mappers import ArtifactMapper
 from application.mappers.page_mappers import PageMapper
 from application.services.aggregate_commit import commit
+from application.services.llm_providers import served_by
 from application.services.llm_scope import workspace_scope
 from application.services.usage_recording import ingestion_counter, record_ingestion_usage
 from domain.exceptions import AggregateNotFoundError, ConcurrencyError, LLMError, ValidationError
@@ -94,9 +95,10 @@ class SummarizePageUseCase:
 
             async with workspace_scope(self.llm_scope, artifact):
                 model_info = await self.llm_client.get_model_info()
-                model_name = (
-                    f"{model_info.get('provider', 'unknown')}/"
-                    f"{model_info.get('model_name', 'unknown')}"
+                model_name = served_by(
+                    model_info.get("provider"),
+                    model_info.get("base_url"),
+                    model_info.get("model_name", "unknown"),
                 )
 
                 # Determine mode and call the appropriate LLM path
@@ -276,9 +278,10 @@ class SummarizeArtifactUseCase:
 
             async with workspace_scope(self.llm_scope, artifact):
                 model_info = await self.llm_client.get_model_info()
-                model_name = (
-                    f"{model_info.get('provider', 'unknown')}/"
-                    f"{model_info.get('model_name', 'unknown')}"
+                model_name = served_by(
+                    model_info.get("provider"),
+                    model_info.get("base_url"),
+                    model_info.get("model_name", "unknown"),
                 )
 
                 # Sliding-window chain

@@ -86,7 +86,7 @@ class LLMProviderRequest(BaseModel):
     omit ``api_key`` to change models only (the stored key is kept).
     """
 
-    provider: Literal["openrouter", "openai", "gemini"]
+    provider: Literal["openrouter", "openai", "gemini", "tamu"]
     api_key: str | None = None
     model: _Model | None = None
     chat_model: _Model | None = None

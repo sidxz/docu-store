@@ -70,6 +70,14 @@ const PROVIDERS: Provider[] = [
     keysUrl: "https://openrouter.ai/settings/keys",
     pricingUrl: OPENROUTER_CAPABLE_MODELS,
   },
+  {
+    id: "tamu",
+    label: "TAMU AI",
+    hint: "Texas A&M's AI Chat API, with a key from your TAMU AI Chat account. A daily token allowance applies.",
+    keysUrl: "https://chat.tamu.ai/",
+    pricingUrl:
+      "https://www.it.tamu.edu/services/services-by-category/communication-and-collaboration/tamu-ai-chat.html",
+  },
 ];
 
 const LANE_LABEL = {
@@ -318,7 +326,7 @@ function ProviderRow({
         <ModelInputs
           model={model}
           chatModel={chatModel}
-          placeholder={status.presets[entry.provider]}
+          placeholder={status.presets[entry.provider] ?? entry}
           suggestions={status.suggestions?.[entry.provider] ?? []}
           onModel={setModel}
           onChatModel={setChatModel}
@@ -404,7 +412,7 @@ function AddProvider({
   const [chatModel, setChatModel] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
-  const preset = status.presets[provider];
+  const preset = status.presets[provider] ?? { model: "", chat_model: "" };
   const alreadyStored = status.providers.some((p) => p.provider === provider);
 
   const pick = (id: LlmProviderId) => {
@@ -427,8 +435,8 @@ function AddProvider({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-2 sm:grid-cols-3">
-        {PROVIDERS.map((p) => (
+      <div className="grid gap-2 sm:grid-cols-[repeat(auto-fit,minmax(10rem,1fr))]">
+        {PROVIDERS.filter((p) => p.id in status.presets).map((p) => (
           <button
             key={p.id}
             type="button"
@@ -489,7 +497,7 @@ function AddProvider({
               autoComplete="off"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder={provider === "openai" ? "sk-…" : "AIza…"}
+              placeholder={provider === "gemini" ? "AIza…" : "sk-…"}
             />
           </label>
           <ModelInputs

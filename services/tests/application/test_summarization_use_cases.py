@@ -207,7 +207,7 @@ class TestSummarizePageUseCase:
 
         # MockLLMClient returns {"provider": "mock", "model_name": "mock-model"}
         saved = page_repo.pages[page.id]
-        assert saved.summary_candidate.model_name == "mock/mock-model"
+        assert saved.summary_candidate.model_name == "mock / mock-model"
 
     @pytest.mark.asyncio
     async def test_notifies_publisher_on_success(self) -> None:

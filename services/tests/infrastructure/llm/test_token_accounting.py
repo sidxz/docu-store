@@ -200,3 +200,26 @@ async def test_a_provider_that_reports_no_model_leaves_it_unset() -> None:
 
     assert counter.model is None
     assert counter.total_tokens == 15
+
+
+async def test_the_model_is_named_with_who_served_it() -> None:
+    """The workspace's provider when it has one (TAMU reports a bare model id),
+    else the vendor LangChain says answered."""
+    from application.ports.user_llm_config import UserLLMConfig
+    from application.services.llm_providers import TAMU_AI_BASE_URL
+    from infrastructure.llm.llm_context import reset_user_config, set_user_config
+
+    handler = TokenCountingCallbackHandler()
+    token = set_user_config(UserLLMConfig(provider="openai", base_url=TAMU_AI_BASE_URL))
+    try:
+        with TokenCounter() as counter:
+            await handler.on_llm_end(_result_with_model(1, 1, llm_output={"model_name": "gpt-5.6-luna"}))
+    finally:
+        reset_user_config(token)
+    assert counter.model == "TAMU AI / gpt-5.6-luna"
+
+    with TokenCounter() as counter:
+        await handler.on_llm_end(
+            _result_with_model(1, 1, meta={"model": "gemma3:27b", "model_provider": "ollama"})
+        )
+    assert counter.model == "Ollama / gemma3:27b"

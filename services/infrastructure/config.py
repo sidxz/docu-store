@@ -331,6 +331,14 @@ class Settings(BaseSettings):
             "and may pick its own embedding model. The default keeps env-keyed behavior."
         ),
     )
+    tamu_ai_enabled: bool = Field(
+        default=False,
+        validation_alias="TAMU_AI_ENABLED",
+        description=(
+            "Offer TAMU AI (Texas A&M's AI Chat API) as a workspace LLM provider. "
+            "Only Texas A&M members can get a key, so it is off unless a deployment opts in."
+        ),
+    )
     user_llm_keys_secret: str | None = Field(
         default=None,
         validation_alias="USER_LLM_KEYS_SECRET",

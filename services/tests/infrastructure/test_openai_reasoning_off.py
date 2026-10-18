@@ -12,6 +12,9 @@ def test_gpt5x_off_is_sent_explicitly() -> None:
 
 def test_openrouter_slug_is_recognised() -> None:
     assert _reasoning_kwargs("openai", None, "openai/gpt-5.2-pro") == {"reasoning_effort": "none"}
+    assert _reasoning_kwargs("openai", None, "protected.gpt-5.6-luna") == {
+        "reasoning_effort": "none"
+    }
 
 
 def test_other_openai_models_are_untouched() -> None:
