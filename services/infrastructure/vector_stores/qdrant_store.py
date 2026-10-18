@@ -41,8 +41,8 @@ def same_model(query_filter: models.Filter | None, model_name: str) -> models.Fi
     While a workspace re-embeds onto a new model, its other vectors are in a
     different space: a query scores them, but meaninglessly.
     """
-    must = list(query_filter.must or []) if query_filter else []
-    return models.Filter(must=[*must, _from_model(model_name)])
+    # Nested whole, so its should/must_not clauses can never be dropped.
+    return models.Filter(must=[*([query_filter] if query_filter else []), _from_model(model_name)])
 
 
 def _in_workspace(workspace_id: UUID) -> models.FieldCondition:

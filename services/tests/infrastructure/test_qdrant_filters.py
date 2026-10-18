@@ -11,6 +11,8 @@ def _keys(flt: models.Filter) -> list[str]:
     for cond in (flt.must or []):
         if isinstance(cond, models.FieldCondition):
             out.append(cond.key)
+        elif isinstance(cond, models.Filter) and cond.must:
+            out.extend(_keys(cond))
         elif isinstance(cond, models.Filter):
             for sub in (cond.should or []):
                 if isinstance(sub, models.FieldCondition):
@@ -141,3 +143,21 @@ def test_same_model_keeps_the_filter_and_adds_the_model():
     store = QdrantStore(collection_name="t")
     flt = same_model(store._build_filter(workspace_id=uuid4(), block_types=["table"]), "m")
     assert _keys(flt) == ["workspace_id", "block_type", "model_name"]
+
+
+def test_same_model_keeps_every_clause_of_the_filter():
+    from qdrant_client import QdrantClient
+
+    from infrastructure.vector_stores.qdrant_store import same_model
+
+    client = QdrantClient(":memory:")
+    client.create_collection("t", vectors_config=models.VectorParams(size=2, distance="Cosine"))
+    client.upsert("t", [
+        models.PointStruct(id=i, vector=[1.0, 0.0], payload={"ws": ws, "model_name": m})
+        for i, (ws, m) in enumerate([("a", "m"), ("b", "m"), ("a", "old")])
+    ])
+    not_b = models.Filter(must_not=[models.FieldCondition(key="ws", match=models.MatchValue(value="b"))])
+    one_a = models.Filter(must=models.FieldCondition(key="ws", match=models.MatchValue(value="a")))
+    for flt in (not_b, one_a):
+        hits = client.query_points("t", query=[1.0, 0.0], query_filter=same_model(flt, "m")).points
+        assert [h.id for h in hits] == [0]
