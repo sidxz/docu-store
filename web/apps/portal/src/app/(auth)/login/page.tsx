@@ -22,6 +22,8 @@ export default function LoginPage() {
   const { googleClientId, githubClientId, entraIdClientId, entraIdTenantId, duarUrl, selfServeEnabled } =
     useAppConfig();
   const router = useRouter();
+  const hasEntraId = Boolean(entraIdClientId && entraIdTenantId);
+  const hasAnyIdp = Boolean(googleClientId || githubClientId || hasEntraId);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -132,40 +134,46 @@ export default function LoginPage() {
               </p>
             </div>
 
-            {/* OAuth buttons */}
+            {/* OAuth buttons — only the identity providers this deployment configures */}
             <div className="space-y-3">
-              {/* Google */}
-              <button
-                disabled={!googleClientId}
-                onClick={() => login("google")}
-                className={`${btnBase} cursor-pointer border border-[#0f172a] bg-white text-[#0f172a] hover:bg-[#f1f5f9]`}
-                style={{ animation: "auth-enter 0.5s ease-out 0.2s both" }}
-              >
-                <GoogleIcon />
-                Continue with Google
-              </button>
+              {googleClientId && (
+                <button
+                  onClick={() => login("google")}
+                  className={`${btnBase} cursor-pointer border border-[#0f172a] bg-white text-[#0f172a] hover:bg-[#f1f5f9]`}
+                  style={{ animation: "auth-enter 0.5s ease-out 0.2s both" }}
+                >
+                  <GoogleIcon />
+                  Continue with Google
+                </button>
+              )}
 
-              {/* GitHub */}
-              <button
-                disabled={!githubClientId}
-                onClick={() => login("github")}
-                className={`${btnBase} cursor-pointer bg-[#0f172a] text-white hover:opacity-85`}
-                style={{ animation: "auth-enter 0.5s ease-out 0.25s both" }}
-              >
-                <GitHubIcon />
-                Continue with GitHub
-              </button>
+              {githubClientId && (
+                <button
+                  onClick={() => login("github")}
+                  className={`${btnBase} cursor-pointer bg-[#0f172a] text-white hover:opacity-85`}
+                  style={{ animation: "auth-enter 0.5s ease-out 0.25s both" }}
+                >
+                  <GitHubIcon />
+                  Continue with GitHub
+                </button>
+              )}
 
-              {/* Entra ID */}
-              <button
-                disabled={!entraIdClientId || !entraIdTenantId}
-                onClick={() => login("entra_id")}
-                className={`${btnBase} cursor-pointer border border-[#0f172a] bg-white text-[#0f172a] hover:bg-[#f1f5f9]`}
-                style={{ animation: "auth-enter 0.5s ease-out 0.3s both" }}
-              >
-                <MicrosoftIcon />
-                Continue with Entra ID
-              </button>
+              {hasEntraId && (
+                <button
+                  onClick={() => login("entra_id")}
+                  className={`${btnBase} cursor-pointer border border-[#0f172a] bg-white text-[#0f172a] hover:bg-[#f1f5f9]`}
+                  style={{ animation: "auth-enter 0.5s ease-out 0.3s both" }}
+                >
+                  <MicrosoftIcon />
+                  Continue with Entra ID
+                </button>
+              )}
+
+              {!hasAnyIdp && (
+                <p className="text-sm" style={{ color: "#64748b" }}>
+                  No sign-in method is configured. Contact your administrator.
+                </p>
+              )}
             </div>
 
             {selfServeEnabled && (
