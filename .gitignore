@@ -80,3 +80,6 @@ services/design_docs/LITERATURE_STATS_DESIGN.md
 
 # Environment-specific deployment notes; keep local, do not commit
 /web/PATH_DEPLOYMENT.md
+
+# Internal discussion / workflow material; keep local, do not commit
+internal-docs/
