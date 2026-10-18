@@ -15,6 +15,7 @@ from application.ports.user_llm_config import (
     UserLLMConfigStore,
     UserLLMProviderEntry,
 )
+from application.ports.workspace_chat_settings import WorkspaceChatSettingsStore
 from application.services.llm_scope import UserLLMScope
 from application.use_cases.chat_use_cases import SendMessageUseCase
 from application.use_cases.token_limit_use_cases import CheckTokenQuotaUseCase
@@ -30,6 +31,7 @@ from interfaces.api.routes.helpers import (
 from interfaces.dependencies import get_auth, get_container
 from tests.conftest import strip_authz_middleware
 from tests.fakes.fake_auth import FakeAuth
+from tests.fakes.fake_chat_settings import UnsetChatSettings
 
 ENTRY = UserLLMProviderEntry(provider="openai", model="gpt-5-mini", chat_model="gpt-5", key_last4="1234")
 
@@ -82,6 +84,7 @@ def _client(store: FakeStore, settings, *, role: str = "editor") -> TestClient:
             UserLLMConfigStore: store,
             CheckTokenQuotaUseCase: FakeQuota(),
             SendMessageUseCase: FakeSendUseCase(),
+            WorkspaceChatSettingsStore: UnsetChatSettings(),
             ChatRunRegistry: ChatRunRegistry(),
             UserLLMScope: UserLLMScope(NullUserLLMConfigStore(), enabled=False),
         },

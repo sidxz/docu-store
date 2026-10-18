@@ -33,6 +33,7 @@ from application.ports.user_llm_config import NullUserLLMConfigStore, UserLLMCon
 from application.ports.vector_store import VectorStore
 from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.ports.workflow_status_cache import WorkflowStatusCache
+from application.ports.workspace_chat_settings import WorkspaceChatSettingsStore
 from application.ports.workspace_embedding_config import WorkspaceEmbeddingConfigStore
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
 from application.services.compound_activity_query import CompoundActivityQuery
@@ -755,6 +756,15 @@ def create_container() -> Container:
         c[UserLLMConfigStore],
         enabled=settings.user_llm_keys_enabled,
         embedding_store=c[WorkspaceEmbeddingConfigStore] if user_keys_fernet else None,
+    )
+
+    from infrastructure.read_repositories.mongo_workspace_chat_settings_store import (
+        MongoWorkspaceChatSettingsStore,
+    )
+
+    container[WorkspaceChatSettingsStore] = lambda c: MongoWorkspaceChatSettingsStore(
+        client=c[AsyncIOMotorClient],
+        db_name=settings.mongo_db,
     )
 
     # Summarization Use Cases

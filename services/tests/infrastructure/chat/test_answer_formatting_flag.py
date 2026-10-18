@@ -120,3 +120,21 @@ async def test_enabled_is_unchanged(monkeypatch) -> None:
     assert fmt.called
     assert text == "REWRITTEN"
     assert _formatting_step(events).output.startswith("Formatted (")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("server_flag", [True, False])
+async def test_the_workspace_setting_beats_the_server_flag(monkeypatch, server_flag) -> None:
+    from infrastructure import config
+    from infrastructure.llm import answer_formatting_context as ctx
+
+    monkeypatch.setattr(config.settings, "chat_enable_answer_formatting", server_flag)
+    fmt = _Formatting()
+    token = ctx.set_answer_formatting(not server_flag)
+    try:
+        text, _ = await _answer(_agent(fmt))
+    finally:
+        ctx.reset_answer_formatting(token)
+
+    assert fmt.called is (not server_flag)
+    assert text == ("REWRITTEN" if fmt.called else DRAFT)

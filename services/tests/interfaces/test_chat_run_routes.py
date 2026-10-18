@@ -10,6 +10,7 @@ from returns.result import Success
 
 from application.dtos.chat_dtos import AgentEvent
 from application.ports.user_llm_config import NullUserLLMConfigStore
+from application.ports.workspace_chat_settings import WorkspaceChatSettingsStore
 from application.services.llm_scope import UserLLMScope
 from application.use_cases.chat_use_cases import (
     DeleteConversationUseCase,
@@ -23,6 +24,7 @@ from interfaces.api.main import app
 from interfaces.dependencies import get_auth, get_container
 from tests.conftest import strip_authz_middleware
 from tests.fakes.fake_auth import FakeAuth
+from tests.fakes.fake_chat_settings import UnsetChatSettings
 
 WS = uuid4()
 OWNER = uuid4()
@@ -92,6 +94,7 @@ def _client(
             Settings: SimpleNamespace(user_llm_keys_enabled=False),
             CheckTokenQuotaUseCase: FakeQuota(),
             SendMessageUseCase: FakeSendUseCase(),
+            WorkspaceChatSettingsStore: UnsetChatSettings(),
             GetConversationUseCase: get_uc or FakeGetConversation(),
             DeleteConversationUseCase: delete_uc or FakeDeleteConversation(),
             ChatRunRegistry: registry,

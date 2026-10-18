@@ -1,7 +1,7 @@
 """Workspace routes.
 
-Duar member/group proxies, admin token limits, and the workspace's BYO LLM
-providers and embedding model (self-serve).
+Duar member/group proxies, admin token limits, chat settings, and the
+workspace's BYO LLM providers and embedding model (self-serve).
 """
 
 import asyncio
@@ -32,6 +32,7 @@ from application.ports.repositories.artifact_read_models import ArtifactReadMode
 from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.token_limit_store import TokenLimitStore
 from application.ports.user_llm_config import UserLLMConfig, UserLLMConfigStore
+from application.ports.workspace_chat_settings import WorkspaceChatSettingsStore
 from application.services.llm_providers import PRESETS, ProviderPreset
 from application.use_cases.cser_export_use_case import build_cser_export_zip
 from infrastructure.config import Settings
@@ -159,6 +160,41 @@ async def _source_filenames_by_artifact_id(
         artifact_id: artifact.source_filename if artifact else None
         for artifact_id, artifact in zip(artifact_ids, artifacts, strict=True)
     }
+
+
+class WorkspaceChatSettingsResponse(BaseModel):
+    answer_formatting: bool = Field(description="Whether chat answers get the formatting pass")
+    can_manage: bool
+
+
+class WorkspaceChatSettingsRequest(BaseModel):
+    answer_formatting: bool
+
+
+@router.get("/chat-settings", status_code=status.HTTP_200_OK)
+async def get_chat_settings(
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> WorkspaceChatSettingsResponse:
+    """The workspace's chat settings, falling back to the server defaults."""
+    on = await container[WorkspaceChatSettingsStore].get_answer_formatting(auth.workspace_id)
+    return WorkspaceChatSettingsResponse(
+        answer_formatting=container[Settings].chat_enable_answer_formatting if on is None else on,
+        can_manage=auth.is_admin,
+    )
+
+
+@router.put("/chat-settings", status_code=status.HTTP_204_NO_CONTENT)
+async def set_chat_settings(
+    body: WorkspaceChatSettingsRequest,
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> None:
+    """Switch answer formatting for the whole workspace (admin only)."""
+    _require_admin(auth)
+    await container[WorkspaceChatSettingsStore].set_answer_formatting(
+        auth.workspace_id, body.answer_formatting, updated_by=auth.user_id
+    )
 
 
 @router.get("/cser-training-export")

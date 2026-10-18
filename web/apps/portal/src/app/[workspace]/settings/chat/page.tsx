@@ -1,10 +1,13 @@
 "use client";
 
 import { Globe, Lock } from "lucide-react";
+import { toast } from "sonner";
 
 import { Card, CardHeader } from "@/components/ui/Card";
+import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ReasoningSettings } from "@/components/chat/ReasoningSettings";
+import { useSetAnswerFormatting, useWorkspaceChatSettings } from "@/hooks/use-workspace-chat-settings";
 import { useScopeStore } from "@/lib/stores/scope-store";
 
 const SCOPE_OPTIONS = [
@@ -17,6 +20,7 @@ export default function ChatSettingsPage() {
 
   return (
     <div className="max-w-2xl space-y-6">
+      <AnswerFormattingSetting />
       <ReasoningSettings />
 
       <Card>
@@ -44,5 +48,37 @@ export default function ChatSettingsPage() {
         </ToggleGroup>
       </Card>
     </div>
+  );
+}
+
+function AnswerFormattingSetting() {
+  const { data } = useWorkspaceChatSettings();
+  const setFormatting = useSetAnswerFormatting();
+  if (!data) return null;
+
+  return (
+    <Card>
+      <CardHeader
+        title="Answer formatting"
+        action={
+          <Switch
+            checked={data.answer_formatting}
+            disabled={!data.can_manage || setFormatting.isPending}
+            onCheckedChange={(on) =>
+              setFormatting.mutate(on, {
+                onError: () => toast.error("Could not update answer formatting"),
+              })
+            }
+            aria-label="Answer formatting"
+          />
+        }
+      />
+      <p className="text-xs text-text-muted">
+        A final pass that moves the part of each answer that most directly addresses the question
+        to the top, leaving the rest as written. Turning it off shows the answer as drafted, which
+        is faster and costs one model call less. Applies to everyone in this workspace.
+        {!data.can_manage && " Only workspace admins can change it."}
+      </p>
+    </Card>
   );
 }
