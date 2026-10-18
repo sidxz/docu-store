@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from application.dtos.health_dtos import DetailedHealthResponse
+
+if TYPE_CHECKING:
+    from uuid import UUID
 
 
 class SystemHealthChecker(Protocol):
@@ -15,4 +18,6 @@ class SystemHealthChecker(Protocol):
     free of infrastructure knowledge.
     """
 
-    async def run_checks(self) -> DetailedHealthResponse: ...
+    async def run_checks(self, workspace_id: UUID | None = None) -> DetailedHealthResponse:
+        """``workspace_id``: whose AI provider to check when workspaces bring their own keys."""
+        ...

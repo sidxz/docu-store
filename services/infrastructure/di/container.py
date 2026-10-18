@@ -873,6 +873,7 @@ def create_container() -> Container:
         reranker=c[Reranker],
         heartbeat_store=c[WorkerHeartbeatStore],
         settings=settings,
+        llm_store=c[UserLLMConfigStore],
     )
     container[GetSystemHealthUseCase] = lambda c: GetSystemHealthUseCase(
         health_checker=c[SystemHealthChecker],

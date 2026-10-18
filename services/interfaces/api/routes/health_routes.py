@@ -43,7 +43,7 @@ async def get_detailed_health(
 
     logger.info("detailed_health_check_requested")
     use_case = container[GetSystemHealthUseCase]
-    return await use_case.execute()
+    return await use_case.execute(auth.workspace_id)
 
 
 # ---------------------------------------------------------------------------
