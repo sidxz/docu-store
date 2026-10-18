@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { FileUp } from "lucide-react";
+import { FileUp, Globe, Lock } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -35,6 +35,21 @@ const ARTIFACT_TYPES = [
   { label: "Unclassified", value: "UNCLASSIFIED" },
 ];
 
+const DESTINATIONS = [
+  {
+    value: "workspace" as const,
+    label: "Workspace",
+    icon: Globe,
+    detail: (ws: string) => `Everyone in ${ws} can find, search and chat with these documents.`,
+  },
+  {
+    value: "private" as const,
+    label: "Private",
+    icon: Lock,
+    detail: () => "Only you can see these documents, unless you share them.",
+  },
+];
+
 export default function UploadPage() {
   const { uppy, addFiles } = useDocumentUploader();
   const { workspace } = useParams<{ workspace: string }>();
@@ -42,7 +57,7 @@ export default function UploadPage() {
   const { trackEvent } = useAnalytics();
   const [artifactType, setArtifactType] = useState("SCIENTIFIC_DOCUMENT");
   const [sourceUri, setSourceUri] = useState("");
-  const defaultScope = useScopeStore((s) => s.defaultScope);
+  const { defaultScope, setDefaultScope } = useScopeStore();
   const [skipped, setSkipped] = useState(0); // files filtered out (wrong type / too big / duplicate)
 
   // keep batch meta in sync with the controls
@@ -162,7 +177,36 @@ export default function UploadPage() {
         title="Upload documents"
         subtitle="Drag a folder or files — they upload in parallel with per-file status."
       />
-      <div className="mx-auto max-w-3xl space-y-4">
+      <div className="mx-auto max-w-3xl space-y-5">
+        <fieldset disabled={isUploading} className="space-y-2">
+          <legend className="mb-2 text-sm font-medium text-text-primary">Upload to</legend>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {DESTINATIONS.map(({ value, label, icon: Icon, detail }) => (
+              <label
+                key={value}
+                className="flex cursor-pointer items-start gap-3 rounded-xl border border-border-default bg-surface p-4 transition-colors hover:border-primary/50 has-[:checked]:border-primary has-[:checked]:bg-accent-light has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40"
+              >
+                <input
+                  type="radio"
+                  name="destination"
+                  value={value}
+                  checked={defaultScope === value}
+                  onChange={() => setDefaultScope(value)}
+                  className="sr-only"
+                />
+                <Icon className="mt-0.5 size-5 shrink-0 text-accent-text" />
+                <span>
+                  <span className="block text-sm font-medium text-text-primary">{label}</span>
+                  <span className="mt-0.5 block text-xs text-text-muted">{detail(workspace)}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-text-muted">
+            You can change this later with Share on the document's page.
+          </p>
+        </fieldset>
+
         <div className="flex items-center gap-3">
           <Select value={artifactType} onValueChange={setArtifactType} disabled={isUploading}>
             <SelectTrigger className="w-64">
@@ -187,11 +231,13 @@ export default function UploadPage() {
             />
           </label>
         </div>
-        <p className="text-xs text-text-muted">
-          Applies to all files in this batch · visibility: {defaultScope}
-        </p>
 
         <UploadDropzone
+          title={
+            defaultScope === "workspace"
+              ? `Drop files or a folder to add them to ${workspace}`
+              : "Drop files or a folder to add them privately"
+          }
           onFiles={handleFiles}
           onReject={(n) => setSkipped((s) => s + n)}
           disabled={isUploading}

@@ -2,7 +2,7 @@
 
 import { Fragment } from "react";
 import Link from "next/link";
-import { Building2, ChevronDown, Coins, Globe, Lock, LogOut, Moon, Sun } from "lucide-react";
+import { Building2, ChevronDown, Coins, LogOut, Moon, Sun } from "lucide-react";
 import { useAuthz } from "@duar-auth/react";
 import type { MonthTokenUsage } from "@docu-store/types";
 
@@ -12,7 +12,6 @@ import { appPath } from "@/lib/base-path";
 import { useBreadcrumbs } from "@/hooks/use-breadcrumbs";
 import { useUserTokenUsage } from "@/hooks/use-usage";
 import { useThemeStore } from "@/lib/stores/theme-store";
-import { useScopeStore } from "@/lib/stores/scope-store";
 import { SearchCommand } from "./SearchCommand";
 import { ProcessingIndicator } from "./ProcessingIndicator";
 import { getInitials, formatTokens } from "@/lib/utils";
@@ -42,7 +41,6 @@ export function Topbar() {
   const { logout } = useAuthz();
   const breadcrumbs = useBreadcrumbs();
   const { theme, toggleTheme } = useThemeStore();
-  const { defaultScope, setDefaultScope } = useScopeStore();
   const usage = useUserTokenUsage();
 
   const handleLogout = () => {
@@ -114,25 +112,6 @@ export function Topbar() {
         {usage.data?.month && (usage.data.month.total > 0 || usage.data.month.limit !== null) && (
           <TokenBadge month={usage.data.month} />
         )}
-
-        {/* Scope toggle */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              onClick={() => setDefaultScope(defaultScope === "workspace" ? "private" : "workspace")}
-              aria-label={`Default visibility: ${defaultScope}. Click to switch.`}
-            >
-              {defaultScope === "workspace" ? (
-                <Globe className="size-4" />
-              ) : (
-                <Lock className="size-4" />
-              )}
-              {defaultScope === "workspace" ? "Workspace" : "Private"}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">Default visibility for new documents</TooltipContent>
-        </Tooltip>
 
         {/* Global text-size slider */}
         <FontSizeControl />
