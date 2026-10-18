@@ -47,7 +47,7 @@ export function UploadDropzone({ title = "Drag files or a folder here", onFiles,
         <UploadCloud className="size-6 text-accent-text" />
       </div>
       <p className="text-sm font-medium text-text-primary">{title}</p>
-      <p className="mt-1 text-xs text-text-muted">PDF, PPT, PPTX, DOC, DOCX · up to 100 MB each</p>
+      <p className="mt-1 text-xs text-text-muted">PDF, PPTX, DOCX · up to 100 MB each</p>
       <div className="mt-4 flex gap-2">
         <Button type="button" variant="outline" size="sm" onClick={open} disabled={disabled}>
           <FilePlus2 className="size-4" />Browse files

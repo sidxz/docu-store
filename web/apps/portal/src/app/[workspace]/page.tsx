@@ -221,7 +221,7 @@ export default function DashboardPage() {
                     Upload Document
                   </p>
                   <p className="text-xs text-text-muted">
-                    PDF, PPTX, DOC, DOCX
+                    PDF, PPTX, DOCX
                   </p>
                 </div>
               </Link>
