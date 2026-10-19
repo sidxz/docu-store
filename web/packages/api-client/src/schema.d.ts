@@ -68,31 +68,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/artifacts/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Create Artifact
-         * @description Create a new artifact.
-         *
-         *     Returns:
-         *         201 Created: Artifact successfully created
-         *         400 Bad Request: Validation error
-         *         500 Internal Server Error: Infrastructure failure (DB unavailable, etc.)
-         */
-        post: operations["create_artifact_artifacts__post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/artifacts/upload": {
         parameters: {
             query?: never;
@@ -1494,7 +1469,7 @@ export interface paths {
         };
         /**
          * Get Workflow Stats
-         * @description Get Temporal workflow execution statistics (admin only).
+         * @description Get Temporal workflow execution statistics for this workspace (admin only).
          */
         get: operations["get_workflow_stats_stats_workflows_get"];
         put?: never;
@@ -1838,92 +1813,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/user/llm-provider": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Llm Provider
-         * @description Every provider the caller has configured (never a key), plus form presets.
-         */
-        get: operations["get_llm_provider_user_llm_provider_get"];
-        /**
-         * Set Llm Provider
-         * @description Add or update one provider. With a key it becomes active; other providers are kept.
-         */
-        put: operations["set_llm_provider_user_llm_provider_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/user/llm-provider/{provider}/activate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Activate Llm Provider
-         * @description Switch which stored provider everything runs on. One click back, too.
-         */
-        post: operations["activate_llm_provider_user_llm_provider__provider__activate_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/user/llm-provider/{provider}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Delete Llm Provider */
-        delete: operations["delete_llm_provider_user_llm_provider__provider__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/user/llm-provider/{provider}/test": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Probe Llm Provider
-         * @description Probe one stored provider — active or not, so it can be tried before switching.
-         *
-         *     Models may be overridden per request. Testing is how you find out whether a
-         *     model works, so requiring it to be saved first would have the order backwards:
-         *     you would have to commit to a model to learn it was the wrong one. The key is
-         *     never part of the request; only the stored one is ever used.
-         */
-        post: operations["probe_llm_provider_user_llm_provider__provider__test_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/workspace/members": {
         parameters: {
             query?: never;
@@ -2030,6 +1919,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspace/chat-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Chat Settings
+         * @description The workspace's chat settings, falling back to the server defaults.
+         */
+        get: operations["get_chat_settings_workspace_chat_settings_get"];
+        /**
+         * Set Chat Settings
+         * @description Switch answer formatting for the whole workspace (admin only).
+         */
+        put: operations["set_chat_settings_workspace_chat_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspace/cser-training-export": {
         parameters: {
             query?: never;
@@ -2050,6 +1963,143 @@ export interface paths {
         get: operations["export_cser_training_data_workspace_cser_training_export_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/embedding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Workspace Embedding
+         * @description The workspace's embedding model and whether its keys can serve it.
+         */
+        get: operations["get_workspace_embedding_workspace_embedding_get"];
+        /**
+         * Set Workspace Embedding
+         * @description Change the workspace's embedding model (admin). Re-embeds existing documents.
+         */
+        put: operations["set_workspace_embedding_workspace_embedding_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/embedding/reembed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume Workspace Reembed
+         * @description Re-embed the documents still holding vectors from another model (admin).
+         *
+         *     Retries a failed re-embed, or finishes one that stopped, without redoing
+         *     the documents already on the workspace's model.
+         */
+        post: operations["resume_workspace_reembed_workspace_embedding_reembed_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/llm-provider": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Llm Provider
+         * @description Every provider the workspace has configured (never a key), plus form presets.
+         *
+         *     Any member may read it — to know whether the workspace can upload and chat —
+         *     but only admins see a key's last four characters or may change anything.
+         */
+        get: operations["get_llm_provider_workspace_llm_provider_get"];
+        /**
+         * Set Llm Provider
+         * @description Add or update one provider (admin). With a key it becomes active; others are kept.
+         */
+        put: operations["set_llm_provider_workspace_llm_provider_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/llm-provider/{provider}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Activate Llm Provider
+         * @description Switch which stored provider everything runs on (admin). One click back, too.
+         */
+        post: operations["activate_llm_provider_workspace_llm_provider__provider__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/llm-provider/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Llm Provider */
+        delete: operations["delete_llm_provider_workspace_llm_provider__provider__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/llm-provider/{provider}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Probe Llm Provider
+         * @description Probe one stored provider — active or not, so it can be tried before switching.
+         *
+         *     Models may be overridden per request. Testing is how you find out whether a
+         *     model works, so requiring it to be saved first would have the order backwards:
+         *     you would have to commit to a model to learn it was the wrong one. The key is
+         *     never part of the request; only the stored one is ever used. Admin only: a
+         *     probe spends the workspace's key.
+         */
+        post: operations["probe_llm_provider_workspace_llm_provider__provider__test_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2151,6 +2201,10 @@ export interface components {
             grounding_is_grounded?: boolean | null;
             /** Grounding Confidence */
             grounding_confidence?: number | null;
+            /** Grounding Llm Verified */
+            grounding_llm_verified?: boolean | null;
+            /** Grounding Passes */
+            grounding_passes?: components["schemas"]["GroundingPassDTO"][];
         };
         /**
          * AnalyzeCompoundBoxRequest
@@ -2419,10 +2473,7 @@ export interface components {
         };
         /** Body_upload_blob_artifacts_upload_post */
         Body_upload_blob_artifacts_upload_post: {
-            /**
-             * File
-             * Format: binary
-             */
+            /** File */
             file: string;
             artifact_type: components["schemas"]["ArtifactType"];
             /** Source Uri */
@@ -2699,8 +2750,6 @@ export interface components {
             collection_name: string;
             /** Points Count */
             points_count: number;
-            /** Indexed Vectors Count */
-            indexed_vectors_count: number;
             /** Status */
             status: string;
         };
@@ -2827,6 +2876,11 @@ export interface components {
             artifact_id: string;
             /** Artifact Title */
             artifact_title?: string | null;
+            /**
+             * Labels
+             * @default []
+             */
+            labels: string[];
         };
         /**
          * CompoundProfileDTO
@@ -2963,16 +3017,10 @@ export interface components {
             reranker_device?: string | null;
             /** Kafka Enabled */
             kafka_enabled: boolean;
-            /** Temporal Address */
-            temporal_address: string;
             /** Temporal Max Concurrent Activities */
             temporal_max_concurrent_activities: number;
             /** Temporal Max Concurrent Llm Activities */
             temporal_max_concurrent_llm_activities: number;
-            /** Qdrant Url */
-            qdrant_url: string;
-            /** Blob Base Url */
-            blob_base_url: string;
         };
         /**
          * ContentBlockDTO
@@ -3171,36 +3219,6 @@ export interface components {
             entity_type?: string | null;
         };
         /**
-         * CreateArtifactRequest
-         * @description Request DTO for creating a new artifact.
-         */
-        CreateArtifactRequest: {
-            /**
-             * Artifact Id
-             * @description Optional artifact ID to use instead of generating a new one
-             */
-            artifact_id?: string | null;
-            /**
-             * Source Uri
-             * @description URI pointing to the source of the artifact
-             */
-            source_uri?: string | null;
-            /**
-             * Source Filename
-             * @description Original filename of the artifact
-             */
-            source_filename?: string | null;
-            /** @description Classification type of the artifact */
-            artifact_type: components["schemas"]["ArtifactType"];
-            /** @description MIME type of the artifact */
-            mime_type: components["schemas"]["MimeType"];
-            /**
-             * Storage Location
-             * @description Location where the artifact is stored
-             */
-            storage_location: string;
-        };
-        /**
          * CreateConversationRequest
          * @description Request to create a new conversation.
          */
@@ -3282,6 +3300,15 @@ export interface components {
             workers: components["schemas"]["WorkerHeartbeat"][];
             /** Checked At */
             checked_at: string;
+        };
+        /** EmbeddingModelOption */
+        EmbeddingModelOption: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Providers */
+            providers: string[];
         };
         /**
          * EntityRefDTO
@@ -3366,6 +3393,18 @@ export interface components {
             grounded_rate: number;
             /** Avg Confidence */
             avg_confidence: number;
+        };
+        /**
+         * GroundingPassDTO
+         * @description One pass of the verify/refine loop.
+         */
+        GroundingPassDTO: {
+            /** Is Grounded */
+            is_grounded?: boolean | null;
+            /** Confidence */
+            confidence?: number | null;
+            /** Llm Verified */
+            llm_verified?: boolean | null;
         };
         /** GroundingStatsResponse */
         GroundingStatsResponse: {
@@ -3537,7 +3576,9 @@ export interface components {
         };
         /**
          * LLMProviderEntry
-         * @description One configured provider. Exactly one of a caller's entries is ``active``.
+         * @description One configured provider. Exactly one of a workspace's entries is ``active``.
+         *
+         *     ``key_last4`` is blank for non-admins.
          */
         LLMProviderEntry: {
             /** Provider */
@@ -3562,7 +3603,7 @@ export interface components {
         };
         /**
          * LLMProviderRequest
-         * @description PUT /user/llm-provider. Blank models fall back to the provider preset;
+         * @description PUT /workspace/llm-provider. Blank models fall back to the provider preset;
          *     omit ``api_key`` to change models only (the stored key is kept).
          */
         LLMProviderRequest: {
@@ -3580,13 +3621,18 @@ export interface components {
         };
         /**
          * LLMProviderResponse
-         * @description GET /user/llm-provider — keys are write-only; only their last 4 are shown.
+         * @description GET /workspace/llm-provider — keys are write-only; admins see their last 4.
          */
         LLMProviderResponse: {
             /** Enabled */
             enabled: boolean;
             /** Configured */
             configured: boolean;
+            /**
+             * Can Manage
+             * @default false
+             */
+            can_manage: boolean;
             /**
              * Providers
              * @default []
@@ -3921,6 +3967,20 @@ export interface components {
             smiles_resolved?: {
                 [key: string]: unknown;
             }[];
+        };
+        /** ReEmbedProgress */
+        ReEmbedProgress: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "done" | "running" | "failed" | "unknown";
+            /** Total */
+            total: number;
+            /** Done */
+            done: number;
+            /** Error */
+            error?: string | null;
         };
         /**
          * RecentConversationDTO
@@ -4369,6 +4429,14 @@ export interface components {
             source_type: string;
             /** External Url */
             external_url?: string | null;
+            /** Query Source */
+            query_source?: string | null;
+            /** Vector Score */
+            vector_score?: number | null;
+            /** Rerank Score */
+            rerank_score?: number | null;
+            /** Page Indexes */
+            page_indexes?: number[] | null;
         };
         /**
          * StepLatencyStats
@@ -5011,6 +5079,10 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+            /** Input */
+            input?: unknown;
+            /** Context */
+            ctx?: Record<string, never>;
         };
         /** VectorStatsResponse */
         VectorStatsResponse: {
@@ -5119,6 +5191,56 @@ export interface components {
             max_duration_seconds: number;
             /** P95 Duration Seconds */
             p95_duration_seconds: number;
+        };
+        /** WorkspaceChatSettingsRequest */
+        WorkspaceChatSettingsRequest: {
+            /** Answer Formatting */
+            answer_formatting: boolean;
+        };
+        /** WorkspaceChatSettingsResponse */
+        WorkspaceChatSettingsResponse: {
+            /**
+             * Answer Formatting
+             * @description Whether chat answers get the formatting pass
+             */
+            answer_formatting: boolean;
+            /** Can Manage */
+            can_manage: boolean;
+        };
+        /** WorkspaceEmbeddingBody */
+        WorkspaceEmbeddingBody: {
+            /** Model */
+            model: string;
+            /**
+             * Reembed
+             * @default false
+             */
+            reembed: boolean;
+        };
+        /** WorkspaceEmbeddingResponse */
+        WorkspaceEmbeddingResponse: {
+            /** Enabled */
+            enabled: boolean;
+            /** Model */
+            model: string;
+            /** Server Model */
+            server_model: string;
+            /** Has Documents */
+            has_documents: boolean;
+            /** Usable */
+            usable: boolean;
+            /** Detail */
+            detail?: string | null;
+            /** Options */
+            options: components["schemas"]["EmbeddingModelOption"][];
+            reembed?: components["schemas"]["ReEmbedProgress"] | null;
+        };
+        /** WorkspaceEmbeddingUpdate */
+        WorkspaceEmbeddingUpdate: {
+            /** Model */
+            model: string;
+            /** Reembed Workflows */
+            reembed_workflows: number;
         };
         /** WorkspaceTokenLimitsResponse */
         WorkspaceTokenLimitsResponse: {
@@ -5238,39 +5360,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_artifact_artifacts__post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateArtifactRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ArtifactResponse"];
-                };
             };
             /** @description Validation Error */
             422: {
@@ -7934,150 +8023,6 @@ export interface operations {
             };
         };
     };
-    get_llm_provider_user_llm_provider_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LLMProviderResponse"];
-                };
-            };
-        };
-    };
-    set_llm_provider_user_llm_provider_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LLMProviderRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    activate_llm_provider_user_llm_provider__provider__activate_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                provider: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_llm_provider_user_llm_provider__provider__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                provider: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    probe_llm_provider_user_llm_provider__provider__test_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                provider: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": components["schemas"]["LLMProviderTestRequest"] | null;
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LLMProviderTestResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     search_members_workspace_members_get: {
         parameters: {
             query?: {
@@ -8247,6 +8192,57 @@ export interface operations {
             };
         };
     };
+    get_chat_settings_workspace_chat_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceChatSettingsResponse"];
+                };
+            };
+        };
+    };
+    set_chat_settings_workspace_chat_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkspaceChatSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     export_cser_training_data_workspace_cser_training_export_get: {
         parameters: {
             query?: {
@@ -8268,6 +8264,223 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_workspace_embedding_workspace_embedding_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceEmbeddingResponse"];
+                };
+            };
+        };
+    };
+    set_workspace_embedding_workspace_embedding_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkspaceEmbeddingBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceEmbeddingUpdate"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_workspace_reembed_workspace_embedding_reembed_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceEmbeddingUpdate"];
+                };
+            };
+        };
+    };
+    get_llm_provider_workspace_llm_provider_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMProviderResponse"];
+                };
+            };
+        };
+    };
+    set_llm_provider_workspace_llm_provider_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LLMProviderRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activate_llm_provider_workspace_llm_provider__provider__activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_llm_provider_workspace_llm_provider__provider__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    probe_llm_provider_workspace_llm_provider__provider__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["LLMProviderTestRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMProviderTestResponse"];
                 };
             };
             /** @description Validation Error */
