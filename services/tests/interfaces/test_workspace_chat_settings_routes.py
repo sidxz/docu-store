@@ -17,28 +17,33 @@ from tests.fakes.fake_auth import FakeAuth
 
 class Store:
     def __init__(self) -> None:
-        self.on: bool | None = None
+        self.by_workspace: dict = {}
+
+    @property
+    def on(self) -> bool | None:
+        return next(iter(self.by_workspace.values()), None)
 
     async def get_answer_formatting(self, workspace_id):
-        return self.on
+        return self.by_workspace.get(workspace_id)
 
     async def set_answer_formatting(self, workspace_id, on, *, updated_by):
-        self.on = on
+        self.by_workspace[workspace_id] = on
 
 
 class FakeContainer(dict):
     pass
 
 
-def _client(*, role="admin", server_default=True):
-    store = Store()
+def _client(*, role="admin", server_default=True, store=None):
+    store = store or Store()
     container = FakeContainer({
         Settings: SimpleNamespace(chat_enable_answer_formatting=server_default),
         WorkspaceChatSettingsStore: store,
     })
     strip_authz_middleware(app)
     app.dependency_overrides[get_container] = lambda: container
-    app.dependency_overrides[get_auth] = lambda: FakeAuth(role=role, user_id=uuid4(), workspace_id=uuid4())
+    auth = FakeAuth(role=role, user_id=uuid4(), workspace_id=uuid4())
+    app.dependency_overrides[get_auth] = lambda: auth
     return TestClient(app), store
 
 
@@ -68,5 +73,15 @@ def test_only_an_admin_can_switch_it_and_it_sticks() -> None:
             "answer_formatting": False,
             "can_manage": True,
         }
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_a_workspace_sees_only_its_own_setting() -> None:
+    try:
+        client, store = _client()
+        assert client.put("/workspace/chat-settings", json={"answer_formatting": False}).status_code == 204
+        other, _ = _client(role="editor", store=store)  # another workspace, same store
+        assert other.get("/workspace/chat-settings").json()["answer_formatting"] is True
     finally:
         app.dependency_overrides.clear()

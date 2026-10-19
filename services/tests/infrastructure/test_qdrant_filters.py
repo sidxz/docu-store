@@ -1,4 +1,4 @@
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from qdrant_client import models
@@ -161,3 +161,23 @@ def test_same_model_keeps_every_clause_of_the_filter():
     for flt in (not_b, one_a):
         hits = client.query_points("t", query=[1.0, 0.0], query_filter=same_model(flt, "m")).points
         assert [h.id for h in hits] == [0]
+
+
+async def test_workspace_counts_and_stale_vectors_stay_in_the_workspace():
+    from qdrant_client import AsyncQdrantClient
+
+    from infrastructure.vector_stores.qdrant_store import count_in_workspace, stale_vectors
+
+    ours, theirs, a, b, c = (str(uuid4()) for _ in range(5))
+    client = AsyncQdrantClient(":memory:")
+    await client.create_collection("t", vectors_config=models.VectorParams(size=2, distance="Cosine"))
+    await client.upsert("t", [
+        models.PointStruct(
+            id=i, vector=[1.0, 0.0], payload={"workspace_id": ws, "artifact_id": art, "model_name": m}
+        )
+        for i, (ws, art, m) in enumerate(
+            [(ours, a, "new"), (ours, a, "old"), (ours, b, "old"), (theirs, c, "old")]
+        )
+    ])
+    assert await count_in_workspace(client, "t", UUID(ours)) == 3
+    assert await stale_vectors(client, "t", UUID(ours), "new") == (3, {a: 1, b: 1})

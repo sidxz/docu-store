@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 from interfaces.api.main import app
@@ -55,3 +56,37 @@ def test_workflow_stats_leave_out_other_workspaces(monkeypatch) -> None:
         assert [f["workflow_id"] for f in body["recent_failures"]] == [f"embedding-{OURS}"]
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.mark.integration
+async def test_workspace_entity_ids_are_read_from_that_workspace_only(monkeypatch) -> None:
+    """The real Mongo query behind the filter above (local docker-compose / CI mongodb)."""
+    from motor.motor_asyncio import AsyncIOMotorClient
+
+    client = AsyncIOMotorClient("mongodb://localhost:27017", serverSelectionTimeoutMS=3000)
+    try:
+        await client.admin.command("ping")
+    except Exception as exc:  # pragma: no cover - only hit with no local/CI Mongo
+        pytest.skip(f"no Mongo reachable at localhost:27017: {exc}")
+    db_name = f"docu_store_test_{uuid4().hex[:8]}"
+    monkeypatch.setattr(
+        stats_routes,
+        "settings",
+        SimpleNamespace(mongo_db=db_name, mongo_artifacts_collection="a", mongo_pages_collection="p"),
+    )
+    ours, theirs = uuid4(), uuid4()
+    db = client[db_name]
+    try:
+        await db["a"].insert_many([
+            {"artifact_id": "art-ours", "workspace_id": str(ours)},
+            {"artifact_id": "art-theirs", "workspace_id": str(theirs)},
+        ])
+        await db["p"].insert_many([
+            {"page_id": "page-ours", "workspace_id": str(ours)},
+            {"page_id": "page-theirs", "workspace_id": str(theirs)},
+        ])
+        ids = await stats_routes._workspace_entity_ids({AsyncIOMotorClient: client}, ours)
+        assert ids == {"art-ours", "page-ours"}
+    finally:
+        await client.drop_database(db_name)
+        client.close()
