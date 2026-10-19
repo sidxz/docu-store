@@ -63,11 +63,8 @@ export interface ConfigSummary {
   reranker_model: string | null;
   reranker_device: string | null;
   kafka_enabled: boolean;
-  temporal_address: string;
   temporal_max_concurrent_activities: number;
   temporal_max_concurrent_llm_activities: number;
-  qdrant_url: string;
-  blob_base_url: string;
 }
 
 export interface WorkerHeartbeat {

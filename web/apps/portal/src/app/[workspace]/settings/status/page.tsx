@@ -335,11 +335,8 @@ function ConfigSection({ config }: { config: DetailedHealthResponse["config"] })
     ...(config.reranker_model ? [["Reranker Model", config.reranker_model] as [string, string]] : []),
     ...(config.reranker_device ? [["Reranker Device", config.reranker_device] as [string, string]] : []),
     ["Kafka Enabled", config.kafka_enabled ? "Yes" : "No"],
-    ["Temporal Address", config.temporal_address],
     ["Temporal Max Activities", String(config.temporal_max_concurrent_activities)],
     ["Temporal Max LLM Activities", String(config.temporal_max_concurrent_llm_activities)],
-    ["Qdrant URL", config.qdrant_url],
-    ["Blob Storage", config.blob_base_url],
   ];
 
   return (
