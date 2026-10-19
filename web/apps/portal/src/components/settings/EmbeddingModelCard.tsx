@@ -47,7 +47,8 @@ export function EmbeddingModelCard() {
   const selected = choice ?? data.model;
   const selectedOption = data.options.find((o) => o.id === selected);
   const reembed = data.reembed;
-  const running = reembed?.state === "running";
+  // "unknown" counts as running: the server refuses a model change it can't confirm is safe.
+  const running = reembed?.state === "running" || reembed?.state === "unknown";
 
   const onSave = async () => {
     if (
@@ -123,8 +124,9 @@ export function EmbeddingModelCard() {
       {running && (
         <div className="mt-3 space-y-1.5">
           <p className="text-xs text-text-muted">
-            Re-embedding documents: {reembed.done.toLocaleString()} of{" "}
-            {reembed.total.toLocaleString()} vectors done. Search covers the finished ones.
+            {reembed.state === "unknown" ? "Can't reach the re-embed service right now. " : "Re-embedding documents: "}
+            {reembed.done.toLocaleString()} of {reembed.total.toLocaleString()} vectors done.
+            Search covers the finished ones.
           </p>
           <Progress value={reembed.total ? (reembed.done / reembed.total) * 100 : 0} />
         </div>

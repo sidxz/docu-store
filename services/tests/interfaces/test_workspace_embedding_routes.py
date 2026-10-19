@@ -32,13 +32,23 @@ MODEL = "openai/text-embedding-3-small"
 
 class EmbeddingStore:
     def __init__(self) -> None:
-        self.model: str | None = None
+        self.by_workspace: dict = {}
+        self.workspace_id = None  # the caller's; ``model`` reads and writes it
+
+    @property
+    def model(self) -> str | None:
+        return self.by_workspace.get(self.workspace_id)
+
+    @model.setter
+    def model(self, value: str | None) -> None:
+        self.by_workspace[self.workspace_id] = value
 
     async def get(self, workspace_id):
-        return WorkspaceEmbeddingConfig(model=self.model) if self.model else None
+        model = self.by_workspace.get(workspace_id)
+        return WorkspaceEmbeddingConfig(model=model) if model else None
 
     async def set(self, workspace_id, model, *, updated_by):
-        self.model = model
+        self.by_workspace[workspace_id] = model
 
 
 class LLMStore:
@@ -64,23 +74,29 @@ class ReadModel:
 class BulkReEmbed:
     def __init__(self) -> None:
         self.calls: list[list[str]] = []
+        self.workspaces: list = []
 
     async def execute(self, workspace_id, targets=None):
         self.calls.append(targets)
+        self.workspaces.append(workspace_id)
         return BulkWorkflowResponse(triggered=4, workflow_ids=[], targets=targets)
 
 
 class ReEmbed:
     def __init__(self) -> None:
         self.state = "done"
+        self.error: str | None = None
         self.models: list[str] = []
+        self.workspaces: list = []
 
     async def progress(self, workspace_id, model_name):
         self.models.append(model_name)
-        return ReEmbedProgress(state=self.state, total=10, done=4)
+        self.workspaces.append(workspace_id)
+        return ReEmbedProgress(state=self.state, total=10, done=4, error=self.error)
 
     async def resume(self, workspace_id, model_name):
         self.models.append(model_name)
+        self.workspaces.append(workspace_id)
         return 3
 
 
@@ -95,6 +111,7 @@ class FakeContainer(dict):
 
 def _client(*, enabled=True, docs=0, keys=None, role="admin"):
     store, bulk, reembed = EmbeddingStore(), BulkReEmbed(), ReEmbed()
+    store.workspace_id = workspace_id = uuid4()
     container = FakeContainer({
         Settings: SimpleNamespace(user_llm_keys_enabled=enabled),
         WorkspaceEmbeddingConfigStore: store,
@@ -106,9 +123,11 @@ def _client(*, enabled=True, docs=0, keys=None, role="admin"):
     })
     strip_authz_middleware(app)
     app.dependency_overrides[get_container] = lambda: container
-    app.dependency_overrides[get_auth] = lambda: FakeAuth(role=role, user_id=uuid4(), workspace_id=uuid4())
+    app.dependency_overrides[get_auth] = lambda: FakeAuth(
+        role=role, user_id=uuid4(), workspace_id=workspace_id
+    )
     client = TestClient(app)
-    client.reembed = reembed
+    client.reembed, client.workspace_id = reembed, workspace_id
     return client, store, bulk
 
 
@@ -215,6 +234,42 @@ def test_put_is_refused_while_a_reembed_runs() -> None:
         assert _put(client, model=MODEL, reembed=True).status_code == 409
         assert store.model is None
         assert bulk.calls == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_put_is_refused_when_temporal_cannot_say_whether_a_reembed_runs() -> None:
+    try:
+        client, store, bulk = _client(docs=3, keys={"openai": "k"})
+        client.reembed.state = "unknown"
+        assert _put(client, model=MODEL, reembed=True).status_code == 409
+        assert store.model is None
+        assert bulk.calls == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_only_admins_see_why_a_reembed_failed() -> None:
+    """The provider's error text can quote the workspace's key."""
+    try:
+        for role, error in (("admin", "Incorrect API key provided: sk-...abcd"), ("editor", None)):
+            client, _, _ = _client(role=role)
+            client.reembed.state, client.reembed.error = "failed", "Incorrect API key provided: sk-...abcd"
+            assert client.get("/workspace/embedding").json()["reembed"]["error"] == error
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_every_route_acts_on_the_callers_workspace() -> None:
+    try:
+        client, store, bulk = _client(docs=3, keys={"openai": "k"})
+        assert _put(client, model=MODEL, reembed=True).status_code == 200
+        client.get("/workspace/embedding")
+        client.post("/workspace/embedding/reembed")
+        ws = client.workspace_id
+        assert store.by_workspace == {ws: MODEL}
+        assert bulk.workspaces == [ws]
+        assert set(client.reembed.workspaces) == {ws}
     finally:
         app.dependency_overrides.clear()
 

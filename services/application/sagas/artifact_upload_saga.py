@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, BinaryIO
 
 import structlog
@@ -39,8 +40,9 @@ class ArtifactUploadSaga:
         upload_req: UploadBlobRequest,
         auth: AuthContext | None = None,
     ) -> Result[ArtifactResponse, AppError]:
-        # Step 1: Upload blob
-        blob_result = self.upload_blob.execute(stream, upload_req)
+        # Step 1: Upload blob. Type detection and the blob write are blocking I/O,
+        # so they run off the event loop.
+        blob_result = await asyncio.to_thread(self.upload_blob.execute, stream, upload_req)
         if isinstance(blob_result, Failure):
             return blob_result
 

@@ -36,7 +36,11 @@ class FakeQuota:
 
 
 class FakeSendUseCase:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
     async def execute(self, **kwargs):
+        self.calls.append(kwargs)
         yield AgentEvent(type="token", delta="hello")
         yield AgentEvent(type="done")
 
@@ -87,14 +91,16 @@ def _client(
     *,
     get_uc: FakeGetConversation | None = None,
     delete_uc: FakeDeleteConversation | None = None,
+    send_uc: FakeSendUseCase | None = None,
+    chat_settings: object | None = None,
 ) -> TestClient:
     strip_authz_middleware(app)
     app.dependency_overrides[get_container] = lambda: FakeContainer(
         {
             Settings: SimpleNamespace(user_llm_keys_enabled=False),
             CheckTokenQuotaUseCase: FakeQuota(),
-            SendMessageUseCase: FakeSendUseCase(),
-            WorkspaceChatSettingsStore: UnsetChatSettings(),
+            SendMessageUseCase: send_uc or FakeSendUseCase(),
+            WorkspaceChatSettingsStore: chat_settings or UnsetChatSettings(),
             GetConversationUseCase: get_uc or FakeGetConversation(),
             DeleteConversationUseCase: delete_uc or FakeDeleteConversation(),
             ChatRunRegistry: registry,
@@ -135,6 +141,20 @@ def test_send_streams_seq_stamped_frames() -> None:
         assert resp.status_code == 200
         assert "id: 0\nevent: token\n" in resp.text
         assert "id: 1\nevent: done\n" in resp.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_send_passes_on_the_workspaces_answer_formatting() -> None:
+    class FormattingOffInOurWorkspace:
+        async def get_answer_formatting(self, workspace_id):
+            return False if workspace_id == WS else None
+
+    registry, send = ChatRunRegistry(), FakeSendUseCase()
+    try:
+        client = _client(registry, send_uc=send, chat_settings=FormattingOffInOurWorkspace())
+        assert client.post(f"/chat/{uuid4()}/messages", json={"message": "hi"}).status_code == 200
+        assert send.calls[0]["answer_formatting"] is False
     finally:
         app.dependency_overrides.clear()
 

@@ -68,11 +68,8 @@ class ConfigSummary(BaseModel):
     reranker_model: str | None = None
     reranker_device: str | None = None
     kafka_enabled: bool
-    temporal_address: str
     temporal_max_concurrent_activities: int
     temporal_max_concurrent_llm_activities: int
-    qdrant_url: str
-    blob_base_url: str
 
 
 class WorkerHeartbeat(BaseModel):

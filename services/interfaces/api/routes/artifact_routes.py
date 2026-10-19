@@ -9,7 +9,7 @@ from duar_auth import RequestAuth
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 
-from application.dtos.artifact_dtos import ArtifactResponse, CreateArtifactRequest
+from application.dtos.artifact_dtos import ArtifactResponse
 from application.dtos.blob_dtos import UploadBlobRequest
 from application.dtos.correction_dtos import CorrectArtifactMetadataRequest
 from application.dtos.permission_dtos import (
@@ -31,7 +31,6 @@ from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
 from application.use_cases.artifact_use_cases import (
     AddPagesUseCase,
-    CreateArtifactUseCase,
     DeleteArtifactUseCase,
     RemovePagesUseCase,
     UpdateSummaryCandidateUseCase,
@@ -104,29 +103,6 @@ async def get_artifact(
     artifact = await require_workspace_artifact(artifact_id, auth, container)
     await require_artifact_permission(artifact_id, auth, "view")
     return artifact
-
-
-@router.post("/", status_code=status.HTTP_201_CREATED)
-@handle_use_case_errors
-async def create_artifact(
-    request: CreateArtifactRequest,
-    container: Annotated[Container, Depends(get_container)],
-    auth: Annotated[RequestAuth, Depends(get_auth)],
-) -> ArtifactResponse:
-    """Create a new artifact.
-
-    Returns:
-        201 Created: Artifact successfully created
-        400 Bad Request: Validation error
-        500 Internal Server Error: Infrastructure failure (DB unavailable, etc.)
-
-    """
-    await require_action(auth, "artifacts:create")
-    await ensure_terms_accepted(auth, container)
-    await ensure_llm_configured(auth, container)
-    await ensure_within_quota(auth, container)
-    use_case = container[CreateArtifactUseCase]
-    return await use_case.execute(request=request, auth=auth)
 
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)

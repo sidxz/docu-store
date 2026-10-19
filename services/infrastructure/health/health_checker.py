@@ -130,11 +130,8 @@ class InfrastructureHealthChecker:
             reranker_model=s.reranker_model_name if s.reranker_enabled else None,
             reranker_device=s.reranker_device if s.reranker_enabled else None,
             kafka_enabled=s.enable_external_event_streaming,
-            temporal_address=s.temporal_address,
             temporal_max_concurrent_activities=s.temporal_max_concurrent_activities,
             temporal_max_concurrent_llm_activities=s.temporal_max_concurrent_llm_activities,
-            qdrant_url=s.qdrant_url,
-            blob_base_url=s.blob_base_url,
         )
 
     # ------------------------------------------------------------------
@@ -146,7 +143,7 @@ class InfrastructureHealthChecker:
         checks: list[asyncio.Task[ServiceStatus]] = [
             _timed_check("MongoDB", self._check_mongodb()),
             _timed_check("EventStoreDB", self._check_eventstoredb()),
-            _timed_check("Qdrant", self._check_qdrant()),
+            _timed_check("Qdrant", self._check_qdrant(workspace_id)),
             _timed_check("Temporal", self._check_temporal()),
             _timed_check("LLM Service", self._check_llm(workspace_id)),
             _timed_check("Duar", self._check_duar()),
@@ -170,9 +167,7 @@ class InfrastructureHealthChecker:
             details["replica_set"] = rs_status.get("set", "unknown")
             members = rs_status.get("members", [])
             details["members"] = len(members)
-            details["primary"] = next(
-                (m["name"] for m in members if m.get("stateStr") == "PRIMARY"), None,
-            )
+            details["has_primary"] = any(m.get("stateStr") == "PRIMARY" for m in members)
         except Exception:
             details["replica_set"] = "unavailable"
 
@@ -198,19 +193,24 @@ class InfrastructureHealthChecker:
 
         return ServiceStatus(name="EventStoreDB", status="healthy")
 
-    async def _check_qdrant(self) -> ServiceStatus:
-        page_info = await self._vector_store.get_collection_info()
-        compound_info = await self._compound_vector_store.get_compound_collection_info()
-        summary_info = await self._summary_vector_store.get_collection_info()
-
+    async def _check_qdrant(self, workspace_id: UUID | None) -> ServiceStatus:
+        # Collections are shared by every workspace: report only the caller's
+        # vectors, never the platform's totals.
+        if workspace_id is None:
+            await self._vector_store.get_collection_info()
+            return ServiceStatus(name="Qdrant", status="healthy")
+        stores = {
+            "page_embeddings": self._vector_store,
+            "compound_embeddings": self._compound_vector_store,
+            "summary_embeddings": self._summary_vector_store,
+        }
         return ServiceStatus(
             name="Qdrant",
             status="healthy",
             details={
                 "collections": {
-                    "page_embeddings": page_info,
-                    "compound_embeddings": compound_info,
-                    "summary_embeddings": summary_info,
+                    name: {"points_count": await store.count_vectors(workspace_id)}
+                    for name, store in stores.items()
                 },
             },
         )
@@ -356,8 +356,8 @@ class InfrastructureHealthChecker:
                 return ServiceStatus(
                     name="Blob Storage",
                     status="healthy" if exists else "degraded",
-                    details={"scheme": scheme, "path": path, "exists": exists},
-                    error=f"Blob directory does not exist: {path}" if not exists else None,
+                    details={"scheme": scheme, "exists": exists},
+                    error="Blob directory does not exist" if not exists else None,
                 )
             # S3/GCS — try listing root
             await asyncio.to_thread(fs.ls, parsed.path, detail=False)

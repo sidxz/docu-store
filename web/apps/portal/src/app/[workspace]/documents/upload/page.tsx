@@ -57,13 +57,17 @@ export default function UploadPage() {
   const { trackEvent } = useAnalytics();
   const [artifactType, setArtifactType] = useState("SCIENTIFIC_DOCUMENT");
   const [sourceUri, setSourceUri] = useState("");
-  const { defaultScope, setDefaultScope } = useScopeStore();
+  const defaultScope = useScopeStore((s) => s.defaultScope);
+  // This batch's destination. Until picked it follows the default, which can still
+  // change when server preferences load; a pick is never overwritten by that.
+  const [picked, setPicked] = useState<typeof defaultScope | null>(null);
+  const destination = picked ?? defaultScope;
   const [skipped, setSkipped] = useState(0); // files filtered out (wrong type / too big / duplicate)
 
   // keep batch meta in sync with the controls
   useEffect(() => {
     const uri = sourceUri.trim();
-    uppy.setMeta({ artifact_type: artifactType, visibility: defaultScope, source_uri: uri });
+    uppy.setMeta({ artifact_type: artifactType, visibility: destination, source_uri: uri });
     // xhr-upload appends every allowedMetaFields entry verbatim (no presence
     // check), so an empty source_uri would POST ""/"undefined" and the backend
     // stores it as-is (source_uri: str | None, no empty→None coercion). Toggle
@@ -73,7 +77,7 @@ export default function UploadPage() {
         ? ["artifact_type", "visibility", "source_uri"]
         : ["artifact_type", "visibility"],
     });
-  }, [uppy, artifactType, defaultScope, sourceUri]);
+  }, [uppy, artifactType, destination, sourceUri]);
 
   // Derived, not mirrored: currentUploads empties when #runUpload finishes —
   // upload(), retryAll() and per-row retryUpload() all route through it, and
@@ -190,8 +194,8 @@ export default function UploadPage() {
                   type="radio"
                   name="destination"
                   value={value}
-                  checked={defaultScope === value}
-                  onChange={() => setDefaultScope(value)}
+                  checked={destination === value}
+                  onChange={() => setPicked(value)}
                   className="sr-only"
                 />
                 <Icon className="mt-0.5 size-5 shrink-0 text-accent-text" />
@@ -234,7 +238,7 @@ export default function UploadPage() {
 
         <UploadDropzone
           title={
-            defaultScope === "workspace"
+            destination === "workspace"
               ? `Drop files or a folder to add them to ${workspace}`
               : "Drop files or a folder to add them privately"
           }

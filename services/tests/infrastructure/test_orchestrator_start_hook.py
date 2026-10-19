@@ -47,3 +47,38 @@ async def test_hook_is_skipped_when_the_start_fails() -> None:
 async def test_no_hook_is_fine() -> None:
     orch = TemporalWorkflowOrchestrator(client=_Client())
     await orch._start_workflow("SomeWorkflow", "arg", id="wf-2", task_queue="q")
+
+
+async def test_reembed_start_reports_whether_it_started() -> None:
+    """Callers count re-embeds started; a refused start must not count."""
+    from uuid import uuid4
+
+    assert await TemporalWorkflowOrchestrator(client=_Client()).start_batch_reembed_workflow(
+        artifact_id=uuid4()
+    )
+    for start in ("start_batch_reembed_workflow", "start_batch_reembed_summaries_workflow"):
+        orch = TemporalWorkflowOrchestrator(client=_Client(fail=True))
+        assert await getattr(orch, start)(artifact_id=uuid4()) is False
+
+
+class _DescribeClient:
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+
+    def get_workflow_handle(self, workflow_id, run_id=None):  # noqa: ANN001, ANN201
+        return self
+
+    async def describe(self):  # noqa: ANN201
+        raise self.error
+
+
+async def test_only_temporal_not_found_reads_as_not_found() -> None:
+    """An outage is not "no such workflow": callers treat NOT_FOUND as finished."""
+    from temporalio.service import RPCError, RPCStatusCode
+
+    async def status(error: Exception) -> str:
+        orch = TemporalWorkflowOrchestrator(client=_DescribeClient(error))
+        return (await orch.get_workflow_statuses({"x": "wf"}))["x"].status
+
+    assert await status(RPCError("gone", RPCStatusCode.NOT_FOUND, b"")) == "NOT_FOUND"
+    assert await status(RPCError("down", RPCStatusCode.UNAVAILABLE, b"")) == "UNKNOWN"

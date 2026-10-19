@@ -23,7 +23,6 @@ from application.ports.repositories.user_preferences_store import UserPreference
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
 from application.services.llm_scope import UserLLMScope
 from application.use_cases.artifact_use_cases import (
-    CreateArtifactUseCase,
     DeleteArtifactUseCase,
     RemovePagesUseCase,
 )
@@ -188,38 +187,18 @@ def make_client() -> Callable[[dict[type, object]], TestClient]:
 
 
 class TestArtifactRoutes:
-    def test_create_artifact_success(self, make_client) -> None:
-        artifact_id = uuid4()
-        response_dto = ArtifactResponse(
-            artifact_id=artifact_id,
-            source_uri="https://example.com/paper.pdf",
-            source_filename="paper.pdf",
-            artifact_type=ArtifactType.RESEARCH_ARTICLE,
-            mime_type=MimeType.PDF,
-            storage_location="/storage/paper.pdf",
-        )
-        create_use_case = FakeUseCase(Success(response_dto))
-
-        client = make_client(
-            {
-                CreateArtifactUseCase: create_use_case,
-                CheckTokenQuotaUseCase: FakeUseCase(Success(None)),
-            },
-        )
-
+    def test_artifacts_are_only_created_by_upload(self, make_client) -> None:
+        """No route takes a client-declared type and storage key: uploads are typed by content."""
+        client = make_client({})
         request = CreateArtifactRequest(
-            source_uri="https://example.com/paper.pdf",
             source_filename="paper.pdf",
             artifact_type=ArtifactType.RESEARCH_ARTICLE,
             mime_type=MimeType.PDF,
-            storage_location="/storage/paper.pdf",
+            storage_location="../../../../proc/self/environ",
         )
-        response = client.post("/artifacts/", json=request.model_dump())
+        response = client.post("/artifacts/", json=request.model_dump(mode="json"))
 
-        assert response.status_code == 201
-        data = response.json()
-        assert data["artifact_id"] == str(artifact_id)
-        assert data["source_filename"] == "paper.pdf"
+        assert response.status_code == 405
 
     def test_upload_denied_without_create_action(self, make_client) -> None:
         client = make_client({}, auth=FakeAuth(role="viewer", actions=set()))
@@ -229,20 +208,6 @@ class TestArtifactRoutes:
             files={"file": ("paper.pdf", b"%PDF", "application/pdf")},
             data={"artifact_type": "RESEARCH_ARTICLE"},
         )
-
-        assert response.status_code == 403
-
-    def test_create_denied_without_create_action(self, make_client) -> None:
-        client = make_client({}, auth=FakeAuth(role="editor", actions=set()))
-
-        request = CreateArtifactRequest(
-            source_uri="https://example.com/paper.pdf",
-            source_filename="paper.pdf",
-            artifact_type=ArtifactType.RESEARCH_ARTICLE,
-            mime_type=MimeType.PDF,
-            storage_location="/storage/paper.pdf",
-        )
-        response = client.post("/artifacts/", json=request.model_dump())
 
         assert response.status_code == 403
 

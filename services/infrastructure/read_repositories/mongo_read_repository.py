@@ -1,3 +1,4 @@
+import asyncio
 import time
 from datetime import UTC, datetime
 from uuid import UUID
@@ -311,82 +312,37 @@ class MongoReadRepository(
         sticky_categories: list[str] | None = None,
         allowed_artifact_ids: list[UUID] | None = None,
     ) -> BrowseCategoriesResponse:
-        # Use tag dictionary for category stats (fast indexed query)
-        dict_match: dict = {}
-        if workspace_id is not None:
-            dict_match["workspace_id"] = str(workspace_id)
-
-        pipeline: list[dict] = []
-        if dict_match:
-            pipeline.append({"$match": dict_match})
-
-        pipeline.append(
-            {
-                "$group": {
-                    "_id": "$entity_type",
-                    "all_artifact_ids": {"$push": "$artifact_ids"},
-                    "distinct_count": {"$sum": 1},
-                },
-            },
+        # Counted from the artifacts the caller may open, the way the folders list
+        # them. (The tag dictionary spans every artifact and holds merged compound
+        # aliases, which are searchable but not folders.)
+        base = self._browse_base_match(workspace_id, allowed_artifact_ids)
+        stats = await asyncio.gather(
+            self._category_counts(
+                base, "$tag_mentions", "$tag_mentions.entity_type", {"$toLower": "$tag_mentions.tag"}
+            ),
+            self._category_counts(
+                {**base, "author_mentions.0": {"$exists": True}},
+                "$author_mentions",
+                "author",
+                {"$toLower": "$author_mentions.name"},
+            ),
+            self._category_counts(
+                {**base, "presentation_date.date": {"$ne": None}},
+                None,
+                "date",
+                {"$substrCP": [_PRESENTATION_DATE, 0, 4]},  # date folders are years
+            ),
         )
-        # Flatten and count unique artifact ids
-        pipeline.append(
-            {
-                "$addFields": {
-                    "flat_ids": {
-                        "$reduce": {
-                            "input": "$all_artifact_ids",
-                            "initialValue": [],
-                            "in": {"$setUnion": ["$$value", "$$this"]},
-                        },
-                    },
-                },
-            },
-        )
-        pipeline.append(
-            {
-                "$project": {
-                    "entity_type": "$_id",
-                    "artifact_count": {"$size": "$flat_ids"},
-                    "distinct_count": 1,
-                },
-            },
-        )
-
-        raw_stats = await self.tag_dictionary.aggregate(pipeline).to_list(100)
-
-        # Count tags the way _get_tag_folders lists them. The dictionary also holds
-        # merged compound aliases (searchable, not folders) and ignores visibility.
-        folder_counts = {
-            d["_id"]: d["n"]
-            for d in await self.artifacts.aggregate(
-                [
-                    {"$match": self._browse_base_match(workspace_id, allowed_artifact_ids)},
-                    {"$unwind": "$tag_mentions"},
-                    {
-                        "$group": {
-                            "_id": {
-                                "et": "$tag_mentions.entity_type",
-                                "tag": {"$toLower": "$tag_mentions.tag"},
-                            },
-                        },
-                    },
-                    {"$group": {"_id": "$_id.et", "n": {"$sum": 1}}},
-                ],
-            ).to_list(100)
-        }
+        raw_stats = [item for found in stats for item in found]
 
         categories: dict[str, TagCategoryDTO] = {}
         for item in raw_stats:
-            et = item["entity_type"]
+            et = item["_id"]
             categories[et] = TagCategoryDTO(
                 entity_type=et,
                 display_name=ENTITY_TYPE_DISPLAY_NAMES.get(et, et.replace("_", " ").title()),
                 artifact_count=item["artifact_count"],
-                # author and date folders come from their own fields, as the dictionary does
-                distinct_count=item["distinct_count"]
-                if et in ("author", "date")
-                else folder_counts.get(et, 0),
+                distinct_count=item["distinct_count"],
             )
 
         # Inject sticky categories (always present even if count 0)
@@ -417,16 +373,44 @@ class MongoReadRepository(
         )
         sorted_cats = sticky_cats + rest_cats
 
-        # Total artifacts: count distinct across all categories
-        total_match: dict = {}
-        if workspace_id is not None:
-            total_match["workspace_id"] = str(workspace_id)
-        total = await self.artifacts.count_documents(total_match)
+        total = await self.artifacts.count_documents(base)
 
         return BrowseCategoriesResponse(
             categories=sorted_cats[:limit],
             total_artifacts=total,
         )
+
+    async def _category_counts(
+        self, match: dict, unwind: str | None, entity_type: str, value: dict
+    ) -> list[dict]:
+        """Per entity type: distinct folder values, and distinct artifacts across them."""
+        pipeline: list[dict] = [{"$match": match}]
+        if unwind:
+            pipeline.append({"$unwind": unwind})
+        pipeline += [
+            {
+                "$group": {
+                    "_id": {"et": entity_type, "v": value},
+                    "ids": {"$addToSet": "$artifact_id"},
+                },
+            },
+            {"$group": {"_id": "$_id.et", "distinct_count": {"$sum": 1}, "ids": {"$push": "$ids"}}},
+            {
+                "$project": {
+                    "distinct_count": 1,
+                    "artifact_count": {
+                        "$size": {
+                            "$reduce": {
+                                "input": "$ids",
+                                "initialValue": [],
+                                "in": {"$setUnion": ["$$value", "$$this"]},
+                            },
+                        },
+                    },
+                },
+            },
+        ]
+        return await self.artifacts.aggregate(pipeline).to_list(None)
 
     async def get_tag_folders(
         self,

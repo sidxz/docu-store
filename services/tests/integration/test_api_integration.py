@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from types import SimpleNamespace
 from uuid import UUID
@@ -11,7 +12,7 @@ from fastapi.testclient import TestClient
 from returns.result import Success
 from duar_auth.authz_middleware import AuthzMiddleware
 
-from application.dtos.artifact_dtos import ArtifactResponse
+from application.dtos.artifact_dtos import ArtifactResponse, CreateArtifactRequest
 from application.dtos.page_dtos import PageResponse
 from application.ports.repositories.artifact_read_models import ArtifactReadModel
 from application.ports.repositories.page_read_models import PageReadModel
@@ -124,7 +125,9 @@ def client() -> Callable[[dict[type, object]], TestClient]:
         container = SimpleContainer(overrides)
         app.dependency_overrides[get_container] = lambda: container
         app.dependency_overrides[get_auth] = lambda: fake_auth
-        return TestClient(app)
+        test_client = TestClient(app)
+        test_client.auth_context = fake_auth  # for setup done through use cases
+        return test_client
 
     yield _client
     app.dependency_overrides.clear()
@@ -158,8 +161,13 @@ def test_create_page_and_add_compound_mentions(client) -> None:
         "mime_type": MimeType.PDF,
         "storage_location": "/storage/paper.pdf",
     }
-    artifact_response = api.post("/artifacts/", json=create_artifact)
-    artifact_id = artifact_response.json()["artifact_id"]
+    # Artifacts are created by the upload saga; seed one through the use case.
+    created = asyncio.run(
+        use_cases[CreateArtifactUseCase].execute(
+            CreateArtifactRequest(**create_artifact), auth=api.auth_context
+        )
+    )
+    artifact_id = str(created.unwrap().artifact_id)
 
     create_page_payload = {
         "artifact_id": artifact_id,
