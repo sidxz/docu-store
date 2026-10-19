@@ -46,6 +46,8 @@ services:
       APP_ENV: production
     ports:
       - "${API_PORT:-8002}:8000"
+    volumes:
+      - blobs:/data/blobs
     networks:
       - docu-store
     restart: unless-stopped
@@ -112,6 +114,7 @@ services:
       TEMPORAL_MAX_CONCURRENT_ACTIVITIES: ${TEMPORAL_MAX_CONCURRENT_ACTIVITIES:-5}
     volumes:
       - huggingface-cache:/home/docustore/.cache/huggingface
+      - blobs:/data/blobs
     networks:
       - docu-store
     restart: unless-stopped
@@ -130,6 +133,8 @@ services:
       TEMPORAL_ADDRESS: temporal:7233
       MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
       TEMPORAL_MAX_CONCURRENT_LLM_ACTIVITIES: ${TEMPORAL_MAX_CONCURRENT_LLM_ACTIVITIES:-2}
+    volumes:
+      - blobs:/data/blobs
     networks:
       - docu-store
     restart: unless-stopped
@@ -180,6 +185,15 @@ services:
 
 volumes:
   huggingface-cache:
+  # Stores uploaded documents and page images when BLOB_BASE_URL is
+  # file:///data/blobs (the default). Not used with S3 or Azure.
+  #
+  # The api, temporal-worker and llm-worker must all see the same files.
+  # On a single server, this volume does that. With several swarm servers,
+  # each one gets its own separate volume, so a file saved on one server is
+  # missing on the others. In that case, mount shared storage (such as NFS)
+  # at /data/blobs instead, or use S3 / Azure.
+  blobs:
 
 networks:
   docu-store:

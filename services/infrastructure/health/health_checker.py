@@ -345,34 +345,39 @@ class InfrastructureHealthChecker:
     async def _check_blob_storage(self) -> ServiceStatus:
         import fsspec
 
-        parsed = urlparse(self._settings.blob_base_url)
-        scheme = parsed.scheme or "file"
+        scheme = urlparse(self._settings.blob_base_url).scheme or "file"
 
         try:
-            fs = fsspec.filesystem(scheme, **(self._settings.blob_storage_options or {}))
+            fs, path = fsspec.core.url_to_fs(
+                self._settings.blob_base_url, **(self._settings.blob_storage_options or {})
+            )
+            exists = await asyncio.to_thread(fs.exists, path)
             if scheme == "file":
-                path = parsed.path
-                exists = await asyncio.to_thread(fs.exists, path)
                 return ServiceStatus(
                     name="Blob Storage",
                     status="healthy" if exists else "degraded",
                     details={"scheme": scheme, "exists": exists},
                     error="Blob directory does not exist" if not exists else None,
                 )
-            # S3/GCS — try listing root
-            await asyncio.to_thread(fs.ls, parsed.path, detail=False)
-            return ServiceStatus(
-                name="Blob Storage",
-                status="healthy",
-                details={"scheme": scheme},
-            )
+            # S3/Azure: the prefix appears with the first upload, so an empty
+            # one is fine as long as its bucket/container is there.
+            if not exists:
+                exists = await asyncio.to_thread(fs.exists, path.strip("/").split("/")[0])
         except Exception as e:
+            # Store errors name buckets, accounts and paths: log them, show the type.
+            logger.warning("health.blob_storage_failed", error=str(e))
             return ServiceStatus(
                 name="Blob Storage",
                 status="unhealthy",
-                error=str(e),
+                error=type(e).__name__,
                 details={"scheme": scheme},
             )
+        return ServiceStatus(
+            name="Blob Storage",
+            status="healthy" if exists else "unhealthy",
+            details={"scheme": scheme},
+            error="Bucket or container not found" if not exists else None,
+        )
 
     # ------------------------------------------------------------------
     # Model checks

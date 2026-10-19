@@ -274,13 +274,21 @@ APP_UMAMI_WEBSITE_ID=7e5f446f-...
 
 #### Blob Storage
 
+Uploads and page images. The local filesystem, S3 (or MinIO / R2) and Azure Blob Storage work out of the box:
+
 ```env
-# Local filesystem (default — mount a volume for persistence)
+# Local filesystem (default) — docker-compose.prod.yml shares a `blobs` volume here (single node)
 BLOB_BASE_URL=file:///data/blobs
 
-# S3-compatible (for production)
+# S3 — credentials from AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY or an IAM role
 BLOB_BASE_URL=s3://your-bucket/docu-store
+
+# Azure — AZURE_STORAGE_ACCOUNT_NAME + AZURE_STORAGE_ACCOUNT_KEY, AZURE_STORAGE_CONNECTION_STRING,
+# or the account name alone to sign in with a managed identity
+BLOB_BASE_URL=az://your-container/docu-store
 ```
+
+Create the bucket or container first. Details: [Blob Storage](https://docustore.io/docs/integration/blob-storage).
 
 #### Full reference
 

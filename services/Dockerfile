@@ -66,8 +66,12 @@ RUN v="$(dpkg-query -W -f='${Version}' libreoffice-core)" && \
     dpkg --compare-versions "$v" ge "4:25.2.3-2+deb13u8" || \
     { echo "libreoffice-core $v predates DSA-6543-1" >&2; exit 1; }
 
-# Non-root user (UID 1000 — standard for k8s SecurityContext)
-RUN useradd -r -u 1000 -m docustore
+# Non-root user (UID 1000 — standard for k8s SecurityContext). Volume mount
+# points are created up front: a fresh named volume takes its owner from the
+# image, and a path the image lacks is mounted root-owned and unwritable.
+RUN useradd -r -u 1000 -m docustore && \
+    mkdir -p /data/blobs /home/docustore/.cache/huggingface && \
+    chown -R docustore:docustore /data/blobs /home/docustore/.cache
 USER docustore
 
 EXPOSE 8000
