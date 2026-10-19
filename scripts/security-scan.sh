@@ -24,5 +24,5 @@ trivy fs --scanners vuln,secret "${gate[@]}" \
 [[ "$component" == cli ]] && exit 0
 
 image="docu-store-$component:scan"
-docker build -t "$image" "$ROOT/$component"
+docker build --build-arg SECURITY_REFRESH="$(date +%F)" -t "$image" "$ROOT/$component"
 trivy image --scanners vuln "${gate[@]}" "$image"

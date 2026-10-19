@@ -49,6 +49,7 @@ jobs:
           context: services/
           load: true
           tags: docu-store:scan
+          build-args: SECURITY_REFRESH=${{ github.run_id }}
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/docu-store:latest
 
       - name: Trivy vulnerability scan
@@ -65,6 +66,7 @@ jobs:
         with:
           context: services/
           push: true
+          build-args: SECURITY_REFRESH=${{ github.run_id }}
           tags: |
             ghcr.io/${{ github.repository_owner }}/docu-store:${{ steps.version.outputs.VERSION }}
             ghcr.io/${{ github.repository_owner }}/docu-store:latest

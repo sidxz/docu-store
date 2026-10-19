@@ -53,6 +53,12 @@ COPY domain/ domain/
 COPY infrastructure/ infrastructure/
 COPY interfaces/ interfaces/
 
+# Security fixes published since the cached apt layer above was built. Release
+# and publish builds pass a fresh SECURITY_REFRESH, which re-runs only this
+# layer and the ones after it; the dependency layers stay cached.
+ARG SECURITY_REFRESH
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
 # Fail the build on a LibreOffice older than the October 2026 security batch
 # (DSA-6543-1); base trixie lags trixie-security. Kept late so it never
 # invalidates the cached dependency layers above.
