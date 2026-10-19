@@ -20,6 +20,10 @@ class FsspecBlobStore(BlobStore):
         self.storage_options = storage_options or {}
 
     def _url(self, key: str) -> str:
+        # Every key stays under base_url, whoever built it.
+        if key.startswith("/") or ".." in key.split("/"):
+            msg = f"Invalid blob key: {key!r}"
+            raise ValueError(msg)
         return f"{self.base_url}/{key}"
 
     def put_stream(self, key: str, stream: BinaryIO, *, mime_type: str | None = None) -> StoredBlob:

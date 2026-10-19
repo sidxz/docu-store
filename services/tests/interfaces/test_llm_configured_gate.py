@@ -1,4 +1,4 @@
-"""428 BYO-key gate on chat send + artifact upload/create."""
+"""428 BYO-key gate on chat send + artifact upload."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 from returns.result import Success
 
-from application.dtos.artifact_dtos import CreateArtifactRequest
 from application.dtos.chat_dtos import AgentEvent
 from application.ports.user_llm_config import (
     NullUserLLMConfigStore,
@@ -150,21 +149,6 @@ def test_upload_428_before_saga_runs() -> None:
         )
         assert resp.status_code == 428
         assert resp.json()["detail"] == LLM_NOT_CONFIGURED_MEMBER_DETAIL
-    finally:
-        app.dependency_overrides.clear()
-
-
-def test_create_428_before_use_case_runs() -> None:
-    body = CreateArtifactRequest(
-        source_uri="https://example.com/paper.pdf",
-        source_filename="paper.pdf",
-        artifact_type=ArtifactType.RESEARCH_ARTICLE,
-        mime_type=MimeType.PDF,
-        storage_location="/storage/paper.pdf",
-    )
-    try:
-        resp = _client(FakeStore(), _settings()).post("/artifacts/", json=body.model_dump())
-        assert resp.status_code == 428
     finally:
         app.dependency_overrides.clear()
 

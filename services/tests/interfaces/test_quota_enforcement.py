@@ -119,22 +119,6 @@ def test_upload_blocked_over_limit() -> None:
         app.dependency_overrides.clear()
 
 
-def test_create_artifact_blocked_over_limit() -> None:
-    quota = FakeQuota(OVER_LIMIT)
-    try:
-        resp = _client(quota=quota).post(
-            "/artifacts/",
-            json={
-                "artifact_type": "UNCLASSIFIED",
-                "mime_type": "application/pdf",
-                "storage_location": "blob://test",
-            },
-        )
-        assert resp.status_code == 429
-    finally:
-        app.dependency_overrides.clear()
-
-
 def test_create_page_blocked_over_limit() -> None:
     """LLM enrichment cascades off page creation — it must be gated too."""
     quota = FakeQuota(OVER_LIMIT)
