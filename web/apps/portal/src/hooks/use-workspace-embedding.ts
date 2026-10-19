@@ -14,7 +14,8 @@ export interface EmbeddingModelOption {
 
 /** How many of the workspace's vectors are on its current model. */
 export interface ReEmbedProgress {
-  state: "done" | "running" | "failed";
+  /** "unknown": the server could not reach Temporal, so a re-embed may still run. */
+  state: "done" | "running" | "failed" | "unknown";
   total: number;
   done: number;
   /** Why it failed, while Temporal still remembers. */
@@ -44,7 +45,11 @@ export function useWorkspaceEmbedding() {
     queryFn: () => authFetchJson<WorkspaceEmbedding>("/workspace/embedding"),
     staleTime: 5 * 60 * 1000,
     retry: 1,
-    refetchInterval: (query) => (query.state.data?.reembed?.state === "running" ? 3000 : false),
+    // Each poll asks Temporal about every stale document, so keep it slow.
+    refetchInterval: (query) => {
+      const state = query.state.data?.reembed?.state;
+      return state === "running" || state === "unknown" ? 15_000 : false;
+    },
   });
 }
 

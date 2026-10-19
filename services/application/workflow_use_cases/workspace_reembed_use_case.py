@@ -12,6 +12,7 @@ import asyncio
 from typing import TYPE_CHECKING, Literal
 from uuid import UUID
 
+import structlog
 from pydantic import BaseModel
 
 if TYPE_CHECKING:
@@ -24,11 +25,14 @@ _WORKFLOWS = {
     "text": ("start_batch_reembed_workflow", "batch-reembed-{}"),
     "summaries": ("start_batch_reembed_summaries_workflow", "batch-reembed-summaries-{}"),
 }
+log = structlog.get_logger(__name__)
+
 _FAILED = frozenset({"FAILED", "TIMED_OUT", "TERMINATED", "CANCELED"})
 
 
 class ReEmbedProgress(BaseModel):
-    state: Literal["done", "running", "failed"]
+    # "unknown": Temporal could not be asked, so a re-embed may still be running
+    state: Literal["done", "running", "failed", "unknown"]
     total: int  # vectors in the workspace
     done: int  # of those, from the current model
     error: str | None = None  # why it failed, when Temporal still knows
@@ -60,16 +64,26 @@ class WorkspaceReEmbedUseCase:
 
         # ponytail: one describe per stale artifact and target, sequential; fine for
         # self-serve workspaces, use Temporal visibility queries if they reach thousands.
-        statuses = await self._orchestrator.get_workflow_statuses({
-            f"{target}:{artifact_id}": _WORKFLOWS[target][1].format(artifact_id)
-            for target, by_artifact in stale.items()
-            for artifact_id in by_artifact
-        })
         done = total - left
+        try:
+            statuses = await self._orchestrator.get_workflow_statuses({
+                f"{target}:{artifact_id}": _WORKFLOWS[target][1].format(artifact_id)
+                for target, by_artifact in stale.items()
+                for artifact_id in by_artifact
+            })
+        except Exception:
+            log.warning("workspace_reembed.temporal_unreachable", workspace_id=str(workspace_id))
+            return ReEmbedProgress(state="unknown", total=total, done=done)
         if any(s.status == "RUNNING" for s in statuses.values()):
             return ReEmbedProgress(state="running", total=total, done=done)
-        failed = next((s.workflow_id for s in statuses.values() if s.status in _FAILED), None)
-        error = await self._orchestrator.get_workflow_failure(failed) if failed else None
+        if any(s.status == "UNKNOWN" for s in statuses.values()):
+            return ReEmbedProgress(state="unknown", total=total, done=done)
+        failed = next((s for s in statuses.values() if s.status in _FAILED), None)
+        error = (
+            await self._orchestrator.get_workflow_failure(failed.workflow_id, failed.run_id)
+            if failed
+            else None
+        )
         return ReEmbedProgress(state="failed", total=total, done=done, error=error)
 
     async def resume(self, workspace_id: UUID, model_name: str) -> int:
@@ -79,6 +93,5 @@ class WorkspaceReEmbedUseCase:
         for target, by_artifact in stale.items():
             start = getattr(self._orchestrator, _WORKFLOWS[target][0])
             for artifact_id in by_artifact:
-                await start(artifact_id=UUID(artifact_id))
-                started += 1
+                started += await start(artifact_id=UUID(artifact_id))  # False: already running
         return started

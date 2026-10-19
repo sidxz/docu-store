@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 from temporalio.client import Client, WorkflowFailureError
-from temporalio.service import RPCError
+from temporalio.service import RPCError, RPCStatusCode
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -390,7 +390,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
     async def start_batch_reembed_workflow(
         self,
         artifact_id: UUID,
-    ) -> None:
+    ) -> bool:
         """Start the batch re-embed workflow for an artifact."""
         await self._ensure_client()
 
@@ -410,12 +410,14 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
                 "batch_reembed_workflow_started",
                 artifact_id=str(artifact_id),
             )
+            return True
         except Exception as e:
             logger.exception(
                 "failed_to_start_batch_reembed_workflow",
                 artifact_id=str(artifact_id),
                 error=str(e),
             )
+            return False
 
     async def start_artifact_parse_workflow(
         self,
@@ -444,7 +446,7 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
     async def start_batch_reembed_smiles_workflow(
         self,
         artifact_id: UUID,
-    ) -> None:
+    ) -> bool:
         """Start the batch SMILES re-embed workflow for an artifact."""
         await self._ensure_client()
 
@@ -464,17 +466,19 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
                 "batch_reembed_smiles_workflow_started",
                 artifact_id=str(artifact_id),
             )
+            return True
         except Exception as e:
             logger.exception(
                 "failed_to_start_batch_reembed_smiles_workflow",
                 artifact_id=str(artifact_id),
                 error=str(e),
             )
+            return False
 
     async def start_batch_reembed_summaries_workflow(
         self,
         artifact_id: UUID,
-    ) -> None:
+    ) -> bool:
         """Start the batch summaries re-embed workflow for an artifact."""
         await self._ensure_client()
 
@@ -494,12 +498,14 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
                 "batch_reembed_summaries_workflow_started",
                 artifact_id=str(artifact_id),
             )
+            return True
         except Exception as e:
             logger.exception(
                 "failed_to_start_batch_reembed_summaries_workflow",
                 artifact_id=str(artifact_id),
                 error=str(e),
             )
+            return False
 
     async def get_page_workflow_statuses(
         self,
@@ -539,14 +545,16 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
         await self._ensure_client()
         return await self._query_workflow_statuses(workflow_ids)
 
-    async def get_workflow_failure(self, workflow_id: str) -> str | None:
-        """Why a closed workflow failed (its innermost error message), else None.
+    async def get_workflow_failure(self, workflow_id: str, run_id: str | None = None) -> str | None:
+        """Why a closed workflow run failed (its innermost error message), else None.
 
-        Only call it for a closed workflow: ``result()`` waits on a running one.
+        Pass the ``run_id`` that was described as closed: ``result()`` waits on a
+        running run, and without it a restart in between would be the one read.
         """
         await self._ensure_client()
         try:
-            await self._client.get_workflow_handle(workflow_id).result(follow_runs=False)
+            handle = self._client.get_workflow_handle(workflow_id, run_id=run_id)
+            await handle.result(follow_runs=False)
         except WorkflowFailureError as e:
             error: BaseException = e
             while error.__cause__ is not None:
@@ -588,11 +596,13 @@ class TemporalWorkflowOrchestrator(WorkflowOrchestrator):
                     started_at=desc.start_time,
                     closed_at=desc.close_time,
                 )
-            except RPCError:
-                results[name] = TemporalWorkflowInfo(
-                    workflow_id=wf_id,
-                    status="NOT_FOUND",
-                )
+            except RPCError as e:
+                if e.status == RPCStatusCode.NOT_FOUND:
+                    results[name] = TemporalWorkflowInfo(workflow_id=wf_id, status="NOT_FOUND")
+                    continue
+                # An outage is not "never ran": callers read NOT_FOUND as finished.
+                logger.warning("failed_to_query_workflow_status", workflow_id=wf_id, error=str(e))
+                results[name] = TemporalWorkflowInfo(workflow_id=wf_id, status="UNKNOWN")
             except Exception as e:
                 logger.warning(
                     "failed_to_query_workflow_status",

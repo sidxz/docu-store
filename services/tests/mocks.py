@@ -706,9 +706,10 @@ class MockWorkflowOrchestrator:
             raise self.raise_on_call
         self.artifact_parse_calls.append(artifact_id)
 
-    async def start_batch_reembed_workflow(self, artifact_id: UUID) -> None:
+    async def start_batch_reembed_workflow(self, artifact_id: UUID) -> bool:
         if self.raise_on_call:
             raise self.raise_on_call
+        return True
 
     async def get_page_workflow_statuses(self, page_id: UUID) -> dict:
         return {}

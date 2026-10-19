@@ -291,11 +291,13 @@ async def _vector_model_name(container: Container, model: str) -> str:
     return str((await container[EmbeddingGenerator].get_model_info()).get("model_name", ""))
 
 
-async def _reembed_progress(container: Container, workspace_id: UUID) -> ReEmbedProgress:
-    model = await _current_embedding_model(container, workspace_id)
-    return await container[WorkspaceReEmbedUseCase].progress(
-        workspace_id, await _vector_model_name(container, model)
+async def _reembed_progress(container: Container, auth: RequestAuth) -> ReEmbedProgress:
+    model = await _current_embedding_model(container, auth.workspace_id)
+    progress = await container[WorkspaceReEmbedUseCase].progress(
+        auth.workspace_id, await _vector_model_name(container, model)
     )
+    # The provider's error text can quote the workspace's key; only admins can act on it.
+    return progress if auth.is_admin else progress.model_copy(update={"error": None})
 
 
 @router.get("/embedding", status_code=status.HTTP_200_OK)
@@ -332,7 +334,7 @@ async def get_workspace_embedding(
             EmbeddingModelOption(id=key, label=preset.label, providers=list(preset.providers))
             for key, preset in EMBEDDING_MODELS.items()
         ],
-        reembed=await _reembed_progress(container, auth.workspace_id) if enabled else None,
+        reembed=await _reembed_progress(container, auth) if enabled else None,
     )
 
 
@@ -372,10 +374,10 @@ async def set_workspace_embedding(
             status_code=status.HTTP_409_CONFLICT,
             detail="Changing the embedding model re-embeds every document in this workspace.",
         )
-    if has_documents and (await _reembed_progress(container, auth.workspace_id)).state == "running":
+    if has_documents and (await _reembed_progress(container, auth)).state in ("running", "unknown"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Wait for the current re-embed to finish before changing the model again.",
+            detail="A re-embed may still be running. Wait for it to finish before changing the model.",
         )
     # The workspace must hold a key for what is picked — searching needs it right
     # away, and the re-embed below runs on it.

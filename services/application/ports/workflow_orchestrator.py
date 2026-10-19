@@ -202,10 +202,13 @@ class WorkflowOrchestrator(Protocol):
     async def start_batch_reembed_workflow(
         self,
         artifact_id: UUID,
-    ) -> None:
+    ) -> bool:
         """Start the batch re-embed workflow for an artifact.
 
         Re-embeds all pages with full contextual prefixes in one batch.
+
+        Returns False when Temporal refused the start (already running,
+        unreachable).
 
         Args:
             artifact_id: Unique identifier of the artifact.
@@ -217,10 +220,13 @@ class WorkflowOrchestrator(Protocol):
     async def start_batch_reembed_smiles_workflow(
         self,
         artifact_id: UUID,
-    ) -> None:
+    ) -> bool:
         """Start the batch SMILES re-embed workflow for an artifact.
 
         Re-embeds all compound SMILES vectors for every page of the artifact.
+
+        Returns False when Temporal refused the start (already running,
+        unreachable).
 
         Args:
             artifact_id: Unique identifier of the artifact.
@@ -232,10 +238,13 @@ class WorkflowOrchestrator(Protocol):
     async def start_batch_reembed_summaries_workflow(
         self,
         artifact_id: UUID,
-    ) -> None:
+    ) -> bool:
         """Start the batch summaries re-embed workflow for an artifact.
 
         Re-embeds all page summaries and the artifact summary.
+
+        Returns False when Temporal refused the start (already running,
+        unreachable).
 
         Args:
             artifact_id: Unique identifier of the artifact.
@@ -281,8 +290,8 @@ class WorkflowOrchestrator(Protocol):
         ...
 
     @abstractmethod
-    async def get_workflow_failure(self, workflow_id: str) -> str | None:
-        """Why a closed workflow failed (its innermost error message), else None."""
+    async def get_workflow_failure(self, workflow_id: str, run_id: str | None = None) -> str | None:
+        """Why a closed workflow run failed (its innermost error message), else None."""
         ...
 
     @abstractmethod
