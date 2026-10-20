@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
 import structlog
@@ -12,6 +13,7 @@ from application.use_cases._guards import (
     require_artifact_workspace,
     require_editor,
 )
+from application.use_cases.storage_keys import artifact_prefix
 from domain.aggregates.artifact import Artifact
 from domain.services.artifact_deletion_service import ArtifactDeletionService
 from domain.value_objects.source_class import SourceClass
@@ -249,7 +251,7 @@ class DeleteArtifactUseCase:
         require_artifact_workspace(auth, artifact)
 
         page_ids = list(artifact.pages)
-        storage_location = artifact.storage_location
+        workspace_id = artifact.workspace_id
         pages = [self.page_repository.get_by_id(pid) for pid in page_ids]
 
         ArtifactDeletionService.delete_artifact_with_pages(artifact, pages)
@@ -261,7 +263,7 @@ class DeleteArtifactUseCase:
         if self.external_event_publisher:
             await self.external_event_publisher.notify_artifact_deleted(artifact_id)
 
-        await self._cleanup_secondary_stores(artifact_id, page_ids, storage_location)
+        await self._cleanup_secondary_stores(artifact_id, page_ids, workspace_id)
 
         return Success(None)
 
@@ -269,12 +271,12 @@ class DeleteArtifactUseCase:
         self,
         artifact_id: UUID,
         page_ids: list[UUID],
-        storage_location: str,
+        workspace_id: UUID | None,
     ) -> None:
         """Best-effort cleanup — errors are logged, never raised."""
         for page_id in page_ids:
             await self._cleanup_page_stores(page_id)
-        await self._cleanup_artifact_stores(artifact_id, storage_location)
+        await self._cleanup_artifact_stores(artifact_id, workspace_id)
 
         logger.info(
             "secondary_store_cleanup_complete",
@@ -309,7 +311,7 @@ class DeleteArtifactUseCase:
     async def _cleanup_artifact_stores(
         self,
         artifact_id: UUID,
-        storage_location: str,
+        workspace_id: UUID | None,
     ) -> None:
         """Best-effort cleanup of artifact-level stores."""
         await _safe_cleanup(
@@ -319,15 +321,16 @@ class DeleteArtifactUseCase:
             artifact_id=str(artifact_id),
             args=(artifact_id,),
         )
-        if self._blob_store and storage_location:
-            await _safe_cleanup(
-                self._blob_store,
-                "delete",
-                "blob",
-                storage_location=storage_location,
-                args=(storage_location,),
-                is_sync=True,
-            )
+        # The whole folder: the upload plus every page image, render and parse
+        # result made from it. Built inside the guard — artifact_prefix raises
+        # without a workspace, and the delete events are already saved here.
+        if self._blob_store and workspace_id:
+            prefix = artifact_prefix(workspace_id, artifact_id)
+            try:
+                # A recursive delete on S3/Azure is many requests; keep it off the loop.
+                await asyncio.to_thread(self._blob_store.delete_prefix, prefix)
+            except Exception:
+                logger.warning("cleanup_blob_failed", exc_info=True, prefix=prefix)
         await _safe_cleanup(
             self._permission_registrar,
             "deregister_resource",
