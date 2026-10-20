@@ -31,3 +31,9 @@ overrides:
   "minimatch@<3.1.4": "^3.1.4"
   "js-yaml@<4.3.2": "^4.3.2"
   "yaml@<1.10.3": "^1.10.3"
+  # katex 0.16 has no fixed release, and rehype-katex, micromark-extension-math,
+  # mermaid and @streamdown/math all ask for ^0.16. 0.17-0.19 changed an internal
+  # API, the CSS class names and how missing-glyph warnings are reported; the
+  # stylesheet comes from the same katex, so rendered math and its styles stay
+  # in step. Drop once they allow 0.19.
+  "katex@<0.19.0": "^0.19.0"
