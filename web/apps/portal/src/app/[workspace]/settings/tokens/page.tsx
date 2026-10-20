@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { AlertTriangle, ShieldAlert } from "lucide-react";
 import { useAuthzHasRole } from "@duar-auth/react";
 
+import { LimitInput } from "@/components/settings/LimitInput";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useMemberUsageStats, useWorkspaceMembers } from "@/hooks/use-stats";
@@ -17,58 +17,6 @@ import { formatTokens } from "@/lib/utils";
 
 function limitLabel(limit: number | null): string {
   return limit === null ? "Unlimited" : formatTokens(limit);
-}
-
-/** Parse the shared limit input: "" = unlimited (null), else a non-negative int.
- * Capped at MAX_SAFE_INTEGER — beyond that JS silently loses precision. */
-function parseLimitInput(raw: string): number | null | undefined {
-  if (raw.trim() === "") return null;
-  const n = Number(raw);
-  return Number.isInteger(n) && n >= 0 && n <= Number.MAX_SAFE_INTEGER ? n : undefined;
-}
-
-function LimitInput({
-  onSave,
-  isPending,
-  placeholder,
-}: {
-  onSave: (limit: number | null) => void;
-  isPending: boolean;
-  placeholder: string;
-}) {
-  const [value, setValue] = useState("");
-  const [badInput, setBadInput] = useState(false);
-  // badInput: the field shows text (e.g. "12e") but exposes value="" — without
-  // this guard that would parse as "" = unlimited and silently drop the quota.
-  const parsed = badInput ? undefined : parseLimitInput(value);
-  return (
-    <span className="flex items-center gap-2">
-      <input
-        type="number"
-        min={0}
-        value={value}
-        onChange={(e) => {
-          setValue(e.target.value);
-          setBadInput(e.target.validity.badInput);
-        }}
-        placeholder={placeholder}
-        className="w-32 rounded-md border border-border-default bg-surface-elevated px-2 py-1 font-mono text-xs text-text-primary"
-      />
-      <button
-        onClick={() => {
-          if (parsed !== undefined) {
-            onSave(parsed);
-            setValue("");
-            setBadInput(false);
-          }
-        }}
-        disabled={isPending || parsed === undefined}
-        className="rounded-md border border-border-default px-2 py-1 text-xs text-text-primary hover:bg-surface-sunken disabled:opacity-50"
-      >
-        Set
-      </button>
-    </span>
-  );
 }
 
 export default function TokenSettingsPage() {
