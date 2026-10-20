@@ -191,9 +191,14 @@ class MongoReadModelMaterializer(MongoReadModelTracking):
         artifact_id: str,
         tracking: Tracking,
     ) -> None:
-        """Delete an artifact read model atomically with tracking."""
+        """Delete an artifact read model and its tag-dictionary entries, atomically
+        with tracking. One transaction per event: a second tracked write for the
+        same event would be skipped as already processed.
+        """
 
         def _delete(session: object) -> None:
+            # Tags first: the cleanup reads the artifact's workspace from its read model.
+            self._replace_tags_in_session(artifact_id, [], session)
             self.artifacts.delete_one({"artifact_id": artifact_id}, session=session)
 
         self._run_in_transaction(tracking, _delete)

@@ -146,6 +146,29 @@ class TestEventProjector:
         assert fields["tag_mentions"] == []
         assert fields["title_mention"] is None
 
+    def test_artifact_deleted_is_one_tracked_write(self) -> None:
+        # Each tracked write records the event's notification id; a second write
+        # for the same event hits the duplicate and is skipped as "already
+        # processed" — which left deleted artifacts in the read model.
+        materializer = FakeMaterializer()
+        projector = ArtifactProjector(materializer)
+        artifact = Artifact.create(
+            source_uri=None,
+            source_filename="paper.pdf",
+            artifact_type=ArtifactType.RESEARCH_ARTICLE,
+            mime_type=MimeType.PDF,
+            storage_location="/storage/paper.pdf",
+        )
+        artifact.collect_events()
+        artifact.delete()
+        (deleted_event,) = artifact.collect_events()
+        tracking = _tracking()
+
+        projector.artifact_deleted(deleted_event, tracking)
+
+        assert materializer.delete_artifact_calls == [(str(artifact.id), tracking)]
+        assert materializer.replace_tags_calls == []
+
     def test_artifact_projector_created_stores_source_size(self) -> None:
         materializer = FakeMaterializer()
         projector = ArtifactProjector(materializer)
@@ -407,29 +430,6 @@ class TestEventProjector:
             },
         }
         assert isinstance(fields["human_corrections.compound_mentions"]["corrected_at"], str)
-
-    def test_artifact_deleted_cleans_tags_and_deletes(self) -> None:
-        materializer = FakeMaterializer()
-        projector = ArtifactProjector(materializer)
-
-        artifact = Artifact.create(
-            source_uri=None,
-            source_filename="paper.pdf",
-            artifact_type=ArtifactType.RESEARCH_ARTICLE,
-            mime_type=MimeType.PDF,
-            storage_location="/storage/paper.pdf",
-        )
-        list(artifact.collect_events())
-
-        artifact.delete()
-        deleted_event = list(artifact.collect_events())[0]
-        projector.artifact_deleted(deleted_event, _tracking())
-
-        # Should clean tags first, then delete
-        assert len(materializer.replace_tags_calls) == 1
-        assert materializer.replace_tags_calls[0][1] == []  # empty tags = cleanup
-        assert len(materializer.delete_artifact_calls) == 1
-        assert materializer.delete_artifact_calls[0][0] == str(artifact.id)
 
     def test_event_projector_routes_and_ignores_unknown_events(self) -> None:
         materializer = FakeMaterializer()

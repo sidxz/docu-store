@@ -181,13 +181,7 @@ class ArtifactProjector:
         )
 
     def artifact_deleted(self, event: object, tracking: object) -> None:
-        """Project ArtifactDeleted event to read model."""
-        # Remove from tag dictionary before deleting artifact read model
-        self._materializer.replace_artifact_tags(
-            artifact_id=str(event.originator_id),  # type: ignore[attr-defined]
-            tags=[],
-            tracking=tracking,  # type: ignore[arg-type]
-        )
+        """Project ArtifactDeleted event to read model (tag dictionary included)."""
         self._materializer.delete_artifact(
             artifact_id=str(event.originator_id),  # type: ignore[attr-defined]
             tracking=tracking,  # type: ignore[arg-type]
