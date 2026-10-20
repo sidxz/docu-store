@@ -9,6 +9,7 @@ import pytest
 from returns.result import Failure, Success
 
 from application.dtos.blob_dtos import UploadBlobRequest
+from application.dtos.errors import AppError
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
 from application.use_cases.artifact_use_cases import CreateArtifactUseCase
 from application.use_cases.blob_use_cases import UploadBlobUseCase
@@ -89,3 +90,55 @@ async def test_upload_records_the_uploaded_size(saga_under_test):
     payload = b"%PDF-1.4 fifteen"
     art = (await saga.execute(io.BytesIO(payload), REQ, auth=AUTH)).unwrap()
     assert art.source_size_bytes == len(payload)
+
+
+class FakeQuota:
+    def __init__(self, result) -> None:
+        self._result = result
+        self.calls: list[tuple] = []
+
+    async def execute(self, workspace_id, incoming_bytes):
+        self.calls.append((workspace_id, incoming_bytes))
+        return self._result
+
+
+def _saga_with_quota(quota):
+    blob, repo = FakeBlobStore(), MockArtifactRepository()
+    saga = ArtifactUploadSaga(
+        upload_blob_use_case=UploadBlobUseCase(blob_store=blob),
+        create_artifact_use_case=CreateArtifactUseCase(repo),
+        permission_registrar=FakePermissionRegistrar(),
+        storage_quota=quota,
+    )
+    return saga, repo, blob
+
+
+FULL = Failure(AppError("storage_full", "This workspace is out of storage."))
+
+
+@pytest.mark.asyncio
+async def test_refused_upload_writes_nothing():
+    saga, repo, blob = _saga_with_quota(FakeQuota(FULL))
+    result = await saga.execute(io.BytesIO(b"%PDF-1.4 x"), REQ, auth=AUTH)
+    assert isinstance(result, Failure)
+    assert result.failure().category == "storage_full"
+    assert blob.puts == {}
+    assert not repo.save_called
+
+
+@pytest.mark.asyncio
+async def test_admins_are_not_exempt():
+    saga, _, _ = _saga_with_quota(FakeQuota(FULL))
+    admin = FakeAuth(role="admin", workspace_id=WS)
+    result = await saga.execute(io.BytesIO(b"%PDF-1.4 x"), REQ, auth=admin)
+    assert isinstance(result, Failure)
+
+
+@pytest.mark.asyncio
+async def test_quota_sees_the_stream_size():
+    quota = FakeQuota(Success(None))
+    saga, _, blob = _saga_with_quota(quota)
+    payload = b"%PDF-1.4 seventeen"
+    await saga.execute(io.BytesIO(payload), REQ, auth=AUTH)
+    assert quota.calls == [(WS, len(payload))]
+    assert list(blob.puts.values()) == [payload]

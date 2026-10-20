@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from typing import TYPE_CHECKING, BinaryIO
 
 import structlog
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
     from application.ports.permission_registrar import PermissionRegistrar
     from application.use_cases.artifact_use_cases import CreateArtifactUseCase
     from application.use_cases.blob_use_cases import UploadBlobUseCase
+    from application.use_cases.storage_limit_use_cases import CheckStorageQuotaUseCase
 
 log = structlog.get_logger(__name__)
 
@@ -29,10 +31,12 @@ class ArtifactUploadSaga:
         upload_blob_use_case: UploadBlobUseCase,
         create_artifact_use_case: CreateArtifactUseCase,
         permission_registrar: PermissionRegistrar,
+        storage_quota: CheckStorageQuotaUseCase | None = None,
     ) -> None:
         self.upload_blob = upload_blob_use_case
         self.create_artifact = create_artifact_use_case
         self.permission_registrar = permission_registrar
+        self.storage_quota = storage_quota
 
     async def execute(
         self,
@@ -44,6 +48,15 @@ class ArtifactUploadSaga:
         # without a workspace.
         if auth is None or not auth.workspace_id:
             return Failure(AppError("validation", "Uploads need a workspace."))
+
+        # Every caller hands over a seekable stream (Starlette's spooled upload,
+        # BytesIO), so the size is known before anything is written.
+        if self.storage_quota is not None:
+            size = stream.seek(0, os.SEEK_END)
+            stream.seek(0)
+            quota = await self.storage_quota.execute(auth.workspace_id, size)
+            if isinstance(quota, Failure):
+                return quota
 
         # Step 1: Upload blob. Type detection and the blob write are blocking I/O,
         # so they run off the event loop.

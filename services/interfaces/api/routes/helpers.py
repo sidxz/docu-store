@@ -60,6 +60,10 @@ def _map_app_error_to_http_exception(error: AppError) -> HTTPException:  # noqa:
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=error.message,
         )
+    if error.category == "storage_full":
+        # A plain 413, as the body-size middleware sends: the portal's uploader
+        # shows `detail` for 4xx and retries 5xx.
+        return HTTPException(status_code=413, detail=error.message)
     # Unknown error category
     return HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -35,6 +35,7 @@ from application.ports.workflow_orchestrator import WorkflowOrchestrator
 from application.ports.workflow_status_cache import WorkflowStatusCache
 from application.ports.workspace_chat_settings import WorkspaceChatSettingsStore
 from application.ports.workspace_embedding_config import WorkspaceEmbeddingConfigStore
+from application.ports.workspace_storage_limit_store import WorkspaceStorageLimitStore
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
 from application.services.compound_activity_query import CompoundActivityQuery
 from application.services.llm_scope import UserLLMScope
@@ -99,6 +100,10 @@ from application.use_cases.reconcile_compound_labels_use_case import (
 from application.use_cases.search_use_cases import HierarchicalSearchUseCase, SearchSummariesUseCase
 from application.use_cases.smiles_embedding_use_cases import EmbedCompoundSmilesUseCase
 from application.use_cases.smiles_search_use_cases import SearchSimilarCompoundsUseCase
+from application.use_cases.storage_limit_use_cases import (
+    CheckStorageQuotaUseCase,
+    cap_bytes_from_settings,
+)
 from application.use_cases.summarization_use_cases import (
     SummarizeArtifactUseCase,
     SummarizePageUseCase,
@@ -608,6 +613,7 @@ def create_container() -> Container:
         upload_blob_use_case=c[UploadBlobUseCase],
         create_artifact_use_case=c[CreateArtifactUseCase],
         permission_registrar=c[PermissionRegistrar],
+        storage_quota=c[CheckStorageQuotaUseCase],
     )
 
     # Literature. Registered whether or not LITERATURE_ENABLED is set -- the
@@ -765,6 +771,20 @@ def create_container() -> Container:
     container[WorkspaceChatSettingsStore] = lambda c: MongoWorkspaceChatSettingsStore(
         client=c[AsyncIOMotorClient],
         db_name=settings.mongo_db,
+    )
+
+    from infrastructure.read_repositories.mongo_workspace_storage_limit_store import (
+        MongoWorkspaceStorageLimitStore,
+    )
+
+    container[WorkspaceStorageLimitStore] = lambda c: MongoWorkspaceStorageLimitStore(
+        client=c[AsyncIOMotorClient],
+        db_name=settings.mongo_db,
+    )
+    container[CheckStorageQuotaUseCase] = lambda c: CheckStorageQuotaUseCase(
+        limit_store=c[WorkspaceStorageLimitStore],
+        artifact_read_model=c[ArtifactReadModel],
+        cap_bytes=cap_bytes_from_settings(settings),
     )
 
     # Summarization Use Cases
