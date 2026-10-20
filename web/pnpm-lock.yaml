@@ -31,11 +31,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@duar-auth/js':
-        specifier: ^1.4.1
-        version: 1.4.1
+        specifier: ^1.5.1
+        version: 1.5.1
       '@duar-auth/react':
-        specifier: ^1.4.1
-        version: 1.4.1(@duar-auth/js@1.4.1)(react@19.2.4)
+        specifier: ^1.5.1
+        version: 1.5.1(@duar-auth/js@1.5.1)(react@19.2.4)
       '@radix-ui/react-use-controllable-state':
         specifier: ^1.2.3
         version: 1.2.3(@types/react@19.2.14)(react@19.2.4)
@@ -289,13 +289,13 @@ packages:
   '@chevrotain/types@11.1.2':
     resolution: {integrity: sha512-U+HFai5+zmJCkK86QsaJtoITlboZHBqrVketcO2ROv865xfCMSFpELQoz1GkX5GzME8pTa+3kbKrZHQtI0gdbw==}
 
-  '@duar-auth/js@1.4.1':
-    resolution: {integrity: sha512-Dg5Ll4u0+P5gNRRTvCOSiO15TTIABybS7gaYfR2po69qxb9KkC8YYOsf9Wxdtsd6KYaHl5IdxqwPWagH9xe6dQ==}
+  '@duar-auth/js@1.5.1':
+    resolution: {integrity: sha512-0mwjUumObYbRjf8cu5UTC2sLQuQmVtk7CnNdWCfFcnfT0xNLmK5ENg+E4XyCbXotMl2UPUVExhqrQkrh3RDGow==}
 
-  '@duar-auth/react@1.4.1':
-    resolution: {integrity: sha512-0NRSdIHK9ayeVmeZAa36vT+7fEFQ3+goN//WYXmvcnVu5w83GkLKR9iC6K0qqngpaH4pUXHJZjtZ3iLCwSpz/w==}
+  '@duar-auth/react@1.5.1':
+    resolution: {integrity: sha512-eUEed5KoSz/d5z5tM/wh3ndaKlDS5XzjX7/SYqmLXDsbo0sclA1HF3lHw2td9G1+ymnP4pYVrGM+EuI3/hOEiw==}
     peerDependencies:
-      '@duar-auth/js': ^1.4.1
+      '@duar-auth/js': ^1.5.1
       react: ^18.0.0 || ^19.0.0
 
   '@emnapi/runtime@1.11.3':
@@ -3803,13 +3803,13 @@ snapshots:
 
   '@chevrotain/types@11.1.2': {}
 
-  '@duar-auth/js@1.4.1':
+  '@duar-auth/js@1.5.1':
     dependencies:
       jose: 5.10.0
 
-  '@duar-auth/react@1.4.1(@duar-auth/js@1.4.1)(react@19.2.4)':
+  '@duar-auth/react@1.5.1(@duar-auth/js@1.5.1)(react@19.2.4)':
     dependencies:
-      '@duar-auth/js': 1.4.1
+      '@duar-auth/js': 1.5.1
       react: 19.2.4
 
   '@emnapi/runtime@1.11.3':
