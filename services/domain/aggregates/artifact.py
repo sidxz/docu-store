@@ -34,6 +34,7 @@ class Artifact(Aggregate):
         owner_id: UUID | None = None,
         source_class: SourceClass = SourceClass.INTERNAL,
         licence: str | None = None,
+        source_size_bytes: int | None = None,
     ) -> "Artifact":
         """Create a new Artifact aggregate (Factory Method)."""
         kwargs = {
@@ -46,6 +47,7 @@ class Artifact(Aggregate):
             "owner_id": owner_id,
             "source_class": source_class,
             "licence": licence,
+            "source_size_bytes": source_size_bytes,
         }
         if artifact_id is not None:
             # Same as Page.create: eventsourcing takes an explicit id via _create,
@@ -67,6 +69,8 @@ class Artifact(Aggregate):
         # they in fact are: documents someone uploaded here.
         source_class: SourceClass = SourceClass.INTERNAL
         licence: str | None = None
+        # Size of the uploaded file; what the workspace storage limit counts.
+        source_size_bytes: int | None = None
 
     @event(Created)  # Links this handler to the Created event class above
     def __init__(
@@ -80,6 +84,7 @@ class Artifact(Aggregate):
         owner_id: UUID | None = None,
         source_class: SourceClass = SourceClass.INTERNAL,
         licence: str | None = None,
+        source_size_bytes: int | None = None,
     ) -> None:
         # Strip whitespace BEFORE validation to catch whitespace-only strings
         if source_uri is not None:
@@ -107,6 +112,7 @@ class Artifact(Aggregate):
         self.owner_id = owner_id
         self.source_class = source_class
         self.licence = licence
+        self.source_size_bytes = source_size_bytes
         self._pages: list[UUID] = []
         self.title_mention: TitleMention | None = None
         self.summary_candidate: SummaryCandidate | None = None

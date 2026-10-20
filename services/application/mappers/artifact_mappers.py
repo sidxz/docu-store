@@ -30,6 +30,7 @@ class ArtifactMapper:
             summary_candidate=artifact.summary_candidate,
             workspace_id=artifact.workspace_id,
             owner_id=artifact.owner_id,
+            source_size_bytes=artifact.source_size_bytes,
             human_corrections={
                 k: HumanCorrectionInfo(**v) for k, v in artifact.human_corrections.items()
             },

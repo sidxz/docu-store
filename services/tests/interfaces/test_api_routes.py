@@ -73,6 +73,13 @@ class FakeArtifactReadModel(ArtifactReadModel):
     ) -> ArtifactResponse | None:
         return self._artifacts.get(artifact_id)
 
+    async def sum_source_bytes(self, workspace_id: UUID) -> int:
+        return sum(
+            a.source_size_bytes or 0
+            for a in self._artifacts.values()
+            if a.workspace_id == workspace_id
+        )
+
     async def find_artifact_id_by_source_uri(
         self,
         source_uri: str,

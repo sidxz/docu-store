@@ -81,3 +81,11 @@ async def test_upload_without_a_workspace_is_refused(saga_under_test):
     assert isinstance(result, Failure)
     assert result.failure().category == "validation"
     assert blob.puts == {}
+
+
+@pytest.mark.asyncio
+async def test_upload_records_the_uploaded_size(saga_under_test):
+    saga, _, _ = saga_under_test
+    payload = b"%PDF-1.4 fifteen"
+    art = (await saga.execute(io.BytesIO(payload), REQ, auth=AUTH)).unwrap()
+    assert art.source_size_bytes == len(payload)

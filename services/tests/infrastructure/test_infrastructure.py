@@ -146,6 +146,24 @@ class TestEventProjector:
         assert fields["tag_mentions"] == []
         assert fields["title_mention"] is None
 
+    def test_artifact_projector_created_stores_source_size(self) -> None:
+        materializer = FakeMaterializer()
+        projector = ArtifactProjector(materializer)
+        artifact = Artifact.create(
+            source_uri=None,
+            source_filename="paper.pdf",
+            artifact_type=ArtifactType.RESEARCH_ARTICLE,
+            mime_type=MimeType.PDF,
+            storage_location="/storage/paper.pdf",
+            source_size_bytes=123,
+        )
+        created_event = list(artifact.collect_events())[0]
+
+        projector.artifact_created(created_event, _tracking())
+
+        _, fields, _ = materializer.upsert_artifact_calls[0]
+        assert fields["source_size_bytes"] == 123
+
     def test_pages_added_uses_add_to_array(self) -> None:
         materializer = FakeMaterializer()
         projector = ArtifactProjector(materializer)

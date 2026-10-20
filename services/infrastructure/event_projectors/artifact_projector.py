@@ -29,6 +29,7 @@ class ArtifactProjector:
                 "storage_location": event.storage_location,
                 "workspace_id": str(event.workspace_id) if event.workspace_id else None,
                 "owner_id": str(event.owner_id) if event.owner_id else None,
+                "source_size_bytes": event.source_size_bytes,
                 "pages": [],
                 "title_mention": None,
                 "tag_mentions": [],

@@ -27,6 +27,10 @@ class ArtifactReadModel(ABC):
         """
 
     @abstractmethod
+    async def sum_source_bytes(self, workspace_id: UUID) -> int:
+        """Total uploaded bytes of the workspace's documents (its storage use)."""
+
+    @abstractmethod
     async def list_artifacts(
         self,
         workspace_id: UUID | None = None,

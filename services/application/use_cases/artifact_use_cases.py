@@ -55,12 +55,15 @@ class CreateArtifactUseCase:
         *,
         source_class: SourceClass = SourceClass.INTERNAL,
         licence: str | None = None,
+        source_size_bytes: int | None = None,
     ) -> Result[ArtifactResponse, AppError]:
         """``source_class``/``licence`` are set by the ingest path, not the caller.
 
         They come from the saga, which got them from the fetch that established
         them. Defaulting to INTERNAL means an artifact created any other way is
         labelled as this workspace's own, which is the safe reading.
+        ``source_size_bytes`` is the stored size the saga measured; it counts
+        toward the workspace's storage limit, so it is never taken from a request.
         """
         require_editor(auth)
 
@@ -75,6 +78,7 @@ class CreateArtifactUseCase:
             owner_id=auth.user_id if auth else None,
             source_class=source_class,
             licence=licence,
+            source_size_bytes=source_size_bytes,
         )
 
         self.artifact_repository.save(artifact)

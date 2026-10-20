@@ -70,6 +70,7 @@ class ArtifactUploadSaga:
             auth=auth,
             source_class=upload_req.source_class,
             licence=upload_req.licence,
+            source_size_bytes=blob_response.size_bytes,
         )
         if isinstance(artifact_result, Failure):
             return artifact_result
