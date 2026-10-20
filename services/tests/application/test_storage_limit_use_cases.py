@@ -187,3 +187,19 @@ async def test_new_workspace_reports_zero():
     assert summary.uploaded_bytes == 0
     assert summary.on_disk_bytes == 0
     assert summary.effective_limit_bytes is None
+
+
+@pytest.mark.asyncio
+async def test_on_disk_below_uploaded_is_measured_again():
+    # On disk includes the uploads themselves, so a cached figure smaller than
+    # uploaded_bytes is stale (measured before the upload) — not something to show.
+    blob = FakeBlobStore(0)
+    await GetWorkspaceStorageUseCase(FakeLimitStore(), FakeReadModel(0), blob, None).execute(WS)
+    blob._size = 500
+
+    summary = await GetWorkspaceStorageUseCase(
+        FakeLimitStore(), FakeReadModel(100), blob, None
+    ).execute(WS)
+
+    assert summary.on_disk_bytes == 500
+    assert len(blob.measured) == 2

@@ -116,15 +116,17 @@ class GetWorkspaceStorageUseCase:
         )
         return WorkspaceStorage(
             uploaded_bytes=uploaded,
-            on_disk_bytes=await self._on_disk(workspace_id),
+            on_disk_bytes=await self._on_disk(workspace_id, at_least=uploaded),
             limit_bytes=limit_bytes,
             cap_bytes=self._cap,
             effective_limit_bytes=effective_storage_limit(limit_bytes, self._cap),
         )
 
-    async def _on_disk(self, workspace_id: UUID) -> int | None:
+    async def _on_disk(self, workspace_id: UUID, *, at_least: int) -> int | None:
+        # Disk use includes the uploads, so a cached figure below ``at_least`` was
+        # measured before the latest upload: measure again rather than show it.
         cached = _ON_DISK_CACHE.get(workspace_id)
-        if cached and time.monotonic() - cached[0] < _ON_DISK_TTL_S:
+        if cached and time.monotonic() - cached[0] < _ON_DISK_TTL_S and cached[1] >= at_least:
             return cached[1]
         try:
             size = await asyncio.to_thread(self._blobs.total_size, workspace_prefix(workspace_id))
