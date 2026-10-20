@@ -8,14 +8,24 @@ import pytest
 from returns.result import Failure, Success
 
 from application.dtos.errors import AppError
+from application.dtos.usage_dtos import WorkspaceStorage
+from application.use_cases import storage_limit_use_cases
 from application.use_cases.storage_limit_use_cases import (
     MIB,
     CheckStorageQuotaUseCase,
+    GetWorkspaceStorageUseCase,
     effective_storage_limit,
 )
 from interfaces.api.routes.helpers import _map_app_error_to_http_exception
 
 WS = uuid4()
+
+
+@pytest.fixture(autouse=True)
+def _fresh_on_disk_cache():
+    storage_limit_use_cases._ON_DISK_CACHE.clear()
+    yield
+    storage_limit_use_cases._ON_DISK_CACHE.clear()
 
 
 class FakeLimitStore:
@@ -109,3 +119,71 @@ async def test_quota_fails_open_when_the_store_errors():
 
 def test_storage_full_maps_to_413():
     assert _map_app_error_to_http_exception(AppError("storage_full", "x")).status_code == 413
+
+
+class FakeBlobStore:
+    def __init__(self, size: int = 0, *, error: Exception | None = None) -> None:
+        self._size = size
+        self._error = error
+        self.measured: list[str] = []
+
+    def total_size(self, prefix: str) -> int:
+        self.measured.append(prefix)
+        if self._error:
+            raise self._error
+        return self._size
+
+
+def _summary(*, used=0, on_disk=0, limit=None, cap=None, blob=None):
+    blob = blob or FakeBlobStore(on_disk)
+    use_case = GetWorkspaceStorageUseCase(FakeLimitStore(limit), FakeReadModel(used), blob, cap)
+    return use_case, blob
+
+
+@pytest.mark.asyncio
+async def test_storage_summary_reports_both_numbers():
+    use_case, blob = _summary(used=10, on_disk=80, limit=50, cap=100)
+
+    summary = await use_case.execute(WS)
+
+    assert summary == WorkspaceStorage(
+        uploaded_bytes=10,
+        on_disk_bytes=80,
+        limit_bytes=50,
+        cap_bytes=100,
+        effective_limit_bytes=50,
+    )
+    assert blob.measured == [f"workspaces/{WS}"]
+
+
+@pytest.mark.asyncio
+async def test_on_disk_is_none_when_measurement_fails():
+    use_case, _ = _summary(used=10, blob=FakeBlobStore(error=OSError("bucket gone")))
+
+    summary = await use_case.execute(WS)
+
+    assert summary.on_disk_bytes is None
+    assert summary.uploaded_bytes == 10
+
+
+@pytest.mark.asyncio
+async def test_on_disk_is_cached_per_workspace():
+    use_case, blob = _summary(on_disk=80)
+    other = uuid4()
+
+    await use_case.execute(WS)
+    await use_case.execute(WS)
+    await use_case.execute(other)
+
+    assert blob.measured == [f"workspaces/{WS}", f"workspaces/{other}"]
+
+
+@pytest.mark.asyncio
+async def test_new_workspace_reports_zero():
+    use_case, _ = _summary()
+
+    summary = await use_case.execute(WS)
+
+    assert summary.uploaded_bytes == 0
+    assert summary.on_disk_bytes == 0
+    assert summary.effective_limit_bytes is None

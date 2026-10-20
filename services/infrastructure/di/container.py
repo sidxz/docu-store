@@ -102,6 +102,7 @@ from application.use_cases.smiles_embedding_use_cases import EmbedCompoundSmiles
 from application.use_cases.smiles_search_use_cases import SearchSimilarCompoundsUseCase
 from application.use_cases.storage_limit_use_cases import (
     CheckStorageQuotaUseCase,
+    GetWorkspaceStorageUseCase,
     cap_bytes_from_settings,
 )
 from application.use_cases.summarization_use_cases import (
@@ -784,6 +785,12 @@ def create_container() -> Container:
     container[CheckStorageQuotaUseCase] = lambda c: CheckStorageQuotaUseCase(
         limit_store=c[WorkspaceStorageLimitStore],
         artifact_read_model=c[ArtifactReadModel],
+        cap_bytes=cap_bytes_from_settings(settings),
+    )
+    container[GetWorkspaceStorageUseCase] = lambda c: GetWorkspaceStorageUseCase(
+        limit_store=c[WorkspaceStorageLimitStore],
+        artifact_read_model=c[ArtifactReadModel],
+        blob_store=c[BlobStore],
         cap_bytes=cap_bytes_from_settings(settings),
     )
 
