@@ -21,6 +21,7 @@ from application.use_cases.page_payload import (
     filter_names,
     table_scope_candidates,
 )
+from application.use_cases.storage_keys import parsed_document_key
 from infrastructure.text_chunkers.block_aware_chunker import (
     chunk_blocks,
     chunk_payload,
@@ -89,12 +90,14 @@ class BatchReEmbedArtifactPagesUseCase:
             parts.append(f"Summary: {page.summary_candidate.summary[:200]}")
         return " | ".join(parts) + "\n\n" if parts else ""
 
-    def _load_ir_blocks(self, artifact_id: UUID) -> dict[int, list[Block]] | None:
+    def _load_ir_blocks(
+        self, workspace_id: UUID | None, artifact_id: UUID
+    ) -> dict[int, list[Block]] | None:
         """Load the artifact IR once, grouped by page index. None if absent."""
         if self.blob_store is None:
             return None
-        key = f"artifacts/{artifact_id}/parsed/document.json"
         try:
+            key = parsed_document_key(workspace_id, artifact_id)
             if not self.blob_store.exists(key):
                 return None
             doc = ParsedDocument.model_validate_json(self.blob_store.get_bytes(key))
@@ -131,7 +134,7 @@ class BatchReEmbedArtifactPagesUseCase:
         total_chunks = 0
 
         # Load IR once for the whole artifact (not per page/batch)
-        ir_by_page = self._load_ir_blocks(artifact_id)
+        ir_by_page = self._load_ir_blocks(artifact.workspace_id, artifact_id)
 
         # Process pages in batches to bound memory
         for batch_start in range(0, len(artifact.pages), _PAGE_BATCH_SIZE):

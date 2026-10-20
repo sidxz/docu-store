@@ -48,7 +48,9 @@ class Artifact(Aggregate):
             "licence": licence,
         }
         if artifact_id is not None:
-            kwargs["originator_id"] = artifact_id
+            # Same as Page.create: eventsourcing takes an explicit id via _create,
+            # not as an __init__ kwarg.
+            return cls._create(cls.Created, id=artifact_id, **kwargs)
         return cls(**kwargs)
 
     class Created(Aggregate.Created):

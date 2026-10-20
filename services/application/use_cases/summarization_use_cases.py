@@ -14,6 +14,7 @@ from application.services.aggregate_commit import commit
 from application.services.llm_providers import served_by
 from application.services.llm_scope import workspace_scope
 from application.services.usage_recording import ingestion_counter, record_ingestion_usage
+from application.use_cases.storage_keys import page_image_key
 from domain.exceptions import AggregateNotFoundError, ConcurrencyError, LLMError, ValidationError
 from domain.value_objects.summary_candidate import SummaryCandidate
 
@@ -90,7 +91,7 @@ class SummarizePageUseCase:
             artifact_title = artifact.source_filename or "Unknown"
             page_index = page.index + 1  # 1-based for the prompt
 
-            image_key = f"artifacts/{artifact.id}/pages/{page.index}.png"
+            image_key = page_image_key(artifact.workspace_id, artifact.id, page.index)
             image_exists = self.blob_store.exists(image_key)
 
             async with workspace_scope(self.llm_scope, artifact):

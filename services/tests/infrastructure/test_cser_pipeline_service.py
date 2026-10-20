@@ -40,7 +40,11 @@ def _pair(struct_box, label_box, *, smiles="CCO", label_text="1a"):
 
 def test_render_key_is_deterministic_and_sits_beside_the_page_png():
     artifact_id = UUID("11111111-1111-1111-1111-111111111111")
-    assert cser_render_key(artifact_id, 4) == f"artifacts/{artifact_id}/pages/4_cser.png"
+    ws = UUID("22222222-2222-2222-2222-222222222222")
+    assert (
+        cser_render_key(ws, artifact_id, 4)
+        == f"workspaces/{ws}/artifacts/{artifact_id}/pages/4_cser.png"
+    )
 
 
 def test_extraction_persists_the_render_and_returns_its_pixel_boxes(monkeypatch):

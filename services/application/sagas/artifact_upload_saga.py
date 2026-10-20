@@ -40,9 +40,16 @@ class ArtifactUploadSaga:
         upload_req: UploadBlobRequest,
         auth: AuthContext | None = None,
     ) -> Result[ArtifactResponse, AppError]:
+        # Files live in their workspace's folder, so there is nowhere to put one
+        # without a workspace.
+        if auth is None or not auth.workspace_id:
+            return Failure(AppError("validation", "Uploads need a workspace."))
+
         # Step 1: Upload blob. Type detection and the blob write are blocking I/O,
         # so they run off the event loop.
-        blob_result = await asyncio.to_thread(self.upload_blob.execute, stream, upload_req)
+        blob_result = await asyncio.to_thread(
+            self.upload_blob.execute, stream, upload_req, auth.workspace_id
+        )
         if isinstance(blob_result, Failure):
             return blob_result
 

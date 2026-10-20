@@ -3,6 +3,7 @@ import io
 import struct
 import tracemalloc
 import zipfile
+from uuid import uuid4
 
 from returns.result import Failure, Success
 
@@ -16,6 +17,7 @@ DOCX_MAIN = "application/vnd.openxmlformats-officedocument.wordprocessingml.docu
 PPTX_MAIN = "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
 DOCM_MAIN = "application/vnd.ms-word.document.macroEnabled.main+xml"
 PDF = b"%PDF-1.7\n%\xe2\xe3\xcf\xd3\n1 0 obj\n"
+WS = uuid4()
 
 
 class FakeBlobStore:
@@ -45,7 +47,7 @@ def _upload(data, declared=MimeType.DOCX.value, filename="upload.bin"):
     req = UploadBlobRequest(
         artifact_type=ArtifactType.RESEARCH_ARTICLE, filename=filename, mime_type=declared
     )
-    return UploadBlobUseCase(blob_store=blob).execute(io.BytesIO(data), req), blob
+    return UploadBlobUseCase(blob_store=blob).execute(io.BytesIO(data), req, WS), blob
 
 
 def test_pdf_is_identified_by_content_not_declared_type():

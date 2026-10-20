@@ -3,16 +3,26 @@
 from __future__ import annotations
 
 import io
+from uuid import uuid4
 
 import pytest
-from returns.result import Success
+from returns.result import Failure, Success
 
 from application.dtos.blob_dtos import UploadBlobRequest
 from application.sagas.artifact_upload_saga import ArtifactUploadSaga
 from application.use_cases.artifact_use_cases import CreateArtifactUseCase
 from application.use_cases.blob_use_cases import UploadBlobUseCase
 from domain.value_objects.artifact_type import ArtifactType
+from tests.fakes.fake_auth import FakeAuth
 from tests.mocks import MockArtifactRepository
+
+WS = uuid4()
+AUTH = FakeAuth(role="editor", workspace_id=WS)
+REQ = UploadBlobRequest(
+    artifact_type=ArtifactType.RESEARCH_ARTICLE,
+    filename="x.pdf",
+    mime_type="application/pdf",
+)
 
 
 class FakeBlobStore:
@@ -42,19 +52,32 @@ def saga_under_test():
         create_artifact_use_case=CreateArtifactUseCase(artifact_repo),
         permission_registrar=registrar,
     )
-    return saga, artifact_repo
+    return saga, artifact_repo, blob
 
 
 @pytest.mark.asyncio
 async def test_saga_uploads_and_creates_artifact_without_parsing(saga_under_test):
-    saga, artifact_repo = saga_under_test
-    req = UploadBlobRequest(
-        artifact_type=ArtifactType.RESEARCH_ARTICLE,
-        filename="x.pdf",
-        mime_type="application/pdf",
-    )
-    result = await saga.execute(io.BytesIO(b"%PDF-1.4 ..."), req)
+    saga, artifact_repo, _ = saga_under_test
+    result = await saga.execute(io.BytesIO(b"%PDF-1.4 ..."), REQ, auth=AUTH)
     assert isinstance(result, Success)
     artifact = result.unwrap()
     assert artifact.pages in (None, [])  # no pages created synchronously
     assert artifact_repo.save_called  # artifact persisted to repo
+
+
+@pytest.mark.asyncio
+async def test_upload_keeps_the_source_in_the_artifacts_own_folder(saga_under_test):
+    saga, _, blob = saga_under_test
+    art = (await saga.execute(io.BytesIO(b"%PDF-1.4 x"), REQ, auth=AUTH)).unwrap()
+    (key,) = blob.puts
+    assert key == f"workspaces/{WS}/artifacts/{art.artifact_id}/source.pdf"
+    assert art.storage_location == key
+
+
+@pytest.mark.asyncio
+async def test_upload_without_a_workspace_is_refused(saga_under_test):
+    saga, _, blob = saga_under_test
+    result = await saga.execute(io.BytesIO(b"%PDF-1.4 x"), REQ, auth=None)
+    assert isinstance(result, Failure)
+    assert result.failure().category == "validation"
+    assert blob.puts == {}

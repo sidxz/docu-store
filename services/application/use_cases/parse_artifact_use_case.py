@@ -11,7 +11,12 @@ from returns.result import Failure, Result, Success
 
 from application.dtos.errors import AppError
 from application.dtos.page_dtos import CreatePageRequest
-from application.use_cases.storage_keys import render_pdf_key
+from application.use_cases.storage_keys import (
+    page_image_key,
+    page_thumb_key,
+    parsed_document_key,
+    render_pdf_key,
+)
 from domain.value_objects.mime_type import MimeType
 from domain.value_objects.text_mention import TextMention
 from infrastructure.file_services.segmentation import segment_document
@@ -77,22 +82,23 @@ class ParseArtifactUseCase:
         parsed = await asyncio.to_thread(parser.parse, render_key)
 
         # Persist page images (same keys chat already uses).
+        workspace_id = artifact.workspace_id
         for page in parsed.pages:
             self.blob_store.put_stream(
-                f"artifacts/{artifact_id}/pages/{page.index}.png",
+                page_image_key(workspace_id, artifact_id, page.index),
                 io.BytesIO(page.png),
                 mime_type="image/png",
             )
             if page.thumb:
                 self.blob_store.put_stream(
-                    f"artifacts/{artifact_id}/pages/{page.index}_thumb.jpg",
+                    page_thumb_key(workspace_id, artifact_id, page.index),
                     io.BytesIO(page.thumb),
                     mime_type="image/jpeg",
                 )
 
         # Persist the structure-only IR blob.
         self.blob_store.put_stream(
-            f"artifacts/{artifact_id}/parsed/document.json",
+            parsed_document_key(workspace_id, artifact_id),
             io.BytesIO(parsed.document.model_dump_json().encode()),
             mime_type="application/json",
         )

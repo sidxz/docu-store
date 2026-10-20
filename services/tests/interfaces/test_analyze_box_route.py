@@ -10,7 +10,6 @@ from application.dtos.page_dtos import PageResponse
 from application.ports.blob_store import BlobStore
 from application.ports.cser_service import CserService
 from application.ports.repositories.page_read_models import PageReadModel
-from application.use_cases.storage_keys import cser_render_key
 from interfaces.api.main import app
 from interfaces.dependencies import get_auth, get_container
 from tests.conftest import strip_authz_middleware
@@ -19,7 +18,8 @@ from tests.mocks import MockCserService
 
 PAGE_ID = UUID("44444444-4444-4444-4444-444444444444")
 ARTIFACT_ID = UUID("55555555-5555-5555-5555-555555555555")
-RENDER_KEY = cser_render_key(ARTIFACT_ID, 7)
+WS = UUID("66666666-6666-6666-6666-666666666666")
+RENDER_KEY = f"workspaces/{WS}/artifacts/{ARTIFACT_ID}/pages/7_cser.png"
 URL = f"/pages/{PAGE_ID}/compounds/analyze-box"
 
 
@@ -60,7 +60,7 @@ def _client(cser, *, has_render: bool = True, actions=None) -> TestClient:
         },
     )
     app.dependency_overrides[get_auth] = lambda: FakeAuth(
-        role="editor", user_id=uuid4(), workspace_id=uuid4(), actions=actions,
+        role="editor", user_id=uuid4(), workspace_id=WS, actions=actions,
     )
     return TestClient(app)
 

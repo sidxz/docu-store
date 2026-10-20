@@ -1,11 +1,12 @@
 from typing import BinaryIO
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from returns.result import Failure, Result, Success
 
 from application.dtos.blob_dtos import UploadBlobRequest, UploadBlobResponse
 from application.dtos.errors import AppError
 from application.ports.blob_store import BlobStore, StoredBlob
+from application.use_cases.storage_keys import source_key
 from application.use_cases.upload_validation import detect_document_type
 from domain.exceptions import ValidationError
 from domain.value_objects.mime_type import MimeType
@@ -28,13 +29,14 @@ class UploadBlobUseCase:
         self,
         stream: BinaryIO,
         cmd: UploadBlobRequest,
+        workspace_id: UUID,
     ) -> Result[UploadBlobResponse, AppError]:
         try:
             # The bytes decide the type; the client's Content-Type and filename don't.
             mime_type = detect_document_type(stream)
 
             artifact_id = uuid4()
-            storage_key = f"artifacts/{artifact_id}/source{_EXTENSIONS[mime_type]}"
+            storage_key = source_key(workspace_id, artifact_id, _EXTENSIONS[mime_type])
 
             stored: StoredBlob = self.blob_store.put_stream(
                 storage_key,

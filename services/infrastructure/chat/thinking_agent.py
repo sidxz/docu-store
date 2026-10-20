@@ -23,6 +23,7 @@ from uuid import uuid4
 import structlog
 
 from application.dtos.chat_dtos import AgentEvent
+from application.use_cases.storage_keys import page_image_key
 from infrastructure.chat.models import GroundingResult
 from infrastructure.chat.utils import extract_cited_indices
 from infrastructure.config import settings
@@ -282,7 +283,7 @@ class ThinkingAgent:
                         status="started",
                         description="Loading page images for visual analysis...",
                     )
-                    images_b64 = await self._load_page_images(citations)
+                    images_b64 = await self._load_page_images(citations, workspace_id)
                     yield AgentEvent(
                         type="step_completed",
                         step="image_loading",
@@ -567,6 +568,7 @@ class ThinkingAgent:
     async def _load_page_images(
         self,
         citations: list[SourceCitationDTO],
+        workspace_id: UUID,
     ) -> list[str]:
         """Load page PNG images for the most relevant cited pages."""
         assert self._blob_store is not None  # noqa: S101
@@ -595,7 +597,7 @@ class ThinkingAgent:
         blob_store = self._blob_store
 
         async def _load_one(c: SourceCitationDTO) -> str | None:
-            image_key = f"artifacts/{c.artifact_id}/pages/{c.page_index}.png"
+            image_key = page_image_key(workspace_id, c.artifact_id, c.page_index)
             try:
                 exists = await asyncio.to_thread(blob_store.exists, image_key)
                 if not exists:

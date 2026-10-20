@@ -26,6 +26,7 @@ from application.ports.text_chunker import TextChunker
 from application.ports.vector_store import VectorStore
 from application.services.llm_scope import UserLLMScope, workspace_scope
 from application.use_cases.page_payload import build_page_payload, table_scope_candidates
+from application.use_cases.storage_keys import parsed_document_key
 from domain.exceptions import AggregateNotFoundError, LLMError, LLMNotConfiguredError
 from domain.value_objects.embedding_metadata import EmbeddingMetadata, EmbeddingType
 from domain.value_objects.source_class import SourceClass
@@ -133,11 +134,13 @@ class GeneratePageEmbeddingUseCase:
         self.blob_store = blob_store
         self.llm_scope = llm_scope
 
-    def _load_page_blocks(self, artifact_id: UUID, page_index: int) -> list[Block] | None:
+    def _load_page_blocks(
+        self, workspace_id: UUID | None, artifact_id: UUID, page_index: int
+    ) -> list[Block] | None:
         if self.blob_store is None:
             return None
-        key = f"artifacts/{artifact_id}/parsed/document.json"
         try:
+            key = parsed_document_key(workspace_id, artifact_id)
             if not self.blob_store.exists(key):
                 return None
             doc = ParsedDocument.model_validate_json(self.blob_store.get_bytes(key))
@@ -198,7 +201,7 @@ class GeneratePageEmbeddingUseCase:
             # 4. Chunk — block-aware from the IR blob if available, else char fallback.
             from infrastructure.config import settings as _settings
 
-            page_blocks = self._load_page_blocks(page.artifact_id, page.index)
+            page_blocks = self._load_page_blocks(page.workspace_id, page.artifact_id, page.index)
             chunk_metadata: list[dict] | None = None
             if page_blocks:
                 block_chunks = [

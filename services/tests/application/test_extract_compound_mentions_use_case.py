@@ -65,10 +65,14 @@ class FakeRepo:
         self.saved += 1
 
 
+WS = UUID("77777777-7777-7777-7777-777777777777")
+
+
 @pytest.fixture
 def artifact():
     return SimpleNamespace(
         id=UUID("22222222-2222-2222-2222-222222222222"),
+        workspace_id=WS,
         mime_type=MimeType.PDF,
         storage_location="artifacts/src.pdf",
     )
@@ -113,7 +117,10 @@ async def test_coordinates_reach_the_compound_mention(artifact, monkeypatch):
     assert mention.structure_confidence == 0.91
     assert mention.label_confidence == 0.77
     # The render lands beside the docling page image, for page index 3.
-    assert cser.extract_calls[0]["render_key"] == f"artifacts/{artifact.id}/pages/3_cser.png"
+    assert (
+        cser.extract_calls[0]["render_key"]
+        == f"workspaces/{WS}/artifacts/{artifact.id}/pages/3_cser.png"
+    )
 
 
 @pytest.mark.asyncio
@@ -129,5 +136,8 @@ async def test_human_corrected_page_gets_its_render_but_no_inference(artifact, m
 
     assert isinstance(result, Success)
     assert cser.extract_calls == []  # the expensive part never ran
-    assert cser.render_calls[0]["render_key"] == f"artifacts/{artifact.id}/pages/3_cser.png"
+    assert (
+        cser.render_calls[0]["render_key"]
+        == f"workspaces/{WS}/artifacts/{artifact.id}/pages/3_cser.png"
+    )
     assert page.updated_with is None  # the human's mentions are untouched

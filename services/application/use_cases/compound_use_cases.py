@@ -85,7 +85,7 @@ class ExtractCompoundMentionsUseCase:
             page = self.page_repository.get_by_id(page_id)
             artifact = self.artifact_repository.get_by_id(page.artifact_id)
 
-            render_key = cser_render_key(page.artifact_id, page.index)
+            render_key = cser_render_key(artifact.workspace_id, page.artifact_id, page.index)
 
             # The aggregate silently drops machine updates on a human-corrected
             # page (page.py:118). Check here too, so we don't pay for inference

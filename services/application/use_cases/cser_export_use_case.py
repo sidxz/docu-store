@@ -68,7 +68,7 @@ def build_cser_export_zip(
         for page in pages:
             page_id = page["page_id"]
             artifact_id = page["artifact_id"]
-            render_key = cser_render_key(artifact_id, page["index"])
+            render_key = cser_render_key(workspace_id, artifact_id, page["index"])
 
             if not blob_store.exists(render_key):
                 # Extracted before renders were persisted. Re-running compound

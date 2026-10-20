@@ -12,7 +12,10 @@ from application.use_cases.page_use_cases import CreatePageUseCase, UpdateTextMe
 from application.use_cases.parse_artifact_use_case import ParseArtifactUseCase, page_id_for
 from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.mime_type import MimeType
+from tests.fakes.fake_auth import FakeAuth
 from tests.mocks import MockArtifactRepository, MockPageRepository
+
+WS = uuid4()
 
 
 def _fake_result():
@@ -64,7 +67,7 @@ async def _make_artifact(artifact_repo, mime=MimeType.PDF, storage="artifacts/x/
         mime_type=mime,
         storage_location=storage,
     )
-    return (await uc.execute(req)).unwrap().artifact_id
+    return (await uc.execute(req, auth=FakeAuth(workspace_id=WS))).unwrap().artifact_id
 
 
 def _build_uc(parsers, blob, page_repo, artifact_repo, converter=None):
@@ -90,8 +93,8 @@ async def test_parse_creates_page_stores_image_and_ir():
 
     assert isinstance(result, Success)
     assert result.unwrap() == [page_id_for(artifact_id, 0)]
-    assert f"artifacts/{artifact_id}/pages/0.png" in blob.puts
-    assert f"artifacts/{artifact_id}/parsed/document.json" in blob.puts
+    assert f"workspaces/{WS}/artifacts/{artifact_id}/pages/0.png" in blob.puts
+    assert f"workspaces/{WS}/artifacts/{artifact_id}/parsed/document.json" in blob.puts
 
 
 @pytest.mark.asyncio
@@ -104,7 +107,7 @@ async def test_parse_pptx_converts_source_then_parses_render_key():
     result = await uc.execute(artifact_id)
 
     assert isinstance(result, Success)
-    render_key = f"artifacts/{artifact_id}/derived/render.pdf"
+    render_key = f"workspaces/{WS}/artifacts/{artifact_id}/derived/render.pdf"
     assert converter.calls == [("artifacts/x/source.pptx", render_key)]
     assert parser.parsed_key == render_key
 
