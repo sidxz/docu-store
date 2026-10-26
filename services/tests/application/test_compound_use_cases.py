@@ -22,6 +22,9 @@ from tests.mocks import (
 )
 
 
+WS = uuid4()
+
+
 def _make_artifact(mime=MimeType.PDF, storage="/storage/paper.pdf") -> Artifact:
     return Artifact.create(
         source_uri=None,
@@ -29,11 +32,12 @@ def _make_artifact(mime=MimeType.PDF, storage="/storage/paper.pdf") -> Artifact:
         artifact_type=ArtifactType.RESEARCH_ARTICLE,
         mime_type=mime,
         storage_location=storage,
+        workspace_id=WS,
     )
 
 
 def _make_page(artifact_id) -> Page:
-    return Page.create(name="Page 1", artifact_id=artifact_id, index=0)
+    return Page.create(name="Page 1", artifact_id=artifact_id, index=0, workspace_id=WS)
 
 
 def _make_use_case(
@@ -98,7 +102,7 @@ class TestExtractCompoundMentionsUseCase:
         )
         await use_case.execute(page.id)
 
-        assert cser.extract_calls[0]["storage_key"] == f"artifacts/{artifact.id}/derived/render.pdf"
+        assert cser.extract_calls[0]["storage_key"] == f"workspaces/{WS}/artifacts/{artifact.id}/derived/render.pdf"
 
     @pytest.mark.asyncio
     async def test_skips_results_without_smiles(self) -> None:

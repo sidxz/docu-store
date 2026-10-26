@@ -73,6 +73,13 @@ class FakeArtifactReadModel(ArtifactReadModel):
     ) -> ArtifactResponse | None:
         return self._artifacts.get(artifact_id)
 
+    async def sum_source_bytes(self, workspace_id: UUID) -> int:
+        return sum(
+            a.source_size_bytes or 0
+            for a in self._artifacts.values()
+            if a.workspace_id == workspace_id
+        )
+
     async def find_artifact_id_by_source_uri(
         self,
         source_uri: str,
@@ -269,6 +276,7 @@ class TestArtifactRoutes:
 
     def test_stream_pdf_serves_derived_render_for_pptx(self, make_client) -> None:
         artifact_id = uuid4()
+        ws = uuid4()
         read_model = FakeArtifactReadModel(
             {
                 artifact_id: ArtifactResponse(
@@ -276,8 +284,8 @@ class TestArtifactRoutes:
                     source_filename="deck.pptx",
                     artifact_type=ArtifactType.RESEARCH_ARTICLE,
                     mime_type=MimeType.PPTX,
-                    storage_location=f"artifacts/{artifact_id}/source.pptx",
-                    workspace_id=None,
+                    storage_location=f"workspaces/{ws}/artifacts/{artifact_id}/source.pptx",
+                    workspace_id=ws,
                 ),
             },
         )
@@ -296,12 +304,15 @@ class TestArtifactRoutes:
                 return b"%PDF-1.4 fake"
 
         blob = RecordingBlob()
-        client = make_client({ArtifactReadModel: read_model, BlobStore: blob})
+        client = make_client(
+            {ArtifactReadModel: read_model, BlobStore: blob},
+            auth=FakeAuth(role="editor", workspace_id=ws),
+        )
 
         response = client.get(f"/artifacts/{artifact_id}/pdf")
 
         assert response.status_code == 200
-        derived = f"artifacts/{artifact_id}/derived/render.pdf"
+        derived = f"workspaces/{ws}/artifacts/{artifact_id}/derived/render.pdf"
         # Serves the converted PDF, never the raw .pptx.
         assert blob.get_keys == [derived]
         assert all("source.pptx" not in k for k in blob.exists_keys)

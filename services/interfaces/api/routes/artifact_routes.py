@@ -37,7 +37,12 @@ from application.use_cases.artifact_use_cases import (
 )
 from application.use_cases.correct_metadata_use_cases import CorrectArtifactMetadataUseCase
 from application.use_cases.processing_artifacts_use_case import ListProcessingArtifactsUseCase
-from application.use_cases.storage_keys import cser_render_key, render_pdf_key
+from application.use_cases.storage_keys import (
+    cser_render_key,
+    page_image_key,
+    page_thumb_key,
+    render_pdf_key,
+)
 from domain.value_objects.artifact_type import ArtifactType
 from domain.value_objects.summary_candidate import SummaryCandidate
 from interfaces.api.middleware import handle_use_case_errors
@@ -385,6 +390,7 @@ async def stream_artifact_pdf(
 
 def resolve_page_image(
     blob_store: BlobStore,
+    workspace_id: UUID,
     artifact_id: UUID,
     page_index: int,
     size: str | None,
@@ -397,7 +403,7 @@ def resolve_page_image(
     handles by offering to re-run extraction.
     """
     if size == "cser":
-        cser_key = cser_render_key(artifact_id, page_index)
+        cser_key = cser_render_key(workspace_id, artifact_id, page_index)
         if not blob_store.exists(cser_key):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -406,12 +412,12 @@ def resolve_page_image(
         return blob_store.get_bytes(cser_key), "image/png"
 
     if size == "thumb":
-        thumb_key = f"artifacts/{artifact_id}/pages/{page_index}_thumb.jpg"
+        thumb_key = page_thumb_key(workspace_id, artifact_id, page_index)
         if blob_store.exists(thumb_key):
             return blob_store.get_bytes(thumb_key), "image/jpeg"
         # Fall through to the full PNG if no thumbnail was generated.
 
-    image_key = f"artifacts/{artifact_id}/pages/{page_index}.png"
+    image_key = page_image_key(workspace_id, artifact_id, page_index)
 
     if not blob_store.exists(image_key):
         raise HTTPException(
@@ -448,7 +454,10 @@ async def stream_page_image(
     await require_workspace_artifact(artifact_id, auth, container)
     await require_artifact_permission(artifact_id, auth, "view")
     blob_store = container[BlobStore]
-    content, media_type = resolve_page_image(blob_store, artifact_id, page_index, size)
+    # Keys come from the caller's workspace, so a lookup can only land in its own folder.
+    content, media_type = resolve_page_image(
+        blob_store, auth.workspace_id, artifact_id, page_index, size
+    )
     return StreamingResponse(BytesIO(content), media_type=media_type)
 
 

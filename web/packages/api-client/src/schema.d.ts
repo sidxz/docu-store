@@ -1919,6 +1919,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspace/storage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Workspace Storage
+         * @description Uploaded bytes, disk use and the storage limits (admin only).
+         */
+        get: operations["get_workspace_storage_workspace_storage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/storage/limit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Workspace Storage Limit
+         * @description Set the workspace's storage limit in bytes (admin only); never above the cap.
+         */
+        put: operations["set_workspace_storage_limit_workspace_storage_limit_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspace/chat-settings": {
         parameters: {
             query?: never;
@@ -2371,6 +2411,11 @@ export interface components {
              * @description User who created this artifact
              */
             owner_id?: string | null;
+            /**
+             * Source Size Bytes
+             * @description Size of the uploaded file in bytes
+             */
+            source_size_bytes?: number | null;
             /**
              * Pages
              * @description List of page IDs associated with the artifact
@@ -4456,6 +4501,11 @@ export interface components {
             /** Max Ms */
             max_ms: number;
         };
+        /** StorageLimitBody */
+        StorageLimitBody: {
+            /** Limit Bytes */
+            limit_bytes: number | null;
+        };
         /**
          * SummaryCandidate
          * @description Represents a summary candidate extracted from a page using NLP.
@@ -5241,6 +5291,25 @@ export interface components {
             model: string;
             /** Reembed Workflows */
             reembed_workflows: number;
+        };
+        /**
+         * WorkspaceStorage
+         * @description What a workspace stores: uploaded bytes (the limit counts these) and disk use.
+         *
+         *     ``on_disk_bytes`` adds everything generated from the uploads (page images,
+         *     renders, parsed text); null when it could not be measured.
+         */
+        WorkspaceStorage: {
+            /** Uploaded Bytes */
+            uploaded_bytes: number;
+            /** On Disk Bytes */
+            on_disk_bytes: number | null;
+            /** Limit Bytes */
+            limit_bytes: number | null;
+            /** Cap Bytes */
+            cap_bytes: number | null;
+            /** Effective Limit Bytes */
+            effective_limit_bytes: number | null;
         };
         /** WorkspaceTokenLimitsResponse */
         WorkspaceTokenLimitsResponse: {
@@ -8173,6 +8242,57 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_workspace_storage_workspace_storage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceStorage"];
+                };
+            };
+        };
+    };
+    set_workspace_storage_limit_workspace_storage_limit_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageLimitBody"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             204: {

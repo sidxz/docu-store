@@ -42,6 +42,7 @@ class ArtifactResponse(BaseModel):
     storage_location: str = Field(..., description="Location where the artifact is stored")
     workspace_id: UUID | None = Field(None, description="Workspace this artifact belongs to")
     owner_id: UUID | None = Field(None, description="User who created this artifact")
+    source_size_bytes: int | None = Field(None, description="Size of the uploaded file in bytes")
     pages: list[UUID] | list[PageResponse] | None = Field(
         default_factory=list,
         description="List of page IDs associated with the artifact",

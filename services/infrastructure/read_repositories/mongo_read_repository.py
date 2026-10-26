@@ -137,6 +137,16 @@ class MongoReadRepository(
         )
         return [doc async for doc in self.pages.find(query)]
 
+    async def sum_source_bytes(self, workspace_id: UUID) -> int:
+        # Deleted documents have no read model, so this is live usage. $sum skips
+        # rows without the field.
+        pipeline = [
+            {"$match": {"workspace_id": str(workspace_id)}},
+            {"$group": {"_id": None, "total": {"$sum": "$source_size_bytes"}}},
+        ]
+        result = await self.artifacts.aggregate(pipeline).to_list(1)
+        return result[0]["total"] if result else 0
+
     async def get_artifact_by_id(
         self,
         artifact_id: UUID,

@@ -24,6 +24,7 @@ const TABS: SettingsTab[] = [
 
 const ADMIN_TABS: SettingsTab[] = [
   { label: "Token Settings", segment: "tokens" },
+  { label: "Storage", segment: "storage" },
   { label: "Stats", segment: "stats" },
   { label: "Status", segment: "status" },
 ];

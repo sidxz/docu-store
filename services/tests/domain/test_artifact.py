@@ -28,6 +28,43 @@ class TestArtifactCreation:
         assert sample_artifact.pages == ()
         assert sample_artifact.is_deleted is False
 
+    def test_created_event_carries_source_size(self) -> None:
+        artifact = Artifact.create(
+            source_uri=None,
+            source_filename="file.pdf",
+            artifact_type=ArtifactType.RESEARCH_ARTICLE,
+            mime_type=MimeType.PDF,
+            storage_location="k",
+            source_size_bytes=123,
+        )
+        assert artifact.source_size_bytes == 123
+        (created,) = artifact.collect_events()
+        assert created.source_size_bytes == 123
+
+    def test_artifact_created_without_size_has_none(self) -> None:
+        artifact = Artifact.create(
+            source_uri=None,
+            source_filename="file.pdf",
+            artifact_type=ArtifactType.RESEARCH_ARTICLE,
+            mime_type=MimeType.PDF,
+            storage_location="k",
+        )
+        assert artifact.source_size_bytes is None
+
+    def test_create_with_an_explicit_id_uses_it(self) -> None:
+        # The upload stores the source under an id before the artifact exists;
+        # the artifact must take that id so all its files share one folder.
+        aid = uuid4()
+        artifact = Artifact.create(
+            source_uri=None,
+            source_filename="file.pdf",
+            artifact_type=ArtifactType.RESEARCH_ARTICLE,
+            mime_type=MimeType.PDF,
+            storage_location="k",
+            artifact_id=aid,
+        )
+        assert artifact.id == aid
+
     def test_artifact_initialization_validates_source_uri(self) -> None:
         """Test that source_uri can be None (optional field)."""
         artifact = Artifact.create(

@@ -81,3 +81,22 @@ class FsspecBlobStore(BlobStore):
     def delete(self, key: str) -> None:
         fs, path = fsspec.core.url_to_fs(self._url(key), **self.storage_options)
         fs.rm(path)
+
+    def delete_prefix(self, prefix: str) -> None:
+        # "" resolves to the store root: one stray call would wipe every workspace.
+        if not prefix.strip("/"):
+            msg = "Refusing to delete an empty blob prefix"
+            raise ValueError(msg)
+        fs, path = fsspec.core.url_to_fs(self._url(prefix), **self.storage_options)
+        if fs.exists(path):  # local rm raises on a missing path
+            fs.rm(path, recursive=True)
+
+    def total_size(self, prefix: str) -> int:
+        fs, path = fsspec.core.url_to_fs(self._url(prefix), **self.storage_options)
+        try:
+            # One listing, not fs.du: s3fs caches listings for the life of the
+            # process and exists() would then miss files written afterwards;
+            # adlfs du sends one HEAD per file.
+            return sum(info.get("size") or 0 for info in fs.find(path, detail=True).values())
+        finally:
+            fs.invalidate_cache()

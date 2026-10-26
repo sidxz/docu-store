@@ -16,9 +16,12 @@ from tests.mocks import (
 )
 
 
+WS = uuid4()
+
+
 class _IRBlobStore:
     def __init__(self, artifact_id, blocks):
-        self._key = f"artifacts/{artifact_id}/parsed/document.json"
+        self._key = f"workspaces/{WS}/artifacts/{artifact_id}/parsed/document.json"
         self._doc = ParsedDocument(source_mime="application/pdf", blocks=blocks)
 
     def exists(self, key): return key == self._key
@@ -36,6 +39,7 @@ async def test_batch_reembed_block_aware_when_ir_present():
         artifact_type=ArtifactType.RESEARCH_ARTICLE,
         mime_type=MimeType.PDF,
         storage_location="artifacts/x/source.pdf",
+        workspace_id=WS,
     )
     page = Page.create(name="P1", artifact_id=artifact.id, index=0)
     page.update_text_mention(TextMention(text="fallback text"))
@@ -68,6 +72,7 @@ async def test_batch_reembed_scopes_table_tags():
         artifact_type=ArtifactType.RESEARCH_ARTICLE,
         mime_type=MimeType.PDF,
         storage_location="artifacts/x/source.pdf",
+        workspace_id=WS,
     )
     page = Page.create(name="P1", artifact_id=artifact.id, index=0)
     page.update_text_mention(TextMention(text="Rho in the intro; PptT assay table below."))
@@ -109,6 +114,7 @@ async def test_batch_reembed_table_keeps_the_compound_under_every_name():
         artifact_type=ArtifactType.RESEARCH_ARTICLE,
         mime_type=MimeType.PDF,
         storage_location="artifacts/x/source.pdf",
+        workspace_id=WS,
     )
     page = Page.create(name="P1", artifact_id=artifact.id, index=0)
     page.update_text_mention(TextMention(text="8d is CHEMBL6133834; InhA assay below."))

@@ -24,6 +24,7 @@ from tests.mocks import (
 )
 
 # The threshold in the use case (100 chars)
+WS = uuid4()
 _SHORT_TEXT = "Short."
 _LONG_TEXT = "A" * 101
 
@@ -35,11 +36,12 @@ def _make_artifact() -> Artifact:
         artifact_type=ArtifactType.RESEARCH_ARTICLE,
         mime_type=MimeType.PDF,
         storage_location="/storage/slides.pdf",
+        workspace_id=WS,
     )
 
 
 def _make_page(artifact_id, text: str | None = None) -> Page:
-    page = Page.create(name="Slide 1", artifact_id=artifact_id, index=0)
+    page = Page.create(name="Slide 1", artifact_id=artifact_id, index=0, workspace_id=WS)
     if text:
         page.update_text_mention(TextMention(text=text))
     return page

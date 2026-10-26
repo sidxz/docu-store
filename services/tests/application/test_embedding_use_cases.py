@@ -34,8 +34,11 @@ from tests.mocks import (
 )
 
 
+WS = uuid4()
+
+
 def _page_with_text(text: str) -> Page:
-    page = Page.create(name="Test Page", artifact_id=uuid4(), index=0)
+    page = Page.create(name="Test Page", artifact_id=uuid4(), index=0, workspace_id=WS)
     page.update_text_mention(TextMention(text=text))
     return page
 
@@ -316,7 +319,7 @@ class _IRBlobStore:
     """Blob store exposing only one IR doc for a given artifact."""
 
     def __init__(self, artifact_id, blocks):
-        self._key = f"artifacts/{artifact_id}/parsed/document.json"
+        self._key = f"workspaces/{WS}/artifacts/{artifact_id}/parsed/document.json"
         self._doc = ParsedDocument(source_mime="application/pdf", blocks=blocks)
 
     def exists(self, key):

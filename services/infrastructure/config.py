@@ -804,6 +804,15 @@ class Settings(BaseSettings):
         validation_alias="MAX_UPLOAD_MB",
         description="Largest accepted request body (uploads included), in MiB.",
     )
+    max_workspace_storage_mb: int | None = Field(
+        default=None,
+        ge=0,
+        validation_alias="MAX_WORKSPACE_STORAGE_MB",
+        description=(
+            "Cap on each workspace's uploaded bytes, in MiB; workspace admins can "
+            "set a lower limit, never a higher one. Unset = no cap."
+        ),
+    )
 
     # Prompt management
     prompt_repository_type: Literal["langfuse", "yaml"] = Field(

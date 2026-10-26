@@ -74,3 +74,17 @@ class UserTokenUsageResponse(TokenUsageDTO):
     """GET /chat/usage: requested-window totals + current-month block."""
 
     month: MonthUsage
+
+
+class WorkspaceStorage(BaseModel):
+    """What a workspace stores: uploaded bytes (the limit counts these) and disk use.
+
+    ``on_disk_bytes`` adds everything generated from the uploads (page images,
+    renders, parsed text); null when it could not be measured.
+    """
+
+    uploaded_bytes: int
+    on_disk_bytes: int | None
+    limit_bytes: int | None
+    cap_bytes: int | None
+    effective_limit_bytes: int | None

@@ -17,7 +17,7 @@ from fastapi.responses import StreamingResponse
 from lagom import Container
 from pydantic import BaseModel, Field
 
-from application.dtos.usage_dtos import TokenLimitEntry
+from application.dtos.usage_dtos import TokenLimitEntry, WorkspaceStorage
 from application.dtos.user_dtos import (
     LLMLaneTestResult,
     LLMProviderEntry,
@@ -33,8 +33,14 @@ from application.ports.repositories.page_read_models import PageReadModel
 from application.ports.token_limit_store import TokenLimitStore
 from application.ports.user_llm_config import UserLLMConfig, UserLLMConfigStore
 from application.ports.workspace_chat_settings import WorkspaceChatSettingsStore
+from application.ports.workspace_storage_limit_store import WorkspaceStorageLimitStore
 from application.services.llm_providers import PRESETS, ProviderPreset
 from application.use_cases.cser_export_use_case import build_cser_export_zip
+from application.use_cases.storage_limit_use_cases import (
+    MIB,
+    GetWorkspaceStorageUseCase,
+    cap_bytes_from_settings,
+)
 from application.workflow_use_cases.workspace_reembed_use_case import (
     ReEmbedProgress,
     WorkspaceReEmbedUseCase,
@@ -141,6 +147,44 @@ async def delete_user_token_limit(
     """Remove a per-user override so the user falls back to the workspace default."""
     _require_admin(auth)
     await container[TokenLimitStore].delete(auth.workspace_id, user_id)
+
+
+# ── Storage ─────────────────────────────────────────────────────────────────
+
+
+class StorageLimitBody(BaseModel):
+    # Required (no default), as with TokenLimitBody: PUT {} 422s instead of
+    # silently clearing the limit. null = only the deployment cap applies.
+    limit_bytes: int | None = Field(ge=0, le=2**63 - 1)
+
+
+@router.get("/storage", status_code=status.HTTP_200_OK)
+async def get_workspace_storage(
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> WorkspaceStorage:
+    """Uploaded bytes, disk use and the storage limits (admin only)."""
+    _require_admin(auth)
+    return await container[GetWorkspaceStorageUseCase].execute(auth.workspace_id)
+
+
+@router.put("/storage/limit", status_code=status.HTTP_204_NO_CONTENT)
+async def set_workspace_storage_limit(
+    body: StorageLimitBody,
+    container: Annotated[Container, Depends(get_container)],
+    auth: Annotated[RequestAuth, Depends(get_auth)],
+) -> None:
+    """Set the workspace's storage limit in bytes (admin only); never above the cap."""
+    _require_admin(auth)
+    cap = cap_bytes_from_settings(container[Settings])
+    if cap is not None and body.limit_bytes is not None and body.limit_bytes > cap:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"The limit can't be above this deployment's cap of {cap // MIB} MB.",
+        )
+    await container[WorkspaceStorageLimitStore].set_limit(
+        auth.workspace_id, body.limit_bytes, updated_by=auth.user_id
+    )
 
 
 # ── CSER training export ────────────────────────────────────────────────────

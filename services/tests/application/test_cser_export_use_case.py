@@ -11,10 +11,13 @@ from uuid import UUID, uuid4
 from PIL import Image
 
 from application.use_cases.cser_export_use_case import build_cser_export_zip, yolo_line
-from application.use_cases.storage_keys import cser_render_key
 
 WORKSPACE = UUID("44444444-4444-4444-4444-444444444444")
 EXPORTED_AT = datetime(2026, 8, 27, 12, 0, tzinfo=UTC)
+
+
+def _render_key(artifact_id, index):
+    return f"workspaces/{WORKSPACE}/artifacts/{artifact_id}/pages/{index}_cser.png"
 
 
 def _png(width: int, height: int) -> bytes:
@@ -73,7 +76,7 @@ def test_export_layout_and_verbatim_coordinates():
         },
     ]
     image_bytes = _png(1000, 2000)
-    blob = FakeBlobStore({cser_render_key(artifact_id, 3): image_bytes})
+    blob = FakeBlobStore({_render_key(artifact_id, 3): image_bytes})
 
     raw = build_cser_export_zip(
         [_page(page_id, artifact_id, 3, mentions)], blob, WORKSPACE, EXPORTED_AT
@@ -113,7 +116,7 @@ def test_export_layout_and_verbatim_coordinates():
 
 def test_a_reviewed_empty_page_exports_an_empty_ground_truth_and_no_label_file():
     page_id, artifact_id = uuid4(), uuid4()
-    blob = FakeBlobStore({cser_render_key(artifact_id, 0): _png(100, 100)})
+    blob = FakeBlobStore({_render_key(artifact_id, 0): _png(100, 100)})
 
     raw = build_cser_export_zip([_page(page_id, artifact_id, 0, [])], blob, WORKSPACE, EXPORTED_AT)
 
@@ -145,7 +148,7 @@ def test_mentions_without_coordinates_are_left_out_of_ground_truth():
         {"smiles": "CCO", "extracted_id": "1a", "structure_bbox": None, "label_bbox": None},
         {"smiles": "CCC", "extracted_id": "2b", "structure_bbox": [1, 2, 3, 4], "label_bbox": None},
     ]
-    blob = FakeBlobStore({cser_render_key(artifact_id, 0): _png(100, 100)})
+    blob = FakeBlobStore({_render_key(artifact_id, 0): _png(100, 100)})
 
     raw = build_cser_export_zip([_page(page_id, artifact_id, 0, mentions)], blob, WORKSPACE, EXPORTED_AT)
 
@@ -159,7 +162,7 @@ def test_source_filename_comes_from_the_artifact_filenames_map_not_the_page():
     artifact document and is passed in as a lookup map keyed by artifact_id.
     """
     page_id, artifact_id = uuid4(), uuid4()
-    blob = FakeBlobStore({cser_render_key(artifact_id, 0): _png(10, 10)})
+    blob = FakeBlobStore({_render_key(artifact_id, 0): _png(10, 10)})
 
     raw = build_cser_export_zip(
         [_page(page_id, artifact_id, 0, [])],
@@ -176,7 +179,7 @@ def test_source_filename_comes_from_the_artifact_filenames_map_not_the_page():
 
 def test_source_filename_is_none_when_the_map_has_no_entry():
     page_id, artifact_id = uuid4(), uuid4()
-    blob = FakeBlobStore({cser_render_key(artifact_id, 0): _png(10, 10)})
+    blob = FakeBlobStore({_render_key(artifact_id, 0): _png(10, 10)})
 
     raw = build_cser_export_zip([_page(page_id, artifact_id, 0, [])], blob, WORKSPACE, EXPORTED_AT)
 
@@ -191,7 +194,7 @@ def test_a_page_whose_mentions_all_lack_coordinates_is_skipped_not_exported_as_e
     # not make that claim — it would train the detector to miss real structures.
     page_id, artifact_id = uuid4(), uuid4()
     mentions = [{"smiles": "CCO", "extracted_id": "1a", "structure_bbox": None, "label_bbox": None}]
-    blob = FakeBlobStore({cser_render_key(artifact_id, 0): _png(100, 100)})
+    blob = FakeBlobStore({_render_key(artifact_id, 0): _png(100, 100)})
 
     raw = build_cser_export_zip([_page(page_id, artifact_id, 0, mentions)], blob, WORKSPACE, EXPORTED_AT)
 

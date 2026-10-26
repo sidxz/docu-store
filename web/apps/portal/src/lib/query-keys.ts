@@ -117,6 +117,7 @@ export const queryKeys = {
     all: ["workspace"] as const,
     members: () => [...queryKeys.workspace.all, "members"] as const,
     tokenLimits: () => [...queryKeys.workspace.all, "token-limits"] as const,
+    storage: () => [...queryKeys.workspace.all, "storage"] as const,
     embedding: () => [...queryKeys.workspace.all, "embedding"] as const,
     llmProvider: () => [...queryKeys.workspace.all, "llm-provider"] as const,
     chatSettings: () => [...queryKeys.workspace.all, "chat-settings"] as const,

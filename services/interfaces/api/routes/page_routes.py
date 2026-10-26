@@ -215,7 +215,7 @@ async def analyze_compound_box(
     page = await require_workspace_page(page_id, auth, container)
     await require_page_permission(page, auth, "edit")
 
-    render_key = cser_render_key(page.artifact_id, page.index)
+    render_key = cser_render_key(auth.workspace_id, page.artifact_id, page.index)
     blob_store = container[BlobStore]
     if not await asyncio.to_thread(blob_store.exists, render_key):
         raise HTTPException(
