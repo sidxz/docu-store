@@ -19,4 +19,4 @@ Changes to the API, workers and web portal. The CLI keeps its own log in [cli/CH
 - Deleting a document removes it from document lists.
 
 ### Security
-- Dependencies updated past their published advisories. Services: Pillow 13.0.0 (with docling 2.142.1, the first release that supports it), pypdf 6.21.2, certifi 2026.10.19, filelock 4.2.1, setuptools 84.1.0 and OpenTelemetry 1.45.1. Web: Next.js 16.4.3, zod 4.6.7 and fast-uri 3.1.9.
+- Dependencies updated past their published advisories. Services: Pillow 13.0.0 (with docling 2.142.1, the first release that supports it), pypdf 7.1.0, dnspython 2.9.2, mail-parser 4.11.0, pyasn1 0.6.5, soupsieve 4.1.1, temporalio 1.35.0, certifi 2026.10.19, filelock 4.2.1, setuptools 84.1.0 and OpenTelemetry 1.45.2. Web: Next.js 16.4.6, zod 4.6.7 and fast-uri 3.1.9.
