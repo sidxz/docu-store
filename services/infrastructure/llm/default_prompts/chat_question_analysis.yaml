@@ -31,3 +31,4 @@ template: |
   - "follow_up": references prior conversation context
   - For "reformulated_query": combine conversation context with the current question into a standalone search query
   - For "search_strategy": use "hierarchical" for factual/comparative, "summary" for exploratory, "compound" if SMILES detected, "hybrid" for complex multi-faceted queries
+  - Write every text field in the same language as the current question. Do not mix in words from another language.

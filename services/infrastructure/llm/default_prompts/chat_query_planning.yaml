@@ -45,3 +45,4 @@ template: |
   - "search_strategy": use "hierarchical" for factual/comparative, "summary" for exploratory, "compound" if SMILES detected, "hybrid" for complex multi-faceted queries
   - "hyde_hypothesis": {enable_hyde} — If enabled AND query_type is "exploratory", write a short (1-2 sentence) hypothetical answer that a good document might contain. This helps find semantically similar documents. Set to null for non-exploratory queries.
   - "confidence": 0.0-1.0 estimate of how well-defined the query is. High (0.8-1.0) for specific factual queries. Medium (0.5-0.8) for moderately ambiguous queries. Low (<0.5) for very vague or under-specified queries.
+  - Write every text field in the same language as the current question. Do not mix in words from another language.
