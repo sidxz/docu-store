@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -34,8 +36,10 @@ class _StubClient:
 
     def __init__(self) -> None:
         self.kwargs: dict = {}
+        self.delay = 0.0  # how long Langfuse takes to answer
 
     def get_prompt(self, **kwargs):
+        time.sleep(self.delay)
         self.kwargs = kwargs
         return SimpleNamespace(compile=lambda **_: "ok", version=1)
 
@@ -63,6 +67,34 @@ async def test_render_without_bundled_prompt_passes_no_fallback(repo_and_stub):
     await repo.render_prompt("not_a_bundled_prompt")
 
     assert stub.kwargs["fallback"] is None
+
+
+async def test_render_does_not_retry_the_fetch_when_it_can_fall_back(repo_and_stub):
+    repo, stub = repo_and_stub
+
+    await repo.render_prompt("chat_query_planning", question="q")
+    assert stub.kwargs["max_retries"] == 0
+
+    await repo.render_prompt("not_a_bundled_prompt")
+    assert "max_retries" not in stub.kwargs  # nothing to fall back to: keep the SDK's retries
+
+
+async def test_render_leaves_the_event_loop_free_while_langfuse_is_slow(repo_and_stub):
+    repo, stub = repo_and_stub
+    stub.delay = 0.2
+    ticks = 0
+
+    async def tick() -> None:
+        nonlocal ticks
+        while True:
+            await asyncio.sleep(0.01)
+            ticks += 1
+
+    ticker = asyncio.create_task(tick())
+    await repo.render_prompt("chat_query_planning", question="q")
+    ticker.cancel()
+
+    assert ticks >= 5
 
 
 async def test_yaml_repository_reads_the_bundled_prompts_by_default():

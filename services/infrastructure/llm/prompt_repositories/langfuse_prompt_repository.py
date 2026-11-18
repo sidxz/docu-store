@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import structlog
 
 from infrastructure.llm.prompt_repositories.bundled_prompts import bundled_prompts
@@ -51,19 +53,20 @@ class LangfusePromptRepository:
         client = self._get_client()
         try:
             # A missing prompt or an unreachable Langfuse renders the bundled prompt.
-            # ponytail: the SDK does not cache a fallback, so while Langfuse is down
-            # every render re-tries the fetch first (about a second); cache the
-            # outage if that latency ever matters.
-            kwargs: dict = {
-                "name": name,
-                "label": "latest",
-                "fallback": bundled_prompts().get(name),
-            }
+            fallback = bundled_prompts().get(name)
+            kwargs: dict = {"name": name, "label": "latest", "fallback": fallback}
+            if fallback is not None:
+                # One attempt is enough when there is something to fall back to.
+                # ponytail: the SDK does not cache a fallback, so while Langfuse is down
+                # every render still pays that one attempt (instant when refused, the
+                # fetch timeout when it hangs); remember the outage if that ever matters.
+                kwargs["max_retries"] = 0
             if version is not None:
                 kwargs["version"] = int(version)
                 del kwargs["label"]  # version takes precedence over label
 
-            lf_prompt = client.get_prompt(**kwargs)
+            # In a thread: the SDK call blocks for as long as Langfuse takes to answer.
+            lf_prompt = await asyncio.to_thread(client.get_prompt, **kwargs)
             rendered = lf_prompt.compile(**variables)
 
             log.debug(
