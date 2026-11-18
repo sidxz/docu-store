@@ -5,11 +5,12 @@ Changes to the API, workers and web portal. The CLI keeps its own log in [cli/CH
 ## [Unreleased]
 
 ### Added
-- The API publishes the release's bundled prompts to Langfuse when it starts, in the background. A new Langfuse version is created only when a bundled prompt changed, so restarts add nothing, and a deployment no longer seeds prompts from outside. It uses the existing `LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`.
-- A prompt edited in the Langfuse UI stays in use until a release ships a changed version of that same prompt. The release's version then takes over, and the edit stays in the prompt's history. The version the app last published carries the `bundled` label.
+- The API publishes the release's bundled prompts to Langfuse when it starts, in the background. A new Langfuse version is created only when a bundled prompt changed, so restarts add nothing. It uses the existing `LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`. When upgrading, remove any step that seeds prompts into Langfuse from outside: a version written from outside after the app's own counts as an edit and stays in use.
+- A prompt edited in the Langfuse UI stays in use until a release ships a changed version of that same prompt. The release's version then takes over, and the edit stays in the prompt's history. The version the app last published carries the `bundled` label. The first start after upgrading is the exception: nothing carries the label yet, so a prompt whose current Langfuse version differs from the bundled one is replaced by the bundled one.
 
 ### Fixed
 - A prompt missing from Langfuse, or an unreachable Langfuse, no longer fails the LLM call. The bundled prompt is used instead.
+- Fetching a prompt no longer blocks the event loop while Langfuse is slow to answer.
 - `PROMPT_REPOSITORY_TYPE=yaml` finds the bundled prompts. It looked in a folder that does not exist.
 
 ### Removed
