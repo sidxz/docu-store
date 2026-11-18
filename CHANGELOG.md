@@ -4,6 +4,10 @@ Changes to the API, workers and web portal. The CLI keeps its own log in [cli/CH
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-17
+
+Released as `services-v2.1.0`. The web portal stays at `web-v2.0.0`.
+
 ### Added
 - The API publishes the release's bundled prompts to Langfuse when it starts, in the background. A new Langfuse version is created only when a bundled prompt changed, so restarts add nothing. It uses the existing `LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`. When upgrading, remove any step that seeds prompts into Langfuse from outside: a version written from outside after the app's own counts as an edit and stays in use.
 - A prompt edited in the Langfuse UI stays in use until a release ships a changed version of that same prompt. The release's version then takes over, and the edit stays in the prompt's history. The version the app last published carries the `bundled` label. The first start after upgrading is the exception: nothing carries the label yet, so a prompt whose current Langfuse version differs from the bundled one is replaced by the bundled one.
