@@ -1,5 +1,6 @@
 """Main FastAPI application."""
 
+import asyncio
 import contextlib
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -10,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from infrastructure.auth import duar, register_service_actions
 from infrastructure.config import settings
+from infrastructure.llm.prompt_repositories.langfuse_prompt_sync import start_bundled_prompt_sync
 from infrastructure.logging import setup_logging
 from interfaces.api.routes.artifact_routes import router as artifact_router
 from interfaces.api.routes.auth_routes import router as auth_router
@@ -41,6 +43,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # Register RBAC action definitions best-effort — never block boot if
         # Duar is slow/down (the SDK ctor-actions path would be fatal).
         await register_service_actions(duar)
+
+        # Publish this release's prompts to Langfuse in the background. Boot never
+        # waits on Langfuse; the sync retries until it answers.
+        prompt_sync_task = start_bundled_prompt_sync(settings)
 
         stale_vectors = 0  # vectors left over from a previous embedding model
 
@@ -163,8 +169,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             # Don't fail startup - embedding features will just be unavailable
 
         # Ensure heartbeat indexes and start API heartbeat reporter
-        import asyncio
-
         from application.dtos.health_dtos import ModelStatus
         from application.ports.worker_heartbeat_store import WorkerHeartbeatStore
         from infrastructure.health.heartbeat_reader import MongoHeartbeatReader
@@ -243,10 +247,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         yield
 
         # Cleanup
-        if heartbeat_task is not None:
-            heartbeat_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await heartbeat_task
+        for task in (heartbeat_task, prompt_sync_task):
+            if task is not None:
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
         logger.info("app_shutting_down")
         logger.info("app_stopped")
 
