@@ -4,6 +4,17 @@ Changes to the API, workers and web portal. The CLI keeps its own log in [cli/CH
 
 ## [Unreleased]
 
+### Added
+- The API publishes the release's bundled prompts to Langfuse when it starts, in the background. A new Langfuse version is created only when a bundled prompt changed, so restarts add nothing, and a deployment no longer seeds prompts from outside. It uses the existing `LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`.
+- A prompt edited in the Langfuse UI stays in use until a release ships a changed version of that same prompt. The release's version then takes over, and the edit stays in the prompt's history. The version the app last published carries the `bundled` label.
+
+### Fixed
+- A prompt missing from Langfuse, or an unreachable Langfuse, no longer fails the LLM call. The bundled prompt is used instead.
+- `PROMPT_REPOSITORY_TYPE=yaml` finds the bundled prompts. It looked in a folder that does not exist.
+
+### Removed
+- `make langfuse-seed` and `scripts/seed_langfuse_prompts.py`. `make docker-up` no longer seeds prompts; the API publishes them on its first start.
+
 ## [2.0.0] - 2026-11-17
 
 Released as `services-v2.0.0` and `web-v2.0.0`.
