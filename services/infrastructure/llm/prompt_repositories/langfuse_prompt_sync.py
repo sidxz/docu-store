@@ -14,6 +14,7 @@ published again only when the bundled template differs from that version, so:
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import structlog
@@ -88,3 +89,48 @@ def _get(client: Any, name: str, label: str) -> Any | None:
         return client.api.prompts.get(name, label=label)
     except NotFoundError:
         return None
+
+
+def start_bundled_prompt_sync(settings: Any) -> asyncio.Task[None] | None:
+    """Start the sync in the background; None when Langfuse is not the prompt store.
+
+    Call from the one process that owns the sync (the API). Starting it in several
+    is harmless: racing syncs can only add duplicate identical versions.
+    """
+    if settings.prompt_repository_type != "langfuse":
+        return None
+    if not (settings.langfuse_public_key and settings.langfuse_secret_key):
+        return None
+    return asyncio.create_task(keep_syncing_bundled_prompts(settings))
+
+
+async def keep_syncing_bundled_prompts(settings: Any, retry_seconds: float = 60) -> None:
+    """Sync once, retrying until Langfuse takes it. Raises nothing but cancellation."""
+    from infrastructure.health.gpu_info import _get_app_version
+
+    release = _get_app_version()
+    while True:
+        try:
+            result = await asyncio.to_thread(sync_bundled_prompts, _client(settings), release)
+        except Exception as exc:  # Langfuse down or misconfigured: the app runs on its fallback
+            log.warning("langfuse_prompt_sync.failed", error=str(exc), retry_seconds=retry_seconds)
+            await asyncio.sleep(retry_seconds)
+        else:
+            log.info(
+                "langfuse_prompt_sync.done",
+                release=release,
+                created=result["created"],
+                adopted=result["adopted"],
+                unchanged=len(result["unchanged"]),
+            )
+            return
+
+
+def _client(settings: Any) -> Any:
+    from langfuse import Langfuse
+
+    return Langfuse(
+        host=settings.langfuse_host,
+        public_key=settings.langfuse_public_key,
+        secret_key=settings.langfuse_secret_key,
+    )

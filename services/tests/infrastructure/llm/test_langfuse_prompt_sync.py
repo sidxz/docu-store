@@ -8,7 +8,12 @@ import pytest
 import structlog
 from langfuse.api import NotFoundError
 
-from infrastructure.llm.prompt_repositories.langfuse_prompt_sync import sync_bundled_prompts
+from infrastructure.llm.prompt_repositories import langfuse_prompt_sync as sync_module
+from infrastructure.llm.prompt_repositories.langfuse_prompt_sync import (
+    keep_syncing_bundled_prompts,
+    start_bundled_prompt_sync,
+    sync_bundled_prompts,
+)
 
 
 class FakeLangfuse:
@@ -158,3 +163,51 @@ def test_unreachable_raises(fake):
 
     with pytest.raises(RuntimeError, match="langfuse down"):
         sync_bundled_prompts(fake, "2.1.0", {"a": "A"})
+
+
+async def test_retries_until_sync_succeeds(monkeypatch):
+    calls = []
+
+    def flaky(client, release, prompts=None):
+        calls.append(release)
+        if len(calls) < 3:
+            msg = "langfuse down"
+            raise RuntimeError(msg)
+        return {"created": [], "adopted": [], "unchanged": []}
+
+    monkeypatch.setattr(sync_module, "sync_bundled_prompts", flaky)
+    monkeypatch.setattr(sync_module, "_client", lambda settings: object())
+
+    await keep_syncing_bundled_prompts(SimpleNamespace(), retry_seconds=0)
+
+    assert len(calls) == 3
+
+
+def _settings(
+    repo_type: str = "langfuse", public_key: str | None = "pk", secret_key: str | None = "sk"
+):
+    return SimpleNamespace(
+        prompt_repository_type=repo_type,
+        langfuse_host="http://unused",
+        langfuse_public_key=public_key,
+        langfuse_secret_key=secret_key,
+    )
+
+
+async def test_sync_is_not_started_without_langfuse():
+    assert start_bundled_prompt_sync(_settings(repo_type="yaml")) is None
+    assert start_bundled_prompt_sync(_settings(public_key=None, secret_key=None)) is None
+
+
+async def test_sync_starts_in_the_background_when_langfuse_is_configured(monkeypatch):
+    seen = []
+
+    async def record(settings, retry_seconds=60):
+        seen.append(settings)
+
+    monkeypatch.setattr(sync_module, "keep_syncing_bundled_prompts", record)
+    settings = _settings()
+
+    await start_bundled_prompt_sync(settings)
+
+    assert seen == [settings]
