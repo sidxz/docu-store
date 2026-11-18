@@ -7,6 +7,7 @@ import time
 from types import SimpleNamespace
 
 import pytest
+import yaml
 
 from infrastructure.llm.prompt_repositories.bundled_prompts import (
     DEFAULT_PROMPTS_DIR,
@@ -19,9 +20,9 @@ from infrastructure.llm.prompt_repositories.langfuse_prompt_repository import (
 
 
 def test_load_converts_placeholders_and_strips_trailing_whitespace(tmp_path):
-    (tmp_path / "p.yaml").write_text('name: p\ntemplate: |\n  Q: {question}\n  {{"a": 1}}\n\n')
+    (tmp_path / "p.yaml").write_text('name: p\ntemplate: |\n  Q: {question}\n  {{"a": {{}}}}\n\n')
 
-    assert load_bundled_prompts(tmp_path) == {"p": 'Q: {{question}}\n{{"a": 1}}'}
+    assert load_bundled_prompts(tmp_path) == {"p": 'Q: {{question}}\n{"a": {}}'}
 
 
 def test_every_bundled_file_loads():
@@ -29,6 +30,20 @@ def test_every_bundled_file_loads():
 
     assert set(prompts) == {p.stem for p in DEFAULT_PROMPTS_DIR.glob("*.yaml")}
     assert "{{question}}" in prompts["chat_query_planning"]
+
+
+def test_langfuse_compiles_each_bundled_prompt_like_the_yaml_repository():
+    """Python's ``{{`` escapes must reach the model as ``{``, on both paths."""
+    from langfuse.model import TemplateParser
+
+    for path in DEFAULT_PROMPTS_DIR.glob("*.yaml"):
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        variables = {v: f"<{v}>" for v in data.get("input_variables", [])}
+
+        expected = data["template"].rstrip().format_map(variables)
+        compiled = TemplateParser.compile_template(bundled_prompts()[data["name"]], variables)
+
+        assert compiled == expected, data["name"]
 
 
 class _StubClient:

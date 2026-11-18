@@ -4,6 +4,14 @@ Changes to the API, workers and web portal. The CLI keeps its own log in [cli/CH
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-11-17
+
+Released as `services-v2.1.1`. The web portal stays at `web-v2.0.0`.
+
+### Fixed
+- Prompts served from Langfuse reach the model with single braces. The JSON examples in `chat_query_planning`, `chat_question_analysis` and `chat_grounding_verification` arrived as `{{ … }}`. On the first start, the API publishes corrected versions of these prompts, which replace any edit made to them in the Langfuse UI. The edit stays in each prompt's history.
+- Query planning and question analysis write their search queries in the language of the question. The model sometimes mixed in words from another language.
+
 ## [2.1.0] - 2026-11-17
 
 Released as `services-v2.1.0`. The web portal stays at `web-v2.0.0`.
