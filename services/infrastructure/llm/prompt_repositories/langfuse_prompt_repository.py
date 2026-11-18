@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import structlog
 
+from infrastructure.llm.prompt_repositories.bundled_prompts import bundled_prompts
+
 log = structlog.get_logger(__name__)
 
 
@@ -48,7 +50,15 @@ class LangfusePromptRepository:
     ) -> str:
         client = self._get_client()
         try:
-            kwargs: dict = {"name": name, "label": "latest"}
+            # A missing prompt or an unreachable Langfuse renders the bundled prompt.
+            # ponytail: the SDK does not cache a fallback, so while Langfuse is down
+            # every render re-tries the fetch first; cache the outage if that
+            # latency ever matters.
+            kwargs: dict = {
+                "name": name,
+                "label": "latest",
+                "fallback": bundled_prompts().get(name),
+            }
             if version is not None:
                 kwargs["version"] = int(version)
                 del kwargs["label"]  # version takes precedence over label

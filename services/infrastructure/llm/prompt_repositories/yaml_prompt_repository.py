@@ -5,9 +5,9 @@ from pathlib import Path
 import structlog
 import yaml
 
-log = structlog.get_logger(__name__)
+from infrastructure.llm.prompt_repositories.bundled_prompts import DEFAULT_PROMPTS_DIR
 
-_DEFAULT_PROMPTS_DIR = Path(__file__).resolve().parents[2] / "default_prompts"
+log = structlog.get_logger(__name__)
 
 
 class YamlPromptRepository:
@@ -20,7 +20,7 @@ class YamlPromptRepository:
     The `version` parameter is ignored — the file on disk is always returned.
     """
 
-    def __init__(self, prompts_dir: Path = _DEFAULT_PROMPTS_DIR) -> None:
+    def __init__(self, prompts_dir: Path = DEFAULT_PROMPTS_DIR) -> None:
         self._dir = prompts_dir
         self._cache: dict[str, str] = {}  # name → raw template string
 
