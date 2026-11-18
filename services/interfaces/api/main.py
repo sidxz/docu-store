@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from infrastructure.auth import duar, register_service_actions
 from infrastructure.config import settings
+from infrastructure.llm.prompt_repositories.langfuse_prompt_sync import start_bundled_prompt_sync
 from infrastructure.logging import setup_logging
 from interfaces.api.routes.artifact_routes import router as artifact_router
 from interfaces.api.routes.auth_routes import router as auth_router
@@ -45,10 +46,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         # Publish this release's prompts to Langfuse in the background. Boot never
         # waits on Langfuse; the sync retries until it answers.
-        from infrastructure.llm.prompt_repositories.langfuse_prompt_sync import (
-            start_bundled_prompt_sync,
-        )
-
         prompt_sync_task = start_bundled_prompt_sync(settings)
 
         stale_vectors = 0  # vectors left over from a previous embedding model

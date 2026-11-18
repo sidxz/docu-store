@@ -211,3 +211,34 @@ async def test_sync_starts_in_the_background_when_langfuse_is_configured(monkeyp
     await start_bundled_prompt_sync(settings)
 
     assert seen == [settings]
+
+
+async def test_start_never_raises(monkeypatch):
+    assert start_bundled_prompt_sync(SimpleNamespace()) is None  # settings without the fields
+
+
+async def test_a_failing_version_lookup_is_retried_like_any_other_failure(monkeypatch):
+    from infrastructure.health import gpu_info
+
+    lookups = []
+
+    def version() -> str:
+        lookups.append(1)
+        if len(lookups) == 1:
+            msg = "pyproject unreadable"
+            raise OSError(msg)
+        return "2.1.0"
+
+    seen = []
+    monkeypatch.setattr(gpu_info, "_get_app_version", version)
+    monkeypatch.setattr(sync_module, "_client", lambda settings: object())
+    monkeypatch.setattr(
+        sync_module,
+        "sync_bundled_prompts",
+        lambda client, release, prompts=None: seen.append(release)
+        or {"created": [], "adopted": [], "unchanged": []},
+    )
+
+    await keep_syncing_bundled_prompts(_settings(), retry_seconds=0)
+
+    assert seen == ["2.1.0"]
